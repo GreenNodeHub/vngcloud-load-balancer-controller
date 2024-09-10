@@ -63,7 +63,8 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: controller:latest
+        image: vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.0
+        imagePullPolicy: Always
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

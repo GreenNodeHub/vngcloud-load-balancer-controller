@@ -17,16 +17,254 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("Ingress Controller", func() {
-	Context("When reconciling a resource", func() {
+	Context("When update status", func() {
+		It("should not reconcile", func() {
+			countReconcile := 0
+			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+				countReconcile++
+				klog.Info("Reconcile Ingress: ", req)
+				klog.Info("Done: ", req)
+				return ctrl.Result{}, nil
+			}
+			mockIngressReconciler.ensureTest = funcTest
+			mockIngressReconciler.deleteTest = funcTest
+			ingress := newIngressResource("test-ingress", "default")
+			Expect(ingress).NotTo(BeNil())
+			Expect(ingress.Name).To(Equal("test-ingress"))
+			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
-		It("should successfully reconcile the resource", func() {
+			// update status
+			ingress = &networkingv1.Ingress{}
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)).Should(Succeed())
 
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: "10.0.0.1"}}
+			Expect(k8sClient.Status().Update(ctx, ingress)).Should(Succeed())
+
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)).Should(Succeed())
+				return ingress != nil &&
+					len(ingress.Status.LoadBalancer.Ingress) > 0 &&
+					ingress.Status.LoadBalancer.Ingress[0].IP == "10.0.0.1"
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				return countReconcile == 1
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				return countReconcile == 2
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
+
+	Context("When update status inside reconcile", func() {
+		It("should not reconcile", func() {
+			countReconcile := 0
+			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+				countReconcile++
+				klog.Info("Reconcile Ingress: ", req)
+
+				// update status
+				ingress := &networkingv1.Ingress{}
+				k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)
+
+				ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: "10.0.0.1"}}
+				k8sClient.Status().Update(ctx, ingress)
+				klog.Info("Done: ", req)
+				return ctrl.Result{}, nil
+			}
+			mockIngressReconciler.ensureTest = funcTest
+			mockIngressReconciler.deleteTest = funcTest
+
+			ingress := newIngressResource("test-ingress", "default")
+			Expect(ingress).NotTo(BeNil())
+			Expect(ingress.Name).To(Equal("test-ingress"))
+			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
+
+			Eventually(func() bool {
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)).Should(Succeed())
+				return ingress != nil &&
+					len(ingress.Status.LoadBalancer.Ingress) > 0 &&
+					ingress.Status.LoadBalancer.Ingress[0].IP == "10.0.0.1"
+			}, timeout, interval).Should(BeTrue())
+
+			Eventually(func() bool {
+				return countReconcile == 1
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				return countReconcile == 2
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	Context("When update annotaion", func() {
+		It("should reconcile immediately", func() {
+			countReconcile := 0
+			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+				countReconcile++
+				klog.Info("Reconcile Ingress: ", req)
+				klog.Info("Done: ", req)
+				return ctrl.Result{}, nil
+			}
+			mockIngressReconciler.ensureTest = funcTest
+			mockIngressReconciler.deleteTest = funcTest
+
+			ingress := newIngressResource("test-ingress", "default")
+			Expect(ingress).NotTo(BeNil())
+			Expect(ingress.Name).To(Equal("test-ingress"))
+			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				return countReconcile == 1
+			}, timeout, interval).Should(BeTrue())
+
+			updateIngressAnnotation("test-ingress", "default", "test", "test")
+			Eventually(func() bool {
+				return countReconcile == 2
+			}, timeout, interval).Should(BeTrue())
+
+			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				return countReconcile == 3
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	Context("When update annotation in whitelist annotation", func() {
+		It("should not reconcile", func() {
+			countReconcile := 0
+			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+				countReconcile++
+				klog.Info("Reconcile Ingress: ", req)
+				klog.Info("Done: ", req)
+				return ctrl.Result{}, nil
+			}
+			mockIngressReconciler.ensureTest = funcTest
+			mockIngressReconciler.deleteTest = funcTest
+
+			ingress := newIngressResource("test-ingress", "default")
+			Expect(ingress).NotTo(BeNil())
+			Expect(ingress.Name).To(Equal("test-ingress"))
+			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				return countReconcile == 1
+			}, timeout, interval).Should(BeTrue())
+
+			updateIngressAnnotation("test-ingress", "default", "example.com/whitelist-annotation-1", "test")
+			Eventually(func() int {
+				return countReconcile
+			}, timeout, interval).Should(Equal(1))
+
+			updateIngressAnnotation("test-ingress", "default", "example.com/blacklist-annotation-1", "test")
+			Eventually(func() int {
+				return countReconcile
+			}, timeout, interval).Should(Equal(2))
+
+			updateIngressAnnotation("test-ingress", "default", "example.com/whitelist-annotation-1", "-")
+			Eventually(func() int {
+				return countReconcile
+			}, timeout, interval).Should(Equal(2))
+
+			updateIngressAnnotation("test-ingress", "default", "example.com/blacklist-annotation-1", "-")
+			Eventually(func() int {
+				return countReconcile
+			}, timeout, interval).Should(Equal(3))
+
+			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, ingress)
+				return err != nil
+			}, timeout, interval).Should(BeTrue())
+			Eventually(func() bool {
+				return countReconcile == 4
+			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	// Context("aaaaaaaaaaaaaaaa", func() {
+	// 	It("aaaaaaaaaaaaaaaaaaaaaa", func() {
+	// 	})
+	// })
+
+	// Context("aaaaaaaaaaaaaaaa", func() {
+	// 	It("aaaaaaaaaaaaaaaaaaaaaa", func() {
+	// 	})
+	// })
 })
+
+func newIngressResource(name, namespace string) *networkingv1.Ingress {
+	return &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"annd2.space": "test",
+			},
+		},
+		Spec: networkingv1.IngressSpec{
+			IngressClassName: PointerOf("vngcloud"),
+			DefaultBackend: &networkingv1.IngressBackend{
+				Service: &networkingv1.IngressServiceBackend{
+					Name: "kubernetes",
+					Port: networkingv1.ServiceBackendPort{
+						Number: 443,
+					},
+				},
+			},
+		},
+	}
+}
+
+func updateIngressAnnotation(name, namespace, key, value string) {
+	ingress := &networkingv1.Ingress{}
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, ingress)).Should(Succeed())
+	if value == "-" {
+		delete(ingress.Annotations, key)
+	} else {
+		ingress.Annotations[key] = value
+	}
+	Expect(k8sClient.Update(ctx, ingress)).Should(Succeed())
+
+	if value == "-" {
+		Eventually(func() bool {
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, ingress)).Should(Succeed())
+			return ingress != nil && ingress.Annotations[key] == ""
+		}, timeout, interval).Should(BeTrue())
+	} else {
+		Eventually(func() bool {
+			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, ingress)).Should(Succeed())
+			return ingress != nil && ingress.Annotations[key] == value
+		}, timeout, interval).Should(BeTrue())
+	}
+}
+
+func PointerOf[T any](t T) *T {
+	return &t
+}

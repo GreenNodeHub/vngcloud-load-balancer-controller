@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -142,16 +143,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
+
 	if err = (&controller.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
 	if err = (&controller.IngressReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
 		os.Exit(1)

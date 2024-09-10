@@ -1,2 +1,8 @@
 resources:
 - manager.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+images:
+- name: controller
+  newName: vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller
+  newTag: v0.0.0
