@@ -23,12 +23,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +48,7 @@ type ServiceReconciler struct {
 	FinalizerManager k8s.FinalizerManager
 
 	eventClassification *EventClassification
+	annotationParser    annotations.Parser
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -93,6 +95,11 @@ func (r *ServiceReconciler) getObjectByKey(key string) (interface{}, bool) {
 	return resource, true
 }
 
+// getReconcileRequests returns a list of reconcile requests periodically (which LoadBalancer have changed and need to be reconciled)
+func (r *ServiceReconciler) getReconcileRequestsPeriodically() []reconcile.Request {
+	return []reconcile.Request{}
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -104,11 +111,13 @@ func (r *ServiceReconciler) getObjectByKey(key string) (interface{}, bool) {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	ctx = context.WithValue(ctx, LogUtilsName, req.Name)
+	logger := GetLogUtils().LogWithContext(ctx)
 
 	key := genKey(req.Namespace, req.Name)
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
-		klog.Info("Event is nil, return.")
+		logger.Info("Event is nil, return.")
 		return ctrl.Result{}, nil
 	}
 
@@ -131,22 +140,26 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *ServiceReconciler) ensureObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
+	logger := GetLogUtils().LogWithContext(ctx)
+
 	if err := r.FinalizerManager.AddFinalizers(ctx, svc, consts.ServiceFinalizer); err != nil {
 		// r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
 		return ctrl.Result{}, err
 	}
 
-	klog.Info("Reconcile Object ", genKey(svc.Namespace, svc.Name))
+	logger.Info("Reconcile Object ", genKey(svc.Namespace, svc.Name))
 	time.Sleep(3 * time.Second)
-	klog.Info("Done Reconcile Object")
+	logger.Info("Done Reconcile Object")
 	return ctrl.Result{}, nil
 }
 
 func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
+	logger := GetLogUtils().LogWithContext(ctx)
+
 	if k8s.HasFinalizer(svc, consts.ServiceFinalizer) {
-		klog.Info("Delete Object ", genKey(svc.Namespace, svc.Name))
+		logger.Info("Delete Object ", genKey(svc.Namespace, svc.Name))
 		time.Sleep(10 * time.Second)
-		klog.Info("Done Delete Object")
+		logger.Info("Done Delete Object")
 
 		if err := r.FinalizerManager.RemoveFinalizers(ctx, svc, consts.ServiceFinalizer); err != nil {
 			// r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
@@ -160,6 +173,11 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Servic
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
+	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+
+	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
+	ctx := context.Background()
+	periodicReconciler.Start(ctx)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
@@ -183,15 +201,15 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
 						return false
 					}
-					klog.Info("Create Service: ")
+					logrus.Info("Create Service: ")
 					return true
 				case *corev1.Endpoints:
 					return false
 				case *corev1.Node:
-					klog.Info("Create Node: ")
+					logrus.Info("Create Node: ")
 					return true
 				default:
-					klog.Info("object is of an unknown type: ", e.Object)
+					logrus.Info("object is of an unknown type: ", e.Object)
 					return false
 				}
 			},
@@ -206,7 +224,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 
 					if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
-						klog.Info("Service Spec changed")
+						logrus.Info("Service Spec changed")
 						return true
 					}
 
@@ -216,28 +234,28 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						delete(newIngress.Annotations, k)
 					}
 					if !reflect.DeepEqual(oldIngress.Annotations, newIngress.Annotations) {
-						klog.Info("Service Annotations changed")
+						logrus.Info("Service Annotations changed")
 						return true
 					}
 					if !reflect.DeepEqual(oldIngress.DeletionTimestamp.IsZero(), newIngress.DeletionTimestamp.IsZero()) {
-						klog.Info("Service DeletionTimestamp changed")
+						logrus.Info("Service DeletionTimestamp changed")
 						return true
 					}
 					return false
 
 				case *corev1.Endpoints:
-					klog.Info("Update Endpoints: ")
+					logrus.Info("Update Endpoints: ")
 					return true
 				case *corev1.Node:
 					oldIngress := e.ObjectOld.(*corev1.Node)
 					newIngress := e.ObjectNew.(*corev1.Node)
 					if oldIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != newIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] {
-						klog.Info("Node Annotations changed")
+						logrus.Info("Node Annotations changed")
 						return true
 					}
 					return false
 				default:
-					klog.Info("object is of an unknown type: ", e.ObjectNew)
+					logrus.Info("object is of an unknown type: ", e.ObjectNew)
 					return false
 				}
 			},
@@ -247,16 +265,16 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
 						return false
 					}
-					klog.Info("Delete Service: ")
+					logrus.Info("Delete Service: ")
 					return true
 				case *corev1.Endpoints:
-					klog.Info("Delete Endpoints: ")
+					logrus.Info("Delete Endpoints: ")
 					return true
 				case *corev1.Node:
-					klog.Info("Delete Node: ")
+					logrus.Info("Delete Node: ")
 					return true
 				default:
-					klog.Info("object is of an unknown type: ", e.Object)
+					logrus.Info("object is of an unknown type: ", e.Object)
 					return false
 				}
 			},

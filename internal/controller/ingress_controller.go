@@ -21,17 +21,19 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // IngressReconciler reconciles a Ingress object
@@ -41,6 +43,7 @@ type IngressReconciler struct {
 	FinalizerManager k8s.FinalizerManager
 
 	eventClassification *EventClassification
+	annotationParser    annotations.Parser
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -75,6 +78,11 @@ func (r *IngressReconciler) getObjectByKey(key string) (interface{}, bool) {
 	return resource, true
 }
 
+// getReconcileRequests returns a list of reconcile requests periodically (which LoadBalancer have changed and need to be reconciled)
+func (r *IngressReconciler) getReconcileRequestsPeriodically() []reconcile.Request {
+	return []reconcile.Request{}
+}
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
@@ -86,11 +94,13 @@ func (r *IngressReconciler) getObjectByKey(key string) (interface{}, bool) {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	ctx = context.WithValue(ctx, LogUtilsName, req.Name)
+	logger := GetLogUtils().LogWithContext(ctx)
 
 	key := genKey(req.Namespace, req.Name)
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
-		klog.Info("Event is nil, return.")
+		logger.Info("Event is nil, return.")
 		return ctrl.Result{}, nil
 	}
 
@@ -113,21 +123,25 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *IngressReconciler) ensureObject(ctx context.Context, ingress *networkingv1.Ingress) (ctrl.Result, error) {
+	logger := GetLogUtils().LogWithContext(ctx)
+
 	if err := r.FinalizerManager.AddFinalizers(ctx, ingress, consts.IngressFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	klog.Info("Reconcile Object ", genKey(ingress.Namespace, ingress.Name))
+	logger.Info("Reconcile Object ", genKey(ingress.Namespace, ingress.Name))
 	time.Sleep(3 * time.Second)
-	klog.Info("Done Reconcile Object")
+	logger.Info("Done Reconcile Object")
 	return ctrl.Result{}, nil
 }
 
 func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkingv1.Ingress) (ctrl.Result, error) {
+	logger := GetLogUtils().LogWithContext(ctx)
+
 	if k8s.HasFinalizer(ingress, consts.IngressFinalizer) {
-		klog.Info("Delete Object ", genKey(ingress.Namespace, ingress.Name))
+		logger.Info("Delete Object ", genKey(ingress.Namespace, ingress.Name))
 		time.Sleep(10 * time.Second)
-		klog.Info("Done Delete Object")
+		logger.Info("Done Delete Object")
 
 		if err := r.FinalizerManager.RemoveFinalizers(ctx, ingress, consts.IngressFinalizer); err != nil {
 			return ctrl.Result{}, err
@@ -140,6 +154,11 @@ func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkin
 // SetupWithManager sets up the controller with the Manager.
 func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
+	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
+
+	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
+	ctx := context.Background()
+	periodicReconciler.Start(ctx)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1.Ingress{}).
@@ -167,7 +186,7 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 
 				if !reflect.DeepEqual(oldIngress.DeletionTimestamp.IsZero(), newIngress.DeletionTimestamp.IsZero()) {
-					klog.Info("Service DeletionTimestamp changed")
+					logrus.Info("Service DeletionTimestamp changed")
 					return true
 				}
 

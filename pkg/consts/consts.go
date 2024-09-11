@@ -14,4 +14,7 @@ const (
 
 	ServiceFinalizer = "service.vngcloud.vn/resources"
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
+
+	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
+	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 )

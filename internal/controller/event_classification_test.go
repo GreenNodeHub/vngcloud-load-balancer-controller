@@ -41,55 +41,49 @@ func TestEventClassification_Classify(t *testing.T) {
 
 	// Test CreateEvent: cache is empty, resource exists
 	event := ec.Classify("resource1")
-	if event.Type != CreateEvent || event.Obj != "obj1" {
-		t.Errorf("Expected CreateEvent for resource1, got %v", event.Type)
+	if event == nil || event.Type != CreateEvent || event.Obj != "obj1" {
+		t.Errorf("Expected CreateEvent for resource1, got %v", event)
 	}
 
-	// Test UpdateEvent: object changed in cache to valid
+	// Test SyncEvent: object changed in cache to valid
 	mockData["resource1"] = "obj1-updated-valid"
 	event = ec.Classify("resource1")
-	if event.Type != UpdateEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected UpdateEvent for resource1, got %v", event.Type)
+	if event == nil || event.Type != SyncEvent || event.Obj != "obj1-updated-valid" {
+		t.Errorf("Expected SyncEvent for resource1, got %v", event)
 	}
 
-	// Test UpdateEvent: object changed in cache to invalid
+	// Test DeleteEvent: object changed in cache to invalid
 	mockData["resource1"] = "obj1-updated-invalid"
 	event = ec.Classify("resource1")
-	if event.Type != DeleteEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected DeleteEvent for resource1, got %v", event.Type)
+	if event == nil || event.Type != DeleteEvent || event.Obj != "obj1-updated-valid" {
+		t.Errorf("Expected DeleteEvent for resource1, got %v", event)
 	}
 
 	// Test UpdateEvent: object changed in cache to valid
 	mockData["resource1"] = "obj1-updated-valid"
 	event = ec.Classify("resource1")
-	if event.Type != CreateEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected CreateEvent for resource1, got %v", event.Type)
+	if event == nil || event.Type != CreateEvent || event.Obj != "obj1-updated-valid" {
+		t.Errorf("Expected CreateEvent for resource1, got %v", event)
 	}
 
 	// Test DeleteEvent: resource was removed from external data
 	delete(mockData, "resource1")
 	event = ec.Classify("resource1")
 	if event == nil || event.Type != DeleteEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected DeleteEvent for resource1, got %v", event.Type)
+		t.Errorf("Expected DeleteEvent for resource1, got %v", event)
 	}
 
-	// Test CreateEvent: new object with invalid state
+	// Test nil: new object with invalid state
 	mockData["resource3"] = "obj3"
 	event = ec.Classify("resource3")
-	if event.Type != CreateEvent || event.Obj != "obj3" {
-		t.Errorf("Expected CreateEvent for resource3, got %v", event.Type)
-	}
-
-	// Test DeleteEvent: invalid object should cause delete event
-	event = ec.Classify("resource3")
-	if event.Type != DeleteEvent || event.Obj != "obj3" {
-		t.Errorf("Expected DeleteEvent for invalid obj3, got %v", event.Type)
+	if event != nil {
+		t.Errorf("Expected nil for resource3, got %v", event)
 	}
 
 	// Test nil: no event triggered for an unknown resource
 	event = ec.Classify("unknown")
 	if event != nil {
-		t.Errorf("Expected nil for unknown resource, got %v", event.Type)
+		t.Errorf("Expected nil for unknown resource, got %v", event)
 	}
 }
 
@@ -175,7 +169,7 @@ func TestEventClassification_Classify2(t *testing.T) {
 
 			event := ec.Classify(tt.key)
 
-			if event.Type != tt.expectedType {
+			if event == nil || event.Type != tt.expectedType {
 				t.Errorf("expected event type %v, got %v", tt.expectedType, event.Type)
 			}
 

@@ -20,6 +20,9 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"path"
+	runtime2 "runtime"
+	"strconv"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -35,6 +38,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	// +kubebuilder:scaffold:imports
@@ -49,6 +53,16 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
+
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp: true,
+		CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
+			fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
+			//return frame.Function, fileName
+			return "", fileName
+		},
+	})
 }
 
 func main() {

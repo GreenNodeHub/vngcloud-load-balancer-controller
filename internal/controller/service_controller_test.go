@@ -180,7 +180,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func() bool {
 				klog.Info("countReconcile: ", countReconcile, " countReconcileDelete: ", countReconcileDelete)
 				return countReconcile == 1 && countReconcileDelete == 0
-			}, timeout, interval).Should(Equal(true))
+			}, timeout, interval).Should(BeTrue())
 
 			// when update a service LoadBalancer type to the other type, the controller will reconcile it as a delete event
 			service = &corev1.Service{}
@@ -189,7 +189,7 @@ var _ = Describe("Service Controller", func() {
 			Expect(k8sClient.Update(ctx, service)).Should(Succeed())
 			Eventually(func() bool {
 				return countReconcile == 1 && countReconcileDelete == 1
-			}, timeout, interval).Should(Equal(true))
+			}, timeout, interval).Should(BeTrue())
 
 			// when update a service not LoadBalancer type, the controller will not reconcile it
 			service = &corev1.Service{}
@@ -198,7 +198,7 @@ var _ = Describe("Service Controller", func() {
 			Expect(k8sClient.Update(ctx, service)).Should(Succeed())
 			Eventually(func() bool {
 				return countReconcile == 1 && countReconcileDelete == 1
-			}, timeout, interval).Should(Equal(true))
+			}, timeout, interval).Should(BeTrue())
 
 			// when update a service to LoadBalancer type, the controller will reconcile it as a create event
 			service = &corev1.Service{}
@@ -207,7 +207,7 @@ var _ = Describe("Service Controller", func() {
 			Expect(k8sClient.Update(ctx, service)).Should(Succeed())
 			Eventually(func() bool {
 				return countReconcile == 2 && countReconcileDelete == 1
-			}, timeout, interval).Should(Equal(true))
+			}, timeout, interval).Should(BeTrue())
 
 			// when delete a service LoadBalancer type, the controller will not reconcile it
 			service = &corev1.Service{}
@@ -215,7 +215,7 @@ var _ = Describe("Service Controller", func() {
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
 			Eventually(func() bool {
 				return countReconcile == 2 && countReconcileDelete == 2
-			}, timeout, interval).Should(Equal(true))
+			}, timeout, interval).Should(BeTrue())
 		})
 	})
 

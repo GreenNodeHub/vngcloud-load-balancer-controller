@@ -1,12 +1,14 @@
 package controller
 
-import "k8s.io/klog/v2"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 type EventType string
 
 const (
 	CreateEvent EventType = "CREATE"
-	UpdateEvent EventType = "UPDATE"
+	// UpdateEvent EventType = "UPDATE"
 	DeleteEvent EventType = "DELETE"
 	SyncEvent   EventType = "SYNC"
 )
@@ -37,10 +39,10 @@ func (ec *EventClassification) Classify(key string) *Event {
 
 	objGetValid, objCacheValid := ec.isValid(objGet), ec.isValid(objCache)
 
-	klog.Infof("okGet: %v, objGetValid: %v", okGet, objGetValid)
-	klog.Infof("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
+	logrus.Infof("okGet: %v, objGetValid: %v", okGet, objGetValid)
+	logrus.Infof("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
 
-	if okCache && !okGet && objCacheValid {
+	if okCache && !okGet {
 		delete(ec.cache, key)
 		return &Event{
 			Type: DeleteEvent,
@@ -48,7 +50,10 @@ func (ec *EventClassification) Classify(key string) *Event {
 		}
 	}
 
-	if !okCache && okGet && objGetValid {
+	if !okCache && okGet {
+		if !objGetValid {
+			return nil
+		}
 		ec.cache[key] = objGet
 		return &Event{
 			Type: CreateEvent,
@@ -82,6 +87,7 @@ func (ec *EventClassification) Classify(key string) *Event {
 		}
 	}
 
+	ec.cache[key] = objGet
 	return &Event{
 		Type: SyncEvent,
 		Obj:  objGet,
