@@ -18,9 +18,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -49,10 +47,14 @@ type ServiceReconciler struct {
 
 	eventClassification *EventClassification
 	annotationParser    annotations.Parser
+	resourceDependant   ResourceDependant
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+
+	// at the first time, we should ignore event create Node
+	isShouldReconcile bool
 }
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -64,13 +66,6 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=endpoints/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
-func genKey(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
-func revertKey(key string) (string, string) {
-	split := strings.Split(key, "/")
-	return split[0], split[1]
-}
 func (r *ServiceReconciler) isValid(obj interface{}) bool {
 	object, ok := obj.(*corev1.Service)
 	if !ok {
@@ -150,11 +145,14 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, svc *corev1.Servic
 	logger.Info("Reconcile Object ", genKey(svc.Namespace, svc.Name))
 	time.Sleep(3 * time.Second)
 	logger.Info("Done Reconcile Object")
+
+	r.resourceDependant.SetService(svc, true)
 	return ctrl.Result{}, nil
 }
 
 func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
 	logger := GetLogUtils().LogWithContext(ctx)
+	r.resourceDependant.ClearService(svc.Namespace, svc.Name)
 
 	if k8s.HasFinalizer(svc, consts.ServiceFinalizer) {
 		logger.Info("Delete Object ", genKey(svc.Namespace, svc.Name))
@@ -174,6 +172,7 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Servic
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+	r.resourceDependant = NewResourceDependant(r.Client)
 
 	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
 	ctx := context.Background()
@@ -183,12 +182,35 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&corev1.Service{}).
 		Watches(
 			&corev1.Endpoints{},
-			handler.EnqueueRequestsFromMapFunc(r.findServiceForEndpoints),
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
+				return r.resourceDependant.GetServiceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+			}),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Watches(
 			&corev1.Node{},
-			handler.EnqueueRequestsFromMapFunc(r.findServiceForNode),
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+				// list all services with type LoadBalancer
+				services := &corev1.ServiceList{}
+				err := r.List(ctx, services)
+				if err != nil {
+					return []reconcile.Request{}
+				}
+
+				// filter services with type LoadBalancer
+				requests := make([]reconcile.Request, 0)
+				for _, service := range services.Items {
+					if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      service.GetName(),
+								Namespace: service.GetNamespace(),
+							},
+						})
+					}
+				}
+				return requests
+			}),
 			builder.WithPredicates(predicate.AnnotationChangedPredicate{}),
 		).
 		WithOptions(controller.Options{
@@ -206,10 +228,14 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				case *corev1.Endpoints:
 					return false
 				case *corev1.Node:
+					if !r.isShouldReconcile {
+						r.isShouldReconcile = true
+						return false
+					}
 					logrus.Info("Create Node: ")
 					return true
 				default:
-					logrus.Info("object is of an unknown type: ", e.Object)
+					logrus.Warn("object is of an unknown type: ", e.Object)
 					return false
 				}
 			},
@@ -255,7 +281,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					return false
 				default:
-					logrus.Info("object is of an unknown type: ", e.ObjectNew)
+					logrus.Warn("object is of an unknown type: ", e.ObjectNew)
 					return false
 				}
 			},
@@ -274,57 +300,10 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					logrus.Info("Delete Node: ")
 					return true
 				default:
-					logrus.Info("object is of an unknown type: ", e.Object)
+					logrus.Warn("object is of an unknown type: ", e.Object)
 					return false
 				}
 			},
 		}).
 		Complete(r)
-}
-
-func (r *ServiceReconciler) findServiceForEndpoints(ctx context.Context, endpoint client.Object) []reconcile.Request {
-	serviceSelect := &corev1.Service{}
-	err := r.Get(ctx, client.ObjectKey{Name: endpoint.GetName(), Namespace: endpoint.GetNamespace()}, serviceSelect)
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	if serviceSelect.Spec.Type != corev1.ServiceTypeLoadBalancer {
-		return []reconcile.Request{}
-	}
-
-	return []reconcile.Request{{
-		NamespacedName: types.NamespacedName{
-			Name:      serviceSelect.GetName(),
-			Namespace: serviceSelect.GetNamespace(),
-		},
-	}}
-}
-
-func (r *ServiceReconciler) findServiceForNode(ctx context.Context, _ client.Object) []reconcile.Request {
-	// list all services
-	services := &corev1.ServiceList{}
-	err := r.List(ctx, services)
-	if err != nil {
-		return []reconcile.Request{}
-	}
-
-	// filter services with type LoadBalancer
-	var loadBalancerServices []corev1.Service
-	for _, service := range services.Items {
-		if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
-			loadBalancerServices = append(loadBalancerServices, service)
-		}
-	}
-
-	// create requests for all load balancer services
-	requests := make([]reconcile.Request, len(loadBalancerServices))
-	for i, service := range loadBalancerServices {
-		requests[i] = reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: service.GetName(),
-			},
-		}
-	}
-	return requests
 }

@@ -25,12 +25,16 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -44,10 +48,14 @@ type IngressReconciler struct {
 
 	eventClassification *EventClassification
 	annotationParser    annotations.Parser
+	resourceDependant   ResourceDependant
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
+
+	// at the first time, we should ignore event create Node
+	isShouldReconcile bool
 }
 
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
@@ -132,11 +140,14 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, ingress *networkin
 	logger.Info("Reconcile Object ", genKey(ingress.Namespace, ingress.Name))
 	time.Sleep(3 * time.Second)
 	logger.Info("Done Reconcile Object")
+
+	r.resourceDependant.SetIngress(ingress, true)
 	return ctrl.Result{}, nil
 }
 
 func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkingv1.Ingress) (ctrl.Result, error) {
 	logger := GetLogUtils().LogWithContext(ctx)
+	r.resourceDependant.ClearIngress(ingress.Namespace, ingress.Name)
 
 	if k8s.HasFinalizer(ingress, consts.IngressFinalizer) {
 		logger.Info("Delete Object ", genKey(ingress.Namespace, ingress.Name))
@@ -155,6 +166,7 @@ func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkin
 func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
+	r.resourceDependant = NewResourceDependant(r.Client)
 
 	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
 	ctx := context.Background()
@@ -162,38 +174,147 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1.Ingress{}).
+		Watches(
+			&corev1.Endpoints{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
+				return r.resourceDependant.GetIngressNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+			}),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, service client.Object) []reconcile.Request {
+				return r.resourceDependant.GetIngressNeedReconcile("service", service.GetNamespace(), service.GetName())
+			}),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&corev1.Node{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+				// list all ingresses
+				ingresses := &networkingv1.IngressList{}
+				err := r.List(ctx, ingresses)
+				if err != nil {
+					return []reconcile.Request{}
+				}
+
+				// filter ingresses with class
+				requests := make([]reconcile.Request, 0)
+				for _, ingress := range ingresses.Items {
+					if ingress.Spec.IngressClassName != nil && *ingress.Spec.IngressClassName == consts.IngressClass {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      ingress.GetName(),
+								Namespace: ingress.GetNamespace(),
+							},
+						})
+					}
+				}
+				return requests
+			}),
+			builder.WithPredicates(predicate.AnnotationChangedPredicate{}),
+		).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 5, // ..................
+		}).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
-				return true
+				switch e.Object.(type) {
+				case *networkingv1.Ingress:
+					if object := e.Object.(*networkingv1.Ingress); object.Spec.IngressClassName == nil ||
+						*object.Spec.IngressClassName != consts.IngressClass {
+						return false
+					}
+					logrus.Info("Create Ingress: ")
+					return true
+				case *corev1.Service:
+					return false
+				case *corev1.Endpoints:
+					return false
+				case *corev1.Node:
+					if !r.isShouldReconcile {
+						r.isShouldReconcile = true
+						return false
+					}
+					logrus.Info("Create Node: ")
+					return true
+				default:
+					logrus.Warn("object is of an unknown type: ", e.Object)
+					return false
+				}
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
-				oldIngress := e.ObjectOld.(*networkingv1.Ingress)
-				newIngress := e.ObjectNew.(*networkingv1.Ingress)
-				// return !reflect.DeepEqual(oldIngress.Status, newIngress.Status)
-				// return !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) || !reflect.DeepEqual(oldIngress.Annotations, newIngress.Annotations)
-				if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
+				switch e.ObjectNew.(type) {
+				case *networkingv1.Ingress:
+					oldIngress := e.ObjectOld.(*networkingv1.Ingress)
+					newIngress := e.ObjectNew.(*networkingv1.Ingress)
+					if (oldIngress.Spec.IngressClassName == nil || *oldIngress.Spec.IngressClassName != consts.IngressClass) &&
+						(newIngress.Spec.IngressClassName == nil || *newIngress.Spec.IngressClassName != consts.IngressClass) {
+						return false
+					}
+					if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
+						logrus.Info("Spec changed")
+						return true
+					}
+
+					// remove whitelisted annotations in the comparison
+					for k := range consts.WhitelistedAnnotations {
+						delete(oldIngress.Annotations, k)
+						delete(newIngress.Annotations, k)
+					}
+					if !reflect.DeepEqual(oldIngress.Annotations, newIngress.Annotations) {
+						logrus.Info("Annotations changed")
+						return true
+					}
+
+					if !reflect.DeepEqual(oldIngress.DeletionTimestamp.IsZero(), newIngress.DeletionTimestamp.IsZero()) {
+						logrus.Info("DeletionTimestamp changed")
+						return true
+					}
+					return false
+
+				case *corev1.Service:
+					logrus.Info("Update Service: ")
 					return true
-				}
 
-				// remove whitelisted annotations in the comparison
-				for k := range consts.WhitelistedAnnotations {
-					delete(oldIngress.Annotations, k)
-					delete(newIngress.Annotations, k)
-				}
-
-				if !reflect.DeepEqual(oldIngress.Annotations, newIngress.Annotations) {
+				case *corev1.Endpoints:
+					logrus.Info("Update Endpoints: ")
 					return true
+				case *corev1.Node:
+					oldIngress := e.ObjectOld.(*corev1.Node)
+					newIngress := e.ObjectNew.(*corev1.Node)
+					if oldIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != newIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] {
+						logrus.Info("Node Annotations changed")
+						return true
+					}
+					return false
+				default:
+					logrus.Warn("object is of an unknown type: ", e.ObjectNew)
+					return false
 				}
-
-				if !reflect.DeepEqual(oldIngress.DeletionTimestamp.IsZero(), newIngress.DeletionTimestamp.IsZero()) {
-					logrus.Info("Service DeletionTimestamp changed")
-					return true
-				}
-
-				return false
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
-				return true
+				switch e.Object.(type) {
+				case *networkingv1.Ingress:
+					if object := e.Object.(*networkingv1.Ingress); object.Spec.IngressClassName == nil ||
+						*object.Spec.IngressClassName != consts.IngressClass {
+						return false
+					}
+					logrus.Info("Delete Ingress: ")
+					return true
+				case *corev1.Service:
+					logrus.Info("Delete Service: ")
+					return true
+				case *corev1.Endpoints:
+					logrus.Info("Delete Endpoints: ")
+					return true
+				case *corev1.Node:
+					logrus.Info("Delete Node: ")
+					return true
+				default:
+					logrus.Warn("object is of an unknown type: ", e.Object)
+					return false
+				}
 			},
 		}).
 		Complete(r)

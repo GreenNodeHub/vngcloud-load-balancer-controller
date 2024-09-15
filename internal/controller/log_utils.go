@@ -29,7 +29,7 @@ func (l *logHelper) LogWithContext(ctx context.Context) *logrus.Entry {
 			fields[string(key)] = value
 		}
 	}
-	logrus.Println("LogWithContext fields: ", fields)
+	// logrus.Println("LogWithContext fields: ", fields)
 	return logrus.WithFields(fields)
 }
 

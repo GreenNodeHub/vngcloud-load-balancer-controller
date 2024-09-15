@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/sirupsen/logrus"
+// "github.com/sirupsen/logrus"
 )
 
 type EventType string
@@ -39,8 +39,8 @@ func (ec *EventClassification) Classify(key string) *Event {
 
 	objGetValid, objCacheValid := ec.isValid(objGet), ec.isValid(objCache)
 
-	logrus.Infof("okGet: %v, objGetValid: %v", okGet, objGetValid)
-	logrus.Infof("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
+	// logrus.Infof("okGet: %v, objGetValid: %v", okGet, objGetValid)
+	// logrus.Infof("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
 
 	if okCache && !okGet {
 		delete(ec.cache, key)
