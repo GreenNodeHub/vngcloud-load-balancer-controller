@@ -9,6 +9,7 @@ rules:
   - ""
   resources:
   - endpoints
+  - nodes
   - services
   verbs:
   - create
@@ -22,6 +23,7 @@ rules:
   - ""
   resources:
   - endpoints/finalizers
+  - nodes/finalizers
   - services/finalizers
   verbs:
   - update
@@ -29,6 +31,7 @@ rules:
   - ""
   resources:
   - endpoints/status
+  - nodes/status
   - services/status
   verbs:
   - get

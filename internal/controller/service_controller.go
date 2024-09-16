@@ -57,6 +57,9 @@ type ServiceReconciler struct {
 	// at the first time, we should ignore event create Node
 	isShouldReconcile bool
 }
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get;update;patch

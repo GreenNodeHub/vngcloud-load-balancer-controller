@@ -46,7 +46,15 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
+        volumeMounts:
+        - mountPath: /etc/vngcloud-load-balancer-controller
+          name: secret
+          readOnly: true
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: secret
+        secret:
+          secretName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-mysecret

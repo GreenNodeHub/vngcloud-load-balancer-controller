@@ -31,3 +31,5 @@ metricsService:
     protocol: TCP
     targetPort: 8443
   type: ClusterIP
+mysecret:
+  configYaml: ""

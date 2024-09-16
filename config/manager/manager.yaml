@@ -1,11 +1,24 @@
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   labels:
+#     control-plane: controller-manager
+#     app.kubernetes.io/name: vngcloud-load-balancer-controller
+#     app.kubernetes.io/managed-by: kustomize
+#   name: system
+---
 apiVersion: v1
-kind: Namespace
+kind: Secret
 metadata:
-  labels:
-    control-plane: controller-manager
-    app.kubernetes.io/name: vngcloud-load-balancer-controller
-    app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: mysecret
+  namespace: system
+type: Opaque
+stringData:
+  config.yaml: |
+    chartVersion: 0.0.1
+    cluster:
+      clusterName: k8s-name
+      clusterID: k8s-id
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -92,5 +105,13 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        volumeMounts:
+        - name: secret
+          mountPath: /etc/vngcloud-load-balancer-controller
+          readOnly: true
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - secret:
+          secretName: vngcloud-load-balancer-controller-mysecret
+        name: secret
