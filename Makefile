@@ -216,3 +216,11 @@ $(HELMIFY): $(LOCALBIN)
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) charts/vngcloud-load-balancer-controller
+
+.PHONY: logs
+logs:
+	kubectl logs $$(kubectl get pods -n kube-system -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | grep vngcloud-load-balancer-controller) -n kube-system -f
+
+.PHONY: exec
+exec:
+	kubectl exec -it $$(kubectl get pods -n kube-system -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | grep vngcloud-load-balancer-controller) -n kube-system -- sh
