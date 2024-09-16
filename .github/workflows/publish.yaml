@@ -1,0 +1,70 @@
+name: Release
+
+# RELEASE="v1.0.9" bash -c 'git tag $RELEASE && git push origin $RELEASE'
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on version tags, e.g., v1.0.0
+
+env:
+  REPO: vcr.vngcloud.vn/81-vks-public
+
+jobs:
+  build_package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.1
+
+      - name: Log in to the GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to the vCR
+        uses: docker/login-action@v3
+        with:
+          registry: vcr.vngcloud.vn
+          username: ${{ secrets.VCR_USER_PRO }}
+          password: ${{ secrets.VCR_PASSWORD_PRO }}
+
+      - name: Debug
+        run: echo ${{ github.ref_name }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+          # platforms: linux/amd64
+          # outputs: type=registry
+          tags: |
+            ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.sha }}
+            ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.ref_name }}
+            ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.sha }}
+            ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.ref_name }}
+          # target: vngcloud-load-balancer-controller
+  create_release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="${{ github.ref_name }}" \
+              --generate-notes
