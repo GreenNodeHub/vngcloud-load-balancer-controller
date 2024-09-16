@@ -44,6 +44,7 @@ import (
 type IngressReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
+	Config           *Config
 	FinalizerManager k8s.FinalizerManager
 
 	eventClassification *EventClassification

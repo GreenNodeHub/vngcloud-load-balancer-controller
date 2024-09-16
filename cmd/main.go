@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path"
 	runtime2 "runtime"
@@ -39,14 +40,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	conf     controller.Config
 )
 
 func init() {
@@ -90,6 +94,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	err := initConfig()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	setupLog.Info(fmt.Sprintf("The version is [%s], chartVersion is [%s]", version.Version, conf.ChartVersion))
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -162,6 +172,7 @@ func main() {
 	if err = (&controller.ServiceReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
+		Config:           &conf,
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
@@ -170,6 +181,7 @@ func main() {
 	if err = (&controller.IngressReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
+		Config:           &conf,
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
@@ -191,4 +203,25 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() error {
+	configFile := "/etc/vngcloud-load-balancer-controller/config.yaml"
+	setupLog.Info("Loading configuration", "config", configFile)
+	viper.SetConfigFile(configFile)
+	viper.AutomaticEnv()
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err != nil {
+		setupLog.Error(err, "Failed to read config file")
+		return err
+	}
+
+	if err := viper.Unmarshal(&conf); err != nil {
+		setupLog.Error(err, "Unable to decode the configuration")
+		return err
+	}
+	setupLog.Info("Configuration loaded", "config", conf)
+	return nil
 }
