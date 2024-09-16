@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-metrics-reader
+  labels:
+  {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
