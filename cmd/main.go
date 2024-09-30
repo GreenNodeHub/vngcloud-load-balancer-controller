@@ -55,18 +55,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	// +kubebuilder:scaffold:scheme
-
-	logrus.SetReportCaller(true)
-	logrus.SetFormatter(&logrus.TextFormatter{
-		DisableTimestamp: true,
-		CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
-			fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
-			//return frame.Function, fileName
-			return "", fileName
-		},
-	})
 }
 
 func main() {
@@ -75,6 +64,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
+	var devMode bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -86,6 +76,8 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.BoolVar(&devMode, "dev-mode", false,
+		"If set, log will be printed in different format, easier to debug")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -93,6 +85,18 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	if devMode {
+		logrus.SetReportCaller(true)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableTimestamp: true,
+			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
+				fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
+				//return frame.Function, fileName
+				return "", fileName
+			},
+		})
+	}
 
 	err := initConfig()
 	if err != nil {
