@@ -264,7 +264,3 @@ func updateIngressAnnotation(name, namespace, key, value string) {
 		}, timeout, interval).Should(BeTrue())
 	}
 }
-
-func PointerOf[T any](t T) *T {
-	return &t
-}

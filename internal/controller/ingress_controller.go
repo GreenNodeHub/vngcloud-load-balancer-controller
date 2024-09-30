@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -35,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -49,7 +50,7 @@ type IngressReconciler struct {
 
 	eventClassification *EventClassification
 	annotationParser    annotations.Parser
-	resourceDependant   ResourceDependant
+	resourceDependant   ResourceDependant[*networkingv1.Ingress]
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -102,11 +103,11 @@ func (r *IngressReconciler) getReconcileRequestsPeriodically() []reconcile.Reque
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-	ctx = context.WithValue(ctx, LogUtilsName, req.Name)
-	logger := GetLogUtils().LogWithContext(ctx)
-
 	key := genKey(req.Namespace, req.Name)
+
+	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + key)).GetContext()
+	logger := contexts.NewContext(ctx).Log()
+
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
 		logger.Info("Event is nil, return.")
@@ -132,7 +133,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *IngressReconciler) ensureObject(ctx context.Context, ingress *networkingv1.Ingress) (ctrl.Result, error) {
-	logger := GetLogUtils().LogWithContext(ctx)
+	logger := contexts.NewContext(ctx).Log()
 
 	if err := r.FinalizerManager.AddFinalizers(ctx, ingress, consts.IngressFinalizer); err != nil {
 		return ctrl.Result{}, err
@@ -142,13 +143,14 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, ingress *networkin
 	time.Sleep(3 * time.Second)
 	logger.Info("Done Reconcile Object")
 
-	r.resourceDependant.SetIngress(ingress, true)
+	r.resourceDependant.Set(ingress, true)
 	return ctrl.Result{}, nil
 }
 
 func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkingv1.Ingress) (ctrl.Result, error) {
-	logger := GetLogUtils().LogWithContext(ctx)
-	r.resourceDependant.ClearIngress(ingress.Namespace, ingress.Name)
+	logger := contexts.NewContext(ctx).Log()
+
+	r.resourceDependant.Clear(ingress)
 
 	if k8s.HasFinalizer(ingress, consts.IngressFinalizer) {
 		logger.Info("Delete Object ", genKey(ingress.Namespace, ingress.Name))
@@ -167,25 +169,25 @@ func (r *IngressReconciler) deleteObject(ctx context.Context, ingress *networkin
 func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
-	r.resourceDependant = NewResourceDependant(r.Client)
+	r.resourceDependant = NewIngressDependant(r.Client)
 
-	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
-	ctx := context.Background()
-	periodicReconciler.Start(ctx)
+	// periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
+	// ctx := context.Background()
+	// periodicReconciler.Start(ctx)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&networkingv1.Ingress{}).
 		Watches(
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
-				return r.resourceDependant.GetIngressNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+				return r.resourceDependant.GetResourceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
 			}),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Watches(
 			&corev1.Service{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, service client.Object) []reconcile.Request {
-				return r.resourceDependant.GetIngressNeedReconcile("service", service.GetNamespace(), service.GetName())
+				return r.resourceDependant.GetResourceNeedReconcile("service", service.GetNamespace(), service.GetName())
 			}),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).

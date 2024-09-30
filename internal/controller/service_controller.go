@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -48,7 +49,7 @@ type ServiceReconciler struct {
 
 	eventClassification *EventClassification
 	annotationParser    annotations.Parser
-	resourceDependant   ResourceDependant
+	resourceDependant   ResourceDependant[*corev1.Service]
 
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -57,6 +58,7 @@ type ServiceReconciler struct {
 	// at the first time, we should ignore event create Node
 	isShouldReconcile bool
 }
+
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
@@ -109,11 +111,11 @@ func (r *ServiceReconciler) getReconcileRequestsPeriodically() []reconcile.Reque
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-	ctx = context.WithValue(ctx, LogUtilsName, req.Name)
-	logger := GetLogUtils().LogWithContext(ctx)
-
 	key := genKey(req.Namespace, req.Name)
+
+	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("s/" + key)).GetContext()
+	logger := contexts.NewContext(ctx).Log()
+
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
 		logger.Info("Event is nil, return.")
@@ -139,7 +141,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *ServiceReconciler) ensureObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
-	logger := GetLogUtils().LogWithContext(ctx)
+	logger := contexts.NewContext(ctx).Log()
 
 	if err := r.FinalizerManager.AddFinalizers(ctx, svc, consts.ServiceFinalizer); err != nil {
 		// r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
@@ -150,13 +152,13 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, svc *corev1.Servic
 	time.Sleep(3 * time.Second)
 	logger.Info("Done Reconcile Object")
 
-	r.resourceDependant.SetService(svc, true)
+	r.resourceDependant.Set(svc, true)
 	return ctrl.Result{}, nil
 }
 
 func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
-	logger := GetLogUtils().LogWithContext(ctx)
-	r.resourceDependant.ClearService(svc.Namespace, svc.Name)
+	logger := contexts.NewContext(ctx).Log()
+	r.resourceDependant.Clear(svc)
 
 	if k8s.HasFinalizer(svc, consts.ServiceFinalizer) {
 		logger.Info("Delete Object ", genKey(svc.Namespace, svc.Name))
@@ -176,18 +178,18 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Servic
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
-	r.resourceDependant = NewResourceDependant(r.Client)
+	r.resourceDependant = NewServiceDependant(r.Client)
 
-	periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
-	ctx := context.Background()
-	periodicReconciler.Start(ctx)
+	// periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
+	// ctx := context.Background()
+	// periodicReconciler.Start(ctx)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
 		Watches(
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
-				return r.resourceDependant.GetServiceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+				return r.resourceDependant.GetResourceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
 			}),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
