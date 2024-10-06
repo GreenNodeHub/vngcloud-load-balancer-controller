@@ -26,9 +26,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,6 +54,58 @@ var (
 	cancel                context.CancelFunc
 	mockIngressReconciler *IngressReconciler
 	mockServiceReconciler *ServiceReconciler
+	mockProvider          *provider.MockProvider
+
+	mockConfig = &config.Config{
+		Cluster: struct {
+			ClusterName string "mapstructure:\"clusterName\""
+			ClusterID   string "mapstructure:\"clusterID\""
+		}{ClusterName: "test-cluster", ClusterID: "test-cluster-id"},
+	}
+
+	mockNode1 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-1",
+			Labels: map[string]string{
+				"vks.vngcloud.vn/subnet-id": "subnet-1",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000001",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: corev1.NodeHostName, Address: "mock-node-1"},
+			},
+		},
+	}
+
+	mockNode2 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-2",
+			Labels: map[string]string{
+				"vks.vngcloud.vn/subnet-id": "subnet-2",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000002",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.2"},
+				{Type: corev1.NodeHostName, Address: "mock-node-2"},
+			},
+		},
+	}
 )
 
 const (
@@ -107,10 +163,16 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	finalizerManager := k8s.NewDefaultFinalizerManager(k8sManager.GetClient(), ctrl.Log)
+	mockProvider = provider.NewMockProvider()
 	mockIngressReconciler = &IngressReconciler{
 		modeTest: true,
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
+
+		Config:           mockConfig,
+		Provider:         mockProvider,
+		FinalizerManager: finalizerManager,
 	}
 	err = mockIngressReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -119,6 +181,10 @@ var _ = BeforeSuite(func() {
 		modeTest: true,
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
+
+		Config:           mockConfig,
+		Provider:         mockProvider,
+		FinalizerManager: finalizerManager,
 	}
 	err = mockServiceReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -129,6 +195,11 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
+	// Create mock node
+	err = k8sClient.Create(ctx, mockNode1)
+	Expect(err).ToNot(HaveOccurred())
+	// err = k8sClient.Create(ctx, mockNode2)
+	// Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

@@ -42,7 +42,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	// +kubebuilder:scaffold:imports
 )
@@ -50,7 +52,7 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
-	conf     controller.Config
+	conf     = config.NewConfig()
 )
 
 func init() {
@@ -174,18 +176,24 @@ func main() {
 	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
 
 	if err = (&controller.ServiceReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Config:           &conf,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Config: conf,
+		Provider: &provider.VNGCLOUD_Provider{
+			Config: conf,
+		},
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
 	if err = (&controller.IngressReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Config:           &conf,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Config: conf,
+		Provider: &provider.VNGCLOUD_Provider{
+			Config: conf,
+		},
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")

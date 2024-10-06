@@ -20,43 +20,60 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
+	k8sBuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/event_classification"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	periodicreconciler "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/periodic_reconciler"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 )
 
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
-	Config           *Config
+	Config           *config.Config
 	FinalizerManager k8s.FinalizerManager
 
-	eventClassification *EventClassification
+	eventClassification *event_classification.EventClassification
 	annotationParser    annotations.Parser
 	resourceDependant   ResourceDependant[*corev1.Service]
 
+	Provider provider.Provider
+
+	// for testing reconcile behavior when some resource is created, updated, deleted
 	modeTest   bool
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 
-	// at the first time, we should ignore event create Node
-	isShouldReconcile bool
+	netwotkID  string
+	subnetID   string
+	subnetCIDR string
+
+	knownNodes []*corev1.Node
+
+	// store to delete redundant loadbalancer resources
+	cacheLoadBalancerBuilder map[string]builder.LoadbalancerBuilder
 }
 
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
@@ -86,6 +103,22 @@ func (r *ServiceReconciler) isValid(obj interface{}) bool {
 	return true
 }
 
+func (r *ServiceReconciler) getNodes(client client.Client) ([]*corev1.Node, error) {
+	nodes := &corev1.NodeList{}
+	err := client.List(context.Background(), nodes)
+	if err != nil {
+		return nil, err
+	}
+	// filter nodes with annotation
+	filteredNodes := make([]*corev1.Node, 0)
+	for i := range nodes.Items {
+		if nodes.Items[i].Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != "true" {
+			filteredNodes = append(filteredNodes, &nodes.Items[i])
+		}
+	}
+	return filteredNodes, nil
+}
+
 func (r *ServiceReconciler) getObjectByKey(key string) (interface{}, bool) {
 	namespace, name := revertKey(key)
 	resource := &corev1.Service{}
@@ -94,6 +127,17 @@ func (r *ServiceReconciler) getObjectByKey(key string) (interface{}, bool) {
 		return nil, false
 	}
 	return resource, true
+}
+
+func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj *corev1.Service, key, value string) error {
+	if obj == nil {
+		return nil
+	}
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+	obj.Annotations[key] = value
+	return r.Update(ctx, obj, &client.UpdateOptions{})
 }
 
 // getReconcileRequests returns a list of reconcile requests periodically (which LoadBalancer have changed and need to be reconciled)
@@ -115,6 +159,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("s/" + key)).GetContext()
 	logger := contexts.NewContext(ctx).Log()
+	defer logger.Info("------------------------------------")
 
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
@@ -125,64 +170,453 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// for testing
 	if r.modeTest {
 		switch event.Type {
-		case DeleteEvent:
+		case event_classification.DeleteEvent:
+			r.resourceDependant.Clear(event.Obj.(*corev1.Service))
 			return r.deleteTest(ctx, req)
 		default:
+			r.resourceDependant.Set(event.Obj.(*corev1.Service), true)
 			return r.ensureTest(ctx, req)
 		}
 	}
 
 	switch event.Type {
-	case DeleteEvent:
+	case event_classification.DeleteEvent:
 		return r.deleteObject(ctx, event.Obj.(*corev1.Service))
+	case event_classification.CreateEvent:
+		return r.ensureObject(ctx, event.Obj.(*corev1.Service), event.OldObj)
 	default:
-		return r.ensureObject(ctx, event.Obj.(*corev1.Service))
+		return r.ensureObject(ctx, event.Obj.(*corev1.Service), event.OldObj)
 	}
 }
 
-func (r *ServiceReconciler) ensureObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
+func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Service, oldObjInterface interface{}) (ctrl.Result, error) {
 	logger := contexts.NewContext(ctx).Log()
 
-	if err := r.FinalizerManager.AddFinalizers(ctx, svc, consts.ServiceFinalizer); err != nil {
-		// r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
 		return ctrl.Result{}, err
 	}
 
-	logger.Info("Reconcile Object ", genKey(svc.Namespace, svc.Name))
-	time.Sleep(3 * time.Second)
-	logger.Info("Done Reconcile Object")
+	logger.Info("Reconcile Object ", genKey(obj.Namespace, obj.Name))
 
-	r.resourceDependant.Set(svc, true)
+	loadBalancerBuilder, err := builder.NewLoadBalancerBuilderByService(ctx, obj, r.annotationParser, r.Client,
+		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.Config.Cluster.ClusterID,
+		r.knownNodes,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// logger.Info("LoadBalancerBuilder: ", loadBalancerBuilder.StringFormat(), " ", loadBalancerBuilder.JSONFormat())
+	// loadBalancerBuilder.Print()
+
+	// ignore reconcile
+	if loadBalancerBuilder.IsIgnored() {
+		logger.Info("Service is ignored")
+		return ctrl.Result{}, nil
+	}
+
+	// create loadbalancer, update service annotation and reconcile later
+	if loadBalancerBuilder.GetID() == "" {
+		// check if loadbalancer with the generate name exists, if exists, update annotation and return
+		lb, err := r.Provider.GetLoadBalancerByName(loadBalancerBuilder.GetName())
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if lb == nil {
+			// create loadbalancer. It mays create lb, listener, pool at the same time
+			lb, err = r.Provider.CreateLoadBalancer(loadBalancerBuilder.CreateLoadBalancerOptions())
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if lb == nil || lb.UUID == "" {
+			return ctrl.Result{}, errs.ErrorLoadBalancerNotHaveUUID
+		}
+		r.updateObjectAnnotation(ctx, obj, fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID), lb.UUID)
+		return ctrl.Result{}, nil
+	} else {
+		if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+			logger.Error("Failed to wait for loadbalancer active: ", err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// inspect current loadbalancer in portal to compare with the new one
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetID(), r.Provider)
+	if err != nil {
+		logger.Error("Failed to get current loadbalancer: ", err)
+		return ctrl.Result{}, err
+	}
+
+	// // ensure tags
+	// tags := VNGHelper.MergeTags(ctx, currentBuilder, loadBalancerBuilder)
+	// if tags != nil {
+	// 	if err := r.Provider.UpdateTags(loadBalancerBuilder.GetID(), tags); err != nil {
+	// 		logger.Error("Failed to update tags: ", err)
+	// 		return ctrl.Result{}, err
+	// 	}
+	// }
+
+	// ensure package
+	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
+		currentBuilder.GetPackageID() != "" &&
+		loadBalancerBuilder.GetPackageID() != "" {
+		if err := r.Provider.ResizeLoadBalancer(loadBalancerBuilder.GetID(), loadBalancerBuilder.GetPackageID()); err != nil {
+			logger.Error("Failed to resize loadbalancer: ", err)
+			return ctrl.Result{}, err
+		}
+		if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+			logger.Error("Failed to wait for loadbalancer active: ", err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// ensure pools
+	for _, poolBuilder := range loadBalancerBuilder.GetPoolBuilders() {
+		poolInPortal := currentBuilder.GetPoolBuilderByName(poolBuilder.GetName())
+		if poolInPortal == nil {
+			if _pool, err := r.Provider.CreatePool(loadBalancerBuilder.GetID(),
+				poolBuilder.GetICreatePoolRequest().WithLoadBalancerId(loadBalancerBuilder.GetID())); err != nil {
+				logger.Error("Failed to create pool: ", err)
+				return ctrl.Result{}, err
+			} else {
+				poolBuilder.SetID(_pool.UUID)
+			}
+
+			if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+		} else {
+			poolBuilder.SetID(poolInPortal.GetID())
+			updateOptions, message := builder.VNGHelper.ComparePoolBuilder(loadBalancerBuilder.GetID(), poolInPortal, poolBuilder)
+			if updateOptions != nil {
+				logger.Info("Update pool: ", strings.Join(message, ", "))
+				err := r.Provider.UpdatePool(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
+					updateOptions.WithLoadBalancerId(loadBalancerBuilder.GetID()))
+				if err != nil {
+					logger.Error("Failed to update pool: ", err)
+					return ctrl.Result{}, err
+				}
+				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+					logger.Error("Failed to wait for loadbalancer active: ", err)
+					return ctrl.Result{}, err
+				}
+			}
+
+			// ensure pool members
+			if !builder.VNGHelper.ComparePoolMembers(poolInPortal.Members, poolBuilder.Members) {
+				err := r.Provider.UpdatePoolMembers(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
+					poolBuilder.GetIUpdatePoolMembersRequest())
+				if err != nil {
+					logger.Error("Failed to update pool members: ", err)
+					return ctrl.Result{}, err
+				}
+				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+					logger.Error("Failed to wait for loadbalancer active: ", err)
+					return ctrl.Result{}, err
+				}
+			}
+		}
+	}
+
+	// ensure listeners
+	for _, listenerBuilder := range loadBalancerBuilder.GetListenerBuilders() {
+		// set default pool id created above
+		referPool := loadBalancerBuilder.GetPoolBuilderByName(listenerBuilder.GetPoolName())
+		if referPool == nil {
+			logger.Error("Failed to get refer pool: ", listenerBuilder.GetPoolName())
+			return ctrl.Result{}, nil
+		}
+		listenerBuilder.SetPoolID(referPool.GetID())
+
+		// listenerInPortal := currentBuilder.GetListenerBuilderByName(listenerBuilder.GetName())
+		listenerInPortal := currentBuilder.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
+		if listenerInPortal == nil {
+			if _, err := r.Provider.CreateListener(loadBalancerBuilder.GetID(),
+				listenerBuilder.GetICreateListenerRequest().WithLoadBalancerId(loadBalancerBuilder.GetID()),
+			); err != nil {
+				logger.Error("Failed to create listener: ", err)
+				return ctrl.Result{}, err
+			}
+			if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+		} else {
+			listenerBuilder.SetID(listenerInPortal.GetID())
+
+			// if mismatch listener protocol, return error => user must delete listener in portal ..........................
+			if listenerInPortal.ListenerProtocol != listenerBuilder.ListenerProtocol {
+				logger.Error("Listener protocol mismatch: ", listenerInPortal.ListenerProtocol, listenerBuilder.ListenerProtocol)
+				return ctrl.Result{}, nil
+			}
+
+			updateOptions, message := builder.VNGHelper.CompareListenerBuilder(loadBalancerBuilder.GetID(), listenerInPortal, listenerBuilder)
+			if updateOptions != nil {
+				logger.Info("Update listener: ", strings.Join(message, ", "))
+				err := r.Provider.UpdateListener(loadBalancerBuilder.GetID(), listenerInPortal.GetID(), updateOptions)
+				if err != nil {
+					logger.Error("Failed to update listener: ", err)
+					return ctrl.Result{}, err
+				}
+				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+					logger.Error("Failed to wait for loadbalancer active: ", err)
+					return ctrl.Result{}, err
+				}
+			}
+		}
+	}
+
+	var (
+		oldBuilder builder.LoadbalancerBuilder
+		ok         bool
+	)
+
+	if oldBuilder, ok = r.cacheLoadBalancerBuilder[genKey(obj.Namespace, obj.Name)]; !ok {
+		// check oldObjInterface can be converted to *corev1.Service, if not, set oldObj = nil
+		var oldObj *corev1.Service
+		if oldObj, ok = oldObjInterface.(*corev1.Service); !ok {
+			oldObj = nil
+		}
+		// build again
+		var err error
+		oldBuilder, err = builder.NewLoadBalancerBuilderByService(ctx, oldObj, r.annotationParser, r.Client,
+			r.netwotkID, r.subnetID, r.subnetCIDR,
+			r.Config.Cluster.ClusterID,
+			r.knownNodes,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// delete redundant listeners
+	for _, listener := range oldBuilder.GetListenerBuilders() {
+		if currentListener := currentBuilder.GetListenerBuilderByName(listener.GetName()); currentListener != nil &&
+			loadBalancerBuilder.GetListenerBuilderByName(listener.GetName()) == nil {
+			if err := r.Provider.DeleteListener(currentBuilder.GetID(), currentListener.GetID()); err != nil {
+				logger.Error("Failed to delete listener: ", err)
+				return ctrl.Result{}, err
+			}
+			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+			currentListener.SetIsDeleted(true)
+		}
+	}
+
+	// delete redundant pools, should check if pool is used by other listeners then ignore
+	for _, pool := range oldBuilder.GetPoolBuilders() {
+		if currentPool := currentBuilder.GetPoolBuilderByName(pool.GetName()); currentPool != nil &&
+			loadBalancerBuilder.GetPoolBuilderByName(pool.GetName()) == nil {
+			if currentBuilder.IsPoolInUseByOtherListener(currentPool.GetID()) {
+				logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
+				continue
+			}
+			if err := r.Provider.DeletePool(currentBuilder.GetID(), pool.GetID()); err != nil {
+				logger.Error("Failed to delete pool: ", err)
+				return ctrl.Result{}, err
+			}
+			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	r.cacheLoadBalancerBuilder[genKey(obj.Namespace, obj.Name)] = loadBalancerBuilder
+	r.resourceDependant.Set(obj, true)
 	return ctrl.Result{}, nil
 }
 
-func (r *ServiceReconciler) deleteObject(ctx context.Context, svc *corev1.Service) (ctrl.Result, error) {
+func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Service) (ctrl.Result, error) {
 	logger := contexts.NewContext(ctx).Log()
-	r.resourceDependant.Clear(svc)
+	r.resourceDependant.Clear(obj)
 
-	if k8s.HasFinalizer(svc, consts.ServiceFinalizer) {
-		logger.Info("Delete Object ", genKey(svc.Namespace, svc.Name))
-		time.Sleep(10 * time.Second)
-		logger.Info("Done Delete Object")
-
-		if err := r.FinalizerManager.RemoveFinalizers(ctx, svc, consts.ServiceFinalizer); err != nil {
-			// r.eventRecorder.Event(svc, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
-			return ctrl.Result{}, err
-		}
+	if !k8s.HasFinalizer(obj, consts.ServiceFinalizer) {
 		return ctrl.Result{}, nil
 	}
+
+	logger.Info("Delete Object ", genKey(obj.Namespace, obj.Name))
+
+	_, err := r.subDeleteObject(ctx, obj)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
+}
+
+func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Service) (ctrl.Result, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	var oldBuilder builder.LoadbalancerBuilder
+	var ok bool
+	if oldBuilder, ok = r.cacheLoadBalancerBuilder[genKey(obj.Namespace, obj.Name)]; !ok {
+		// build again
+		var err error
+		oldBuilder, err = builder.NewLoadBalancerBuilderByService(ctx, obj, r.annotationParser, r.Client,
+			r.netwotkID, r.subnetID, r.subnetCIDR,
+			r.Config.Cluster.ClusterID,
+			r.knownNodes,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	// ignore reconcile
+	if oldBuilder.IsIgnored() {
+		logger.Info("Service is ignored")
+		return ctrl.Result{}, nil
+	}
+
+	if oldBuilder.GetID() == "" {
+		logger.Info("LoadBalancer ID is empty, return.")
+		return ctrl.Result{}, nil
+	}
+
+	// inspect current loadbalancer in portal to compare with
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetID(), r.Provider)
+	if err != nil {
+		logger.Error("Failed to get current loadbalancer: ", err)
+		return ctrl.Result{}, err
+	}
+
+	// check if can delete whole loadbalancer
+	// oldBuilder and currentBuilder should be the same listeners' name, pool's name
+	checkCanDeleteWholeLoadBalancer := func(oldBuilder, currentBuilder builder.LoadbalancerBuilder) bool {
+		if len(oldBuilder.GetListenerBuilders()) != len(currentBuilder.GetListenerBuilders()) {
+			return false
+		}
+		if len(oldBuilder.GetPoolBuilders()) != len(currentBuilder.GetPoolBuilders()) {
+			return false
+		}
+		for _, listener := range oldBuilder.GetListenerBuilders() {
+			if currentListener := currentBuilder.GetListenerBuilderByName(listener.GetName()); currentListener == nil {
+				return false
+			}
+		}
+		for _, pool := range oldBuilder.GetPoolBuilders() {
+			if currentPool := currentBuilder.GetPoolBuilderByName(pool.GetName()); currentPool == nil {
+				return false
+			}
+		}
+		return true
+	}
+
+	// if can delete whole loadbalancer, delete loadbalancer and return
+	if checkCanDeleteWholeLoadBalancer(oldBuilder, currentBuilder) {
+		if err := r.Provider.DeleteLoadBalancer(oldBuilder.GetID()); err != nil {
+			logger.Error("Failed to delete loadbalancer: ", err)
+			return ctrl.Result{}, err
+		}
+		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetName())
+		return ctrl.Result{}, nil
+	}
+
+	// delete redundant listeners
+	for _, listener := range oldBuilder.GetListenerBuilders() {
+		if currentListener := currentBuilder.GetListenerBuilderByName(listener.GetName()); currentListener != nil {
+			if err := r.Provider.DeleteListener(currentBuilder.GetID(), currentListener.GetID()); err != nil {
+				logger.Error("Failed to delete listener: ", err)
+				return ctrl.Result{}, err
+			}
+			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+			currentListener.SetIsDeleted(true)
+		}
+	}
+
+	// delete redundant pools, should check if pool is used by other listeners then ignore
+	for _, pool := range oldBuilder.GetPoolBuilders() {
+		if currentPool := currentBuilder.GetPoolBuilderByName(pool.GetName()); currentPool != nil {
+			if currentBuilder.IsPoolInUseByOtherListener(currentPool.GetID()) {
+				logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
+				continue
+			}
+			if err := r.Provider.DeletePool(currentBuilder.GetID(), pool.GetID()); err != nil {
+				logger.Error("Failed to delete pool: ", err)
+				return ctrl.Result{}, err
+			}
+			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+				logger.Error("Failed to wait for loadbalancer active: ", err)
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *ServiceReconciler) init() error {
+	r.cacheLoadBalancerBuilder = make(map[string]builder.LoadbalancerBuilder)
+
+	// init other components
+	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
+	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+	r.resourceDependant = NewServiceDependant(r.Client)
+
+	periodicReconciler := periodicreconciler.NewPeriodicReconciler(r, 60*time.Second, r.getReconcileRequestsPeriodically)
+	ctx := context.Background()
+	periodicReconciler.Start(ctx)
+
+	return nil
+}
+
+// this function is called by the InitRunnable after cache is started, run after init() function
+func (r *ServiceReconciler) Init(client client.Client) error {
+	// should have at least 1 node to get network information (networkID, subnetID, subnetCIDR)
+	var err error
+	r.knownNodes, err = r.getNodes(client)
+	if err != nil {
+		return err
+	}
+	providerIDs := builder.VNGHelper.GetListProviderID(r.knownNodes)
+	if len(r.knownNodes) == 0 || len(providerIDs) == 0 {
+		return errs.ErrorNoNodeAtInitTime
+	}
+
+	// init provider
+	err = r.Provider.Init(providerIDs)
+	if err != nil {
+		logrus.Error("Failed to init provider: ", err)
+		return err
+	}
+	r.netwotkID = r.Provider.GetNetworkID()
+	r.subnetID = r.Provider.GetSubnetID()
+	r.subnetCIDR = r.Provider.GetSubnetCIDR()
+	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
+		return errs.ErrorNoNetworkInfo
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.eventClassification = NewEventClassification(r.getObjectByKey, r.isValid)
-	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
-	r.resourceDependant = NewServiceDependant(r.Client)
+	err := r.init()
+	if err != nil {
+		return err
+	}
 
-	// periodicReconciler := NewPeriodicReconciler(r, 1*time.Second, r.getReconcileRequestsPeriodically)
-	// ctx := context.Background()
-	// periodicReconciler.Start(ctx)
+	// Add the initialization logic after cache is started
+	if err := mgr.Add(&InitRunnable{
+		Client:     mgr.GetClient(),
+		Reconciler: r, // Pass the reconciler to store nodes
+	}); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Service{}).
@@ -191,33 +625,33 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
 				return r.resourceDependant.GetResourceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
 			}),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Watches(
 			&corev1.Node{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
-				// list all services with type LoadBalancer
-				services := &corev1.ServiceList{}
-				err := r.List(ctx, services)
+				// list all
+				objList := &corev1.ServiceList{}
+				err := r.List(ctx, objList)
 				if err != nil {
 					return []reconcile.Request{}
 				}
 
-				// filter services with type LoadBalancer
+				// filter
 				requests := make([]reconcile.Request, 0)
-				for _, service := range services.Items {
-					if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+				for _, obj := range objList.Items {
+					if obj.Spec.Type == corev1.ServiceTypeLoadBalancer {
 						requests = append(requests, reconcile.Request{
 							NamespacedName: types.NamespacedName{
-								Name:      service.GetName(),
-								Namespace: service.GetNamespace(),
+								Name:      obj.GetName(),
+								Namespace: obj.GetNamespace(),
 							},
 						})
 					}
 				}
 				return requests
 			}),
-			builder.WithPredicates(predicate.AnnotationChangedPredicate{}),
+			k8sBuilder.WithPredicates(predicate.AnnotationChangedPredicate{}),
 		).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 5, // ..................
@@ -229,65 +663,71 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
 						return false
 					}
-					logrus.Info("Create Service: ")
+					logrus.Info("Detect create Service event.")
 					return true
 				case *corev1.Endpoints:
 					return false
 				case *corev1.Node:
-					if !r.isShouldReconcile {
-						r.isShouldReconcile = true
-						return false
+					newNodes, err := r.getNodes(r.Client)
+					if err != nil {
+						logrus.Warn("Detect create Node event but failed to get nodes: ", err)
+						return true
 					}
-					logrus.Info("Create Node: ")
-					return true
+					if !k8s.NodeSlicesEqual(r.knownNodes, newNodes) {
+						logrus.Info("Detect create Node event, update knownNodes.")
+						r.knownNodes = newNodes
+						return true
+					}
+					return false
 				default:
-					logrus.Warn("object is of an unknown type: ", e.Object)
+					logrus.Warn("Detect create object is of an unknown type: ", e.Object)
 					return false
 				}
 			},
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				switch e.ObjectNew.(type) {
 				case *corev1.Service:
-					oldIngress := e.ObjectOld.(*corev1.Service)
-					newIngress := e.ObjectNew.(*corev1.Service)
+					oldObj := e.ObjectOld.(*corev1.Service)
+					newObj := e.ObjectNew.(*corev1.Service)
 
-					if oldIngress.Spec.Type != corev1.ServiceTypeLoadBalancer && newIngress.Spec.Type != corev1.ServiceTypeLoadBalancer {
+					if oldObj.Spec.Type != corev1.ServiceTypeLoadBalancer && newObj.Spec.Type != corev1.ServiceTypeLoadBalancer {
 						return false
 					}
 
-					if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
-						logrus.Info("Service Spec changed")
+					if !reflect.DeepEqual(oldObj.Spec, newObj.Spec) {
+						logrus.Info("Detect update Service Spec event.")
 						return true
 					}
 
 					// remove whitelisted annotations in the comparison
 					for k := range consts.WhitelistedAnnotations {
-						delete(oldIngress.Annotations, k)
-						delete(newIngress.Annotations, k)
+						delete(oldObj.Annotations, k)
+						delete(newObj.Annotations, k)
 					}
-					if !reflect.DeepEqual(oldIngress.Annotations, newIngress.Annotations) {
-						logrus.Info("Service Annotations changed")
+					if !reflect.DeepEqual(oldObj.Annotations, newObj.Annotations) {
+						logrus.Info("Detect update Service Annotations event.")
 						return true
 					}
-					if !reflect.DeepEqual(oldIngress.DeletionTimestamp.IsZero(), newIngress.DeletionTimestamp.IsZero()) {
-						logrus.Info("Service DeletionTimestamp changed")
+					if !reflect.DeepEqual(oldObj.DeletionTimestamp.IsZero(), newObj.DeletionTimestamp.IsZero()) {
+						logrus.Info("Detect update Service DeletionTimestamp event.")
 						return true
 					}
 					return false
 
 				case *corev1.Endpoints:
-					logrus.Info("Update Endpoints: ")
+					logrus.Info("Detect update Endpoints event.")
 					return true
 				case *corev1.Node:
-					oldIngress := e.ObjectOld.(*corev1.Node)
-					newIngress := e.ObjectNew.(*corev1.Node)
-					if oldIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != newIngress.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] {
-						logrus.Info("Node Annotations changed")
+					oldObj := e.ObjectOld.(*corev1.Node)
+					newObj := e.ObjectNew.(*corev1.Node)
+					if oldObj.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != newObj.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] {
+						logrus.Info("Detect update Node Annotations event.")
+						r.knownNodes, _ = r.getNodes(r.Client)
 						return true
 					}
 					return false
 				default:
-					logrus.Warn("object is of an unknown type: ", e.ObjectNew)
+					logrus.Warn("Detect update object is of an unknown type: ", e.ObjectNew)
 					return false
 				}
 			},
@@ -297,16 +737,25 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
 						return false
 					}
-					logrus.Info("Delete Service: ")
+					logrus.Info("Detect delete Service event.")
 					return true
 				case *corev1.Endpoints:
-					logrus.Info("Delete Endpoints: ")
+					logrus.Info("Detect delete Endpoints event.")
 					return true
 				case *corev1.Node:
-					logrus.Info("Delete Node: ")
-					return true
+					newNodes, err := r.getNodes(r.Client)
+					if err != nil {
+						logrus.Warn("Detect delete Node event but failed to get nodes: ", err)
+						return true
+					}
+					if !k8s.NodeSlicesEqual(r.knownNodes, newNodes) {
+						logrus.Info("Detect delete Node event, update knownNodes.")
+						r.knownNodes = newNodes
+						return true
+					}
+					return false
 				default:
-					logrus.Warn("object is of an unknown type: ", e.Object)
+					logrus.Warn("Detect delete object is of an unknown type: ", e.Object)
 					return false
 				}
 			},
