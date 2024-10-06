@@ -1,4 +1,4 @@
-package controller
+package event_classification
 
 import (
 // "github.com/sirupsen/logrus"
@@ -15,8 +15,9 @@ const (
 
 // Event holds the context of an event
 type Event struct {
-	Type EventType
-	Obj  interface{}
+	Type   EventType
+	Obj    interface{}
+	OldObj interface{}
 }
 
 type EventClassification struct {
@@ -89,7 +90,8 @@ func (ec *EventClassification) Classify(key string) *Event {
 
 	ec.cache[key] = objGet
 	return &Event{
-		Type: SyncEvent,
-		Obj:  objGet,
+		Type:   SyncEvent,
+		Obj:    objGet,
+		OldObj: objCache,
 	}
 }

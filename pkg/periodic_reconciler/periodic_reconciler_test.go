@@ -1,4 +1,4 @@
-package controller
+package periodicreconciler
 
 import (
 	"context"

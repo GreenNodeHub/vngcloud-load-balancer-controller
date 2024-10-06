@@ -1,4 +1,4 @@
-package controller
+package event_classification
 
 import (
 	"testing"
