@@ -1,0 +1,362 @@
+package builder
+
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
+	corev1 "k8s.io/api/core/v1"
+)
+
+// providerID
+const (
+	// Define the regular expression pattern
+	patternPrefix = `vngcloud:\/\/`
+	rawPrefix     = `vngcloud://`
+	pattern       = "^" + patternPrefix + "ins-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+
+var (
+	vngCloudProviderIDRegex = regexp.MustCompile(pattern)
+)
+
+func matchCloudProviderPattern(pproviderID string) bool {
+	return vngCloudProviderIDRegex.MatchString(pproviderID)
+}
+
+func getProviderID(pnode *corev1.Node) string {
+	return pnode.Spec.ProviderID[len(rawPrefix):len(pnode.Spec.ProviderID)]
+}
+
+type helperStruct struct{}
+
+var VNGHelper = &helperStruct{}
+
+// GetListProviderID returns the list of provider IDs.
+func (h *helperStruct) GetListProviderID(pnodes []*corev1.Node) []string {
+	var providerIDs []string
+	for _, node := range pnodes {
+		if node != nil && (matchCloudProviderPattern(node.Spec.ProviderID)) {
+			providerIDs = append(providerIDs, getProviderID(node))
+		}
+	}
+
+	return providerIDs
+}
+
+// MergeTags try to keep the current tags, add new tags, return the final tags.
+// Ensure tag contains loadbalancer id.
+// If nil is returned, the tags will not be updated.
+func (h *helperStruct) MergeTags(ctx context.Context, current, new LoadbalancerBuilder) map[string]string {
+	logger := contexts.NewContext(ctx).Log()
+	currentTags, newTags, mergeTags := make(map[string]string), make(map[string]string), make(map[string]string)
+	isNeedUpdate := false
+	if current != nil {
+		currentTags = current.GetTags()
+	}
+	if new != nil {
+		newTags = new.GetTags()
+	}
+
+	for key, value := range currentTags {
+		mergeTags[key] = value
+	}
+	for key, value := range newTags {
+		if mergeTags[key] != value {
+			isNeedUpdate = true
+			mergeTags[key] = value
+		}
+	}
+
+	// ensure tag contains loadbalancer id
+	idValidClusterID := func(_ string) bool {
+		return true
+	}
+
+	joinVKSTags := func(currentValue, id string) string {
+		tags := strings.Split(currentValue, consts.VKS_TAGS_SEPARATOR)
+		tagsValid := make(map[string]bool)
+		for _, tag := range tags {
+			if idValidClusterID(tag) {
+				tagsValid[tag] = true
+			}
+		}
+		if idValidClusterID(id) {
+			tagsValid[id] = true
+		}
+		newTags := make([]string, 0)
+		for tag := range tagsValid {
+			newTags = append(newTags, tag)
+		}
+		return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
+	}
+
+	vksClusterValue := joinVKSTags(currentTags[consts.VKS_TAG_KEY], new.GetID())
+	if vksClusterValue != currentTags[consts.VKS_TAG_KEY] {
+		isNeedUpdate = true
+		mergeTags[consts.VKS_TAG_KEY] = vksClusterValue
+	}
+
+	if !isNeedUpdate {
+		logger.Info("No need to update tags")
+		return nil
+	}
+	return mergeTags
+}
+
+// ParseListenerProtocol parse listener protocol to listener protocol
+func (h *helperStruct) ParseListenerProtocol(pPort corev1.ServicePort) loadbalancerv2.ListenerProtocol {
+	opt := strings.TrimSpace(strings.ToUpper(string(pPort.Protocol)))
+	switch opt {
+	case string(loadbalancerv2.ListenerProtocolUDP):
+		return loadbalancerv2.ListenerProtocolUDP
+	}
+
+	return loadbalancerv2.ListenerProtocolTCP
+}
+
+// ParseMonitorProtocol parse monitor protocol to health check protocol
+func (h *helperStruct) ParseHealthCheckProtocol(pPoolProtocol corev1.Protocol, pMonitorProtocol string) loadbalancerv2.HealthCheckProtocol {
+	switch strings.TrimSpace(strings.ToUpper(string(pPoolProtocol))) {
+	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	switch strings.TrimSpace(strings.ToUpper(pMonitorProtocol)) {
+	case string(loadbalancerv2.HealthCheckProtocolHTTP):
+		return loadbalancerv2.HealthCheckProtocolHTTP
+	case string(loadbalancerv2.HealthCheckProtocolHTTPs):
+		return loadbalancerv2.HealthCheckProtocolHTTPs
+	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	return loadbalancerv2.HealthCheckProtocolTCP
+}
+
+// ParsePoolProtocol parse string to pool protocol
+func (h *helperStruct) ParsePoolProtocol(pPoolProtocol string) loadbalancerv2.PoolProtocol {
+	opt := strings.TrimSpace(strings.ToUpper(string(pPoolProtocol)))
+	switch opt {
+	case string(loadbalancerv2.PoolProtocolProxy):
+		return loadbalancerv2.PoolProtocolProxy
+	case string(loadbalancerv2.PoolProtocolHTTP):
+		return loadbalancerv2.PoolProtocolHTTP
+	case string(loadbalancerv2.PoolProtocolUDP):
+		return loadbalancerv2.PoolProtocolUDP
+	}
+	return loadbalancerv2.PoolProtocolTCP
+}
+
+// ComparePoolBuilder compares two pools.
+func (h *helperStruct) ComparePoolBuilder(lbID string, current, new *poolBuilderType) (*loadbalancerv2.UpdatePoolRequest, []string) {
+	isNeedUpdate := false
+	message := make([]string, 0)
+	healthMonitor := &loadbalancerv2.HealthMonitor{
+		HealthyThreshold:    new.HealthMonitor.HealthyThreshold,
+		UnhealthyThreshold:  new.HealthMonitor.UnhealthyThreshold,
+		Interval:            new.HealthMonitor.Interval,
+		Timeout:             new.HealthMonitor.Timeout,
+		HealthCheckProtocol: new.HealthMonitor.HealthCheckProtocol,
+		HealthCheckMethod:   new.HealthMonitor.HealthCheckMethod,
+		HttpVersion:         new.HealthMonitor.HttpVersion,
+		HealthCheckPath:     new.HealthMonitor.HealthCheckPath,
+		DomainName:          new.HealthMonitor.DomainName,
+		SuccessCode:         new.HealthMonitor.SuccessCode,
+	}
+	updateOptions := &loadbalancerv2.UpdatePoolRequest{
+		PoolCommon: common.PoolCommon{
+			PoolId: current.ID,
+		},
+		LoadBalancerCommon: common.LoadBalancerCommon{
+			LoadBalancerId: lbID,
+		},
+		Algorithm:     new.Algorithm,
+		Stickiness:    new.Stickiness,
+		TLSEncryption: new.TLSEncryption,
+		HealthMonitor: healthMonitor,
+	}
+	if current.Algorithm != new.Algorithm {
+		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.Algorithm, new.Algorithm))
+		isNeedUpdate = true
+	}
+	if new.Stickiness != nil && *current.Stickiness != *new.Stickiness {
+		message = append(message, fmt.Sprintf("stickiness (%t -> %t)", *current.Stickiness, *new.Stickiness))
+		isNeedUpdate = true
+	}
+	if new.TLSEncryption != nil && *current.TLSEncryption != *new.TLSEncryption {
+		message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", *current.TLSEncryption, *new.TLSEncryption))
+		isNeedUpdate = true
+	}
+
+	if current.HealthMonitor.HealthyThreshold != new.HealthMonitor.HealthyThreshold {
+		message = append(message, fmt.Sprintf("healthy threshold (%d -> %d)", current.HealthMonitor.HealthyThreshold, new.HealthMonitor.HealthyThreshold))
+		isNeedUpdate = true
+	}
+	if current.HealthMonitor.UnhealthyThreshold != new.HealthMonitor.UnhealthyThreshold {
+		message = append(message, fmt.Sprintf("unhealthy threshold (%d -> %d)", current.HealthMonitor.UnhealthyThreshold, new.HealthMonitor.UnhealthyThreshold))
+		isNeedUpdate = true
+	}
+	if current.HealthMonitor.Interval != new.HealthMonitor.Interval {
+		message = append(message, fmt.Sprintf("interval (%d -> %d)", current.HealthMonitor.Interval, new.HealthMonitor.Interval))
+		isNeedUpdate = true
+	}
+	if current.HealthMonitor.Timeout != new.HealthMonitor.Timeout {
+		message = append(message, fmt.Sprintf("timeout (%d -> %d)", current.HealthMonitor.Timeout, new.HealthMonitor.Timeout))
+		isNeedUpdate = true
+	}
+
+	if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
+		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+		// domain may return nil
+		if current.HealthMonitor.HealthCheckPath == nil || *current.HealthMonitor.HealthCheckPath != *new.HealthMonitor.HealthCheckPath ||
+			current.HealthMonitor.DomainName == nil || *current.HealthMonitor.DomainName != *new.HealthMonitor.DomainName ||
+			current.HealthMonitor.HttpVersion == nil || *current.HealthMonitor.HttpVersion != *new.HealthMonitor.HttpVersion ||
+			current.HealthMonitor.HealthCheckMethod == nil || *current.HealthMonitor.HealthCheckMethod != *new.HealthMonitor.HealthCheckMethod ||
+			current.HealthMonitor.SuccessCode == nil || *current.HealthMonitor.SuccessCode != *new.HealthMonitor.SuccessCode {
+			isNeedUpdate = true
+		}
+	} else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
+		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP {
+
+		healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolHTTP
+		healthMonitor.HealthCheckPath = current.HealthMonitor.HealthCheckPath
+		healthMonitor.DomainName = current.HealthMonitor.DomainName
+		healthMonitor.HttpVersion = current.HealthMonitor.HttpVersion
+		healthMonitor.HealthCheckMethod = current.HealthMonitor.HealthCheckMethod
+	} else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP &&
+		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+
+		healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolTCP
+		healthMonitor.HealthCheckPath = nil
+		healthMonitor.DomainName = nil
+		healthMonitor.HttpVersion = nil
+		healthMonitor.HealthCheckMethod = nil
+	}
+
+	if !isNeedUpdate {
+		return nil, nil
+	}
+	return updateOptions, message
+}
+
+// ComparePoolMembers compares two pool members.
+func (h *helperStruct) ComparePoolMembers(p1, p2 []*loadbalancerv2.Member) bool {
+	if len(p1) != len(p2) {
+		return false
+	}
+
+	CheckIfPoolMemberExist := func(mems []*loadbalancerv2.Member, mem *loadbalancerv2.Member) bool {
+		for _, r := range mems {
+			if r.IpAddress == mem.IpAddress &&
+				r.Port == mem.Port &&
+				r.MonitorPort == mem.MonitorPort &&
+				r.Backup == mem.Backup &&
+				// r.Name == mem.Name &&
+				r.Weight == mem.Weight {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, m := range p2 {
+		if !CheckIfPoolMemberExist(p1, m) {
+			return false
+		}
+	}
+	return true
+}
+
+// CompareListenerBuilder compares two listener options.
+func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *listenerBuilderType) (*loadbalancerv2.UpdateListenerRequest, []string) {
+	isNeedUpdate := false
+	message := make([]string, 0)
+	updateOptions := &loadbalancerv2.UpdateListenerRequest{
+		LoadBalancerCommon: common.LoadBalancerCommon{
+			LoadBalancerId: lbID,
+		},
+		ListenerCommon: common.ListenerCommon{
+			ListenerId: current.ID,
+		},
+		AllowedCidrs:                new.AllowedCidrs,
+		TimeoutClient:               new.TimeoutClient,
+		TimeoutMember:               new.TimeoutMember,
+		TimeoutConnection:           new.TimeoutConnection,
+		DefaultPoolId:               *new.DefaultPoolId,
+		DefaultCertificateAuthority: new.DefaultCertificateAuthority,
+		// CertificateAuthorities:      new.CertificateAuthorities, // ....................................................... add this field to sdk
+
+		// not support update these fields
+		// Headers:           current.Headers,           // L7: if this field is nil, it will update empty ? => set it nil in L4 // ....................................................... add this field to sdk
+		ClientCertificate: current.ClientCertificate, // L7: if this field is nil, it will update empty ? => set it nil in L4
+	}
+	if new.IsL4 {
+		updateOptions.Headers = nil
+		updateOptions.ClientCertificate = nil
+		updateOptions.DefaultCertificateAuthority = nil
+		// updateOptions.CertificateAuthorities = nil // ....................................................... add this field to sdk
+	}
+
+	if current.AllowedCidrs != new.AllowedCidrs {
+		message = append(message, fmt.Sprintf("allowed cidrs (%v -> %v)", current.AllowedCidrs, new.AllowedCidrs))
+		isNeedUpdate = true
+	}
+
+	if current.TimeoutClient != new.TimeoutClient {
+		message = append(message, fmt.Sprintf("timeout client (%d -> %d)", current.TimeoutClient, new.TimeoutClient))
+		isNeedUpdate = true
+	}
+
+	if current.TimeoutMember != new.TimeoutMember {
+		message = append(message, fmt.Sprintf("timeout member (%d -> %d)", current.TimeoutMember, new.TimeoutMember))
+		isNeedUpdate = true
+	}
+
+	if current.TimeoutConnection != new.TimeoutConnection {
+		message = append(message, fmt.Sprintf("timeout connection (%d -> %d)", current.TimeoutConnection, new.TimeoutConnection))
+		isNeedUpdate = true
+	}
+
+	if *current.DefaultPoolId != *new.DefaultPoolId {
+		message = append(message, fmt.Sprintf("default pool id (%s -> %s)", *current.DefaultPoolId, *new.DefaultPoolId))
+		isNeedUpdate = true
+	}
+	if new.IsL4 && new.DefaultCertificateAuthority != nil &&
+		(current.DefaultCertificateAuthority == nil || *(current.DefaultCertificateAuthority) != *(new.DefaultCertificateAuthority)) {
+		message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)", *current.DefaultCertificateAuthority, *new.DefaultCertificateAuthority))
+		isNeedUpdate = true
+	}
+
+	// .......................................
+	// if len(current.CertificateAuthorities) > 0 && new.CertificateAuthorities == nil {
+	// 	isNeedUpdate = true
+	// } else if new.CertificateAuthorities != nil {
+	// 	if len(current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
+	// 		klog.Infof("listener need update certificate authorities")
+	// 		isNeedUpdate = true
+	// 	} else {
+	// 		maps := make(map[string]bool)
+	// 		for _, ca := range current.CertificateAuthorities {
+	// 			maps[ca] = true
+	// 		}
+	// 		for _, ca := range *new.CertificateAuthorities {
+	// 			if _, ok := maps[ca]; !ok {
+	// 				klog.Infof("listener need update certificate authorities")
+	// 				isNeedUpdate = true
+	// 				break
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	if !isNeedUpdate {
+		return nil, nil
+	}
+	return updateOptions, message
+}
