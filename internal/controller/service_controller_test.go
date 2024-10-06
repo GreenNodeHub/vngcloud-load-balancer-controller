@@ -18,9 +18,13 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +45,7 @@ var _ = Describe("Service Controller", func() {
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
-				klog.Info("Reconcile Service: ", req)
+				klog.Info("Reconcile Service: ", req, ", countReconcile: ", countReconcile)
 				klog.Info("Done: ", req)
 				return ctrl.Result{}, nil
 			}
@@ -106,7 +110,7 @@ var _ = Describe("Service Controller", func() {
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
-				klog.Info("Reconcile Service: ", req)
+				klog.Info("Reconcile Service: ", req, ", countReconcile: ", countReconcile)
 				klog.Info("Done: ", req)
 				return ctrl.Result{}, nil
 			}
@@ -161,13 +165,14 @@ var _ = Describe("Service Controller", func() {
 			countReconcile, countReconcileDelete := 0, 0
 			mockServiceReconciler.ensureTest = func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
-				klog.Info("Reconcile Service: ", req)
+				klog.Info("Reconcile Service: ", req, ", countReconcile: ", countReconcile)
 				klog.Info("Done: ", req)
 				return ctrl.Result{}, nil
 			}
 			mockServiceReconciler.deleteTest = func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcileDelete++
-				klog.Info("Delete Service: ", req)
+				klog.Info("Delete Service: ", req, ", countReconcileDelete: ", countReconcileDelete)
+				time.Sleep(1 * time.Second)
 				klog.Info("Done: ", req)
 				return ctrl.Result{}, nil
 			}
@@ -216,6 +221,46 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func() bool {
 				return countReconcile == 2 && countReconcileDelete == 2
 			}, timeout, interval).Should(BeTrue())
+		})
+	})
+
+	Context("When create service with specific annotation", func() {
+		It("created load balancer shoud have specific attribute", func() {
+			mockServiceReconciler.modeTest = false
+
+			// when create a service LoadBalancer type, the controller will reconcile it
+			service := newSeviceResource("test-service", "default")
+			Expect(service).NotTo(BeNil())
+			service.Annotations = map[string]string{
+				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName): "test-lb",
+			}
+			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+
+			// get load balancer id in the service annotation
+			loadbalancerID := ""
+			Eventually(func() bool {
+				getService := &corev1.Service{}
+				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: service.Name, Namespace: service.Namespace}, getService)).Should(Succeed())
+				loadbalancerID = getService.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+				return loadbalancerID != ""
+			}, timeout, interval).Should(BeTrue())
+
+			// expect load balancer attribute in the mock provider
+			loadbalancer, err := mockProvider.GetLoadBalancerByID(loadbalancerID)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(loadbalancer).ShouldNot(BeNil())
+			Expect(loadbalancer.UUID).Should(Equal(loadbalancerID))
+			Expect(loadbalancer.Name).Should(Equal("test-lb"))
+
+			// clean up
+			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
+			Eventually(func() bool {
+				getService := &corev1.Service{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: service.Name, Namespace: service.Namespace}, getService)
+				return err != nil
+			}, 2*timeout, interval).Should(BeTrue())
+			_, err = mockProvider.GetLoadBalancerByID(loadbalancerID)
+			Expect(err).Should(HaveOccurred())
 		})
 	})
 
