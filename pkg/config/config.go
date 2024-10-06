@@ -19,6 +19,8 @@ type AuthOpts struct {
 	VServerURL   string `gcfg:"vserver-url" mapstructure:"vserverURL" name:"vserver-url"`
 	ClientID     string `gcfg:"client-id" mapstructure:"clientID" name:"client-id"`
 	ClientSecret string `gcfg:"client-secret" mapstructure:"clientSecret" name:"client-secret"`
+	// it should help in dev mode, pass the projectID directly
+	ProjectID string `gcfg:"project-id" mapstructure:"projectID" name:"project-id"`
 }
 
 func NewConfig() *Config {

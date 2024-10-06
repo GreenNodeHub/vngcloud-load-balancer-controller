@@ -77,8 +77,8 @@ func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
 }
 
 func (m *VNGCLOUD_Provider) setupPortalInfo(pmetadataService metadata.IMetadata) error {
-	if m.Config != nil {
-		m.projectID = "pro-462803f3-6858-466f-bf05-df2b33faa360" // ...............................
+	if m.Config != nil && m.Config.Global.ProjectID != "" {
+		m.projectID = m.Config.Global.ProjectID
 		return nil
 	}
 	// [cuongdm3] Get the under project ID from the metadata service
