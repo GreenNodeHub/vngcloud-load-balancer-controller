@@ -12,3 +12,7 @@ func revertKey(key string) (string, string) {
 	split := strings.Split(key, "/")
 	return split[0], split[1]
 }
+
+func PointerOf[T any](t T) *T {
+	return &t
+}

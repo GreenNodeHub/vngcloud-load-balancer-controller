@@ -97,4 +97,9 @@ const (
 	ServiceAnnotationHealthcheckHttpMethod     = "/healthcheck-http-method"
 	ServiceAnnotationHealthcheckHttpVersion    = "/healthcheck-http-version"
 	ServiceAnnotationHealthcheckHttpDomainName = "/healthcheck-http-domain-name"
+
+	SuffixTargetType       = "target-type"        // instance or ip
+	SuffixLoadBalancerID   = "load-balancer-id"   // managed by the controller
+	SuffixLoadBalancerName = "load-balancer-name" // only set via the annotation
+	SuffixIgnore           = "ignore"             // ignore the resource
 )
