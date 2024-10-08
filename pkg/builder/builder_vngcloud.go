@@ -88,14 +88,13 @@ func (b *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuil
 	}
 	poolBuilder := &poolBuilderType{
 		commonBuilder: commonBuilder{
-			Name: pool.Name,
-			ID:   pool.UUID,
+			name: pool.Name,
+			id:   pool.UUID,
 		},
 		Algorithm:     loadbalancerv2.PoolAlgorithm(pool.LoadBalanceMethod),
-		PoolName:      pool.Name,
 		PoolProtocol:  loadbalancerv2.PoolProtocol(pool.Protocol),
-		Stickiness:    nil,
-		TLSEncryption: nil,
+		Stickiness:    pool.Stickiness,
+		TLSEncryption: pool.TLSEncryption,
 		HealthMonitor: &loadbalancerv2.HealthMonitor{
 			HealthyThreshold:    healthMonitor.HealthyThreshold,
 			UnhealthyThreshold:  healthMonitor.UnhealthyThreshold,
@@ -110,10 +109,6 @@ func (b *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuil
 		},
 		IsL4:    isL4,
 		Members: make([]*loadbalancerv2.Member, 0),
-	}
-	if !isL4 {
-		poolBuilder.Stickiness = &pool.Stickiness
-		poolBuilder.TLSEncryption = &pool.TLSEncryption
 	}
 
 	members, err := b.provider.GetPoolMembers(b.loadBalancerID, pool.UUID)
@@ -134,11 +129,11 @@ func (b *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuil
 	return poolBuilder, nil
 }
 
-func (b *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*listenerBuilderType, error) {
-	listenerBuilder := &listenerBuilderType{
+func (b *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*ListenerBuilderType, error) {
+	listenerBuilder := &ListenerBuilderType{
 		commonBuilder: commonBuilder{
-			Name: listener.Name,
-			ID:   listener.UUID,
+			name: listener.Name,
+			id:   listener.UUID,
 		},
 		CreateListenerRequest: loadbalancerv2.CreateListenerRequest{
 			AllowedCidrs:                listener.AllowedCidrs,
@@ -153,6 +148,50 @@ func (b *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*listene
 			ClientCertificate:           listener.ClientCertificateAuthentication,
 			DefaultCertificateAuthority: listener.DefaultCertificateAuthority,
 		},
+		isDeleted:      false,
+		policyBuilders: make([]*policyBuilderType, 0),
+		IsL4:           b.LoadBalancerType == loadbalancerv2.LoadBalancerTypeLayer4,
+		ReferPoolName:  listener.DefaultPoolName,
+	}
+
+	// get policies
+	policies, err := b.provider.ListPolicyOfListener(b.loadBalancerID, listener.UUID)
+	if err != nil {
+		return nil, err
+	}
+	for _, policy := range policies.Items {
+		policyBuilder, err := b.buildPolicy(policy)
+		if err != nil {
+			return nil, err
+		}
+		listenerBuilder.policyBuilders = append(listenerBuilder.policyBuilders, policyBuilder)
 	}
 	return listenerBuilder, nil
+}
+
+func (b *vngcloudLBBuilder) buildPolicy(policy *entityv2.Policy) (*policyBuilderType, error) {
+	policyBuilder := &policyBuilderType{
+		commonBuilder: commonBuilder{
+			name: policy.Name,
+			id:   policy.UUID,
+		},
+		isDeleted:        false,
+		Action:           loadbalancerv2.PolicyAction(policy.Action),
+		Rules:            nil,
+		RedirectPoolID:   policy.RedirectPoolID,
+		RedirectURL:      policy.RedirectURL,
+		RedirectHTTPCode: policy.RedirectHTTPCode,
+		KeepQueryString:  policy.KeepQueryString,
+		ReferPoolName:    policy.RedirectPoolName,
+	}
+	rules := make([]loadbalancerv2.L7RuleRequest, 0)
+	for _, rule := range policy.L7Rules {
+		rules = append(rules, loadbalancerv2.L7RuleRequest{
+			CompareType: loadbalancerv2.PolicyCompareType(rule.CompareType),
+			RuleType:    loadbalancerv2.PolicyRuleType(rule.RuleType),
+			RuleValue:   rule.RuleValue,
+		})
+	}
+	policyBuilder.Rules = rules
+	return policyBuilder, nil
 }

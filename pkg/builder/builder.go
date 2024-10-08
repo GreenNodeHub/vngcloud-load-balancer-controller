@@ -59,12 +59,15 @@ type LoadbalancerBuilder interface {
 	// GetPoolBuilders() []PoolBuilder
 	// GetPoolBuilderByName(name string) PoolBuilder
 
+	AddPoolBuilder(pool *poolBuilderType)
 	GetPoolBuilders() []*poolBuilderType
 	GetPoolBuilderByName(name string) *poolBuilderType
+	GetPoolBuilderByID(name string) *poolBuilderType
 
-	GetListenerBuilders() []*listenerBuilderType
-	GetListenerBuilderByName(name string) *listenerBuilderType
-	GetListenerBuilderByPort(port int) *listenerBuilderType
+	AddListenerBuilder(listener *ListenerBuilderType)
+	GetListenerBuilders() []*ListenerBuilderType
+	GetListenerBuilderByName(name string) *ListenerBuilderType
+	GetListenerBuilderByPort(port int) *ListenerBuilderType
 	// return true if the pool is used by other listener, which is not deleted
 	IsPoolInUseByOtherListener(poolID string) bool
 }
@@ -73,9 +76,8 @@ var _ LoadbalancerBuilder = &lbBuilder{}
 
 type lbBuilder struct {
 	// annotation configuration
-	isIgnored      bool
-	loadBalancerID string
-
+	isIgnored        bool
+	loadBalancerID   string
 	loadBalancerName string
 	LoadBalancerType loadbalancerv2.LoadBalancerType
 	packageID        string
@@ -101,9 +103,16 @@ type lbBuilder struct {
 	TargetNodeLabels           map[string]string
 	IsAutoCreateSecurityGroup  bool
 	SecurityGroups             []string
-	EnableProxyProtocol        []string
 	EnableAutoscale            bool
 	TargetType                 TargetType
+
+	// for L4 only
+	EnableProxyProtocol []string
+
+	// for L7 only
+	enableStickySession bool
+	enableTLSEncryption bool
+	certificateIDs      []string
 
 	// helper components
 	annotationParser annotations.Parser
@@ -116,17 +125,13 @@ type lbBuilder struct {
 	subnetCIDR string
 	clusterID  string
 
-	// addition of ingress controller
-	defaultPoolBuilder *poolBuilderType
-	policyBuilders     []*policyBuilderType
-
 	// load balancer info
 	poolBuilders         []*poolBuilderType
-	listenerBuilders     []*listenerBuilderType
+	listenerBuilders     []*ListenerBuilderType
 	secGroupRuleBuilders []*secGroupRuleBuilderType
 
 	// resource info
-	resourceType      string `` // service, ingress
+	resourceType      string // service, ingress
 	resourceName      string
 	resourceNamespace string
 }
@@ -160,45 +165,20 @@ func (l *lbBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBalanc
 		WithScheme(l.Scheme).
 		WithType(l.LoadBalancerType)
 
-	// if have listener, create first listener
-	if len(l.GetListenerBuilders()) > 0 {
-		listenerBuilder := l.GetListenerBuilders()[0]
-		opts.WithListener(
-			loadbalancerv2.NewCreateListenerRequest(
-				listenerBuilder.GetName(),
-				listenerBuilder.ListenerProtocol,
-				listenerBuilder.ListenerProtocolPort,
-			).WithAllowedCidrs(listenerBuilder.AllowedCidrs).
-				WithTimeoutClient(listenerBuilder.TimeoutClient).
-				WithTimeoutConnection(listenerBuilder.TimeoutConnection).
-				WithTimeoutMember(listenerBuilder.TimeoutMember),
-		)
-	}
-
-	// if have pool, create first pool
+	// if have pool, create first pool, but in L7, only create default pool in this step
 	if len(l.GetPoolBuilders()) > 0 {
 		poolBuilder := l.GetPoolBuilders()[0]
-		opts.WithPool(
-			loadbalancerv2.NewCreatePoolRequest(
-				poolBuilder.GetName(),
-				poolBuilder.PoolProtocol,
-			).WithHealthMonitor(
-				loadbalancerv2.NewHealthMonitor(
-					poolBuilder.HealthMonitor.HealthCheckProtocol,
-				).WithHealthyThreshold(poolBuilder.HealthMonitor.HealthyThreshold).
-					WithUnhealthyThreshold(poolBuilder.HealthMonitor.UnhealthyThreshold).
-					WithInterval(poolBuilder.HealthMonitor.Interval).
-					// WithHealthCheckPath(*poolBuilder.HealthMonitor.HealthCheckPath).
-					// WithHealthCheckMethod(*poolBuilder.HealthMonitor.HealthCheckMethod).
-					// WithDomainName(*poolBuilder.HealthMonitor.DomainName).
-					// WithHttpVersion(*poolBuilder.HealthMonitor.HttpVersion).
-					// WithDomainName(*poolBuilder.HealthMonitor.DomainName).
-					// WithSuccessCode(*poolBuilder.HealthMonitor.SuccessCode).
-					WithTimeout(poolBuilder.HealthMonitor.Timeout),
-			).WithMembers(
-				poolBuilder.GetIMembersRequest()...,
-			).WithAlgorithm(poolBuilder.Algorithm),
-		)
+		if poolBuilder.IsL4 || (!poolBuilder.IsL4 && poolBuilder.GetName() == consts.DEFAULT_NAME_DEFAULT_POOL) {
+			// Both listener and pool properties must be required (non null) or both are not required (null); <nil> map[]},
+			// if have listener, create first listener
+			if len(l.GetListenerBuilders()) > 0 {
+				listenerBuilder := l.GetListenerBuilders()[0]
+				opts.WithListener(
+					listenerBuilder.GetICreateListenerRequest(),
+				)
+				opts.WithPool(poolBuilder.GetICreatePoolRequest(""))
+			}
+		}
 	}
 
 	// if have tags, add tags
@@ -240,6 +220,15 @@ func (l *lbBuilder) Print() {
 	// l.logger.Info(l.listenerBuilders)
 }
 
+func (l *lbBuilder) AddPoolBuilder(pool *poolBuilderType) {
+	for _, p := range l.poolBuilders {
+		if p.GetName() == pool.GetName() {
+			return
+		}
+	}
+	l.poolBuilders = append(l.poolBuilders, pool)
+}
+
 func (l *lbBuilder) GetPoolBuilders() []*poolBuilderType {
 	return l.poolBuilders
 }
@@ -253,11 +242,29 @@ func (l *lbBuilder) GetPoolBuilderByName(name string) *poolBuilderType {
 	return nil
 }
 
-func (l *lbBuilder) GetListenerBuilders() []*listenerBuilderType {
+func (l *lbBuilder) GetPoolBuilderByID(id string) *poolBuilderType {
+	for _, pool := range l.poolBuilders {
+		if pool.GetID() == id {
+			return pool
+		}
+	}
+	return nil
+}
+
+func (l *lbBuilder) AddListenerBuilder(listener *ListenerBuilderType) {
+	for _, l := range l.listenerBuilders {
+		if l.GetName() == listener.GetName() {
+			return
+		}
+	}
+	l.listenerBuilders = append(l.listenerBuilders, listener)
+}
+
+func (l *lbBuilder) GetListenerBuilders() []*ListenerBuilderType {
 	return l.listenerBuilders
 }
 
-func (l *lbBuilder) GetListenerBuilderByName(name string) *listenerBuilderType {
+func (l *lbBuilder) GetListenerBuilderByName(name string) *ListenerBuilderType {
 	for _, listener := range l.listenerBuilders {
 		if listener.GetName() == name {
 			return listener
@@ -266,7 +273,7 @@ func (l *lbBuilder) GetListenerBuilderByName(name string) *listenerBuilderType {
 	return nil
 }
 
-func (l *lbBuilder) GetListenerBuilderByPort(port int) *listenerBuilderType {
+func (l *lbBuilder) GetListenerBuilderByPort(port int) *ListenerBuilderType {
 	for _, listener := range l.listenerBuilders {
 		if listener.ListenerProtocolPort == port {
 			return listener
@@ -276,9 +283,21 @@ func (l *lbBuilder) GetListenerBuilderByPort(port int) *listenerBuilderType {
 }
 
 func (l *lbBuilder) IsPoolInUseByOtherListener(poolID string) bool {
+	// check if the pool is used by other listener
 	for _, listener := range l.listenerBuilders {
 		if !listener.IsDeleted() && *listener.DefaultPoolId == poolID {
 			return true
+		}
+
+		if listener.IsDeleted() {
+			continue
+		}
+
+		// check if the pool is used by policy
+		for _, policy := range listener.GetPolicyBuilders() {
+			if !policy.IsDeleted() && policy.RedirectPoolID == poolID {
+				return true
+			}
 		}
 	}
 	return false
@@ -334,6 +353,17 @@ func (l *lbBuilder) parseAnnotationIgnore(annos map[string]string) bool {
 
 // ---------------------------------------------------------- generate name
 
+func (l *lbBuilder) objectToLBName(clusterID string, pService client.Object) string {
+	hash := l.generateHash()
+	name := fmt.Sprintf("%s_%s_%s_%s_%s",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		TrimString(clusterID, 10),
+		TrimString(pService.GetName(), 10),
+		TrimString(pService.GetNamespace(), 10),
+		hash)
+	return l.validateName(name)
+}
+
 func (l *lbBuilder) generateHash() string {
 	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
@@ -362,8 +392,8 @@ func (l *lbBuilder) mappingProtocol(pPort corev1.ServicePort) string {
 	return string(pPort.Protocol)
 }
 
-// genListenerName generates the name of the listener.
-func (l *lbBuilder) genListenerName(pPort corev1.ServicePort) string {
+// genL4ListenerName generates the name of the listener.
+func (l *lbBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
 	hash := l.generateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
@@ -376,8 +406,8 @@ func (l *lbBuilder) genListenerName(pPort corev1.ServicePort) string {
 	return l.validateName(name)
 }
 
-// genPoolName generates the name of the pool.
-func (l *lbBuilder) genPoolName(pPort corev1.ServicePort) string {
+// genL4PoolName generates the name of the pool.
+func (l *lbBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 	realProtocol := l.mappingProtocol(pPort)
 
 	hash := l.generateHash()

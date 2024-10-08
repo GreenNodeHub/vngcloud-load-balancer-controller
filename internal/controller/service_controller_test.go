@@ -40,6 +40,12 @@ import (
 // 		-> but in test, it just reconcile once when create service
 
 var _ = Describe("Service Controller", func() {
+	Context("Wait 5 seconds before start test", func() {
+		It("should be alright", func() {
+			time.Sleep(5 * time.Second)
+		})
+	})
+
 	Context("When create, update or delete a service", func() {
 		It("should successfully reconcile the resource", func() {
 			countReconcile := 0
@@ -53,7 +59,7 @@ var _ = Describe("Service Controller", func() {
 			mockServiceReconciler.deleteTest = funcTest
 
 			// when create a service LoadBalancer type, the controller will reconcile it
-			service := newSeviceResource("test-service", "default")
+			service := newServiceResource("test-service", "default")
 			Expect(service).NotTo(BeNil())
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 			Eventually(func() int {
@@ -78,7 +84,7 @@ var _ = Describe("Service Controller", func() {
 			}, timeout, interval).Should(Equal(2))
 
 			// when create a service ClusterIP type, the controller will not reconcile it
-			service = newSeviceResource("test-service-2", "default")
+			service = newServiceResource("test-service-2", "default")
 			Expect(service).NotTo(BeNil())
 			service.Spec.Type = corev1.ServiceTypeClusterIP
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
@@ -118,7 +124,7 @@ var _ = Describe("Service Controller", func() {
 			mockServiceReconciler.deleteTest = funcTest
 
 			// when create a service LoadBalancer type, the controller will reconcile it
-			service := newSeviceResource("test-service", "default")
+			service := newServiceResource("test-service", "default")
 			Expect(service).NotTo(BeNil())
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 			Eventually(func() int {
@@ -179,7 +185,7 @@ var _ = Describe("Service Controller", func() {
 			klog.Info("countReconcile: ", countReconcile, " countReconcileDelete: ", countReconcileDelete)
 
 			// when create a service LoadBalancer type, the controller will reconcile it
-			service := newSeviceResource("test-service", "default")
+			service := newServiceResource("test-service", "default")
 			Expect(service).NotTo(BeNil())
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 			Eventually(func() bool {
@@ -229,7 +235,7 @@ var _ = Describe("Service Controller", func() {
 			mockServiceReconciler.modeTest = false
 
 			// when create a service LoadBalancer type, the controller will reconcile it
-			service := newSeviceResource("test-service", "default")
+			service := newServiceResource("test-service", "default")
 			Expect(service).NotTo(BeNil())
 			service.Annotations = map[string]string{
 				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName): "test-lb",
@@ -275,7 +281,7 @@ var _ = Describe("Service Controller", func() {
 	// })
 })
 
-func newSeviceResource(name, namespace string) *corev1.Service {
+func newServiceResource(name, namespace string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

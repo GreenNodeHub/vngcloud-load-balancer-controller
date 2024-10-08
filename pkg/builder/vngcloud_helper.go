@@ -171,26 +171,26 @@ func (h *helperStruct) ComparePoolBuilder(lbID string, current, new *poolBuilder
 	}
 	updateOptions := &loadbalancerv2.UpdatePoolRequest{
 		PoolCommon: common.PoolCommon{
-			PoolId: current.ID,
+			PoolId: current.GetID(),
 		},
 		LoadBalancerCommon: common.LoadBalancerCommon{
 			LoadBalancerId: lbID,
 		},
 		Algorithm:     new.Algorithm,
-		Stickiness:    new.Stickiness,
-		TLSEncryption: new.TLSEncryption,
+		Stickiness:    nil,
+		TLSEncryption: nil,
 		HealthMonitor: healthMonitor,
 	}
 	if current.Algorithm != new.Algorithm {
 		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.Algorithm, new.Algorithm))
 		isNeedUpdate = true
 	}
-	if new.Stickiness != nil && *current.Stickiness != *new.Stickiness {
-		message = append(message, fmt.Sprintf("stickiness (%t -> %t)", *current.Stickiness, *new.Stickiness))
+	if !new.IsL4 && current.Stickiness != new.Stickiness {
+		message = append(message, fmt.Sprintf("stickiness (%t -> %t)", current.Stickiness, new.Stickiness))
 		isNeedUpdate = true
 	}
-	if new.TLSEncryption != nil && *current.TLSEncryption != *new.TLSEncryption {
-		message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", *current.TLSEncryption, *new.TLSEncryption))
+	if !new.IsL4 && current.TLSEncryption != new.TLSEncryption {
+		message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", current.TLSEncryption, new.TLSEncryption))
 		isNeedUpdate = true
 	}
 
@@ -245,36 +245,77 @@ func (h *helperStruct) ComparePoolBuilder(lbID string, current, new *poolBuilder
 	return updateOptions, message
 }
 
-// ComparePoolMembers compares two pool members.
-func (h *helperStruct) ComparePoolMembers(p1, p2 []*loadbalancerv2.Member) bool {
-	if len(p1) != len(p2) {
-		return false
-	}
-
-	CheckIfPoolMemberExist := func(mems []*loadbalancerv2.Member, mem *loadbalancerv2.Member) bool {
-		for _, r := range mems {
-			if r.IpAddress == mem.IpAddress &&
-				r.Port == mem.Port &&
-				r.MonitorPort == mem.MonitorPort &&
-				r.Backup == mem.Backup &&
-				// r.Name == mem.Name &&
-				r.Weight == mem.Weight {
-				return true
-			}
+// checkIfPoolMemberExist checks if the pool member exists in the pool members.
+func (h *helperStruct) checkIfPoolMemberExist(mems []*loadbalancerv2.Member, mem *loadbalancerv2.Member) bool {
+	for _, r := range mems {
+		if r.IpAddress == mem.IpAddress &&
+			r.Port == mem.Port &&
+			r.MonitorPort == mem.MonitorPort &&
+			r.Backup == mem.Backup &&
+			// r.Name == mem.Name &&
+			r.Weight == mem.Weight {
+			return true
 		}
+	}
+	return false
+}
+
+// ComparePoolMembers compares two pool members.
+// mustBeEqual is true if the two pool members must be equal, otherwise, just check if the pool members exist in the other pool members.
+func (h *helperStruct) ComparePoolMembers(parentSet, childSet []*loadbalancerv2.Member, mustBeEqual bool) bool {
+	if mustBeEqual && len(parentSet) != len(childSet) {
 		return false
 	}
 
-	for _, m := range p2 {
-		if !CheckIfPoolMemberExist(p1, m) {
+	for _, m := range childSet {
+		if !h.checkIfPoolMemberExist(parentSet, m) {
 			return false
 		}
 	}
 	return true
 }
 
+// MergePoolMembers merges the pool members.
+func (h *helperStruct) MergePoolMembers(lbID string, currentBuilder, deleteBuilder, addBuilder *poolBuilderType) (loadbalancerv2.IUpdatePoolMembersRequest, error) {
+	currentSet := make([]*loadbalancerv2.Member, 0)
+	deleteSet := make([]*loadbalancerv2.Member, 0)
+	addSet := make([]*loadbalancerv2.Member, 0)
+	if currentBuilder != nil {
+		currentSet = currentBuilder.Members
+	}
+	if deleteBuilder != nil {
+		deleteSet = deleteBuilder.Members
+	}
+	if addBuilder != nil {
+		addSet = addBuilder.Members
+	}
+
+	resultPoolMembers := make([]*loadbalancerv2.Member, 0)
+	for _, member := range currentSet {
+		if h.checkIfPoolMemberExist(addSet, member) || !h.checkIfPoolMemberExist(deleteSet, member) {
+			resultPoolMembers = append(resultPoolMembers, member)
+		}
+	}
+	for _, member := range addSet {
+		if !h.checkIfPoolMemberExist(resultPoolMembers, member) {
+			resultPoolMembers = append(resultPoolMembers, member)
+		}
+	}
+
+	// if the pool members are equal, return nil
+	if h.ComparePoolMembers(resultPoolMembers, currentSet, true) {
+		return nil, nil
+	}
+
+	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
+	for _, member := range resultPoolMembers {
+		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
+	}
+	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, addBuilder.GetID()).WithMembers(convertMembers...), nil
+}
+
 // CompareListenerBuilder compares two listener options.
-func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *listenerBuilderType) (*loadbalancerv2.UpdateListenerRequest, []string) {
+func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *ListenerBuilderType) (*loadbalancerv2.UpdateListenerRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &loadbalancerv2.UpdateListenerRequest{
@@ -282,7 +323,7 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *listene
 			LoadBalancerId: lbID,
 		},
 		ListenerCommon: common.ListenerCommon{
-			ListenerId: current.ID,
+			ListenerId: current.GetID(),
 		},
 		AllowedCidrs:                new.AllowedCidrs,
 		TimeoutClient:               new.TimeoutClient,
@@ -359,4 +400,74 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *listene
 		return nil, nil
 	}
 	return updateOptions, message
+}
+
+// ComparePolicyBuilder
+func (h *helperStruct) ComparePolicyBuilder(lbID, lisID string, current, new *policyBuilderType) (*loadbalancerv2.UpdatePolicyRequest, []string) {
+	isNeedUpdate := false
+	message := make([]string, 0)
+	updateOptions := &loadbalancerv2.UpdatePolicyRequest{
+		LoadBalancerCommon: common.LoadBalancerCommon{
+			LoadBalancerId: lbID,
+		},
+		ListenerCommon: common.ListenerCommon{
+			ListenerId: lisID,
+		},
+		PolicyCommon: common.PolicyCommon{
+			PolicyId: current.GetID(),
+		},
+		Action:           new.Action,
+		Rules:            new.Rules,
+		KeepQueryString:  new.KeepQueryString,
+		RedirectPoolID:   new.RedirectPoolID,
+		RedirectURL:      new.RedirectURL,
+		RedirectHTTPCode: new.RedirectHTTPCode,
+	}
+	if current.Action != new.Action {
+		message = append(message, fmt.Sprintf("action (%s -> %s)", current.Action, new.Action))
+		isNeedUpdate = true
+	}
+	if current.RedirectPoolID != new.RedirectPoolID {
+		message = append(message, fmt.Sprintf("redirect pool id (%s -> %s)", current.RedirectPoolID, new.RedirectPoolID))
+		isNeedUpdate = true
+	}
+	if current.RedirectURL != new.RedirectURL {
+		message = append(message, fmt.Sprintf("redirect url (%s -> %s)", current.RedirectURL, new.RedirectURL))
+		isNeedUpdate = true
+	}
+	if current.RedirectHTTPCode != new.RedirectHTTPCode {
+		message = append(message, fmt.Sprintf("redirect http code (%d -> %d)", current.RedirectHTTPCode, new.RedirectHTTPCode))
+		isNeedUpdate = true
+	}
+	if current.KeepQueryString != new.KeepQueryString {
+		message = append(message, fmt.Sprintf("keep query string (%t -> %t)", current.KeepQueryString, new.KeepQueryString))
+		isNeedUpdate = true
+	}
+	if len(current.Rules) != len(new.Rules) {
+		message = append(message, fmt.Sprintf("len(rules) (%d -> %d)", len(current.Rules), len(new.Rules)))
+		isNeedUpdate = true
+	} else {
+		for _, rule := range new.Rules {
+			if !h.checkIfL7RuleExist(current.Rules, rule) {
+				message = append(message, fmt.Sprintf("rules (%v -> %v)", current.Rules, new.Rules))
+				isNeedUpdate = true
+				break
+			}
+		}
+	}
+	if !isNeedUpdate {
+		return nil, nil
+	}
+	return updateOptions, message
+}
+
+func (h *helperStruct) checkIfL7RuleExist(rules []loadbalancerv2.L7RuleRequest, rule loadbalancerv2.L7RuleRequest) bool {
+	for _, r := range rules {
+		if r.CompareType == rule.CompareType &&
+			r.RuleType == rule.RuleType &&
+			r.RuleValue == rule.RuleValue {
+			return true
+		}
+	}
+	return false
 }

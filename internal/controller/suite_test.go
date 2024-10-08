@@ -71,7 +71,8 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-1",
 			Labels: map[string]string{
-				"vks.vngcloud.vn/subnet-id": "subnet-1",
+				"nodeName":  "mock-node-1",
+				"nodeGroup": "mock-node-group-a",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -93,7 +94,8 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-2",
 			Labels: map[string]string{
-				"vks.vngcloud.vn/subnet-id": "subnet-2",
+				"nodeName":  "mock-node-2",
+				"nodeGroup": "mock-node-group-a",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -103,6 +105,52 @@ var (
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.2"},
 				{Type: corev1.NodeHostName, Address: "mock-node-2"},
+			},
+		},
+	}
+
+	mockNode3 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-3",
+			Labels: map[string]string{
+				"nodeName":  "mock-node-3",
+				"nodeGroup": "mock-node-group-b",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000003",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.3"},
+				{Type: corev1.NodeHostName, Address: "mock-node-3"},
+			},
+		},
+	}
+
+	mockNode4 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-4",
+			Labels: map[string]string{
+				"nodeName":  "mock-node-4",
+				"nodeGroup": "mock-node-group-b",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000004",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.4"},
+				{Type: corev1.NodeHostName, Address: "mock-node-4"},
 			},
 		},
 	}
@@ -198,8 +246,12 @@ var _ = BeforeSuite(func() {
 	// Create mock node
 	err = k8sClient.Create(ctx, mockNode1)
 	Expect(err).ToNot(HaveOccurred())
-	// err = k8sClient.Create(ctx, mockNode2)
-	// Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, mockNode2)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, mockNode3)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, mockNode4)
+	Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -74,6 +75,10 @@ type ServiceReconciler struct {
 
 	// store to delete redundant loadbalancer resources
 	cacheLoadBalancerBuilder map[string]builder.LoadbalancerBuilder
+
+	//  flag to check if the reconciler is initialized
+	initialized bool
+	initLock    sync.Mutex
 }
 
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
@@ -87,6 +92,10 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=endpoints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=endpoints/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
 func (r *ServiceReconciler) isValid(obj interface{}) bool {
@@ -155,6 +164,9 @@ func (r *ServiceReconciler) getReconcileRequestsPeriodically() []reconcile.Reque
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if !r.initialized {
+		return ctrl.Result{Requeue: true}, nil
+	}
 	key := genKey(req.Namespace, req.Name)
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("s/" + key)).GetContext()
@@ -213,11 +225,11 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 
 	// ignore reconcile
 	if loadBalancerBuilder.IsIgnored() {
-		logger.Info("Service is ignored")
+		logger.Info("Object is ignored")
 		return ctrl.Result{}, nil
 	}
 
-	// create loadbalancer, update service annotation and reconcile later
+	// create loadbalancer, update annotation and reconcile later
 	if loadBalancerBuilder.GetID() == "" {
 		// check if loadbalancer with the generate name exists, if exists, update annotation and return
 		lb, err := r.Provider.GetLoadBalancerByName(loadBalancerBuilder.GetName())
@@ -250,6 +262,29 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		return ctrl.Result{}, err
 	}
 
+	// build oldBuilder
+	var (
+		oldBuilder builder.LoadbalancerBuilder
+		ok         bool
+	)
+	if oldBuilder, ok = r.cacheLoadBalancerBuilder[genKey(obj.Namespace, obj.Name)]; !ok {
+		// check oldObjInterface can be converted to *corev1.Service, if not, set oldObj = nil
+		var oldObj *corev1.Service
+		if oldObj, ok = oldObjInterface.(*corev1.Service); !ok {
+			oldObj = nil
+		}
+		// build again
+		var err error
+		oldBuilder, err = builder.NewLoadBalancerBuilderByService(ctx, oldObj, r.annotationParser, r.Client,
+			r.netwotkID, r.subnetID, r.subnetCIDR,
+			r.Config.Cluster.ClusterID,
+			r.knownNodes,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// // ensure tags
 	// tags := VNGHelper.MergeTags(ctx, currentBuilder, loadBalancerBuilder)
 	// if tags != nil {
@@ -278,7 +313,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		poolInPortal := currentBuilder.GetPoolBuilderByName(poolBuilder.GetName())
 		if poolInPortal == nil {
 			if _pool, err := r.Provider.CreatePool(loadBalancerBuilder.GetID(),
-				poolBuilder.GetICreatePoolRequest().WithLoadBalancerId(loadBalancerBuilder.GetID())); err != nil {
+				poolBuilder.GetICreatePoolRequest(loadBalancerBuilder.GetID())); err != nil {
 				logger.Error("Failed to create pool: ", err)
 				return ctrl.Result{}, err
 			} else {
@@ -293,7 +328,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 			poolBuilder.SetID(poolInPortal.GetID())
 			updateOptions, message := builder.VNGHelper.ComparePoolBuilder(loadBalancerBuilder.GetID(), poolInPortal, poolBuilder)
 			if updateOptions != nil {
-				logger.Info("Update pool: ", strings.Join(message, ", "))
+				logger.Info("Need update pool: ", strings.Join(message, ", "))
 				err := r.Provider.UpdatePool(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
 					updateOptions.WithLoadBalancerId(loadBalancerBuilder.GetID()))
 				if err != nil {
@@ -307,9 +342,9 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 			}
 
 			// ensure pool members
-			if !builder.VNGHelper.ComparePoolMembers(poolInPortal.Members, poolBuilder.Members) {
+			if !builder.VNGHelper.ComparePoolMembers(poolInPortal.Members, poolBuilder.Members, false) {
 				err := r.Provider.UpdatePoolMembers(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
-					poolBuilder.GetIUpdatePoolMembersRequest())
+					poolBuilder.GetIUpdatePoolMembersRequest(loadBalancerBuilder.GetID()))
 				if err != nil {
 					logger.Error("Failed to update pool members: ", err)
 					return ctrl.Result{}, err
@@ -356,40 +391,24 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 
 			updateOptions, message := builder.VNGHelper.CompareListenerBuilder(loadBalancerBuilder.GetID(), listenerInPortal, listenerBuilder)
 			if updateOptions != nil {
-				logger.Info("Update listener: ", strings.Join(message, ", "))
+				logger.Info("Need update listener: ", strings.Join(message, ", "))
 				err := r.Provider.UpdateListener(loadBalancerBuilder.GetID(), listenerInPortal.GetID(), updateOptions)
 				if err != nil {
 					logger.Error("Failed to update listener: ", err)
 					return ctrl.Result{}, err
+				}
+
+				// need to update to current builder, avoid mismatch data later
+				listenerInPortal.DefaultPoolId = &updateOptions.DefaultPoolId
+				listenerInPortal.ReferPoolName = ""
+				if p := loadBalancerBuilder.GetPoolBuilderByID(updateOptions.DefaultPoolId); p != nil {
+					listenerInPortal.ReferPoolName = p.GetName()
 				}
 				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
 			}
-		}
-	}
-
-	var (
-		oldBuilder builder.LoadbalancerBuilder
-		ok         bool
-	)
-
-	if oldBuilder, ok = r.cacheLoadBalancerBuilder[genKey(obj.Namespace, obj.Name)]; !ok {
-		// check oldObjInterface can be converted to *corev1.Service, if not, set oldObj = nil
-		var oldObj *corev1.Service
-		if oldObj, ok = oldObjInterface.(*corev1.Service); !ok {
-			oldObj = nil
-		}
-		// build again
-		var err error
-		oldBuilder, err = builder.NewLoadBalancerBuilderByService(ctx, oldObj, r.annotationParser, r.Client,
-			r.netwotkID, r.subnetID, r.subnetCIDR,
-			r.Config.Cluster.ClusterID,
-			r.knownNodes,
-		)
-		if err != nil {
-			return ctrl.Result{}, err
 		}
 	}
 
@@ -413,6 +432,9 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	for _, pool := range oldBuilder.GetPoolBuilders() {
 		if currentPool := currentBuilder.GetPoolBuilderByName(pool.GetName()); currentPool != nil &&
 			loadBalancerBuilder.GetPoolBuilderByName(pool.GetName()) == nil {
+			if currentPool.IsDeleted() {
+				continue
+			}
 			if currentBuilder.IsPoolInUseByOtherListener(currentPool.GetID()) {
 				logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
 				continue
@@ -421,6 +443,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 				logger.Error("Failed to delete pool: ", err)
 				return ctrl.Result{}, err
 			}
+			currentPool.SetIsDeleted(true)
 			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
@@ -494,10 +517,10 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	// check if can delete whole loadbalancer
 	// oldBuilder and currentBuilder should be the same listeners' name, pool's name
 	checkCanDeleteWholeLoadBalancer := func(oldBuilder, currentBuilder builder.LoadbalancerBuilder) bool {
-		if len(oldBuilder.GetListenerBuilders()) != len(currentBuilder.GetListenerBuilders()) {
+		if len(oldBuilder.GetListenerBuilders()) < len(currentBuilder.GetListenerBuilders()) {
 			return false
 		}
-		if len(oldBuilder.GetPoolBuilders()) != len(currentBuilder.GetPoolBuilders()) {
+		if len(oldBuilder.GetPoolBuilders()) < len(currentBuilder.GetPoolBuilders()) {
 			return false
 		}
 		for _, listener := range oldBuilder.GetListenerBuilders() {
@@ -576,6 +599,8 @@ func (r *ServiceReconciler) init() error {
 
 // this function is called by the InitRunnable after cache is started, run after init() function
 func (r *ServiceReconciler) Init(client client.Client) error {
+	r.initLock.Lock()
+	defer r.initLock.Unlock()
 	// should have at least 1 node to get network information (networkID, subnetID, subnetCIDR)
 	var err error
 	r.knownNodes, err = r.getNodes(client)
@@ -600,6 +625,7 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 		return errs.ErrorNoNetworkInfo
 	}
 
+	r.initialized = true
 	return nil
 }
 

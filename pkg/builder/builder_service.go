@@ -2,7 +2,6 @@ package builder
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -95,7 +94,7 @@ func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node)
 
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
-		l.loadBalancerName = l.serviceNameToLBName(l.clusterID, pService)
+		l.loadBalancerName = l.objectToLBName(l.clusterID, pService)
 	}
 
 	// Get members address, nodeIP or podIP
@@ -118,8 +117,8 @@ func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node)
 
 	// Build pool and listener
 	for _, port := range ports {
-		poolName := l.genPoolName(port)
-		listenerName := l.genListenerName(port)
+		poolName := l.genL4PoolName(port)
+		listenerName := l.genL4ListenerName(port)
 
 		// nodePort if target type is instance, targetPort if target type is ip
 		targetPort := 0
@@ -167,32 +166,24 @@ func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node)
 		listenerBuilder := l.createListenerBuilder(port, listenerName)
 		listenerBuilder.ReferPoolName = poolName
 
-		l.poolBuilders = append(l.poolBuilders, poolBuilder)
-		l.listenerBuilders = append(l.listenerBuilders, listenerBuilder)
+		l.AddPoolBuilder(poolBuilder)
+		l.AddListenerBuilder(listenerBuilder)
 	}
 
 	return nil
 
 }
 
-func (l *lbBuilder) serviceNameToLBName(clusterID string, pService *corev1.Service) string {
-	hash := l.generateHash()
-	name := fmt.Sprintf("%s_%s_%s_%s_%s",
-		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(clusterID, 10),
-		TrimString(pService.Namespace, 10),
-		TrimString(pService.Name, 10),
-		hash)
-	return l.validateName(name)
-}
-
 // createListenerBuilder creates the listener options.
-func (l *lbBuilder) createListenerBuilder(pPort corev1.ServicePort, name string) *listenerBuilderType {
-	opt := &listenerBuilderType{
+func (l *lbBuilder) createListenerBuilder(pPort corev1.ServicePort, name string) *ListenerBuilderType {
+	opt := &ListenerBuilderType{
 		IsL4: true,
 		commonBuilder: commonBuilder{
-			Name: name,
+			name: name,
 		},
+		isDeleted:      false,
+		policyBuilders: []*policyBuilderType{},
+		ReferPoolName:  "", // will be set later
 		CreateListenerRequest: loadbalancerv2.CreateListenerRequest{
 			DefaultPoolId: PointerOf(""), // will be set later
 
@@ -238,12 +229,12 @@ func (l *lbBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) *po
 	opt := &poolBuilderType{
 		IsL4: true,
 		commonBuilder: commonBuilder{
-			Name: name,
+			name: name,
 		},
-		PoolName:      name,
+		isDeleted:     false,
 		PoolProtocol:  VNGHelper.ParsePoolProtocol(l.mappingProtocol(pPort)),
-		Stickiness:    nil,
-		TLSEncryption: nil,
+		Stickiness:    false,
+		TLSEncryption: false,
 		HealthMonitor: &healthMonitor,
 		Algorithm:     l.PoolAlgorithm,
 		Members:       nil, // will be set later
