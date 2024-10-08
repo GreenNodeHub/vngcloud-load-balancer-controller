@@ -10,12 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
-	"github.com/vngcloud/vngcloud-go-sdk/vngcloud/objects"
-	"github.com/vngcloud/vngcloud-go-sdk/vngcloud/services/loadbalancer/v2/certificates"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/vngcloud/vngcloud-go-sdk/vngcloud/services/loadbalancer/v2/policy"
-	"github.com/vngcloud/vngcloud-go-sdk/vngcloud/services/network/v2/extensions/secgroup_rule"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
@@ -44,6 +40,11 @@ type wrapPool struct {
 	*entityv2.Pool
 	lbID string
 }
+type wrapPolicy struct {
+	*entityv2.Policy
+	lbID       string
+	listenerID string
+}
 
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
@@ -57,6 +58,7 @@ type MockProvider struct {
 	loadBalancers []*entityv2.LoadBalancer
 	listeners     []*wrapListener
 	pools         []*wrapPool
+	policies      []*wrapPolicy
 
 	mu sync.Mutex
 }
@@ -72,6 +74,7 @@ func NewMockProvider() *MockProvider {
 		loadBalancers: make([]*entityv2.LoadBalancer, 0),
 		listeners:     make([]*wrapListener, 0),
 		pools:         make([]*wrapPool, 0),
+		policies:      make([]*wrapPolicy, 0),
 	}
 }
 
@@ -95,71 +98,71 @@ func (m *MockProvider) GetSubnetCIDR() string {
 	return m.subnetCIDR
 }
 
-// --------------------------- Security Group ---------------------------
+// // --------------------------- Security Group ---------------------------
 
-func (m *MockProvider) ListSecurityGroups() ([]*objects.Secgroup, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) UpdateSecGroupsOfServer(instanceID string, secgroups []string) (*objects.Server, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) GetSecurityGroup(secgroupID string) (*objects.Secgroup, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) DeleteSecurityGroup(secgroupID string) error {
-	m.logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
-}
-func (m *MockProvider) CreateSecurityGroup(name string, description string) (*objects.Secgroup, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
+// func (m *MockProvider) ListSecurityGroups() ([]*objects.Secgroup, error) {
+// 	m.logger.Error("not implemented yet", "ListSecurityGroups")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) UpdateSecGroupsOfServer(instanceID string, secgroups []string) (*objects.Server, error) {
+// 	m.logger.Error("not implemented yet", "UpdateSecGroupsOfServer")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) GetSecurityGroup(secgroupID string) (*objects.Secgroup, error) {
+// 	m.logger.Error("not implemented yet", "GetSecurityGroup")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) DeleteSecurityGroup(secgroupID string) error {
+// 	m.logger.Error("not implemented yet", "DeleteSecurityGroup")
+// 	return errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) CreateSecurityGroup(name string, description string) (*objects.Secgroup, error) {
+// 	m.logger.Error("not implemented yet", "CreateSecurityGroup")
+// 	return nil, errs.ErrorNotImplemented
+// }
 
-func (m *MockProvider) CreateSecurityGroupRule(secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) DeleteSecurityGroupRule(secgroupID string, ruleID string) error {
-	m.logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
-}
-func (m *MockProvider) ListSecurityGroupRules(secgroupID string) ([]*objects.SecgroupRule, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
+// func (m *MockProvider) CreateSecurityGroupRule(secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
+// 	m.logger.Error("not implemented yet", "CreateSecurityGroupRule")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) DeleteSecurityGroupRule(secgroupID string, ruleID string) error {
+// 	m.logger.Error("not implemented yet", "DeleteSecurityGroupRule")
+// 	return errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) ListSecurityGroupRules(secgroupID string) ([]*objects.SecgroupRule, error) {
+// 	m.logger.Error("not implemented yet", "ListSecurityGroupRules")
+// 	return nil, errs.ErrorNotImplemented
+// }
 
-// --------------------------- Tags ---------------------------
+// // --------------------------- Tags ---------------------------
 
-func (m *MockProvider) GetTags(resourceID string) ([]*objects.ResourceTag, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) UpdateTags(resourceID string, tags map[string]string) error {
-	m.logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
-}
+// func (m *MockProvider) GetTags(resourceID string) ([]*objects.ResourceTag, error) {
+// 	m.logger.Error("not implemented yet", "GetTags")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) UpdateTags(resourceID string, tags map[string]string) error {
+// 	m.logger.Error("not implemented yet", "UpdateTags")
+// 	return errs.ErrorNotImplemented
+// }
 
-func (m *MockProvider) GetSubnet(subnetID string) (*objects.Subnet, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
+// func (m *MockProvider) GetSubnet(subnetID string) (*objects.Subnet, error) {
+// 	m.logger.Error("not implemented yet", "GetSubnet")
+// 	return nil, errs.ErrorNotImplemented
+// }
 
-// --------------------------- Server ---------------------------
+// // --------------------------- Server ---------------------------
 
-func (m *MockProvider) GetServerByID(serverID string) (*objects.Server, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) ListServerByProviderIDs(providerIDs []string) ([]*objects.Server, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) WaitForServerActive(serverID string) {
+// func (m *MockProvider) GetServerByID(serverID string) (*objects.Server, error) {
+// 	m.logger.Error("not implemented yet", "GetServerByID")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) ListServerByProviderIDs(providerIDs []string) ([]*objects.Server, error) {
+// 	m.logger.Error("not implemented yet", "ListServerByProviderIDs")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) WaitForServerActive(serverID string) {
 
-}
+// }
 
 // --------------------------- Load Balancer ---------------------------
 
@@ -288,7 +291,7 @@ func (m *MockProvider) DeleteLoadBalancer(lbID string) error {
 	return nil
 }
 func (m *MockProvider) ResizeLoadBalancer(lbID, packageID string) error {
-	m.logger.Error("not implemented yet")
+	m.logger.Error("not implemented yet", "ResizeLoadBalancer")
 	return errs.ErrorNotImplemented
 }
 func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, error) {
@@ -330,14 +333,15 @@ func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, err
 
 // --------------------------- Listener ---------------------------
 
-func (m *MockProvider) GetListenerByName(lbID, name string) (*objects.Listener, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) GetListenerByPort(lbID string, port int) (*objects.Listener, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
+//	func (m *MockProvider) GetListenerByName(lbID, name string) (*objects.Listener, error) {
+//		m.logger.Error("not implemented yet", "GetListenerByName")
+//		return nil, errs.ErrorNotImplemented
+//	}
+//
+//	func (m *MockProvider) GetListenerByPort(lbID string, port int) (*objects.Listener, error) {
+//		m.logger.Error("not implemented yet", "GetListenerByPort")
+//		return nil, errs.ErrorNotImplemented
+//	}
 func (m *MockProvider) CreateListener(lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
 	listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	newListener := &wrapListener{
@@ -426,37 +430,126 @@ func (m *MockProvider) UpdateListener(lbID, listenerID string, opt loadbalancerv
 
 // --------------------------- Policy ---------------------------
 
-func (m *MockProvider) GetPolicyByName(lbID, listenerID, name string) (*objects.Policy, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+//	func (m *MockProvider) GetPolicyByName(lbID, listenerID, name string) (*objects.Policy, error) {
+//		m.logger.Error("not implemented yet", "GetPolicyByName")
+//		return nil, errs.ErrorNotImplemented
+//	}
+func (m *MockProvider) CreatePolicy(lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
+	lb, err := m.GetLoadBalancerByID(lbID)
+	if err != nil {
+		return nil, err
+	}
+	if lb == nil {
+		return nil, errs.ErrorNotFound
+	}
+	listeners, err := m.ListListenerOfLB(lbID)
+	if err != nil {
+		return nil, err
+	}
+	if listeners == nil {
+		return nil, errs.ErrorNotFound
+	}
+	isFound := false
+	for _, l := range listeners.Items {
+		if l.GetId() == listenerID {
+			isFound = true
+			break
+		}
+	}
+	if !isFound {
+		return nil, errs.ErrorNotFound
+	}
+
+	policy := opt.ToRequestBody().(*loadbalancerv2.CreatePolicyRequest)
+	newPolicy := &wrapPolicy{
+		lbID:       lbID,
+		listenerID: listenerID,
+		Policy: &entityv2.Policy{
+			UUID:             "pol-" + randID(),
+			Name:             policy.Name,
+			Description:      "????????",
+			RedirectPoolID:   policy.RedirectPoolID,
+			Action:           string(policy.Action),
+			RedirectURL:      policy.RedirectURL,
+			RedirectPoolName: "",
+			RedirectHTTPCode: policy.RedirectHTTPCode,
+			KeepQueryString:  policy.KeepQueryString,
+			L7Rules:          nil,
+			Position:         0, // ????????
+			DisplayStatus:    consts.ACTIVE_LOADBALANCER_STATUS,
+			CreatedAt:        time.Now().Format(time.RFC3339),
+			UpdatedAt:        time.Now().Format(time.RFC3339),
+			ProgressStatus:   consts.ACTIVE_LOADBALANCER_STATUS,
+		},
+	}
+	if policy.RedirectPoolID != "" {
+		pool, _ := m.GetPoolByID(lbID, policy.RedirectPoolID)
+		if pool != nil {
+			newPolicy.RedirectPoolName = pool.Name
+		} else {
+			return nil, errs.ErrorNotFound
+		}
+	}
+	newRules := make([]*entityv2.L7Rule, 0)
+	for _, r := range policy.Rules {
+		newRules = append(newRules, &entityv2.L7Rule{
+			UUID:               "rule-" + randID(),
+			CompareType:        string(r.CompareType),
+			RuleValue:          r.RuleValue,
+			RuleType:           string(r.RuleType),
+			ProvisioningStatus: consts.ACTIVE_LOADBALANCER_STATUS,
+			OperatingStatus:    consts.ACTIVE_LOADBALANCER_STATUS,
+		})
+	}
+	newPolicy.L7Rules = newRules
+	m.mu.Lock()
+	m.policies = append(m.policies, newPolicy)
+	m.mu.Unlock()
+	return newPolicy.Policy, nil
 }
-func (m *MockProvider) CreatePolicy(lbID, listenerID string, opt *policy.CreateOptsBuilder) (*objects.Policy, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+func (m *MockProvider) ListPolicyOfListener(lbID, listenerID string) (*entityv2.ListPolicies, error) {
+	policies := make([]*entityv2.Policy, 0)
+	for _, p := range m.policies {
+		if p.lbID == lbID && p.listenerID == listenerID {
+			policies = append(policies, p.Policy)
+		}
+	}
+	return &entityv2.ListPolicies{
+		Items: policies,
+	}, nil
 }
-func (m *MockProvider) ListPolicyOfListener(lbID, listenerID string) ([]*objects.Policy, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) GetPolicyByID(policyID string) (*objects.Policy, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) UpdatePolicy(lbID, listenerID, policyID string, opt *policy.UpdateOptsBuilder) error {
-	m.logger.Error("not implemented yet")
+
+//	func (m *MockProvider) GetPolicyByID(policyID string) (*objects.Policy, error) {
+//		m.logger.Error("not implemented yet", "GetPolicyByID")
+//		return nil, errs.ErrorNotImplemented
+//	}
+func (m *MockProvider) UpdatePolicy(lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
+	m.logger.Error("not implemented yet", "UpdatePolicy")
 	return errs.ErrorNotImplemented
 }
 func (m *MockProvider) DeletePolicy(lbID, listenerID, policyID string) error {
-	m.logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
+	isFound := false
+	newPolicies := make([]*wrapPolicy, 0)
+	for i, p := range m.policies {
+		if p.lbID != lbID || p.listenerID != listenerID || p.UUID != policyID {
+			newPolicies = append(newPolicies, m.policies[i])
+		} else {
+			isFound = true
+		}
+	}
+	if !isFound {
+		return errs.ErrorNotFound
+	}
+	m.policies = newPolicies
+	return nil
 }
 
 // --------------------------- Pool ---------------------------
 
-func (m *MockProvider) GetPoolByName(lbID, name string) (*objects.Pool, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
+//	func (m *MockProvider) GetPoolByName(lbID, name string) (*objects.Pool, error) {
+//		m.logger.Error("not implemented yet", "GetPoolByName")
+//		return nil, errs.ErrorNotImplemented
+//	}
 func (m *MockProvider) CreatePool(lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	var (
 		pool          *loadbalancerv2.CreatePoolRequest
@@ -561,13 +654,17 @@ func (m *MockProvider) ListPool(lbID string) (*entityv2.ListPools, error) {
 	}, nil
 }
 func (m *MockProvider) UpdatePoolMembers(lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
-	m.logger.Error("not implemented yet")
+	m.logger.Error("not implemented yet", "UpdatePoolMembers")
 	return errs.ErrorNotImplemented
 }
 
-func (m *MockProvider) GetPoolByID(lbID, poolID string) (*objects.Pool, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+func (m *MockProvider) GetPoolByID(lbID, poolID string) (*entityv2.Pool, error) {
+	for _, p := range m.pools {
+		if p.lbID == lbID && p.GetId() == poolID {
+			return p.Pool, nil
+		}
+	}
+	return nil, errs.ErrorNotFound
 }
 
 func (m *MockProvider) GetPoolMembers(lbID, poolID string) (*entityv2.ListMembers, error) {
@@ -621,21 +718,21 @@ func (m *MockProvider) GetPoolHealthMonitorById(lbID, poolID string) (*entityv2.
 	return nil, errs.ErrorNotFound
 }
 
-// --------------------------- Certificate ---------------------------
+// // --------------------------- Certificate ---------------------------
 
-func (m *MockProvider) ImportCertificate(opt *certificates.ImportOpts) (*objects.Certificate, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) ListCertificates() ([]*objects.Certificate, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) GetCertificateByID(certID string) (*objects.Certificate, error) {
-	m.logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
-}
-func (m *MockProvider) DeleteCertificate(certID string) error {
-	m.logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
-}
+// func (m *MockProvider) ImportCertificate(opt *certificates.ImportOpts) (*objects.Certificate, error) {
+// 	m.logger.Error("not implemented yet", "ImportCertificate")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) ListCertificates() ([]*objects.Certificate, error) {
+// 	m.logger.Error("not implemented yet", "ListCertificates")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) GetCertificateByID(certID string) (*objects.Certificate, error) {
+// 	m.logger.Error("not implemented yet", "GetCertificateByID")
+// 	return nil, errs.ErrorNotImplemented
+// }
+// func (m *MockProvider) DeleteCertificate(certID string) error {
+// 	m.logger.Error("not implemented yet", "DeleteCertificate")
+// 	return errs.ErrorNotImplemented
+// }

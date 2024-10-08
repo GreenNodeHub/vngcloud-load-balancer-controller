@@ -39,7 +39,9 @@ func (p *PeriodicReconciler) Start(ctx context.Context) {
 				// Get the list of reconcile requests to process
 				requests := p.GetReconcileRequests()
 
-				// Log reconciliation start using klog
+				if len(requests) == 0 {
+					continue
+				}
 				logrus.Infof("Starting periodic reconciliation for requests: %v", requests)
 
 				// Call Reconcile for each request and pass the context
