@@ -76,40 +76,38 @@ var _ LoadbalancerBuilder = &lbBuilder{}
 
 type lbBuilder struct {
 	// annotation configuration
-	isIgnored        bool
-	loadBalancerID   string
-	loadBalancerName string
-	LoadBalancerType loadbalancerv2.LoadBalancerType
-	packageID        string
-	Scheme           loadbalancerv2.LoadBalancerScheme
+	isIgnored                  bool
+	loadBalancerID             string
+	loadBalancerName           string
+	loadBalancerType           loadbalancerv2.LoadBalancerType
+	packageID                  string
+	scheme                     loadbalancerv2.LoadBalancerScheme
+	idleTimeoutClient          int
+	idleTimeoutMember          int
+	idleTimeoutConnection      int
+	inboundCIDRs               []string
+	healthcheckProtocol        loadbalancerv2.HealthCheckProtocol
+	healthcheckPath            string
+	successCodes               string
+	healthcheckHttpVersion     loadbalancerv2.HealthCheckHttpVersion
+	healthcheckHttpDomainName  string
+	healthyThresholdCount      int
+	unhealthyThresholdCount    int
+	poolAlgorithm              loadbalancerv2.PoolAlgorithm
+	tags                       map[string]string
+	targetNodeLabels           map[string]string
+	securityGroups             []string
+	healthcheckPort            int
+	healthcheckHttpMethod      loadbalancerv2.HealthCheckMethod
+	healthcheckTimeoutSeconds  int
+	healthcheckIntervalSeconds int
+	enableAutoscale            bool
+	targetType                 TargetType
 
-	IdleTimeoutClient          int
-	IdleTimeoutMember          int
-	IdleTimeoutConnection      int
-	InboundCIDRs               []string
-	HealthcheckProtocol        loadbalancerv2.HealthCheckProtocol
-	HealthcheckHttpMethod      loadbalancerv2.HealthCheckMethod
-	HealthcheckPath            string
-	SuccessCodes               string
-	HealthcheckHttpVersion     loadbalancerv2.HealthCheckHttpVersion
-	HealthcheckHttpDomainName  string
-	PoolAlgorithm              loadbalancerv2.PoolAlgorithm
-	HealthyThresholdCount      int
-	UnhealthyThresholdCount    int
-	HealthcheckTimeoutSeconds  int
-	HealthcheckIntervalSeconds int
-	HealthcheckPort            int
-	Tags                       map[string]string
-	TargetNodeLabels           map[string]string
-	IsAutoCreateSecurityGroup  bool
-	SecurityGroups             []string
-	EnableAutoscale            bool
-	TargetType                 TargetType
+	// annotation configuration for L4 only
+	enableProxyProtocol []string
 
-	// for L4 only
-	EnableProxyProtocol []string
-
-	// for L7 only
+	// annotation configuration for L7 only
 	enableStickySession bool
 	enableTLSEncryption bool
 	certificateIDs      []string
@@ -134,6 +132,9 @@ type lbBuilder struct {
 	resourceType      string // service, ingress
 	resourceName      string
 	resourceNamespace string
+
+	// if user pass the security group annotation, don't create any security group, just use the given security group
+	IsAutoCreateSecurityGroup bool
 }
 
 func (l *lbBuilder) GetName() string {
@@ -149,11 +150,11 @@ func (l *lbBuilder) GetPackageID() string {
 }
 
 func (l *lbBuilder) GetTags() map[string]string {
-	return l.Tags
+	return l.tags
 }
 
 func (l *lbBuilder) GetSecurityGroupIDs() []string {
-	return l.SecurityGroups
+	return l.securityGroups
 }
 
 func (l *lbBuilder) IsIgnored() bool {
@@ -162,8 +163,8 @@ func (l *lbBuilder) IsIgnored() bool {
 
 func (l *lbBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBalancerRequest {
 	opts := loadbalancerv2.NewCreateLoadBalancerRequest(l.GetName(), l.GetPackageID(), l.GetSubnetID()).
-		WithScheme(l.Scheme).
-		WithType(l.LoadBalancerType)
+		WithScheme(l.scheme).
+		WithType(l.loadBalancerType)
 
 	// if have pool, create first pool, but in L7, only create default pool in this step
 	if len(l.GetPoolBuilders()) > 0 {
@@ -195,11 +196,11 @@ func (l *lbBuilder) GetSubnetID() string {
 }
 
 func (l *lbBuilder) GetTargetNodeLabels() map[string]string {
-	return l.TargetNodeLabels
+	return l.targetNodeLabels
 }
 
 func (l *lbBuilder) GetTargetType() TargetType {
-	return l.TargetType
+	return l.targetType
 }
 
 func (l *lbBuilder) StringFormat() string {
@@ -303,54 +304,6 @@ func (l *lbBuilder) IsPoolInUseByOtherListener(poolID string) bool {
 	return false
 }
 
-// ---------------------------------------------------------- annotation
-
-func (l *lbBuilder) parseAnnotation(annos map[string]string) {
-	if l.annotationParser == nil {
-		l.logger.Warn("annotationParser is nil")
-		return
-	}
-
-	l.TargetType = l.parseAnnotationTargetType(annos)
-	l.loadBalancerID = l.parseAnnotationLoadBalancerID(annos)
-	l.loadBalancerName = l.parseAnnotationLoadBalancerName(annos)
-	l.isIgnored = l.parseAnnotationIgnore(annos)
-}
-
-func (l *lbBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
-	option := ""
-	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, annos)
-	switch option {
-	case string(TargetTypeIP):
-		return TargetTypeIP
-	case string(TargetTypeInstance):
-		return TargetTypeInstance
-	default:
-		if exist {
-			l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"", annotations.SuffixTargetType, TargetTypeInstance, TargetTypeIP)
-		}
-	}
-	return TargetTypeInstance
-}
-
-func (l *lbBuilder) parseAnnotationLoadBalancerID(annos map[string]string) string {
-	option := ""
-	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerID, &option, annos)
-	return option
-}
-
-func (l *lbBuilder) parseAnnotationLoadBalancerName(annos map[string]string) string {
-	option := ""
-	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, annos)
-	return option
-}
-
-func (l *lbBuilder) parseAnnotationIgnore(annos map[string]string) bool {
-	option := false
-	l.annotationParser.ParseBoolAnnotation(annotations.ServiceAnnotationIgnore, &option, annos)
-	return option
-}
-
 // ---------------------------------------------------------- generate name
 
 func (l *lbBuilder) objectToLBName(clusterID string, pService client.Object) string {
@@ -384,7 +337,7 @@ func (l *lbBuilder) validateName(newName string) string {
 
 // mappingProtocol maps the protocol TCP to the protocol PROXY if have configured.
 func (l *lbBuilder) mappingProtocol(pPort corev1.ServicePort) string {
-	for _, name := range l.EnableProxyProtocol {
+	for _, name := range l.enableProxyProtocol {
 		if (name == "*" || name == pPort.Name) && pPort.Protocol == corev1.ProtocolTCP {
 			return string(loadbalancerv2.PoolProtocolProxy)
 		}

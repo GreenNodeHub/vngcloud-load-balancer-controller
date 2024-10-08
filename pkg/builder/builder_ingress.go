@@ -47,31 +47,31 @@ func NewLoadBalancerBuilderByIngress(
 
 		loadBalancerID:             "",
 		loadBalancerName:           "",
-		LoadBalancerType:           loadbalancerv2.LoadBalancerTypeLayer7,
+		loadBalancerType:           loadbalancerv2.LoadBalancerTypeLayer7,
 		packageID:                  consts.DEFAULT_L7_PACKAGE_ID,
-		Scheme:                     loadbalancerv2.InternetLoadBalancerScheme,
-		IdleTimeoutClient:          50,
-		IdleTimeoutMember:          50,
-		IdleTimeoutConnection:      5,
-		InboundCIDRs:               []string{"0.0.0.0/0"},
-		HealthcheckProtocol:        loadbalancerv2.HealthCheckProtocolTCP,
-		HealthcheckHttpMethod:      loadbalancerv2.HealthCheckMethodGET,
-		HealthcheckPath:            "/",
-		SuccessCodes:               "200",
-		HealthcheckHttpVersion:     loadbalancerv2.HealthCheckHttpVersionHttp1,
-		HealthcheckHttpDomainName:  "",
-		PoolAlgorithm:              loadbalancerv2.PoolAlgorithmRoundRobin,
-		HealthyThresholdCount:      3,
-		UnhealthyThresholdCount:    3,
-		HealthcheckTimeoutSeconds:  5,
-		HealthcheckIntervalSeconds: 30,
-		HealthcheckPort:            0,
-		Tags:                       map[string]string{},
-		TargetNodeLabels:           map[string]string{},
+		scheme:                     loadbalancerv2.InternetLoadBalancerScheme,
+		idleTimeoutClient:          50,
+		idleTimeoutMember:          50,
+		idleTimeoutConnection:      5,
+		inboundCIDRs:               []string{"0.0.0.0/0"},
+		healthcheckProtocol:        loadbalancerv2.HealthCheckProtocolTCP,
+		healthcheckHttpMethod:      loadbalancerv2.HealthCheckMethodGET,
+		healthcheckPath:            "/",
+		successCodes:               "200",
+		healthcheckHttpVersion:     loadbalancerv2.HealthCheckHttpVersionHttp1,
+		healthcheckHttpDomainName:  "",
+		poolAlgorithm:              loadbalancerv2.PoolAlgorithmRoundRobin,
+		healthyThresholdCount:      3,
+		unhealthyThresholdCount:    3,
+		healthcheckTimeoutSeconds:  5,
+		healthcheckIntervalSeconds: 30,
+		healthcheckPort:            0,
+		tags:                       map[string]string{},
+		targetNodeLabels:           map[string]string{},
 		IsAutoCreateSecurityGroup:  false,
-		SecurityGroups:             []string{},
-		EnableProxyProtocol:        []string{},
-		EnableAutoscale:            false,
+		securityGroups:             []string{},
+		enableProxyProtocol:        []string{},
+		enableAutoscale:            false,
 	}
 	if ingress == nil {
 		return model, nil
@@ -184,13 +184,13 @@ func (l *lbBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, error) 
 			name: consts.DEFAULT_HTTP_LISTENER_NAME,
 		},
 		CreateListenerRequest: loadbalancerv2.CreateListenerRequest{
-			AllowedCidrs:                StringListToString(l.InboundCIDRs),
+			AllowedCidrs:                StringListToString(l.inboundCIDRs),
 			ListenerName:                consts.DEFAULT_HTTP_LISTENER_NAME,
 			ListenerProtocol:            loadbalancerv2.ListenerProtocolHTTP,
 			ListenerProtocolPort:        80,
-			TimeoutClient:               l.IdleTimeoutClient,
-			TimeoutConnection:           l.IdleTimeoutConnection,
-			TimeoutMember:               l.IdleTimeoutMember,
+			TimeoutClient:               l.idleTimeoutClient,
+			TimeoutConnection:           l.idleTimeoutConnection,
+			TimeoutMember:               l.idleTimeoutMember,
 			DefaultPoolId:               PointerOf(""),
 			CertificateAuthorities:      nil,
 			ClientCertificate:           nil,
@@ -218,7 +218,7 @@ func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend
 
 	// nodePort if target type is instance, targetPort if target type is ip
 	targetPort := 0
-	if l.TargetType == TargetTypeInstance {
+	if l.targetType == TargetTypeInstance {
 		targetPort = serviceNodePort
 	} else {
 		targetPort = serviceTargetPort
@@ -226,8 +226,8 @@ func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend
 
 	// get monitor port
 	monitorPort := targetPort
-	if l.HealthcheckPort != 0 {
-		monitorPort = l.HealthcheckPort
+	if l.healthcheckPort != 0 {
+		monitorPort = l.healthcheckPort
 	}
 
 	// Get members address, nodeIP or podIP
@@ -261,24 +261,24 @@ func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend
 
 	// build healthcheck
 	healthMonitor := loadbalancerv2.HealthMonitor{
-		HealthyThreshold:    l.HealthyThresholdCount,
-		UnhealthyThreshold:  l.UnhealthyThresholdCount,
-		Interval:            l.HealthcheckIntervalSeconds,
-		Timeout:             l.HealthcheckTimeoutSeconds,
-		HealthCheckProtocol: l.HealthcheckProtocol,
+		HealthyThreshold:    l.healthyThresholdCount,
+		UnhealthyThreshold:  l.unhealthyThresholdCount,
+		Interval:            l.healthcheckIntervalSeconds,
+		Timeout:             l.healthcheckTimeoutSeconds,
+		HealthCheckProtocol: l.healthcheckProtocol,
 	}
-	if l.HealthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+	if l.healthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
 		healthMonitor = loadbalancerv2.HealthMonitor{
-			HealthyThreshold:    l.HealthyThresholdCount,
-			UnhealthyThreshold:  l.UnhealthyThresholdCount,
-			Interval:            l.HealthcheckIntervalSeconds,
-			Timeout:             l.HealthcheckTimeoutSeconds,
-			HealthCheckProtocol: l.HealthcheckProtocol,
-			HealthCheckMethod:   PointerOf(l.HealthcheckHttpMethod),
-			HealthCheckPath:     PointerOf(l.HealthcheckPath),
-			SuccessCode:         PointerOf(l.SuccessCodes),
-			HttpVersion:         PointerOf(l.HealthcheckHttpVersion),
-			DomainName:          PointerOf(l.HealthcheckHttpDomainName),
+			HealthyThreshold:    l.healthyThresholdCount,
+			UnhealthyThreshold:  l.unhealthyThresholdCount,
+			Interval:            l.healthcheckIntervalSeconds,
+			Timeout:             l.healthcheckTimeoutSeconds,
+			HealthCheckProtocol: l.healthcheckProtocol,
+			HealthCheckMethod:   PointerOf(l.healthcheckHttpMethod),
+			HealthCheckPath:     PointerOf(l.healthcheckPath),
+			SuccessCode:         PointerOf(l.successCodes),
+			HttpVersion:         PointerOf(l.healthcheckHttpVersion),
+			DomainName:          PointerOf(l.healthcheckHttpDomainName),
 		}
 	}
 
@@ -292,7 +292,7 @@ func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend
 		Stickiness:    l.enableStickySession,
 		TLSEncryption: l.enableTLSEncryption,
 		HealthMonitor: &healthMonitor,
-		Algorithm:     l.PoolAlgorithm,
+		Algorithm:     l.poolAlgorithm,
 		Members:       poolMembers,
 	}
 	return opt, nil

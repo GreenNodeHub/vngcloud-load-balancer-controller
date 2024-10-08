@@ -49,9 +49,9 @@ func (b *vngcloudLBBuilder) build() error {
 
 	b.loadBalancerID = lb.UUID
 	b.loadBalancerName = lb.Name
-	b.LoadBalancerType = loadbalancerv2.LoadBalancerType(lb.Type)
+	b.loadBalancerType = loadbalancerv2.LoadBalancerType(lb.Type)
 	b.packageID = lb.PackageID
-	b.Scheme = loadbalancerv2.LoadBalancerScheme(lb.LoadBalancerSchema)
+	b.scheme = loadbalancerv2.LoadBalancerScheme(lb.LoadBalancerSchema)
 
 	// Get pools
 	pools, err := b.provider.ListPool(b.loadBalancerID)
@@ -150,7 +150,7 @@ func (b *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*Listene
 		},
 		isDeleted:      false,
 		policyBuilders: make([]*policyBuilderType, 0),
-		IsL4:           b.LoadBalancerType == loadbalancerv2.LoadBalancerTypeLayer4,
+		IsL4:           b.loadBalancerType == loadbalancerv2.LoadBalancerTypeLayer4,
 		ReferPoolName:  listener.DefaultPoolName,
 	}
 
