@@ -1,6 +1,10 @@
 package config
 
-import "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
+import (
+	"github.com/go-logr/logr"
+	"github.com/spf13/viper"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
+)
 
 // Config struct contains ingress controller configuration
 type Config struct {
@@ -29,4 +33,25 @@ func NewConfig() *Config {
 			SearchOrder: "configDriver,metadataService",
 		},
 	}
+}
+
+func (c *Config) Init(setupLog logr.Logger, configFile string) error {
+	// initConfig reads in config file and ENV variables if set.
+	setupLog.Info("Loading configuration", "config", configFile)
+	viper.SetConfigFile(configFile)
+	viper.SetConfigType("yaml")
+	viper.AutomaticEnv()
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err != nil {
+		setupLog.Error(err, "Failed to read config file")
+		return err
+	}
+
+	if err := viper.Unmarshal(c); err != nil {
+		setupLog.Error(err, "Unable to decode the configuration")
+		return err
+	}
+	setupLog.Info("Configuration loaded", "config", c)
+	return nil
 }

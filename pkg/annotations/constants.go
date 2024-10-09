@@ -13,11 +13,11 @@ const (
 	SuffixInboundCIDRs               = "inbound-cidrs"                // inbound CIDRs
 	SuffixHealthcheckPort            = "healthcheck-port"             // healthcheck port
 	SuffixHealthcheckProtocol        = "healthcheck-protocol"         // healthcheck protocol
-	SuffixHealthcheckPath            = "healthcheck-path"             // healthcheck path
-	SuffixSuccessCodes               = "success-codes"                // success codes
-	SuffixHealthcheckHttpMethod      = "healthcheck-http-method"      // healthcheck http method
-	SuffixHealthcheckHttpVersion     = "healthcheck-http-version"     // healthcheck http version
-	SuffixHealthcheckHttpDomainName  = "healthcheck-http-domain-name" // healthcheck http domain name
+	SuffixSuccessCodes               = "success-codes"                // success codes,                	only for http/https healthcheck protocol
+	SuffixHealthcheckPath            = "healthcheck-path"             // healthcheck path, 				only for http/https healthcheck protocol
+	SuffixHealthcheckHttpMethod      = "healthcheck-http-method"      // healthcheck http method, 		only for http/https healthcheck protocol
+	SuffixHealthcheckHttpVersion     = "healthcheck-http-version"     // healthcheck http version, 		only for http/https healthcheck protocol
+	SuffixHealthcheckHttpDomainName  = "healthcheck-http-domain-name" // healthcheck http domain name, 	only for http/https healthcheck protocol
 	SuffixHealthcheckIntervalSeconds = "healthcheck-interval-seconds" // healthcheck interval seconds
 	SuffixHealthcheckTimeoutSeconds  = "healthcheck-timeout-seconds"  // healthcheck timeout seconds
 	SuffixHealthyThresholdCount      = "healthy-threshold-count"      // healthy threshold count

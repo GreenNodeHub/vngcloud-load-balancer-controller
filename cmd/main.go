@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
@@ -100,7 +99,7 @@ func main() {
 		})
 	}
 
-	err := initConfig()
+	err := conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")
 	if err != nil {
 		os.Exit(1)
 	}
@@ -215,25 +214,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig() error {
-	configFile := "/etc/vngcloud-load-balancer-controller/config.yaml"
-	setupLog.Info("Loading configuration", "config", configFile)
-	viper.SetConfigFile(configFile)
-	viper.AutomaticEnv()
-
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err != nil {
-		setupLog.Error(err, "Failed to read config file")
-		return err
-	}
-
-	if err := viper.Unmarshal(&conf); err != nil {
-		setupLog.Error(err, "Unable to decode the configuration")
-		return err
-	}
-	setupLog.Info("Configuration loaded", "config", conf)
-	return nil
 }

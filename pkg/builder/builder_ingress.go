@@ -32,6 +32,7 @@ func NewLoadBalancerBuilderByIngress(
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
 		poolBuilders:         make([]*poolBuilderType, 0),
+		listenerBuilders:     make([]*ListenerBuilderType, 0),
 
 		annotationParser: annotationParser,
 		context:          ctx,
@@ -72,6 +73,10 @@ func NewLoadBalancerBuilderByIngress(
 		securityGroups:             []string{},
 		enableProxyProtocol:        []string{},
 		enableAutoscale:            false,
+		targetType:                 TargetTypeInstance,
+		enableStickySession:        false,
+		enableTLSEncryption:        false,
+		certificateIDs:             []string{},
 	}
 	if ingress == nil {
 		return model, nil
