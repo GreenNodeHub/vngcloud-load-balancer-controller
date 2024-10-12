@@ -21,6 +21,7 @@ func NewLoadBalancerBuilderByLoadBalancerID(
 			loadBalancerID: loadBalancerID,
 			logger:         contexts.NewContext(ctx).Log(),
 			poolBuilders:   make([]*poolBuilderType, 0),
+			context:        ctx,
 		},
 		provider: provider,
 	}

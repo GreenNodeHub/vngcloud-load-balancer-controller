@@ -20,6 +20,9 @@ type IContext struct {
 }
 
 func NewContext(ctx context.Context) ContextWrapper {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var logId, name string
 	if value, ok := ctx.Value(keyLogID).(string); ok {
 		logId = value
