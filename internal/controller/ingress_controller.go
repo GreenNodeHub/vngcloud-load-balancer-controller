@@ -379,16 +379,21 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		// listenerInPortal := currentBuilder.GetListenerBuilderByName(listenerBuilder.GetName())
 		listenerInPortal := currentBuilder.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
 		if listenerInPortal == nil {
-			if _, err := r.Provider.CreateListener(loadBalancerBuilder.GetID(),
+			if _lis, err := r.Provider.CreateListener(loadBalancerBuilder.GetID(),
 				listenerBuilder.GetICreateListenerRequest().WithLoadBalancerId(loadBalancerBuilder.GetID()),
 			); err != nil {
 				logger.Error("Failed to create listener: ", err)
 				return ctrl.Result{}, err
+			} else {
+				listenerBuilder.SetID(_lis.UUID)
 			}
 			if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
+			// need to update to current builder, avoid mismatch data later
+			currentBuilder.AddCloneListenerBuilder(listenerBuilder)
+			listenerInPortal = currentBuilder.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
 		} else {
 			listenerBuilder.SetID(listenerInPortal.GetID())
 
@@ -586,6 +591,10 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetID(), r.Provider)
 	if err != nil {
+		if errs.IsLoadBalancerNotFound(err) {
+			logger.Info("LoadBalancer not found, return.")
+			return ctrl.Result{}, nil
+		}
 		logger.Error("Failed to get current loadbalancer: ", err)
 		return ctrl.Result{}, err
 	}

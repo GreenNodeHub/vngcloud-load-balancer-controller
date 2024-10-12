@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 
@@ -223,72 +224,148 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
 			mockIngressReconciler.modeTest = false
-			const (
-				serviceName = "test-service-gogsf"
-				ingressName = "test-ingress-gogsf"
-				namespace   = "default"
-			)
 
-			// when create a service NodePort type, nothing should happen
-			service := newServiceNodePortResource(serviceName, namespace)
-			Expect(service).NotTo(BeNil())
-			service.Spec.Ports = []corev1.ServicePort{
-				{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
-			}
-			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+			tests := []struct {
+				name            string
+				generateDepends func() []client.Object
+				generateObj     func() client.Object
+				expect          func(lb *entity.LoadBalancer)
+			}{
+				{
+					name: "create with default annotation",
+					generateDepends: func() []client.Object {
+						service := newServiceNodePortResource("test-service-gogsf", "default")
+						service.Spec.Ports = []corev1.ServicePort{
+							{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+						}
+						return []client.Object{service}
+					},
+					generateObj: func() client.Object {
+						ingress := newIngressResource("test-service-gogsf", "default")
+						Expect(ingress).NotTo(BeNil())
+						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
+							Service: &networkingv1.IngressServiceBackend{
+								Name: "test-service-gogsf",
+								Port: networkingv1.ServiceBackendPort{
+									Number: 80,
+								},
+							},
+						}
+						return ingress
+					},
+					expect: func(loadbalancer *entity.LoadBalancer) {
+						Expect(loadbalancer).ShouldNot(BeNil())
+						Expect(loadbalancer.Name).Should(Equal("vks-test-clust-default-test-servi-9ec42"))
+						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
+						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
+						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
-			// create ingress with specific annotation
-			ingress := newIngressResource(ingressName, namespace)
-			Expect(ingress).NotTo(BeNil())
-			ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
-				Service: &networkingv1.IngressServiceBackend{
-					Name: serviceName,
-					Port: networkingv1.ServiceBackendPort{
-						Number: 80,
+						// check pool
+						pools, err := mockProvider.ListPool(loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(pools).ShouldNot(BeNil())
+						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						for _, pool := range pools.Items {
+							Expect(pool.Name).Should(BeElementOf(
+								consts.DEFAULT_NAME_DEFAULT_POOL,
+								"vks-test-clust-default-test-serv-fbaa0-TCP-80"))
+							Expect(pool.Description).Should(Equal("????????"))
+							Expect(pool.Status).Should(Equal("ACTIVE"))
+							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+							Expect(pool.Protocol).Should(Equal("HTTP"))
+							Expect(pool.Stickiness).Should(Equal(false))
+							Expect(pool.TLSEncryption).Should(Equal(false))
+
+							Expect(pool.HealthMonitor).ShouldNot(BeNil())
+							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+							Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+
+							Expect(pool.Members).ShouldNot(BeNil())
+							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+								mockNode1.Status.Addresses[0].Address,
+								mockNode2.Status.Addresses[0].Address,
+								mockNode3.Status.Addresses[0].Address,
+								mockNode4.Status.Addresses[0].Address))
+						}
+
+						// check listener
+						listeners, err := mockProvider.ListListenerOfLB(loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(listeners).ShouldNot(BeNil())
+						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						for _, listener := range listeners.Items {
+							Expect(listener.Protocol).Should(Equal("HTTP"))
+							Expect(listener.ProtocolPort).Should(Equal(80))
+							Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+							Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
+							Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
+							Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+							Expect(listener.TimeoutClient).Should(Equal(50))
+							Expect(listener.TimeoutConnection).Should(Equal(5))
+							Expect(listener.TimeoutMember).Should(Equal(50))
+							Expect(listener.Description).Should(Equal("????????"))
+							// Expect(listener.Headers).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CertificateAuthorities).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ClientCertificateAuthentication).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						}
 					},
 				},
 			}
-			ingress.Annotations = map[string]string{
-				fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName): "test-lb",
+
+			for _, tt := range tests {
+				depends := tt.generateDepends()
+				for _, depend := range depends {
+					Expect(depend).NotTo(BeNil())
+					Expect(k8sClient.Create(ctx, depend)).Should(Succeed())
+				}
+
+				obj := tt.generateObj()
+				Expect(obj).NotTo(BeNil())
+				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
+
+				// get load balancer id in the annotation
+				loadbalancerID := ""
+				Eventually(func() bool {
+					getObj := &networkingv1.Ingress{}
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)).Should(Succeed())
+					loadbalancerID = getObj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+					return loadbalancerID != ""
+				}, timeout, interval).Should(BeTrue())
+
+				// expect load balancer attribute in the mock provider
+				loadbalancer, err := mockProvider.GetLoadBalancerByID(loadbalancerID)
+				Expect(err).ShouldNot(HaveOccurred())
+				tt.expect(loadbalancer)
+
+				// clean up
+				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
+				Eventually(func() bool {
+					getObj := &networkingv1.Ingress{}
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)
+					return err != nil
+				}, 2*timeout, interval).Should(BeTrue())
+				_, err = mockProvider.GetLoadBalancerByID(loadbalancerID)
+				Expect(err).Should(HaveOccurred())
+
+				for _, depend := range depends {
+					Expect(k8sClient.Delete(ctx, depend)).Should(Succeed())
+					err := k8sClient.Get(ctx, client.ObjectKey{Name: depend.GetName(), Namespace: depend.GetNamespace()}, depend)
+					Expect(err).Should(HaveOccurred())
+				}
 			}
-			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
-
-			// get load balancer id in the annotation
-			loadbalancerID := ""
-			Eventually(func() bool {
-				getObject := &networkingv1.Ingress{}
-				Expect(k8sClient.Get(ctx, client.ObjectKey{Name: ingressName, Namespace: namespace}, getObject)).Should(Succeed())
-				loadbalancerID = getObject.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-				return loadbalancerID != ""
-			}, timeout, interval).Should(BeTrue())
-
-			// expect load balancer attribute in the mock provider
-			loadbalancer, err := mockProvider.GetLoadBalancerByID(loadbalancerID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
-			Eventually(func() bool {
-				loadbalancer, err = mockProvider.GetLoadBalancerByID(loadbalancerID)
-				return err == nil && loadbalancer != nil && loadbalancer.DisplayStatus == consts.ACTIVE_LOADBALANCER_STATUS
-			}, 2*timeout, interval).Should(BeTrue())
-			Expect(loadbalancer.UUID).Should(Equal(loadbalancerID))
-			Expect(loadbalancer.Name).Should(Equal("test-lb"))
-
-			// clean up
-			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
-			Eventually(func() bool {
-				getObject := &networkingv1.Ingress{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: ingressName, Namespace: namespace}, getObject)
-				return err != nil
-			}, 2*timeout, interval).Should(BeTrue())
-			_, err = mockProvider.GetLoadBalancerByID(loadbalancerID)
-			Expect(err).Should(HaveOccurred())
-
-			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
-			Eventually(func() bool {
-				getObject := &corev1.Service{}
-				err := k8sClient.Get(ctx, client.ObjectKey{Name: serviceName, Namespace: namespace}, getObject)
-				return err != nil
-			}, timeout, interval).Should(BeTrue())
 		})
 	})
 
@@ -363,6 +440,43 @@ func newServiceNodePortResource(name, namespace string) *corev1.Service {
 			Type: corev1.ServiceTypeNodePort,
 			Selector: map[string]string{
 				"app": "test",
+			},
+		},
+	}
+}
+
+func newEnpointResource(name, namespace string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "172.172.172.0",
+						Hostname: "test",
+						NodeName: PointerOf("test"),
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Namespace: namespace,
+							Name:      "pod-1",
+						},
+					},
+				},
+				Ports: []corev1.EndpointPort{
+					{
+						Name:        "http",
+						Port:        80,
+						Protocol:    corev1.ProtocolTCP,
+						AppProtocol: PointerOf("http"),
+					},
+				},
 			},
 		},
 	}

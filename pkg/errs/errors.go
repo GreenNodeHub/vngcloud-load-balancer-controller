@@ -1,6 +1,9 @@
 package errs
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var (
 	ErrorNoConfig = errors.New("config is nil")
@@ -22,3 +25,8 @@ var (
 
 	ErrorMissingCertificates = errors.New("missing certificates, need to specific through annotaion")
 )
+
+func IsLoadBalancerNotFound(err error) bool {
+	// if have prefix "Cannot get load balancer with id" then consider as not found
+	return strings.HasPrefix(err.Error(), "Cannot get load balancer with id")
+}

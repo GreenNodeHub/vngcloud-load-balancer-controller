@@ -99,7 +99,7 @@ func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node)
 
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
-		l.loadBalancerName = l.objectToLBName(l.clusterID, pService)
+		l.loadBalancerName = l.objectToLBName()
 	}
 
 	// Get members address, nodeIP or podIP

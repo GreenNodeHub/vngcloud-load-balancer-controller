@@ -70,6 +70,9 @@ type LoadbalancerBuilder interface {
 	GetListenerBuilderByPort(port int) *ListenerBuilderType
 	// return true if the pool is used by other listener, which is not deleted
 	IsPoolInUseByOtherListener(poolID string) bool
+
+	// after create listener, use this function to update current builder
+	AddCloneListenerBuilder(listener *ListenerBuilderType)
 }
 
 var _ LoadbalancerBuilder = &lbBuilder{}
@@ -304,15 +307,42 @@ func (l *lbBuilder) IsPoolInUseByOtherListener(poolID string) bool {
 	return false
 }
 
+func (l *lbBuilder) AddCloneListenerBuilder(listener *ListenerBuilderType) {
+	clone := &ListenerBuilderType{
+		commonBuilder: commonBuilder{
+			name: listener.GetName(),
+			id:   listener.GetID(),
+		},
+		isDeleted:      false,
+		policyBuilders: make([]*policyBuilderType, 0),
+		CreateListenerRequest: loadbalancerv2.CreateListenerRequest{
+			AllowedCidrs:                listener.CreateListenerRequest.AllowedCidrs,
+			ListenerName:                listener.CreateListenerRequest.ListenerName,
+			ListenerProtocol:            listener.CreateListenerRequest.ListenerProtocol,
+			ListenerProtocolPort:        listener.CreateListenerRequest.ListenerProtocolPort,
+			TimeoutClient:               listener.CreateListenerRequest.TimeoutClient,
+			TimeoutConnection:           listener.CreateListenerRequest.TimeoutConnection,
+			TimeoutMember:               listener.CreateListenerRequest.TimeoutMember,
+			DefaultPoolId:               listener.CreateListenerRequest.DefaultPoolId,
+			CertificateAuthorities:      listener.CreateListenerRequest.CertificateAuthorities,
+			ClientCertificate:           listener.CreateListenerRequest.ClientCertificate,
+			DefaultCertificateAuthority: listener.CreateListenerRequest.DefaultCertificateAuthority,
+		},
+		ReferPoolName: listener.ReferPoolName,
+		IsL4:          listener.IsL4,
+	}
+	l.listenerBuilders = append(l.listenerBuilders, clone)
+}
+
 // ---------------------------------------------------------- generate name
 
-func (l *lbBuilder) objectToLBName(clusterID string, pService client.Object) string {
+func (l *lbBuilder) objectToLBName() string {
 	hash := l.generateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s",
 		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(clusterID, 10),
-		TrimString(pService.GetName(), 10),
-		TrimString(pService.GetNamespace(), 10),
+		TrimString(l.clusterID, 10),
+		TrimString(l.resourceNamespace, 10),
+		TrimString(l.resourceName, 10),
 		hash)
 	return l.validateName(name)
 }

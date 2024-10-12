@@ -95,7 +95,7 @@ func NewLoadBalancerBuilderByIngress(
 func (l *lbBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.Node) error {
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
-		l.loadBalancerName = l.objectToLBName(l.clusterID, ingress)
+		l.loadBalancerName = l.objectToLBName()
 	}
 
 	// build default backend pool

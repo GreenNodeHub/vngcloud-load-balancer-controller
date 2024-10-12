@@ -182,7 +182,7 @@ func (l *ListenerBuilderType) GetPoolName() string {
 	return l.ReferPoolName
 }
 
-func (l *ListenerBuilderType) GetICreateListenerRequest() loadbalancerv2.ICreateListenerRequest {
+func (l *ListenerBuilderType) GetICreateListenerRequest() *loadbalancerv2.CreateListenerRequest {
 	return &l.CreateListenerRequest
 	// return loadbalancerv2.NewCreateListenerRequest(l.Name, l.ListenerProtocol, l.ListenerProtocolPort).
 	// 	WithDefaultPoolId(*l.DefaultPoolId).
