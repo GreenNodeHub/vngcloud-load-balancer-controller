@@ -141,73 +141,73 @@ func (m *VNGCLOUD_Provider) GetSubnetCIDR() string {
 
 // // --------------------------- Security Group ---------------------------
 
-// func (m *VNGCLOUD_Provider) ListSecurityGroups() ([]*objects.Secgroup, error) {
+// func (m *VNGCLOUD_Provider) ListSecurityGroups(ctx context.Context,) ([]*objects.Secgroup, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(instanceID string, secgroups []string) (*objects.Server, error) {
+// func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(ctx context.Context,instanceID string, secgroups []string) (*objects.Server, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) GetSecurityGroup(secgroupID string) (*objects.Secgroup, error) {
+// func (m *VNGCLOUD_Provider) GetSecurityGroup(ctx context.Context,secgroupID string) (*objects.Secgroup, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) DeleteSecurityGroup(secgroupID string) error {
+// func (m *VNGCLOUD_Provider) DeleteSecurityGroup(ctx context.Context,secgroupID string) error {
 // 	m.logger.Error("not implemented yet")
 // 	return errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) CreateSecurityGroup(name string, description string) (*objects.Secgroup, error) {
+// func (m *VNGCLOUD_Provider) CreateSecurityGroup(ctx context.Context,name string, description string) (*objects.Secgroup, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
 
-// func (m *VNGCLOUD_Provider) CreateSecurityGroupRule(secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
+// func (m *VNGCLOUD_Provider) CreateSecurityGroupRule(ctx context.Context,secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(secgroupID string, ruleID string) error {
+// func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(ctx context.Context,secgroupID string, ruleID string) error {
 // 	m.logger.Error("not implemented yet")
 // 	return errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) ListSecurityGroupRules(secgroupID string) ([]*objects.SecgroupRule, error) {
+// func (m *VNGCLOUD_Provider) ListSecurityGroupRules(ctx context.Context,secgroupID string) ([]*objects.SecgroupRule, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
 
 // // --------------------------- Tags ---------------------------
 
-// func (m *VNGCLOUD_Provider) GetTags(resourceID string) ([]*objects.ResourceTag, error) {
+// func (m *VNGCLOUD_Provider) GetTags(ctx context.Context,resourceID string) ([]*objects.ResourceTag, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) UpdateTags(resourceID string, tags map[string]string) error {
+// func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context,resourceID string, tags map[string]string) error {
 // 	m.logger.Error("not implemented yet")
 // 	return errs.ErrorNotImplemented
 // }
 
-// func (m *VNGCLOUD_Provider) GetSubnet(subnetID string) (*objects.Subnet, error) {
+// func (m *VNGCLOUD_Provider) GetSubnet(ctx context.Context,subnetID string) (*objects.Subnet, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
 
 // // --------------------------- Server ---------------------------
 
-// func (m *VNGCLOUD_Provider) GetServerByID(serverID string) (*objects.Server, error) {
+// func (m *VNGCLOUD_Provider) GetServerByID(ctx context.Context,serverID string) (*objects.Server, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) ListServerByProviderIDs(providerIDs []string) ([]*objects.Server, error) {
+// func (m *VNGCLOUD_Provider) ListServerByProviderIDs(ctx context.Context,providerIDs []string) ([]*objects.Server, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) WaitForServerActive(serverID string) {
+// func (m *VNGCLOUD_Provider) WaitForServerActive(ctx context.Context,serverID string) {
 
 // }
 
 // --------------------------- Load Balancer ---------------------------
 
-func (m *VNGCLOUD_Provider) ListLoadBalancers() (*entityv2.ListLoadBalancers, error) {
+func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error) {
 	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
 		ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultPageList, defaultPageSize))
 	if sdkErr != nil {
@@ -216,7 +216,7 @@ func (m *VNGCLOUD_Provider) ListLoadBalancers() (*entityv2.ListLoadBalancers, er
 	}
 	return lbs, nil
 }
-func (m *VNGCLOUD_Provider) GetLoadBalancerByID(lbID string) (*entityv2.LoadBalancer, error) {
+func (m *VNGCLOUD_Provider) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	lb, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
 		GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID))
 	if sdkErr != nil {
@@ -226,8 +226,8 @@ func (m *VNGCLOUD_Provider) GetLoadBalancerByID(lbID string) (*entityv2.LoadBala
 	return lb, nil
 }
 
-func (m *VNGCLOUD_Provider) GetLoadBalancerByName(name string) (*entityv2.LoadBalancer, error) {
-	allLBs, err := m.ListLoadBalancers()
+func (m *VNGCLOUD_Provider) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
+	allLBs, err := m.ListLoadBalancers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (m *VNGCLOUD_Provider) GetLoadBalancerByName(name string) (*entityv2.LoadBa
 	return nil, nil
 }
 
-func (m *VNGCLOUD_Provider) CreateLoadBalancer(lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
+func (m *VNGCLOUD_Provider) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	m.logger.Infof("%s Request create load balancer.", icon)
 	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
 		CreateLoadBalancer(lbOptions)
@@ -249,7 +249,7 @@ func (m *VNGCLOUD_Provider) CreateLoadBalancer(lbOptions loadbalancerv2.ICreateL
 	}
 	return newLB, nil
 }
-func (m *VNGCLOUD_Provider) DeleteLoadBalancer(lbID string) error {
+func (m *VNGCLOUD_Provider) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	m.logger.Infof("%s Request delete load balancer %s", icon, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
 		DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID))
@@ -259,11 +259,11 @@ func (m *VNGCLOUD_Provider) DeleteLoadBalancer(lbID string) error {
 	}
 	return nil
 }
-func (m *VNGCLOUD_Provider) ResizeLoadBalancer(lbID, packageID string) error {
+func (m *VNGCLOUD_Provider) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	m.logger.Error("not implemented yet")
 	return errs.ErrorNotImplemented
 }
-func (m *VNGCLOUD_Provider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, error) {
+func (m *VNGCLOUD_Provider) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	m.logger.Infof("%s Waiting for load balancer %s to be ready", waitIcon, lbID)
 	var resultLb *entityv2.LoadBalancer
 
@@ -272,7 +272,7 @@ func (m *VNGCLOUD_Provider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer
 		Factor:   1.2,
 		Steps:    30,
 	}, func() (done bool, err error) {
-		lb, err := m.GetLoadBalancerByID(lbID)
+		lb, err := m.GetLoadBalancerByID(ctx, lbID)
 		if err != nil {
 			m.logger.Errorf("Error getting load balancer %s when wait active: %v", lbID, err)
 			return false, err
@@ -302,16 +302,16 @@ func (m *VNGCLOUD_Provider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer
 
 // --------------------------- Listener ---------------------------
 
-//	func (m *VNGCLOUD_Provider) GetListenerByName(lbID, name string) (*objects.Listener, error) {
+//	func (m *VNGCLOUD_Provider) GetListenerByName(ctx context.Context,lbID, name string) (*objects.Listener, error) {
 //		m.logger.Error("not implemented yet")
 //		return nil, errs.ErrorNotImplemented
 //	}
 //
-//	func (m *VNGCLOUD_Provider) GetListenerByPort(lbID string, port int) (*objects.Listener, error) {
+//	func (m *VNGCLOUD_Provider) GetListenerByPort(ctx context.Context,lbID string, port int) (*objects.Listener, error) {
 //		m.logger.Error("not implemented yet")
 //		return nil, errs.ErrorNotImplemented
 //	}
-func (m *VNGCLOUD_Provider) CreateListener(lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
+func (m *VNGCLOUD_Provider) CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
 	m.logger.Infof("%s Request create listener of load balancer %s", icon, lbID)
 	listener, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateListener(opt)
 	if sdkErr != nil {
@@ -320,7 +320,7 @@ func (m *VNGCLOUD_Provider) CreateListener(lbID string, opt loadbalancerv2.ICrea
 	}
 	return listener, nil
 }
-func (m *VNGCLOUD_Provider) ListListenerOfLB(lbID string) (*entityv2.ListListeners, error) {
+func (m *VNGCLOUD_Provider) ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error) {
 	opt := loadbalancerv2.NewListListenersByLoadBalancerIdRequest(lbID)
 	listeners, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListListenersByLoadBalancerId(opt)
 	if sdkErr != nil {
@@ -329,7 +329,7 @@ func (m *VNGCLOUD_Provider) ListListenerOfLB(lbID string) (*entityv2.ListListene
 	}
 	return listeners, nil
 }
-func (m *VNGCLOUD_Provider) DeleteListener(lbID, listenerID string) error {
+func (m *VNGCLOUD_Provider) DeleteListener(ctx context.Context, lbID, listenerID string) error {
 	m.logger.Infof("%s Request delete listener %s of load balancer %s", icon, listenerID, lbID)
 	opt := loadbalancerv2.NewDeleteListenerByIdRequest(lbID, listenerID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteListenerById(opt)
@@ -339,7 +339,7 @@ func (m *VNGCLOUD_Provider) DeleteListener(lbID, listenerID string) error {
 	}
 	return nil
 }
-func (m *VNGCLOUD_Provider) UpdateListener(lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
+func (m *VNGCLOUD_Provider) UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
 	m.logger.Infof("%s Request update listener %s of load balancer %s", icon, listenerID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateListener(opt)
 	if sdkErr != nil {
@@ -351,11 +351,11 @@ func (m *VNGCLOUD_Provider) UpdateListener(lbID, listenerID string, opt loadbala
 
 // --------------------------- Policy ---------------------------
 
-//	func (m *VNGCLOUD_Provider) GetPolicyByName(lbID, listenerID, name string) (*objects.Policy, error) {
+//	func (m *VNGCLOUD_Provider) GetPolicyByName(ctx context.Context,lbID, listenerID, name string) (*objects.Policy, error) {
 //		m.logger.Error("not implemented yet")
 //		return nil, errs.ErrorNotImplemented
 //	}
-func (m *VNGCLOUD_Provider) CreatePolicy(lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
+func (m *VNGCLOUD_Provider) CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
 	m.logger.Infof("%s Request create policy of listener %s of load balancer %s", icon, listenerID, lbID)
 	policy, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePolicy(opt)
 	if sdkErr != nil {
@@ -364,7 +364,7 @@ func (m *VNGCLOUD_Provider) CreatePolicy(lbID, listenerID string, opt loadbalanc
 	}
 	return policy, nil
 }
-func (m *VNGCLOUD_Provider) ListPolicyOfListener(lbID, listenerID string) (*entityv2.ListPolicies, error) {
+func (m *VNGCLOUD_Provider) ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error) {
 	listPolicies, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPolicies(loadbalancerv2.NewListPoliciesRequest(lbID, listenerID))
 	if sdkErr != nil {
 		m.logger.Error("[ERROR] - ListPolicyOfListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -373,11 +373,11 @@ func (m *VNGCLOUD_Provider) ListPolicyOfListener(lbID, listenerID string) (*enti
 	return listPolicies, nil
 }
 
-//	func (m *VNGCLOUD_Provider) GetPolicyByID(policyID string) (*objects.Policy, error) {
+//	func (m *VNGCLOUD_Provider) GetPolicyByID(ctx context.Context,policyID string) (*objects.Policy, error) {
 //		m.logger.Error("not implemented yet")
 //		return nil, errs.ErrorNotImplemented
 //	}
-func (m *VNGCLOUD_Provider) UpdatePolicy(lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
+func (m *VNGCLOUD_Provider) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	m.logger.Infof("%s Request update policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePolicy(opt)
 	if sdkErr != nil {
@@ -386,7 +386,7 @@ func (m *VNGCLOUD_Provider) UpdatePolicy(lbID, listenerID, policyID string, opt 
 	}
 	return nil
 }
-func (m *VNGCLOUD_Provider) DeletePolicy(lbID, listenerID, policyID string) error {
+func (m *VNGCLOUD_Provider) DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error {
 	m.logger.Infof("%s Request delete policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePolicyById(loadbalancerv2.NewDeletePolicyByIdRequest(lbID, listenerID, policyID))
 	if sdkErr != nil {
@@ -398,11 +398,11 @@ func (m *VNGCLOUD_Provider) DeletePolicy(lbID, listenerID, policyID string) erro
 
 // --------------------------- Pool ---------------------------
 
-//	func (m *VNGCLOUD_Provider) GetPoolByName(lbID, name string) (*objects.Pool, error) {
+//	func (m *VNGCLOUD_Provider) GetPoolByName(ctx context.Context,lbID, name string) (*objects.Pool, error) {
 //		m.logger.Error("not implemented yet")
 //		return nil, errs.ErrorNotImplemented
 //	}
-func (m *VNGCLOUD_Provider) CreatePool(lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
+func (m *VNGCLOUD_Provider) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	m.logger.Infof("%s Request create pool of load balancer %s", icon, lbID)
 	pool, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePool(opt)
 	if sdkErr != nil {
@@ -411,7 +411,7 @@ func (m *VNGCLOUD_Provider) CreatePool(lbID string, opt loadbalancerv2.ICreatePo
 	}
 	return pool, nil
 }
-func (m *VNGCLOUD_Provider) ListPool(lbID string) (*entityv2.ListPools, error) {
+func (m *VNGCLOUD_Provider) ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error) {
 	opt := loadbalancerv2.NewListPoolsByLoadBalancerIdRequest(lbID)
 	pools, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolsByLoadBalancerId(opt)
 	if sdkErr != nil {
@@ -420,17 +420,17 @@ func (m *VNGCLOUD_Provider) ListPool(lbID string) (*entityv2.ListPools, error) {
 	}
 	return pools, nil
 }
-func (m *VNGCLOUD_Provider) UpdatePoolMembers(lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
+func (m *VNGCLOUD_Provider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	m.logger.Error("not implemented yet")
 	return errs.ErrorNotImplemented
 }
 
-func (m *VNGCLOUD_Provider) GetPoolByID(lbID, poolID string) (*entityv2.Pool, error) {
+func (m *VNGCLOUD_Provider) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {
 	m.logger.Error("not implemented yet")
 	return nil, errs.ErrorNotImplemented
 }
 
-func (m *VNGCLOUD_Provider) GetPoolMembers(lbID, poolID string) (*entityv2.ListMembers, error) {
+func (m *VNGCLOUD_Provider) GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error) {
 	opt := loadbalancerv2.NewListPoolMembersRequest(lbID, poolID)
 	members, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolMembers(opt)
 	if sdkErr != nil {
@@ -440,7 +440,7 @@ func (m *VNGCLOUD_Provider) GetPoolMembers(lbID, poolID string) (*entityv2.ListM
 	return members, nil
 }
 
-func (m *VNGCLOUD_Provider) DeletePool(lbID, poolID string) error {
+func (m *VNGCLOUD_Provider) DeletePool(ctx context.Context, lbID, poolID string) error {
 	m.logger.Infof("%s Request delete pool %s of load balancer %s", icon, poolID, lbID)
 	opt := loadbalancerv2.NewDeletePoolByIdRequest(lbID, poolID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePoolById(opt)
@@ -451,7 +451,7 @@ func (m *VNGCLOUD_Provider) DeletePool(lbID, poolID string) error {
 	return nil
 }
 
-func (m *VNGCLOUD_Provider) UpdatePool(lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
+func (m *VNGCLOUD_Provider) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	m.logger.Infof("%s Request update pool %s of load balancer %s", icon, poolID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePool(opt)
 	if sdkErr != nil {
@@ -461,7 +461,7 @@ func (m *VNGCLOUD_Provider) UpdatePool(lbID, poolID string, opt loadbalancerv2.I
 	return nil
 }
 
-func (m *VNGCLOUD_Provider) GetPoolHealthMonitorById(lbID, poolID string) (*entityv2.HealthMonitor, error) {
+func (m *VNGCLOUD_Provider) GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error) {
 	opt := loadbalancerv2.NewGetPoolHealthMonitorByIdRequest(lbID, poolID)
 	monitor, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetPoolHealthMonitorById(opt)
 	if sdkErr != nil {
@@ -473,19 +473,19 @@ func (m *VNGCLOUD_Provider) GetPoolHealthMonitorById(lbID, poolID string) (*enti
 
 // // --------------------------- Certificate ---------------------------
 
-// func (m *VNGCLOUD_Provider) ImportCertificate(opt *certificates.ImportOpts) (*objects.Certificate, error) {
+// func (m *VNGCLOUD_Provider) ImportCertificate(ctx context.Context,opt *certificates.ImportOpts) (*objects.Certificate, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) ListCertificates() ([]*objects.Certificate, error) {
+// func (m *VNGCLOUD_Provider) ListCertificates(ctx context.Context,) ([]*objects.Certificate, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) GetCertificateByID(certID string) (*objects.Certificate, error) {
+// func (m *VNGCLOUD_Provider) GetCertificateByID(ctx context.Context,certID string) (*objects.Certificate, error) {
 // 	m.logger.Error("not implemented yet")
 // 	return nil, errs.ErrorNotImplemented
 // }
-// func (m *VNGCLOUD_Provider) DeleteCertificate(certID string) error {
+// func (m *VNGCLOUD_Provider) DeleteCertificate(ctx context.Context,certID string) error {
 // 	m.logger.Error("not implemented yet")
 // 	return errs.ErrorNotImplemented
 // }

@@ -39,7 +39,7 @@ type vngcloudLBBuilder struct {
 }
 
 func (b *vngcloudLBBuilder) build() error {
-	lb, err := b.provider.GetLoadBalancerByID(b.loadBalancerID)
+	lb, err := b.provider.GetLoadBalancerByID(b.context, b.loadBalancerID)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (b *vngcloudLBBuilder) build() error {
 	b.scheme = loadbalancerv2.LoadBalancerScheme(lb.LoadBalancerSchema)
 
 	// Get pools
-	pools, err := b.provider.ListPool(b.loadBalancerID)
+	pools, err := b.provider.ListPool(b.context, b.loadBalancerID)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (b *vngcloudLBBuilder) build() error {
 	}
 
 	// Get listeners
-	listeners, err := b.provider.ListListenerOfLB(b.loadBalancerID)
+	listeners, err := b.provider.ListListenerOfLB(b.context, b.loadBalancerID)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (b *vngcloudLBBuilder) build() error {
 }
 
 func (b *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuilderType, error) {
-	healthMonitor, err := b.provider.GetPoolHealthMonitorById(b.loadBalancerID, pool.UUID)
+	healthMonitor, err := b.provider.GetPoolHealthMonitorById(b.context, b.loadBalancerID, pool.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (b *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuil
 		Members: make([]*loadbalancerv2.Member, 0),
 	}
 
-	members, err := b.provider.GetPoolMembers(b.loadBalancerID, pool.UUID)
+	members, err := b.provider.GetPoolMembers(b.context, b.loadBalancerID, pool.UUID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (b *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*Listene
 	}
 
 	// get policies
-	policies, err := b.provider.ListPolicyOfListener(b.loadBalancerID, listener.UUID)
+	policies, err := b.provider.ListPolicyOfListener(b.context, b.loadBalancerID, listener.UUID)
 	if err != nil {
 		return nil, err
 	}

@@ -216,13 +216,13 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	// create loadbalancer, update annotation and reconcile later
 	if loadBalancerBuilder.GetID() == "" {
 		// check if loadbalancer with the generate name exists, if exists, update annotation and return
-		lb, err := r.Provider.GetLoadBalancerByName(loadBalancerBuilder.GetName())
+		lb, err := r.Provider.GetLoadBalancerByName(ctx, loadBalancerBuilder.GetName())
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		if lb == nil {
 			// create loadbalancer. It mays create lb, listener, pool at the same time
-			lb, err = r.Provider.CreateLoadBalancer(loadBalancerBuilder.CreateLoadBalancerOptions())
+			lb, err = r.Provider.CreateLoadBalancer(ctx, loadBalancerBuilder.CreateLoadBalancerOptions())
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -233,7 +233,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		r.updateObjectAnnotation(ctx, obj, fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID), lb.UUID)
 		return ctrl.Result{}, nil
 	} else {
-		if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
 			return ctrl.Result{}, err
 		}
@@ -272,7 +272,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	// // ensure tags
 	// tags := VNGHelper.MergeTags(ctx, currentBuilder, loadBalancerBuilder)
 	// if tags != nil {
-	// 	if err := r.Provider.UpdateTags(loadBalancerBuilder.GetID(), tags); err != nil {
+	// 	if err := r.Provider.UpdateTags(ctx,loadBalancerBuilder.GetID(), tags); err != nil {
 	// 		logger.Error("Failed to update tags: ", err)
 	// 		return ctrl.Result{}, err
 	// 	}
@@ -282,11 +282,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
 		currentBuilder.GetPackageID() != "" &&
 		loadBalancerBuilder.GetPackageID() != "" {
-		if err := r.Provider.ResizeLoadBalancer(loadBalancerBuilder.GetID(), loadBalancerBuilder.GetPackageID()); err != nil {
+		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetID(), loadBalancerBuilder.GetPackageID()); err != nil {
 			logger.Error("Failed to resize loadbalancer: ", err)
 			return ctrl.Result{}, err
 		}
-		if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
 			return ctrl.Result{}, err
 		}
@@ -296,7 +296,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	for _, poolBuilder := range loadBalancerBuilder.GetPoolBuilders() {
 		poolInPortal := currentBuilder.GetPoolBuilderByName(poolBuilder.GetName())
 		if poolInPortal == nil {
-			if _pool, err := r.Provider.CreatePool(loadBalancerBuilder.GetID(),
+			if _pool, err := r.Provider.CreatePool(ctx, loadBalancerBuilder.GetID(),
 				poolBuilder.GetICreatePoolRequest(loadBalancerBuilder.GetID())); err != nil {
 				logger.Error("Failed to create pool: ", err)
 				return ctrl.Result{}, err
@@ -304,7 +304,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 				poolBuilder.SetID(_pool.UUID)
 			}
 
-			if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
@@ -313,13 +313,13 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			updateOptions, message := builder.VNGHelper.ComparePoolBuilder(loadBalancerBuilder.GetID(), poolInPortal, poolBuilder)
 			if updateOptions != nil {
 				logger.Info("Need update pool: ", strings.Join(message, ", "))
-				err := r.Provider.UpdatePool(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
+				err := r.Provider.UpdatePool(ctx, loadBalancerBuilder.GetID(), poolInPortal.GetID(),
 					updateOptions.WithLoadBalancerId(loadBalancerBuilder.GetID()))
 				if err != nil {
 					logger.Error("Failed to update pool: ", err)
 					return ctrl.Result{}, err
 				}
-				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
@@ -338,25 +338,25 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 				if updateOptions == nil {
 					continue
 				}
-				err = r.Provider.UpdatePoolMembers(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
+				err = r.Provider.UpdatePoolMembers(ctx, loadBalancerBuilder.GetID(), poolInPortal.GetID(),
 					updateOptions)
 				if err != nil {
 					logger.Error("Failed to update pool members: ", err)
 					return ctrl.Result{}, err
 				}
-				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
 			} else // normal pool
 			if !builder.VNGHelper.ComparePoolMembers(poolInPortal.Members, poolBuilder.Members, true) {
-				err := r.Provider.UpdatePoolMembers(loadBalancerBuilder.GetID(), poolInPortal.GetID(),
+				err := r.Provider.UpdatePoolMembers(ctx, loadBalancerBuilder.GetID(), poolInPortal.GetID(),
 					poolBuilder.GetIUpdatePoolMembersRequest(loadBalancerBuilder.GetID()))
 				if err != nil {
 					logger.Error("Failed to update pool members: ", err)
 					return ctrl.Result{}, err
 				}
-				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
@@ -379,7 +379,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		// listenerInPortal := currentBuilder.GetListenerBuilderByName(listenerBuilder.GetName())
 		listenerInPortal := currentBuilder.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
 		if listenerInPortal == nil {
-			if _lis, err := r.Provider.CreateListener(loadBalancerBuilder.GetID(),
+			if _lis, err := r.Provider.CreateListener(ctx, loadBalancerBuilder.GetID(),
 				listenerBuilder.GetICreateListenerRequest().WithLoadBalancerId(loadBalancerBuilder.GetID()),
 			); err != nil {
 				logger.Error("Failed to create listener: ", err)
@@ -387,7 +387,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			} else {
 				listenerBuilder.SetID(_lis.UUID)
 			}
-			if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
@@ -406,7 +406,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			updateOptions, message := builder.VNGHelper.CompareListenerBuilder(loadBalancerBuilder.GetID(), listenerInPortal, listenerBuilder)
 			if updateOptions != nil {
 				logger.Info("Need update listener: ", strings.Join(message, ", "))
-				err := r.Provider.UpdateListener(loadBalancerBuilder.GetID(), listenerInPortal.GetID(), updateOptions)
+				err := r.Provider.UpdateListener(ctx, loadBalancerBuilder.GetID(), listenerInPortal.GetID(), updateOptions)
 				if err != nil {
 					logger.Error("Failed to update listener: ", err)
 					return ctrl.Result{}, err
@@ -418,7 +418,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 				if p := loadBalancerBuilder.GetPoolBuilderByID(updateOptions.DefaultPoolId); p != nil {
 					listenerInPortal.ReferPoolName = p.GetName()
 				}
-				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
@@ -439,12 +439,12 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 
 			policyInPortal := listenerInPortal.GetPolicyBuilderByName(policyBuilder.GetName())
 			if policyInPortal == nil {
-				if _, err := r.Provider.CreatePolicy(loadBalancerBuilder.GetID(), listenerInPortal.GetID(),
+				if _, err := r.Provider.CreatePolicy(ctx, loadBalancerBuilder.GetID(), listenerInPortal.GetID(),
 					policyBuilder.GetICreatePolicyRequest(loadBalancerBuilder.GetID(), listenerInPortal.GetID())); err != nil {
 					logger.Error("Failed to create policy: ", err)
 					return ctrl.Result{}, err
 				}
-				if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
@@ -454,7 +454,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 					policyInPortal, policyBuilder)
 				if updateOptions != nil {
 					logger.Info("Need update policy: ", strings.Join(message, ", "))
-					err := r.Provider.UpdatePolicy(loadBalancerBuilder.GetID(), listenerBuilder.GetID(), policyInPortal.GetID(), updateOptions)
+					err := r.Provider.UpdatePolicy(ctx, loadBalancerBuilder.GetID(), listenerBuilder.GetID(), policyInPortal.GetID(), updateOptions)
 					if err != nil {
 						logger.Error("Failed to update policy: ", err)
 						return ctrl.Result{}, err
@@ -466,7 +466,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 					if p := loadBalancerBuilder.GetPoolBuilderByID(updateOptions.RedirectPoolID); p != nil {
 						listenerInPortal.ReferPoolName = p.GetName()
 					}
-					if _, err := r.Provider.WaitForLBActive(loadBalancerBuilder.GetID()); err != nil {
+					if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
 						logger.Error("Failed to wait for loadbalancer active: ", err)
 						return ctrl.Result{}, err
 					}
@@ -480,11 +480,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		currentListener := currentBuilder.GetListenerBuilderByName(oldListener.GetName())
 		newListener := loadBalancerBuilder.GetListenerBuilderByName(oldListener.GetName())
 		if currentListener != nil && newListener == nil {
-			if err := r.Provider.DeleteListener(currentBuilder.GetID(), currentListener.GetID()); err != nil {
+			if err := r.Provider.DeleteListener(ctx, currentBuilder.GetID(), currentListener.GetID()); err != nil {
 				logger.Error("Failed to delete listener: ", err)
 				return ctrl.Result{}, err
 			}
-			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, currentBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
@@ -496,12 +496,12 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		for _, policy := range oldListener.GetPolicyBuilders() {
 			if currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName()); currentPolicy != nil &&
 				newListener.GetPolicyBuilderByName(policy.GetName()) == nil {
-				if err := r.Provider.DeletePolicy(currentBuilder.GetID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
+				if err := r.Provider.DeletePolicy(ctx, currentBuilder.GetID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
 					logger.Error("Failed to delete policy: ", err)
 					return ctrl.Result{}, err
 				}
 				currentPolicy.SetIsDeleted(true)
-				if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+				if _, err := r.Provider.WaitForLBActive(ctx, currentBuilder.GetID()); err != nil {
 					logger.Error("Failed to wait for loadbalancer active: ", err)
 					return ctrl.Result{}, err
 				}
@@ -520,12 +520,12 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 				logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
 				continue
 			}
-			if err := r.Provider.DeletePool(currentBuilder.GetID(), pool.GetID()); err != nil {
+			if err := r.Provider.DeletePool(ctx, currentBuilder.GetID(), pool.GetID()); err != nil {
 				logger.Error("Failed to delete pool: ", err)
 				return ctrl.Result{}, err
 			}
 			currentPool.SetIsDeleted(true)
-			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, currentBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
@@ -637,7 +637,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 
 	// if can delete whole loadbalancer, delete loadbalancer and return
 	if checkCanDeleteWholeLoadBalancer(oldBuilder, currentBuilder) {
-		if err := r.Provider.DeleteLoadBalancer(oldBuilder.GetID()); err != nil {
+		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetID()); err != nil {
 			logger.Error("Failed to delete loadbalancer: ", err)
 			return ctrl.Result{}, err
 		}
@@ -663,11 +663,11 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		// delete whole listener
 		currentListener := currentBuilder.GetListenerBuilderByName(oldListener.GetName())
 		if checkCanDeleteWholeListener(oldListener, currentListener) {
-			if err := r.Provider.DeleteListener(oldBuilder.GetID(), oldListener.GetID()); err != nil {
+			if err := r.Provider.DeleteListener(ctx, oldBuilder.GetID(), oldListener.GetID()); err != nil {
 				logger.Error("Failed to delete listener: ", err)
 				return ctrl.Result{}, err
 			}
-			if _, err := r.Provider.WaitForLBActive(oldBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, oldBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}
@@ -676,12 +676,12 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 			// delete redundant policy
 			for _, policy := range oldListener.GetPolicyBuilders() {
 				if currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName()); currentPolicy != nil {
-					if err := r.Provider.DeletePolicy(currentBuilder.GetID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
+					if err := r.Provider.DeletePolicy(ctx, currentBuilder.GetID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
 						logger.Error("Failed to delete policy: ", err)
 						return ctrl.Result{}, err
 					}
 					currentPolicy.SetIsDeleted(true)
-					if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+					if _, err := r.Provider.WaitForLBActive(ctx, currentBuilder.GetID()); err != nil {
 						logger.Error("Failed to wait for loadbalancer active: ", err)
 						return ctrl.Result{}, err
 					}
@@ -700,12 +700,12 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 				logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
 				continue
 			}
-			if err := r.Provider.DeletePool(currentBuilder.GetID(), pool.GetID()); err != nil {
+			if err := r.Provider.DeletePool(ctx, currentBuilder.GetID(), pool.GetID()); err != nil {
 				logger.Error("Failed to delete pool: ", err)
 				return ctrl.Result{}, err
 			}
 			currentPool.SetIsDeleted(true)
-			if _, err := r.Provider.WaitForLBActive(currentBuilder.GetID()); err != nil {
+			if _, err := r.Provider.WaitForLBActive(ctx, currentBuilder.GetID()); err != nil {
 				logger.Error("Failed to wait for loadbalancer active: ", err)
 				return ctrl.Result{}, err
 			}

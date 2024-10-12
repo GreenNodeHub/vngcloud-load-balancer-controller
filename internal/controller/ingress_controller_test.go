@@ -26,6 +26,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +41,7 @@ import (
 var _ = Describe("Ingress Controller", func() {
 	Context("Wait 5 seconds before start test", func() {
 		It("should be alright", func() {
+			ctx = contexts.NewContext(ctx).SetLogName("___i___").GetContext()
 			time.Sleep(5 * time.Second)
 		})
 	})
@@ -265,7 +267,7 @@ var _ = Describe("Ingress Controller", func() {
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
 						// check pool
-						pools, err := mockProvider.ListPool(loadbalancer.UUID)
+						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
 						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
@@ -297,7 +299,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 
 						// check listener
-						listeners, err := mockProvider.ListListenerOfLB(loadbalancer.UUID)
+						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
 						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
@@ -374,7 +376,7 @@ var _ = Describe("Ingress Controller", func() {
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
 						// check pool
-						pools, err := mockProvider.ListPool(loadbalancer.UUID)
+						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
 						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
@@ -405,7 +407,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 
 						// check listener
-						listeners, err := mockProvider.ListListenerOfLB(loadbalancer.UUID)
+						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
 						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
@@ -431,7 +433,7 @@ var _ = Describe("Ingress Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 
 							// check policy
-							policies, err := mockProvider.ListPolicyOfListener(loadbalancer.UUID, listener.UUID)
+							policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 							Expect(err).ShouldNot(HaveOccurred())
 							Expect(policies).ShouldNot(BeNil())
 							Expect(len(policies.Items)).Should(Equal(1)) // number of policy
@@ -465,7 +467,7 @@ var _ = Describe("Ingress Controller", func() {
 				}, timeout, interval).Should(BeTrue())
 
 				// expect load balancer attribute in the mock provider
-				loadbalancer, err := mockProvider.GetLoadBalancerByID(loadbalancerID)
+				loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
 				Expect(err).ShouldNot(HaveOccurred())
 				tt.expect(loadbalancer)
 
@@ -476,7 +478,7 @@ var _ = Describe("Ingress Controller", func() {
 					err := k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)
 					return err != nil
 				}, 2*timeout, interval).Should(BeTrue())
-				_, err = mockProvider.GetLoadBalancerByID(loadbalancerID)
+				_, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
 				Expect(err).Should(HaveOccurred())
 
 				for _, depend := range depends {

@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"testing"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
@@ -105,5 +106,5 @@ func TestCreateLoadBalancerMock(t *testing.T) {
 		templatePoolMemeberRequest(),
 	)
 	opt.Listener = templateCreateListenerRequest()
-	provider.CreateLoadBalancer(opt)
+	provider.CreateLoadBalancer(context.TODO(), opt)
 }

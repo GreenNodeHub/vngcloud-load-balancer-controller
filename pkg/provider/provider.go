@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"context"
+
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 )
@@ -40,37 +42,37 @@ type Provider interface {
 	// ListServerByProviderIDs(providerIDs []string) ([]*objects.Server, error)
 	// WaitForServerActive(serverID string)
 
-	ListLoadBalancers() (*entityv2.ListLoadBalancers, error)
-	GetLoadBalancerByID(lbID string) (*entityv2.LoadBalancer, error)
-	GetLoadBalancerByName(name string) (*entityv2.LoadBalancer, error)
-	CreateLoadBalancer(lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)
-	DeleteLoadBalancer(lbID string) error
-	ResizeLoadBalancer(lbID, packageID string) error
-	WaitForLBActive(lbID string) (*entityv2.LoadBalancer, error)
+	ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error)
+	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
+	GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error)
+	CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)
+	DeleteLoadBalancer(ctx context.Context, lbID string) error
+	ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error
+	WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 
 	// GetListenerByName(lbID, name string) (*objects.Listener, error)
 	// GetListenerByPort(lbID string, port int) (*objects.Listener, error)
-	CreateListener(lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error)
-	ListListenerOfLB(lbID string) (*entityv2.ListListeners, error)
-	DeleteListener(lbID, listenerID string) error
-	UpdateListener(lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error
+	CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error)
+	ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error)
+	DeleteListener(ctx context.Context, lbID, listenerID string) error
+	UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error
 
 	// GetPolicyByName(lbID, listenerID, name string) (*objects.Policy, error)
 	// GetPolicyByID(policyID string) (*objects.Policy, error)
-	CreatePolicy(lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error)
-	ListPolicyOfListener(lbID, listenerID string) (*entityv2.ListPolicies, error)
-	UpdatePolicy(lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error
-	DeletePolicy(lbID, listenerID, policyID string) error
+	CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error)
+	ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error)
+	UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error
+	DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error
 
 	// GetPoolByName(lbID, name string) (*objects.Pool, error)
 	// GetPoolByID(lbID, poolID string) (*entityv2.Pool, error)
-	CreatePool(lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error)
-	ListPool(lbID string) (*entityv2.ListPools, error)
-	UpdatePoolMembers(lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error
-	GetPoolMembers(lbID, poolID string) (*entityv2.ListMembers, error)
-	DeletePool(lbID, poolID string) error
-	UpdatePool(lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error
-	GetPoolHealthMonitorById(lbID, poolID string) (*entityv2.HealthMonitor, error)
+	CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error)
+	ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error)
+	UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error
+	GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error)
+	DeletePool(ctx context.Context, lbID, poolID string) error
+	UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error
+	GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error)
 
 	// ImportCertificate(opt *certificates.ImportOpts) (*objects.Certificate, error)
 	// ListCertificates() ([]*objects.Certificate, error)
