@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	clone "github.com/huandu/go-clone"
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -179,7 +180,7 @@ func (m *MockProvider) ListLoadBalancers() (*entityv2.ListLoadBalancers, error) 
 func (m *MockProvider) GetLoadBalancerByID(lbID string) (*entityv2.LoadBalancer, error) {
 	for _, lb := range m.loadBalancers {
 		if lb.GetId() == lbID {
-			return lb, nil
+			return clone.Clone(lb).(*entityv2.LoadBalancer), nil
 		}
 	}
 	return nil, errs.ErrorNotFound
@@ -192,13 +193,14 @@ func (m *MockProvider) GetLoadBalancerByName(name string) (*entityv2.LoadBalance
 	}
 	for _, lb := range allLBs.Items {
 		if lb.Name == name {
-			return lb, nil
+			return clone.Clone(lb).(*entityv2.LoadBalancer), nil
 		}
 	}
 	return nil, nil
 }
 
 func (m *MockProvider) CreateLoadBalancer(lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
+	m.logger.Infof("%s Request create load balancer.", icon)
 	if lbOptions == nil {
 		return nil, errs.ErrorInvalidInput
 	}
@@ -246,18 +248,55 @@ func (m *MockProvider) CreateLoadBalancer(lbOptions loadbalancerv2.ICreateLoadBa
 		m.CreateListener(lbID, lbOpt.Listener.WithLoadBalancerId(newLB.UUID).WithDefaultPoolId(defaultPoolID))
 	}
 
-	go func(o *entityv2.LoadBalancer) {
-		time.Sleep(5 * time.Second)
-		m.mu.Lock()
-		o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
-		o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
-		m.mu.Unlock()
-	}(newLB)
+	m.updatingStatus(newLB.UUID)
+	go m.readyAfterTime(newLB.UUID)
 
-	return newLB, nil
+	return &entityv2.LoadBalancer{
+		UUID: newLB.UUID,
+	}, nil
+}
+
+func (m *MockProvider) updatingStatus(lbID string) {
+	var o *entityv2.LoadBalancer
+	for _, lb := range m.loadBalancers {
+		if lb.GetId() == lbID {
+			o = lb
+			break
+		}
+	}
+	if o == nil {
+		m.logger.Info("Load Balancer not found")
+		return
+	}
+
+	m.mu.Lock()
+	o.DisplayStatus = consts.CREATED_LOADBALANCER_STATUS
+	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
+	m.mu.Unlock()
+}
+
+func (m *MockProvider) readyAfterTime(lbID string) {
+	var o *entityv2.LoadBalancer
+	for _, lb := range m.loadBalancers {
+		if lb.GetId() == lbID {
+			o = lb
+			break
+		}
+	}
+	if o == nil {
+		m.logger.Info("Load Balancer not found")
+		return
+	}
+
+	time.Sleep(3 * time.Second)
+	m.mu.Lock()
+	o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
+	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
+	m.mu.Unlock()
 }
 
 func (m *MockProvider) DeleteLoadBalancer(lbID string) error {
+	m.logger.Infof("%s Request delete load balancer %s", icon, lbID)
 	newListeners := make([]*wrapListener, 0)
 	for i, lb := range m.listeners {
 		if lb.lbID != lbID {
@@ -295,7 +334,7 @@ func (m *MockProvider) ResizeLoadBalancer(lbID, packageID string) error {
 	return errs.ErrorNotImplemented
 }
 func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, error) {
-	m.logger.Infof("Waiting for load balancer %s to be ready", lbID)
+	m.logger.Infof("%s Waiting for load balancer %s to be ready", waitIcon, lbID)
 	var resultLb *entityv2.LoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -310,7 +349,7 @@ func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, err
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ACTIVE_LOADBALANCER_STATUS &&
 			strings.ToUpper(lb.ProgressStatus) == consts.CREATED_LOADBALANCER_STATUS {
-			m.logger.Infof("Load balancer %s is ready", lbID)
+			m.logger.Infof("%s Load balancer %s is ready", readyIcon, lbID)
 			resultLb = lb
 			return true, nil
 		}
@@ -320,7 +359,7 @@ func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, err
 			return true, errs.ErrorLoadBalancerStatusError
 		}
 
-		m.logger.Infof("Load balancer %s is not ready yet, waiting...", lbID)
+		m.logger.Infof("%s Load balancer %s is not ready yet, waiting...", waitIcon, lbID)
 		return false, nil
 	})
 
@@ -343,6 +382,7 @@ func (m *MockProvider) WaitForLBActive(lbID string) (*entityv2.LoadBalancer, err
 //		return nil, errs.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreateListener(lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
+	m.logger.Infof("%s Request create listener of load balancer %s", icon, lbID)
 	listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	newListener := &wrapListener{
 		lbID: lbID,
@@ -380,13 +420,18 @@ func (m *MockProvider) CreateListener(lbID string, opt loadbalancerv2.ICreateLis
 	m.mu.Lock()
 	m.listeners = append(m.listeners, newListener)
 	m.mu.Unlock()
-	return newListener.Listener, nil
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return &entityv2.Listener{
+		UUID: newListener.Listener.UUID,
+	}, nil
 }
 func (m *MockProvider) ListListenerOfLB(lbID string) (*entityv2.ListListeners, error) {
 	listeners := make([]*entityv2.Listener, 0)
 	for _, l := range m.listeners {
 		if l.lbID == lbID {
-			listeners = append(listeners, l.Listener)
+			listeners = append(listeners, clone.Clone(l.Listener).(*entityv2.Listener))
 		}
 	}
 	return &entityv2.ListListeners{
@@ -394,6 +439,7 @@ func (m *MockProvider) ListListenerOfLB(lbID string) (*entityv2.ListListeners, e
 	}, nil
 }
 func (m *MockProvider) DeleteListener(lbID, listenerID string) error {
+	m.logger.Infof("%s Request delete listener %s of load balancer %s", icon, listenerID, lbID)
 	isFound := false
 	newListeners := make([]*wrapListener, 0)
 	for i, l := range m.listeners {
@@ -407,9 +453,13 @@ func (m *MockProvider) DeleteListener(lbID, listenerID string) error {
 		return errs.ErrorNotFound
 	}
 	m.listeners = newListeners
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
 	return nil
 }
 func (m *MockProvider) UpdateListener(lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
+	m.logger.Infof("%s Request update listener %s of load balancer %s", icon, listenerID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdateListenerRequest)
 	var listener *wrapListener
 	for _, l := range m.listeners {
@@ -425,6 +475,9 @@ func (m *MockProvider) UpdateListener(lbID, listenerID string, opt loadbalancerv
 	listener.Listener.TimeoutConnection = updateOpt.TimeoutConnection
 	listener.Listener.TimeoutMember = updateOpt.TimeoutMember
 	listener.Listener.AllowedCidrs = updateOpt.AllowedCidrs
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
 	return nil
 }
 
@@ -435,6 +488,7 @@ func (m *MockProvider) UpdateListener(lbID, listenerID string, opt loadbalancerv
 //		return nil, errs.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreatePolicy(lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
+	m.logger.Infof("%s Request create policy of listener %s of load balancer %s", icon, listenerID, lbID)
 	lb, err := m.GetLoadBalancerByID(lbID)
 	if err != nil {
 		return nil, err
@@ -460,7 +514,7 @@ func (m *MockProvider) CreatePolicy(lbID, listenerID string, opt loadbalancerv2.
 		return nil, errs.ErrorNotFound
 	}
 
-	policy := opt.ToRequestBody().(*loadbalancerv2.CreatePolicyRequest)
+	policy := opt.(*loadbalancerv2.CreatePolicyRequest)
 	newPolicy := &wrapPolicy{
 		lbID:       lbID,
 		listenerID: listenerID,
@@ -505,13 +559,18 @@ func (m *MockProvider) CreatePolicy(lbID, listenerID string, opt loadbalancerv2.
 	m.mu.Lock()
 	m.policies = append(m.policies, newPolicy)
 	m.mu.Unlock()
-	return newPolicy.Policy, nil
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return &entityv2.Policy{
+		UUID: newPolicy.Policy.UUID,
+	}, nil
 }
 func (m *MockProvider) ListPolicyOfListener(lbID, listenerID string) (*entityv2.ListPolicies, error) {
 	policies := make([]*entityv2.Policy, 0)
 	for _, p := range m.policies {
 		if p.lbID == lbID && p.listenerID == listenerID {
-			policies = append(policies, p.Policy)
+			policies = append(policies, clone.Clone(p.Policy).(*entityv2.Policy))
 		}
 	}
 	return &entityv2.ListPolicies{
@@ -524,6 +583,7 @@ func (m *MockProvider) ListPolicyOfListener(lbID, listenerID string) (*entityv2.
 //		return nil, errs.ErrorNotImplemented
 //	}
 func (m *MockProvider) UpdatePolicy(lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
+	m.logger.Infof("%s Request update policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
 	m.logger.Error("not implemented yet", "UpdatePolicy")
 	return errs.ErrorNotImplemented
 }
@@ -541,6 +601,9 @@ func (m *MockProvider) DeletePolicy(lbID, listenerID, policyID string) error {
 		return errs.ErrorNotFound
 	}
 	m.policies = newPolicies
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
 	return nil
 }
 
@@ -551,6 +614,7 @@ func (m *MockProvider) DeletePolicy(lbID, listenerID, policyID string) error {
 //		return nil, errs.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreatePool(lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
+	m.logger.Infof("%s Request create pool of load balancer %s", icon, lbID)
 	var (
 		pool          *loadbalancerv2.CreatePoolRequest
 		healthMonitor *loadbalancerv2.HealthMonitor
@@ -640,13 +704,18 @@ func (m *MockProvider) CreatePool(lbID string, opt loadbalancerv2.ICreatePoolReq
 	m.mu.Lock()
 	m.pools = append(m.pools, newPool)
 	m.mu.Unlock()
-	return newPool.Pool, nil
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return &entityv2.Pool{
+		UUID: newPool.Pool.UUID,
+	}, nil
 }
 func (m *MockProvider) ListPool(lbID string) (*entityv2.ListPools, error) {
 	pools := make([]*entityv2.Pool, 0)
 	for _, p := range m.pools {
 		if p.lbID == lbID {
-			pools = append(pools, p.Pool)
+			pools = append(pools, clone.Clone(p.Pool).(*entityv2.Pool))
 		}
 	}
 	return &entityv2.ListPools{
@@ -661,7 +730,7 @@ func (m *MockProvider) UpdatePoolMembers(lbID, poolID string, members loadbalanc
 func (m *MockProvider) GetPoolByID(lbID, poolID string) (*entityv2.Pool, error) {
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
-			return p.Pool, nil
+			return clone.Clone(p.Pool).(*entityv2.Pool), nil
 		}
 	}
 	return nil, errs.ErrorNotFound
@@ -670,13 +739,14 @@ func (m *MockProvider) GetPoolByID(lbID, poolID string) (*entityv2.Pool, error) 
 func (m *MockProvider) GetPoolMembers(lbID, poolID string) (*entityv2.ListMembers, error) {
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
-			return p.Members, nil
+			return clone.Clone(p.Members).(*entityv2.ListMembers), nil
 		}
 	}
 	return nil, errs.ErrorNotFound
 }
 
 func (m *MockProvider) DeletePool(lbID, poolID string) error {
+	m.logger.Infof("%s Request delete pool %s of load balancer %s", icon, poolID, lbID)
 	isFound := false
 	newPools := make([]*wrapPool, 0)
 	for i, p := range m.pools {
@@ -690,10 +760,14 @@ func (m *MockProvider) DeletePool(lbID, poolID string) error {
 		return errs.ErrorNotFound
 	}
 	m.pools = newPools
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
 	return nil
 }
 
 func (m *MockProvider) UpdatePool(lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
+	m.logger.Infof("%s Request update pool %s of load balancer %s", icon, poolID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdatePoolRequest)
 	var pool *wrapPool
 	for _, p := range m.pools {
@@ -706,13 +780,16 @@ func (m *MockProvider) UpdatePool(lbID, poolID string, opt loadbalancerv2.IUpdat
 		return errs.ErrorNotFound
 	}
 	pool.Pool.LoadBalanceMethod = string(updateOpt.Algorithm)
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
 	return nil
 }
 
 func (m *MockProvider) GetPoolHealthMonitorById(lbID, poolID string) (*entityv2.HealthMonitor, error) {
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
-			return p.HealthMonitor, nil
+			return clone.Clone(p.HealthMonitor).(*entityv2.HealthMonitor), nil
 		}
 	}
 	return nil, errs.ErrorNotFound

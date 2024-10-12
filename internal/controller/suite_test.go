@@ -19,13 +19,16 @@ package controller
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
@@ -170,6 +173,15 @@ func TestControllers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		DisableTimestamp: true,
+		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+			fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
+			//return frame.Function, fileName
+			return "", fileName
+		},
+	})
 
 	ctx, cancel = context.WithCancel(context.TODO())
 

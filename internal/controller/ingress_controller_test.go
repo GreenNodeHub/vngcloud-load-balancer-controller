@@ -27,6 +27,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -320,6 +321,124 @@ var _ = Describe("Ingress Controller", func() {
 							// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 							// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						}
+					},
+				},
+				{
+					name: "create without default backend, only 1 rule",
+					generateDepends: func() []client.Object {
+						service := newServiceNodePortResource("test-service-gogsf", "default")
+						service.Spec.Ports = []corev1.ServicePort{
+							{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+						}
+						return []client.Object{service}
+					},
+					generateObj: func() client.Object {
+						ingress := newIngressResource("test-service-gogsf", "default")
+						Expect(ingress).NotTo(BeNil())
+						ingress.Spec.DefaultBackend = nil
+						ingress.Spec.Rules = []networkingv1.IngressRule{
+							{
+								Host: "test.com",
+								IngressRuleValue: networkingv1.IngressRuleValue{
+									HTTP: &networkingv1.HTTPIngressRuleValue{
+										Paths: []networkingv1.HTTPIngressPath{
+											{
+												PathType: func() *networkingv1.PathType { pt := networkingv1.PathTypePrefix; return &pt }(),
+												Path:     "/",
+												Backend: networkingv1.IngressBackend{
+													Service: &networkingv1.IngressServiceBackend{
+														Name: "test-service-gogsf",
+														Port: networkingv1.ServiceBackendPort{Number: 80},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						}
+						return ingress
+					},
+					expect: func(loadbalancer *entity.LoadBalancer) {
+						// wait until reconcile done
+						time.Sleep(20 * time.Second)
+
+						Expect(loadbalancer).ShouldNot(BeNil())
+						Expect(loadbalancer.Name).Should(Equal("vks-test-clust-default-test-servi-9ec42"))
+						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
+						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
+						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
+
+						// check pool
+						pools, err := mockProvider.ListPool(loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(pools).ShouldNot(BeNil())
+						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						for _, pool := range pools.Items {
+							Expect(pool.Name).Should(BeElementOf(
+								"vks-9ec42-default-test-service-gogsf-80"))
+							Expect(pool.Description).Should(Equal("????????"))
+							Expect(pool.Status).Should(Equal("ACTIVE"))
+							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+							Expect(pool.Protocol).Should(Equal("HTTP"))
+							Expect(pool.Stickiness).Should(Equal(false))
+							Expect(pool.TLSEncryption).Should(Equal(false))
+
+							Expect(pool.HealthMonitor).ShouldNot(BeNil())
+							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+							Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+
+							Expect(pool.Members).ShouldNot(BeNil())
+							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+								mockNode1.Status.Addresses[0].Address,
+								mockNode2.Status.Addresses[0].Address,
+								mockNode3.Status.Addresses[0].Address,
+								mockNode4.Status.Addresses[0].Address))
+						}
+
+						// check listener
+						listeners, err := mockProvider.ListListenerOfLB(loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(listeners).ShouldNot(BeNil())
+						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						for _, listener := range listeners.Items {
+							Expect(listener.Protocol).Should(Equal("HTTP"))
+							Expect(listener.ProtocolPort).Should(Equal(80))
+							Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+							Expect(listener.DefaultPoolId).Should(Equal(""))   // no default pool
+							Expect(listener.DefaultPoolName).Should(Equal("")) // no default pool
+							Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+							Expect(listener.TimeoutClient).Should(Equal(50))
+							Expect(listener.TimeoutConnection).Should(Equal(5))
+							Expect(listener.TimeoutMember).Should(Equal(50))
+							Expect(listener.Description).Should(Equal("????????"))
+							// Expect(listener.Headers).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CertificateAuthorities).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ClientCertificateAuthentication).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+
+							// check policy
+							policies, err := mockProvider.ListPolicyOfListener(loadbalancer.UUID, listener.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(policies).ShouldNot(BeNil())
+							Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+							for _, policy := range policies.Items {
+								Expect(policy.Name).Should(Equal("vks-9ec42-false-r0-p0"))
+								Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
+							}
 						}
 					},
 				},
