@@ -88,6 +88,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if devMode {
+		logrus.SetLevel(logrus.DebugLevel)
 		logrus.SetReportCaller(true)
 		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableTimestamp: true,
