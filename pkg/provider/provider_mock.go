@@ -593,8 +593,38 @@ func (m *MockProvider) ListPolicyOfListener(ctx context.Context, lbID, listenerI
 func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
-	logger.Error("not implemented yet", "UpdatePolicy")
-	return errs.ErrorNotImplemented
+	updateOpt := opt.(*loadbalancerv2.UpdatePolicyRequest)
+	var policy *wrapPolicy
+	for _, p := range m.policies {
+		if p.lbID == lbID && p.listenerID == listenerID && p.UUID == policyID {
+			policy = p
+			break
+		}
+	}
+	if policy == nil {
+		return errs.ErrorNotFound
+	}
+	policy.Policy.RedirectPoolID = updateOpt.RedirectPoolID
+	policy.Policy.Action = string(updateOpt.Action)
+	policy.Policy.RedirectURL = updateOpt.RedirectURL
+	policy.Policy.RedirectHTTPCode = updateOpt.RedirectHTTPCode
+	policy.Policy.KeepQueryString = updateOpt.KeepQueryString
+	newRules := make([]*entityv2.L7Rule, 0)
+	for _, r := range updateOpt.Rules {
+		newRules = append(newRules, &entityv2.L7Rule{
+			UUID:               "rule-" + randID(),
+			CompareType:        string(r.CompareType),
+			RuleValue:          r.RuleValue,
+			RuleType:           string(r.RuleType),
+			ProvisioningStatus: consts.ACTIVE_LOADBALANCER_STATUS,
+			OperatingStatus:    consts.ACTIVE_LOADBALANCER_STATUS,
+		})
+	}
+	policy.Policy.L7Rules = newRules
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return nil
 }
 func (m *MockProvider) DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error {
 	isFound := false

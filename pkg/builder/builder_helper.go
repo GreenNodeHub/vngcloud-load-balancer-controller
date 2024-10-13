@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"github.com/sirupsen/logrus"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 )
 
@@ -101,6 +102,7 @@ func (l *poolListenerHelper) IsPoolInUseByOtherListener(poolID string) bool {
 	// check if the pool is used by other listener
 	for _, listener := range l.listenerBuilders {
 		if !listener.IsDeleted() && *listener.DefaultPoolId == poolID {
+			logrus.Debugf("Pool %s is used by listener %s.", poolID, listener.GetName())
 			return true
 		}
 
@@ -111,6 +113,7 @@ func (l *poolListenerHelper) IsPoolInUseByOtherListener(poolID string) bool {
 		// check if the pool is used by policy
 		for _, policy := range listener.GetPolicyBuilders() {
 			if !policy.IsDeleted() && policy.RedirectPoolID == poolID {
+				logrus.Debugf("Pool %s is used by policy %s.", poolID, policy.GetName())
 				return true
 			}
 		}

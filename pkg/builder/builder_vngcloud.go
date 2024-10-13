@@ -396,10 +396,12 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 				}
 
 				// need to update to current builder, avoid mismatch data later
-				listenerInPortal.DefaultPoolId = &updateOptions.RedirectPoolID
-				listenerInPortal.ReferPoolName = ""
-				if p := r.GetPoolBuilderByID(updateOptions.RedirectPoolID); p != nil {
-					listenerInPortal.ReferPoolName = p.GetName()
+				policyInPortal.ReferPoolName = ""
+				policyInPortal.RedirectPoolID = updateOptions.RedirectPoolID
+				if policyInPortal.RedirectPoolID != "" {
+					if p := r.GetPoolBuilderByID(updateOptions.RedirectPoolID); p != nil {
+						policyInPortal.ReferPoolName = p.GetName()
+					}
 				}
 				if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
 					r.logger.Error("Failed to wait for loadbalancer active: ", err)

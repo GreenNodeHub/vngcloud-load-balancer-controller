@@ -31,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -238,10 +239,17 @@ var _ = Describe("Service Controller", func() {
 		It("created load balancer shoud have specific attribute", func() {
 			mockServiceReconciler.modeTest = false
 
+			type stepType struct {
+				name          string
+				updateObjects func() []client.Object
+				expect        func(lb *entity.LoadBalancer)
+			}
+
 			tests := []struct {
 				name            string
 				generateService func() *corev1.Service
 				expect          func(lb *entity.LoadBalancer)
+				steps           []stepType
 			}{
 				{
 					name: "create service with default annotation",
@@ -316,6 +324,7 @@ var _ = Describe("Service Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						}
 					},
+					steps: nil,
 				},
 				{
 					name: "all normal annotations in the same time",
@@ -409,6 +418,7 @@ var _ = Describe("Service Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						}
 					},
+					steps: nil,
 				},
 				{
 					name: "create service with target node label, 1 label, 1 node",
@@ -483,6 +493,7 @@ var _ = Describe("Service Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						}
 					},
+					steps: nil,
 				},
 				{
 					name: "create service with target node label, 2 label (AND logic), 1 node",
@@ -557,10 +568,8 @@ var _ = Describe("Service Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						}
 					},
+					steps: nil,
 				},
-				// {
-				// 	name: "service port use UDP protocol",
-				// },
 				{
 					name: "service port use TCP protocol, but annotation use PROXY protocol",
 					generateService: func() *corev1.Service {
@@ -637,12 +646,177 @@ var _ = Describe("Service Controller", func() {
 							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						}
 					},
+					steps: nil,
+				},
+				{
+					name: "update service with new port",
+					generateService: func() *corev1.Service {
+						service := newServiceResource("test-service-1", "default")
+						service.Spec.Ports = []corev1.ServicePort{
+							{Name: "http", Port: 80, TargetPort: intstr.FromInt(80)},
+						}
+						return service
+					},
+					expect: func(loadbalancer *entity.LoadBalancer) {
+						// wait until reconcile done
+						time.Sleep(20 * time.Second)
+
+						Expect(loadbalancer).ShouldNot(BeNil())
+						Expect(loadbalancer.Name).Should(Equal("vks-test-clust-default-test-servi-e3551"))
+						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
+						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L4_PACKAGE_ID))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
+						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
+
+						// check pool
+						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(pools).ShouldNot(BeNil())
+						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						for _, pool := range pools.Items {
+							Expect(pool.Name).Should(Equal("vks-test-clust-default-test-serv-e3551-TCP-80"))
+							Expect(pool.Description).Should(Equal("????????"))
+							Expect(pool.Status).Should(Equal("ACTIVE"))
+							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+							Expect(pool.Protocol).Should(Equal("TCP"))
+							Expect(pool.Stickiness).Should(Equal(false))
+							Expect(pool.TLSEncryption).Should(Equal(false))
+
+							Expect(pool.HealthMonitor).ShouldNot(BeNil())
+							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+							Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+							Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+
+							Expect(pool.Members).ShouldNot(BeNil())
+							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+								mockNode1.Status.Addresses[0].Address,
+								mockNode2.Status.Addresses[0].Address,
+								mockNode3.Status.Addresses[0].Address,
+								mockNode4.Status.Addresses[0].Address))
+						}
+
+						// check listener
+						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(listeners).ShouldNot(BeNil())
+						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						for _, listener := range listeners.Items {
+							Expect(listener.Protocol).Should(Equal("TCP"))
+							Expect(listener.ProtocolPort).Should(Equal(80))
+							Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+							Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
+							Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
+							Expect(listener.Name).Should(Equal("vks-test-clust-default-test-serv-e3551-TCP-80"))
+							Expect(listener.TimeoutClient).Should(Equal(50))
+							Expect(listener.TimeoutConnection).Should(Equal(5))
+							Expect(listener.TimeoutMember).Should(Equal(50))
+							Expect(listener.Description).Should(Equal("????????"))
+							// Expect(listener.Headers).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CertificateAuthorities).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ClientCertificateAuthentication).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						}
+					},
+					steps: []stepType{
+						{
+							name: "update service with new port, 80->81, should delete the old listener and pool",
+							updateObjects: func() []client.Object {
+								// get object
+								object := corev1.Service{}
+								Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "test-service-1", Namespace: "default"}, &object)).Should(Succeed())
+								object.Spec.Ports = []corev1.ServicePort{
+									{Name: "http", Port: 81, TargetPort: intstr.FromInt(80)},
+								}
+								return []client.Object{&object}
+							},
+							expect: func(loadbalancer *entity.LoadBalancer) {
+								// wait until reconcile done
+								time.Sleep(20 * time.Second)
+
+								Expect(loadbalancer).ShouldNot(BeNil())
+								Expect(loadbalancer.Name).Should(Equal("vks-test-clust-default-test-servi-e3551"))
+								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
+								Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L4_PACKAGE_ID))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.Type).Should(Equal("Layer 4"))
+								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
+
+								// check pool
+								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+								Expect(err).ShouldNot(HaveOccurred())
+								Expect(pools).ShouldNot(BeNil())
+								Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+								for _, pool := range pools.Items {
+									Expect(pool.Name).Should(Equal("vks-test-clust-default-test-serv-e3551-TCP-81"))
+									Expect(pool.Description).Should(Equal("????????"))
+									Expect(pool.Status).Should(Equal("ACTIVE"))
+									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+									Expect(pool.Protocol).Should(Equal("TCP"))
+									Expect(pool.Stickiness).Should(Equal(false))
+									Expect(pool.TLSEncryption).Should(Equal(false))
+
+									Expect(pool.HealthMonitor).ShouldNot(BeNil())
+									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+									Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+									Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+									Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+
+									Expect(pool.Members).ShouldNot(BeNil())
+									Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+									Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+										mockNode1.Status.Addresses[0].Address,
+										mockNode2.Status.Addresses[0].Address,
+										mockNode3.Status.Addresses[0].Address,
+										mockNode4.Status.Addresses[0].Address))
+								}
+
+								// check listener
+								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+								Expect(err).ShouldNot(HaveOccurred())
+								Expect(listeners).ShouldNot(BeNil())
+								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								for _, listener := range listeners.Items {
+									Expect(listener.Protocol).Should(Equal("TCP"))
+									Expect(listener.ProtocolPort).Should(Equal(81))
+									Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+									Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
+									Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
+									Expect(listener.Name).Should(Equal("vks-test-clust-default-test-serv-e3551-TCP-81"))
+									Expect(listener.TimeoutClient).Should(Equal(50))
+									Expect(listener.TimeoutConnection).Should(Equal(5))
+									Expect(listener.TimeoutMember).Should(Equal(50))
+									Expect(listener.Description).Should(Equal("????????"))
+									// Expect(listener.Headers).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.CertificateAuthorities).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.ClientCertificateAuthentication).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+									// Expect(listener.DefaultCertificateAuthority).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+								}
+							},
+						},
+					},
 				},
 				// {
-				// 	name: "http/https healthcheck protocol",
+				// 	name: "service port use UDP protocol",
 				// },
 				// {
-				// 	name: "update service with new port",
+				// 	name: "http/https healthcheck protocol",
 				// },
 				// {
 				// 	name: "when user update service with new port (8080->8081), the controller should delete the old listener",
@@ -686,6 +860,20 @@ var _ = Describe("Service Controller", func() {
 				loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
 				Expect(err).ShouldNot(HaveOccurred())
 				tt.expect(loadbalancer)
+
+				if tt.steps != nil {
+					for _, step := range tt.steps {
+						logrus.Info("STEP: ", step.name)
+						updateObjs := step.updateObjects()
+						for _, obj := range updateObjs {
+							Expect(obj).NotTo(BeNil())
+							Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
+						}
+
+						// expect load balancer attribute in the mock provider
+						step.expect(loadbalancer)
+					}
+				}
 
 				// clean up
 				Expect(k8sClient.Delete(ctx, service)).Should(Succeed())

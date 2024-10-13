@@ -138,6 +138,8 @@ func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj *cor
 	if obj == nil {
 		return nil
 	}
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("Update annotation for object %s/%s: %v", obj.Namespace, obj.Name, annos)
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
 	}
