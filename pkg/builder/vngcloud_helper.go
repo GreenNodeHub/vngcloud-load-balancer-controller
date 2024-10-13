@@ -52,7 +52,7 @@ func (h *helperStruct) GetListProviderID(pnodes []*corev1.Node) []string {
 // MergeTags try to keep the current tags, add new tags, return the final tags.
 // Ensure tag contains loadbalancer id.
 // If nil is returned, the tags will not be updated.
-func (h *helperStruct) MergeTags(ctx context.Context, current, new LoadbalancerBuilder) map[string]string {
+func (h *helperStruct) MergeTags(ctx context.Context, current, new ModelBuilder) map[string]string {
 	logger := contexts.NewContext(ctx).Log()
 	currentTags, newTags, mergeTags := make(map[string]string), make(map[string]string), make(map[string]string)
 	isNeedUpdate := false
@@ -276,15 +276,15 @@ func (h *helperStruct) ComparePoolMembers(parentSet, childSet []*loadbalancerv2.
 }
 
 // MergePoolMembers merges the pool members.
-func (h *helperStruct) MergePoolMembers(lbID string, currentBuilder, deleteBuilder, addBuilder *poolBuilderType) (loadbalancerv2.IUpdatePoolMembersRequest, error) {
+func (h *helperStruct) MergePoolMembers(lbID string, oldBuilder OldModelBuilder, currentBuilder, addBuilder *poolBuilderType) (loadbalancerv2.IUpdatePoolMembersRequest, error) {
 	currentSet := make([]*loadbalancerv2.Member, 0)
 	deleteSet := make([]*loadbalancerv2.Member, 0)
 	addSet := make([]*loadbalancerv2.Member, 0)
 	if currentBuilder != nil {
 		currentSet = currentBuilder.Members
 	}
-	if deleteBuilder != nil {
-		deleteSet = deleteBuilder.Members
+	if oldBuilder != nil {
+		deleteSet = oldBuilder.GetDefaultPoolMembers()
 	}
 	if addBuilder != nil {
 		addSet = addBuilder.Members

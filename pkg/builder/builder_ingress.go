@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// depend on ingress provided, build the LoadbalancerBuilder
-func NewLoadBalancerBuilderByIngress(
+// depend on ingress provided, build the ModelBuilder
+func NewModelBuilderByIngress(
 	ctx context.Context,
 	ingress *networkingv1.Ingress,
 	annotationParser annotations.Parser,
@@ -24,8 +24,8 @@ func NewLoadBalancerBuilderByIngress(
 	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
-) (LoadbalancerBuilder, error) {
-	model := &lbBuilder{
+) (ModelBuilder, error) {
+	model := &modelBuilder{
 		resourceType:      "ingress",
 		resourceName:      "",
 		resourceNamespace: "",
@@ -92,7 +92,7 @@ func NewLoadBalancerBuilderByIngress(
 	return model, nil
 }
 
-func (l *lbBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.Node) error {
+func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.Node) error {
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
 		l.loadBalancerName = l.objectToLBName()
@@ -179,7 +179,7 @@ func (l *lbBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.
 }
 
 // buildL7Listener
-func (l *lbBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, error) {
+func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, error) {
 	opt := &ListenerBuilderType{
 		isDeleted:      false,
 		ReferPoolName:  "",
@@ -212,7 +212,7 @@ func (l *lbBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, error) 
 }
 
 // from serviceBackend include name and port, build the pool
-func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend, nodes []*corev1.Node) (*poolBuilderType, error) {
+func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend, nodes []*corev1.Node) (*poolBuilderType, error) {
 	poolName := l.genL7PoolName(int(service.Port.Number))
 
 	// get nodePort and targetPort
@@ -303,7 +303,7 @@ func (l *lbBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend
 	return opt, nil
 }
 
-func (l *lbBuilder) genL7PoolName(port int) string {
+func (l *modelBuilder) genL7PoolName(port int) string {
 	hash := l.generateHash()
 	name := fmt.Sprintf("%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
@@ -313,7 +313,7 @@ func (l *lbBuilder) genL7PoolName(port int) string {
 	return l.validateName(name)
 }
 
-func (l *lbBuilder) genL7PolicyName(mode bool, ruleIndex, pathIndex int) string {
+func (l *modelBuilder) genL7PolicyName(mode bool, ruleIndex, pathIndex int) string {
 	hash := l.generateHash()
 	name := fmt.Sprintf("%s_%s_%t_r%d_p%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
@@ -321,7 +321,7 @@ func (l *lbBuilder) genL7PolicyName(mode bool, ruleIndex, pathIndex int) string 
 	return l.validateName(name)
 }
 
-func (l *lbBuilder) getServicePort(serviceBackend *networkingv1.IngressServiceBackend) (nodePort, targetPort int, err error) {
+func (l *modelBuilder) getServicePort(serviceBackend *networkingv1.IngressServiceBackend) (nodePort, targetPort int, err error) {
 	if serviceBackend.Port.Name != "" {
 		return 0, 0, errs.ErrorServicePortNameEmpty
 	}
@@ -363,7 +363,7 @@ func (l *lbBuilder) getServicePort(serviceBackend *networkingv1.IngressServiceBa
 	return targetPort, nodePort, nil
 }
 
-func (l *lbBuilder) buildPolicyByPath(host, policyName string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {
+func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {
 	// compare type
 	var compareType loadbalancerv2.PolicyCompareType
 	switch *path.PathType {

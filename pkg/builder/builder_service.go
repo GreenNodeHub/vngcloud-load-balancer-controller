@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// depend on service provided, build the LoadbalancerBuilder
-func NewLoadBalancerBuilderByService(
+// depend on service provided, build the ModelBuilder
+func NewModelBuilderByService(
 	ctx context.Context,
 	service *corev1.Service,
 	annotationParser annotations.Parser,
@@ -22,8 +22,8 @@ func NewLoadBalancerBuilderByService(
 	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
-) (LoadbalancerBuilder, error) {
-	model := &lbBuilder{
+) (ModelBuilder, error) {
+	model := &modelBuilder{
 		resourceType:      "service",
 		resourceName:      "",
 		resourceNamespace: "",
@@ -90,7 +90,7 @@ func NewLoadBalancerBuilderByService(
 	return model, nil
 }
 
-func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node) error {
+func (l *modelBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node) error {
 	// Check if the service spec has any port, if not, return error
 	ports := pService.Spec.Ports
 	if len(ports) <= 0 {
@@ -180,7 +180,7 @@ func (l *lbBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node)
 }
 
 // createListenerBuilder creates the listener options.
-func (l *lbBuilder) createListenerBuilder(pPort corev1.ServicePort, name string) *ListenerBuilderType {
+func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name string) *ListenerBuilderType {
 	opt := &ListenerBuilderType{
 		IsL4: true,
 		commonBuilder: commonBuilder{
@@ -208,7 +208,7 @@ func (l *lbBuilder) createListenerBuilder(pPort corev1.ServicePort, name string)
 }
 
 // createPoolBuilder creates the pool options.
-func (l *lbBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) *poolBuilderType {
+func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) *poolBuilderType {
 	healthMonitor := loadbalancerv2.HealthMonitor{
 		HealthyThreshold:    l.healthyThresholdCount,
 		UnhealthyThreshold:  l.unhealthyThresholdCount,

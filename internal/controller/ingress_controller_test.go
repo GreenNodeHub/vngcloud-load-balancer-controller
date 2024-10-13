@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -447,6 +448,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			for _, tt := range tests {
+				logrus.Info("------------------- ", tt.name, " -------------------")
 				depends := tt.generateDepends()
 				for _, depend := range depends {
 					Expect(depend).NotTo(BeNil())
@@ -486,6 +488,7 @@ var _ = Describe("Ingress Controller", func() {
 					err := k8sClient.Get(ctx, client.ObjectKey{Name: depend.GetName(), Namespace: depend.GetNamespace()}, depend)
 					Expect(err).Should(HaveOccurred())
 				}
+				printEndTest()
 			}
 		})
 	})

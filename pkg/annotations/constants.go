@@ -35,4 +35,9 @@ const (
 	SuffixEnableStickySession = "enable-sticky-session"
 	SuffixEnableTLSEncryption = "enable-tls-encryption"
 	SuffixCertificateIDs      = "certificate-ids"
+
+	// for management
+	SuffixManagePools      = "manage-pools"
+	SuffixManageListeners  = "manage-listeners"
+	SuffixManageDFPMembers = "manage-dfp-members"
 )

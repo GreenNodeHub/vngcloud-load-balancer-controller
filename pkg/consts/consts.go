@@ -1,11 +1,24 @@
 package consts
 
-import "time"
+import (
+	"fmt"
+	"time"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+)
 
 // when resource update these annotations, the controller will be ignored
 var WhitelistedAnnotations = map[string]struct{}{
 	"example.com/whitelist-annotation-1": {},
 	"example.com/whitelist-annotation-2": {},
+
+	fmt.Sprintf("%s/%s", SERVICE_ANNOTATION_PREFIX, annotations.SuffixManageListeners):  {},
+	fmt.Sprintf("%s/%s", SERVICE_ANNOTATION_PREFIX, annotations.SuffixManagePools):      {},
+	fmt.Sprintf("%s/%s", SERVICE_ANNOTATION_PREFIX, annotations.SuffixManageDFPMembers): {},
+
+	fmt.Sprintf("%s/%s", INGRESS_ANNOTATION_PREFIX, annotations.SuffixManageListeners):  {},
+	fmt.Sprintf("%s/%s", INGRESS_ANNOTATION_PREFIX, annotations.SuffixManagePools):      {},
+	fmt.Sprintf("%s/%s", INGRESS_ANNOTATION_PREFIX, annotations.SuffixManageDFPMembers): {},
 }
 
 const (

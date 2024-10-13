@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -667,6 +668,7 @@ var _ = Describe("Service Controller", func() {
 			}
 
 			for _, tt := range tests {
+				logrus.Info("------------------- ", tt.name, " -------------------")
 				service := tt.generateService()
 				Expect(service).NotTo(BeNil())
 				Expect(k8sClient.Create(ctx, service)).Should(Succeed())
@@ -694,6 +696,7 @@ var _ = Describe("Service Controller", func() {
 				}, 2*timeout, interval).Should(BeTrue())
 				_, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
 				Expect(err).Should(HaveOccurred())
+				printEndTest()
 			}
 		})
 	})

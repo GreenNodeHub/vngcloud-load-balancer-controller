@@ -32,6 +32,7 @@ func WithAlternativePrefixes(prefixes ...string) ParseOption {
 // Parser is responsible for loading annotations into structured objects.
 // It accepts an list of Object annotations and will search through them until desired annotation is found.
 type Parser interface {
+	GetPrefix() string
 	// ParseStringAnnotation parses annotation into string value
 	// returns whether annotation exists.
 	ParseStringAnnotation(annotation string, value *string, annotations map[string]string, opts ...ParseOption) bool
@@ -71,6 +72,10 @@ var _ Parser = (*suffixAnnotationParser)(nil)
 // actually look for annotation "alb.ingress.kubernetes.io/my-annotation" on objects.
 type suffixAnnotationParser struct {
 	annotationPrefix string
+}
+
+func (p *suffixAnnotationParser) GetPrefix() string {
+	return p.annotationPrefix
 }
 
 func (p *suffixAnnotationParser) ParseStringAnnotation(annotation string, value *string, annotations map[string]string, opts ...ParseOption) bool {

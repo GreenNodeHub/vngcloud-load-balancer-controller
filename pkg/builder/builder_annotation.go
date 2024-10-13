@@ -5,7 +5,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
-func (l *lbBuilder) parseAnnotation(annos map[string]string) {
+func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	if l.annotationParser == nil {
 		l.logger.Warn("annotationParser is nil")
 		return
@@ -43,7 +43,7 @@ func (l *lbBuilder) parseAnnotation(annos map[string]string) {
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
 }
 
-func (l *lbBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
+func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, annos)
 	if !exist {
@@ -60,19 +60,19 @@ func (l *lbBuilder) parseAnnotationTargetType(annos map[string]string) TargetTyp
 	return TargetTypeInstance
 }
 
-func (l *lbBuilder) parseAnnotationLoadBalancerName(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationLoadBalancerName(annos map[string]string) string {
 	option := l.loadBalancerName
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, annos)
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationPackageID(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationPackageID(annos map[string]string) string {
 	option := l.packageID
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixPackageID, &option, annos)
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationScheme(annos map[string]string) loadbalancerv2.LoadBalancerScheme {
+func (l *modelBuilder) parseAnnotationScheme(annos map[string]string) loadbalancerv2.LoadBalancerScheme {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixScheme, &option, annos)
 	switch option {
@@ -89,19 +89,19 @@ func (l *lbBuilder) parseAnnotationScheme(annos map[string]string) loadbalancerv
 	return loadbalancerv2.InternetLoadBalancerScheme
 }
 
-func (l *lbBuilder) parseAnnotationLoadBalancerID(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationLoadBalancerID(annos map[string]string) string {
 	option := ""
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerID, &option, annos)
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationIgnore(annos map[string]string) bool {
+func (l *modelBuilder) parseAnnotationIgnore(annos map[string]string) bool {
 	option := false
 	l.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &option, annos)
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationIdleTimeoutClient(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationIdleTimeoutClient(annos map[string]string) int {
 	optionsInt64 := int64(l.idleTimeoutClient)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutClient, &optionsInt64, annos)
 	if !exists {
@@ -115,7 +115,7 @@ func (l *lbBuilder) parseAnnotationIdleTimeoutClient(annos map[string]string) in
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationIdleTimeoutMember(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationIdleTimeoutMember(annos map[string]string) int {
 	optionsInt64 := int64(l.idleTimeoutMember)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutMember, &optionsInt64, annos)
 	if !exists {
@@ -129,7 +129,7 @@ func (l *lbBuilder) parseAnnotationIdleTimeoutMember(annos map[string]string) in
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationIdleTimeoutConnection(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationIdleTimeoutConnection(annos map[string]string) int {
 	optionsInt64 := int64(l.idleTimeoutConnection)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutConnection, &optionsInt64, annos)
 	if !exists {
@@ -143,7 +143,7 @@ func (l *lbBuilder) parseAnnotationIdleTimeoutConnection(annos map[string]string
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationInboundCIDRs(annos map[string]string) []string {
+func (l *modelBuilder) parseAnnotationInboundCIDRs(annos map[string]string) []string {
 	option := l.inboundCIDRs
 	exist := l.annotationParser.ParseStringSliceAnnotation(annotations.SuffixInboundCIDRs, &option, annos)
 	if !exist {
@@ -152,7 +152,7 @@ func (l *lbBuilder) parseAnnotationInboundCIDRs(annos map[string]string) []strin
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckProtocol(annos map[string]string) loadbalancerv2.HealthCheckProtocol {
+func (l *modelBuilder) parseAnnotationHealthcheckProtocol(annos map[string]string) loadbalancerv2.HealthCheckProtocol {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckProtocol, &option, annos)
 	switch option {
@@ -175,7 +175,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckProtocol(annos map[string]string) 
 	return l.healthcheckProtocol
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckPath(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationHealthcheckPath(annos map[string]string) string {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckPath, &option, annos)
 	if !exist {
@@ -184,7 +184,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckPath(annos map[string]string) stri
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationSuccessCodes(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationSuccessCodes(annos map[string]string) string {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixSuccessCodes, &option, annos)
 	if !exist {
@@ -193,7 +193,7 @@ func (l *lbBuilder) parseAnnotationSuccessCodes(annos map[string]string) string 
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckHttpVersion(annos map[string]string) loadbalancerv2.HealthCheckHttpVersion {
+func (l *modelBuilder) parseAnnotationHealthcheckHttpVersion(annos map[string]string) loadbalancerv2.HealthCheckHttpVersion {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpVersion, &option, annos)
 	if !exist {
@@ -212,7 +212,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckHttpVersion(annos map[string]strin
 	return l.healthcheckHttpVersion
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckHttpDomainName(annos map[string]string) string {
+func (l *modelBuilder) parseAnnotationHealthcheckHttpDomainName(annos map[string]string) string {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpDomainName, &option, annos)
 	if !exist {
@@ -221,7 +221,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckHttpDomainName(annos map[string]st
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationHealthyThresholdCount(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationHealthyThresholdCount(annos map[string]string) int {
 	optionsInt64 := int64(l.healthyThresholdCount)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixHealthyThresholdCount, &optionsInt64, annos)
 	if !exists {
@@ -235,7 +235,7 @@ func (l *lbBuilder) parseAnnotationHealthyThresholdCount(annos map[string]string
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationUnhealthyThresholdCount(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationUnhealthyThresholdCount(annos map[string]string) int {
 	optionsInt64 := int64(l.unhealthyThresholdCount)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixUnhealthyThresholdCount, &optionsInt64, annos)
 	if !exists {
@@ -249,7 +249,7 @@ func (l *lbBuilder) parseAnnotationUnhealthyThresholdCount(annos map[string]stri
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationPoolAlgorithm(annos map[string]string) loadbalancerv2.PoolAlgorithm {
+func (l *modelBuilder) parseAnnotationPoolAlgorithm(annos map[string]string) loadbalancerv2.PoolAlgorithm {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixPoolAlgorithm, &option, annos)
 	if !exist {
@@ -270,7 +270,7 @@ func (l *lbBuilder) parseAnnotationPoolAlgorithm(annos map[string]string) loadba
 	return l.poolAlgorithm
 }
 
-func (l *lbBuilder) parseAnnotationEnableAutoscale(annos map[string]string) bool {
+func (l *modelBuilder) parseAnnotationEnableAutoscale(annos map[string]string) bool {
 	option := false
 	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixEnableAutoscale, &option, annos)
 	if !exists {
@@ -284,7 +284,7 @@ func (l *lbBuilder) parseAnnotationEnableAutoscale(annos map[string]string) bool
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationTags(annos map[string]string) map[string]string {
+func (l *modelBuilder) parseAnnotationTags(annos map[string]string) map[string]string {
 	option := make(map[string]string)
 	exist, err := l.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &option, annos)
 	if !exist {
@@ -298,7 +298,7 @@ func (l *lbBuilder) parseAnnotationTags(annos map[string]string) map[string]stri
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationTargetNodeLabels(annos map[string]string) map[string]string {
+func (l *modelBuilder) parseAnnotationTargetNodeLabels(annos map[string]string) map[string]string {
 	option := l.targetNodeLabels
 	exist, err := l.annotationParser.ParseStringMapAnnotation(annotations.SuffixTargetNodeLabels, &option, annos)
 	if !exist {
@@ -312,7 +312,7 @@ func (l *lbBuilder) parseAnnotationTargetNodeLabels(annos map[string]string) map
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationSecurityGroups(annos map[string]string) []string {
+func (l *modelBuilder) parseAnnotationSecurityGroups(annos map[string]string) []string {
 	option := l.securityGroups
 	exist := l.annotationParser.ParseStringSliceAnnotation(annotations.SuffixSecurityGroups, &option, annos)
 	if !exist {
@@ -321,7 +321,7 @@ func (l *lbBuilder) parseAnnotationSecurityGroups(annos map[string]string) []str
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckPort(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationHealthcheckPort(annos map[string]string) int {
 	optionsInt64 := int64(l.healthcheckPort)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckPort, &optionsInt64, annos)
 	if !exists {
@@ -335,7 +335,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckPort(annos map[string]string) int 
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationEnableProxyProtocol(annos map[string]string) []string {
+func (l *modelBuilder) parseAnnotationEnableProxyProtocol(annos map[string]string) []string {
 	option := l.enableProxyProtocol
 	exist := l.annotationParser.ParseStringSliceAnnotation(annotations.SuffixEnableProxyProtocol, &option, annos)
 	if !exist {
@@ -344,7 +344,7 @@ func (l *lbBuilder) parseAnnotationEnableProxyProtocol(annos map[string]string) 
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationEnableStickySession(annos map[string]string) bool {
+func (l *modelBuilder) parseAnnotationEnableStickySession(annos map[string]string) bool {
 	option := false
 	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixEnableStickySession, &option, annos)
 	if !exists {
@@ -358,7 +358,7 @@ func (l *lbBuilder) parseAnnotationEnableStickySession(annos map[string]string) 
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationEnableTLSEncryption(annos map[string]string) bool {
+func (l *modelBuilder) parseAnnotationEnableTLSEncryption(annos map[string]string) bool {
 	option := false
 	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixEnableTLSEncryption, &option, annos)
 	if !exists {
@@ -372,7 +372,7 @@ func (l *lbBuilder) parseAnnotationEnableTLSEncryption(annos map[string]string) 
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationCertificateIDs(annos map[string]string) []string {
+func (l *modelBuilder) parseAnnotationCertificateIDs(annos map[string]string) []string {
 	option := l.certificateIDs
 	exist := l.annotationParser.ParseStringSliceAnnotation(annotations.SuffixCertificateIDs, &option, annos)
 	if !exist {
@@ -381,7 +381,7 @@ func (l *lbBuilder) parseAnnotationCertificateIDs(annos map[string]string) []str
 	return option
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]string) loadbalancerv2.HealthCheckMethod {
+func (l *modelBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]string) loadbalancerv2.HealthCheckMethod {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpMethod, &option, annos)
 	if !exist {
@@ -403,7 +403,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]string
 	}
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckTimeoutSeconds(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationHealthcheckTimeoutSeconds(annos map[string]string) int {
 	optionsInt64 := int64(l.healthcheckTimeoutSeconds)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckTimeoutSeconds, &optionsInt64, annos)
 	if !exists {
@@ -417,7 +417,7 @@ func (l *lbBuilder) parseAnnotationHealthcheckTimeoutSeconds(annos map[string]st
 	return int(optionsInt64)
 }
 
-func (l *lbBuilder) parseAnnotationHealthcheckIntervalSeconds(annos map[string]string) int {
+func (l *modelBuilder) parseAnnotationHealthcheckIntervalSeconds(annos map[string]string) int {
 	optionsInt64 := int64(l.healthcheckIntervalSeconds)
 	exists, err := l.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckIntervalSeconds, &optionsInt64, annos)
 	if !exists {
@@ -431,9 +431,9 @@ func (l *lbBuilder) parseAnnotationHealthcheckIntervalSeconds(annos map[string]s
 	return int(optionsInt64)
 }
 
-// func (l *lbBuilder) parseAnnotation
-// func (l *lbBuilder) parseAnnotation
-// func (l *lbBuilder) parseAnnotation
-// func (l *lbBuilder) parseAnnotation
-// func (l *lbBuilder) parseAnnotation
-// func (l *lbBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
+// func (l *modelBuilder) parseAnnotation
