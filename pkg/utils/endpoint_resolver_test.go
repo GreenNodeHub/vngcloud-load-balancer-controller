@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -428,6 +429,7 @@ func Test_defaultEndpointResolver_ResolvePodEndpoints(t *testing.T) {
 			r := &defaultEndpointResolver{
 				k8sClient:       k8sClient,
 				failOpenEnabled: tt.fields.failOpenEnabled,
+				logger:          contexts.NewContext(context.Background()).Log(),
 			}
 			got, err := r.ResolvePodEndpoints(ctx, tt.args.svcKey, tt.args.port, tt.args.opts...)
 			if tt.wantErr != nil {
@@ -807,6 +809,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 			r := &defaultEndpointResolver{
 				k8sClient:       k8sClient,
 				failOpenEnabled: tt.fields.failOpenEnabled,
+				logger:          contexts.NewContext(context.Background()).Log(),
 			}
 
 			got, err := r.ResolveNodePortEndpoints(ctx, tt.args.svcKey, tt.args.port, tt.args.opts...)
