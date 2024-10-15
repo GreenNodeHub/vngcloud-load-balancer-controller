@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -128,6 +129,7 @@ func NewOldModelBuilder(annos map[string]string, annotationParser annotations.Pa
 	logrus.Debugf("Old model: %v", model)
 	logrus.Debugf("Old model listeners: %v", model.GetOldListeners())
 	logrus.Debugf("Old model pools: %v", model.GetOldPools())
+	logrus.Debugf("Old model pool default member: %v", model.GetDefaultPoolMembers())
 
 	return model
 }
@@ -195,6 +197,35 @@ func (m *oldModelBuilder) build(annos map[string]string) error {
 				oldPolicies: policies,
 			}
 			m.oldListeners = append(m.oldListeners, listener)
+		}
+	}
+
+	// build default pool members
+	defaultPoolMembers := make([]string, 0)
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManageDFPMembers, &defaultPoolMembers, annos); exists {
+		for _, member := range defaultPoolMembers {
+			// member is in the format of "IP:port:monitorPort"
+			memberParts := strings.Split(member, ":")
+			if len(memberParts) != 3 {
+				continue
+			}
+			// convert memberParts[1], memberParts[3] to int
+			port, err := strconv.Atoi(memberParts[1])
+			if err != nil {
+				continue
+			}
+			monitorPort, err := strconv.Atoi(memberParts[2])
+			if err != nil {
+				continue
+			}
+			m.defaultPoolMembers = append(m.defaultPoolMembers, &loadbalancerv2.Member{
+				IpAddress:   memberParts[0],
+				Port:        port,
+				Backup:      false,
+				Weight:      1,
+				MonitorPort: monitorPort,
+				Name:        "",
+			})
 		}
 	}
 

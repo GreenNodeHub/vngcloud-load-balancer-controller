@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/huandu/go-clone"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -217,6 +218,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		r.knownNodes,
 	)
 	if err != nil {
+		logger.Error("Failed to create loadbalancer builder: ", err)
 		return ctrl.Result{}, err
 	}
 
@@ -571,13 +573,18 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					}
 
+					oldAnnotations := clone.Clone(oldObj.Annotations).(map[string]string)
+					newAnnotations := clone.Clone(newObj.Annotations).(map[string]string)
+
 					// remove whitelisted annotations in the comparison
 					for k := range consts.WhitelistedAnnotations {
-						delete(oldObj.Annotations, k)
-						delete(newObj.Annotations, k)
+						delete(oldAnnotations, k)
+						delete(newAnnotations, k)
 					}
-					if !reflect.DeepEqual(oldObj.Annotations, newObj.Annotations) {
+					if !reflect.DeepEqual(oldAnnotations, newAnnotations) {
 						logrus.Info("Detect update Service Annotations event.")
+						logrus.Debugf("Old annotations: %v", oldObj.Annotations)
+						logrus.Debugf("New annotations: %v", newObj.Annotations)
 						return true
 					}
 					if !reflect.DeepEqual(oldObj.DeletionTimestamp.IsZero(), newObj.DeletionTimestamp.IsZero()) {

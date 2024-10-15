@@ -2,14 +2,16 @@ package builder
 
 import (
 	"context"
-	"strings"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -24,13 +26,15 @@ func NewModelBuilderByService(
 	nodes []*corev1.Node,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
+		poolListenerHelper: poolListenerHelper{
+			poolBuilders:     make([]*poolBuilderType, 0),
+			listenerBuilders: make([]*ListenerBuilderType, 0),
+		},
 		resourceType:      "service",
 		resourceName:      "",
 		resourceNamespace: "",
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
-		poolBuilders:         make([]*poolBuilderType, 0),
-		listenerBuilders:     make([]*ListenerBuilderType, 0),
 
 		annotationParser: annotationParser,
 		context:          ctx,
@@ -85,12 +89,15 @@ func NewModelBuilderByService(
 
 	model.parseAnnotation(service.Annotations)
 
-	model.buildService(service, nodes)
+	err := model.buildService(service, nodes)
+	if err != nil {
+		return nil, err
+	}
 
 	return model, nil
 }
 
-func (l *modelBuilder) buildService(pService *corev1.Service, nodes []*corev1.Node) error {
+func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) error {
 	// Check if the service spec has any port, if not, return error
 	ports := pService.Spec.Ports
 	if len(ports) <= 0 {
@@ -103,22 +110,10 @@ func (l *modelBuilder) buildService(pService *corev1.Service, nodes []*corev1.No
 	}
 
 	// Get members address, nodeIP or podIP
-	var membersAddr []*MemberAddress
-	if l.GetTargetType() == TargetTypeInstance {
-		nodesAfterFilter := l.filterByNodeLabel(nodes, l.GetTargetNodeLabels())
-		if len(nodesAfterFilter) < 1 {
-			l.logger.Warnf("No node available for service %s/%s, pool have no member.", pService.Namespace, pService.Name)
-		}
-		membersAddr = l.getNodeMembersAddr(nodesAfterFilter)
-	} else {
-		var err error
-		membersAddr, err = l.getEndpointMembersAddr(pService.Namespace, pService.Name)
-		if err != nil {
-			return err
-		}
+	endpointResolver := utils.NewDefaultEndpointResolver(l.context, l.client)
+	resolveOpts := []utils.EndpointResolveOption{
+		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(l.GetTargetNodeLabels()))),
 	}
-
-	l.logger.Debugf("Members address: %v", membersAddr)
 
 	// Build pool and listener
 	for _, port := range ports {
@@ -126,29 +121,19 @@ func (l *modelBuilder) buildService(pService *corev1.Service, nodes []*corev1.No
 		listenerName := l.genL4ListenerName(port)
 
 		// nodePort if target type is instance, targetPort if target type is ip
-		targetPort := 0
+		var membersAddr []utils.EndpointAddress
+		var err error
 		if l.targetType == TargetTypeInstance {
-			targetPort = int(port.NodePort)
-		} else {
-			targetPort = int(port.TargetPort.IntValue())
-		}
-
-		// add security group rule
-		monitorPort := int(port.NodePort)
-		if l.healthcheckPort != 0 {
-			monitorPort = l.healthcheckPort
-			if l.IsAutoCreateSecurityGroup && l.healthcheckPort != int(port.NodePort) {
-				l.addSecgroupRule(monitorPort, string(port.Protocol))
-
-				if strings.EqualFold(string(port.Protocol), "UDP") {
-					l.addSecgroupRule(monitorPort, "ICMP")
-				}
+			membersAddr, err = endpointResolver.ResolveNodePortEndpoints(l.context,
+				namespacedName(pService), intstr.FromInt(int(port.Port)), resolveOpts...)
+			if err != nil {
+				return err
 			}
-		}
-		if l.IsAutoCreateSecurityGroup {
-			l.addSecgroupRule(int(port.NodePort), string(port.Protocol))
-			if strings.EqualFold(string(port.Protocol), "UDP") {
-				l.addSecgroupRule(int(port.NodePort), "ICMP")
+		} else {
+			membersAddr, err = endpointResolver.ResolvePodEndpoints(l.context,
+				namespacedName(pService), intstr.FromInt(int(port.Port)), resolveOpts...)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -157,10 +142,10 @@ func (l *modelBuilder) buildService(pService *corev1.Service, nodes []*corev1.No
 		for _, member := range membersAddr {
 			poolMembers = append(poolMembers, &loadbalancerv2.Member{
 				IpAddress:   member.IP,
-				Port:        targetPort,
+				Port:        member.Port,
 				Backup:      false,
 				Weight:      1,
-				MonitorPort: monitorPort,
+				MonitorPort: member.Port,
 				Name:        member.Name,
 			})
 		}

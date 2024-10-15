@@ -3,7 +3,6 @@ module github.com/vngcloud/vngcloud-load-balancer-controller
 go 1.22.0
 
 require (
-	github.com/aws/aws-sdk-go v1.55.5
 	github.com/cuongpiger/joat v1.0.14
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0

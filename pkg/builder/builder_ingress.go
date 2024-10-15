@@ -9,9 +9,11 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,13 +28,16 @@ func NewModelBuilderByIngress(
 	nodes []*corev1.Node,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
+		poolListenerHelper: poolListenerHelper{
+			poolBuilders:     make([]*poolBuilderType, 0),
+			listenerBuilders: make([]*ListenerBuilderType, 0),
+		},
+
 		resourceType:      "ingress",
 		resourceName:      "",
 		resourceNamespace: "",
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
-		poolBuilders:         make([]*poolBuilderType, 0),
-		listenerBuilders:     make([]*ListenerBuilderType, 0),
 
 		annotationParser: annotationParser,
 		context:          ctx,
@@ -87,7 +92,13 @@ func NewModelBuilderByIngress(
 
 	model.parseAnnotation(ingress.Annotations)
 
-	model.buildIngress(ingress, nodes)
+	err := model.buildIngress(ingress, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	model.logger.Debugf("New model listeners: len(%d)", len(model.listenerBuilders))
+	model.logger.Debugf("New model pools: (%d)", len(model.poolBuilders))
 
 	return model, nil
 }
@@ -102,6 +113,7 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	isHaveDefaultBackend := ingress.Spec.DefaultBackend != nil
 	var defaultPoolBuilder *poolBuilderType
 	if isHaveDefaultBackend {
+		l.logger.Debugf("Ingress %s/%s has default backend, building default pool.", l.resourceNamespace, l.resourceName)
 		var err error
 		defaultPoolBuilder, err = l.buildIngressPool(ingress.Spec.DefaultBackend.Service, nodes)
 		if err != nil {
@@ -212,40 +224,51 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 }
 
 // from serviceBackend include name and port, build the pool
-func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend, nodes []*corev1.Node) (*poolBuilderType, error) {
-	poolName := l.genL7PoolName(int(service.Port.Number))
-
-	// get nodePort and targetPort
-	serviceTargetPort, serviceNodePort, err := l.getServicePort(service)
+func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBackend, _ []*corev1.Node) (*poolBuilderType, error) {
+	// find service
+	findService := &corev1.Service{}
+	err := l.client.Get(l.context, types.NamespacedName{Namespace: l.resourceNamespace, Name: service.Name}, findService)
 	if err != nil {
+		l.logger.Errorf("Failed to get service %s/%s: %v", l.resourceNamespace, service.Name, err)
 		return nil, err
 	}
 
-	// nodePort if target type is instance, targetPort if target type is ip
-	targetPort := 0
-	if l.targetType == TargetTypeInstance {
-		targetPort = serviceNodePort
-	} else {
-		targetPort = serviceTargetPort
+	// find service port
+	var servicePort *corev1.ServicePort
+	for _, port := range findService.Spec.Ports {
+		if service.Port.Name != "" && service.Port.Name == port.Name {
+			servicePort = &port
+			break
+		} else if service.Port.Number == port.Port {
+			servicePort = &port
+			break
+		}
+	}
+	if servicePort == nil {
+		return nil, errs.ErrorServicePortNotFound
 	}
 
-	// get monitor port
-	monitorPort := targetPort
-	if l.healthcheckPort != 0 {
-		monitorPort = l.healthcheckPort
-	}
+	poolName := l.genL7PoolName(int(servicePort.Port))
 
 	// Get members address, nodeIP or podIP
-	var membersAddr []*MemberAddress
-	if l.GetTargetType() == TargetTypeInstance {
-		nodesAfterFilter := l.filterByNodeLabel(nodes, l.GetTargetNodeLabels())
-		if len(nodesAfterFilter) < 1 {
-			l.logger.Warnf("No node available for service %s/%s, pool have no member.", l.resourceNamespace, l.resourceName)
+	endpointResolver := utils.NewDefaultEndpointResolver(l.context, l.client)
+	resolveOpts := []utils.EndpointResolveOption{
+		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(l.GetTargetNodeLabels()))),
+	}
+
+	// nodePort if target type is instance, targetPort if target type is ip
+	var membersAddr []utils.EndpointAddress
+	if l.targetType == TargetTypeInstance {
+		membersAddr, err = endpointResolver.ResolveNodePortEndpoints(l.context,
+			types.NamespacedName{Namespace: l.resourceNamespace, Name: service.Name},
+			serviceBackendToIntOrString(service.Port), resolveOpts...)
+		if err != nil {
+			return nil, err
 		}
-		membersAddr = l.getNodeMembersAddr(nodesAfterFilter)
 	} else {
-		var err error
-		membersAddr, err = l.getEndpointMembersAddr(l.resourceName, service.Name)
+		membersAddr, err = endpointResolver.ResolvePodEndpoints(l.context,
+			types.NamespacedName{Namespace: l.resourceNamespace, Name: service.Name},
+			serviceBackendToIntOrString(service.Port), resolveOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -254,9 +277,15 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 	// build members
 	poolMembers := make([]*loadbalancerv2.Member, 0)
 	for _, member := range membersAddr {
+		// get monitor port
+		monitorPort := member.Port
+		if l.healthcheckPort != 0 {
+			monitorPort = l.healthcheckPort
+		}
+
 		poolMembers = append(poolMembers, &loadbalancerv2.Member{
 			IpAddress:   member.IP,
-			Port:        targetPort,
+			Port:        member.Port,
 			Backup:      false,
 			Weight:      1,
 			MonitorPort: monitorPort,
@@ -319,48 +348,6 @@ func (l *modelBuilder) genL7PolicyName(mode bool, ruleIndex, pathIndex int) stri
 		consts.DEFAULT_LB_PREFIX_NAME,
 		hash, mode, ruleIndex, pathIndex)
 	return l.validateName(name)
-}
-
-func (l *modelBuilder) getServicePort(serviceBackend *networkingv1.IngressServiceBackend) (nodePort, targetPort int, err error) {
-	if serviceBackend.Port.Name != "" {
-		return 0, 0, errs.ErrorServicePortNameEmpty
-	}
-	var portInfo intstr.IntOrString
-	if serviceBackend.Port.Name != "" {
-		portInfo.Type = intstr.String
-		portInfo.StrVal = serviceBackend.Port.Name
-	} else {
-		portInfo.Type = intstr.Int
-		portInfo.IntVal = serviceBackend.Port.Number
-	}
-
-	// get service
-	obj := &corev1.Service{}
-	err = l.client.Get(l.context, client.ObjectKey{Name: serviceBackend.Name, Namespace: l.resourceNamespace}, obj)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	targetPort, nodePort = 0, 0
-	ports := obj.Spec.Ports
-	for _, p := range ports {
-		if portInfo.Type == intstr.Int && int(p.Port) == portInfo.IntValue() {
-			nodePort = int(p.NodePort)
-			targetPort = int(p.TargetPort.IntValue())
-			break
-		}
-		if portInfo.Type == intstr.String && p.Name == portInfo.StrVal {
-			nodePort = int(p.NodePort)
-			targetPort = int(p.TargetPort.IntValue())
-			break
-		}
-	}
-
-	if nodePort == 0 || targetPort == 0 {
-		return 0, 0, errs.ErrorServicePortNotFound
-	}
-
-	return targetPort, nodePort, nil
 }
 
 func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {

@@ -124,9 +124,6 @@ type modelBuilder struct {
 	subnetCIDR string
 	clusterID  string
 
-	// load balancer info
-	poolBuilders         []*poolBuilderType
-	listenerBuilders     []*ListenerBuilderType
 	secGroupRuleBuilders []*secGroupRuleBuilderType
 
 	// resource info
@@ -257,9 +254,19 @@ func (l *modelBuilder) GetManageAnnotation() map[string]string {
 		listenerInfos = append(listenerInfos, fmt.Sprintf("%s:%s:[%s]", listener.GetID(), listener.GetName(), strings.Join(policyInfos, "|")))
 	}
 
+	defaultPoolMembers := []string{}
+	defaultPool := l.GetPoolBuilderByName(consts.DEFAULT_NAME_DEFAULT_POOL)
+	if defaultPool != nil {
+		for _, member := range defaultPool.Members {
+			defaultPoolMembers = append(defaultPoolMembers,
+				fmt.Sprintf("%s:%d:%d", member.IpAddress, member.Port, member.MonitorPort))
+		}
+	}
+
 	return map[string]string{
-		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManagePools):     strings.Join(poolInfos, ","),
-		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManageListeners): strings.Join(listenerInfos, ","),
+		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManagePools):      strings.Join(poolInfos, ","),
+		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManageListeners):  strings.Join(listenerInfos, ","),
+		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManageDFPMembers): strings.Join(defaultPoolMembers, ","),
 	}
 }
 

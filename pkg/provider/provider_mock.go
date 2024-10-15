@@ -764,8 +764,44 @@ func (m *MockProvider) ListPool(ctx context.Context, lbID string) (*entityv2.Lis
 }
 func (m *MockProvider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet", "UpdatePoolMembers")
-	return errs.ErrorNotImplemented
+	logger.Infof("%s Request update pool members %s of load balancer %s", icon, poolID, lbID)
+	updateOpt := members.(*loadbalancerv2.UpdatePoolMembersRequest)
+	var pool *wrapPool
+	for _, p := range m.pools {
+		if p.lbID == lbID && p.GetId() == poolID {
+			pool = p
+			break
+		}
+	}
+	if pool == nil {
+		return errs.ErrorNotFound
+	}
+	newMembers := make([]*entityv2.Member, 0)
+	for _, m := range updateOpt.Members {
+		mem := m.(*loadbalancerv2.Member)
+		newMembers = append(newMembers, &entityv2.Member{
+			UUID:           "mem-" + randID(),
+			Address:        mem.IpAddress,
+			ProtocolPort:   mem.Port,
+			Weight:         mem.Weight,
+			MonitorPort:    mem.MonitorPort,
+			SubnetID:       lbID,
+			Name:           mem.Name,
+			PoolID:         poolID,
+			TypeCreate:     "????????",
+			Backup:         false,
+			DisplayStatus:  consts.ACTIVE_LOADBALANCER_STATUS,
+			CreatedAt:      time.Now().Format(time.RFC3339),
+			UpdatedAt:      time.Now().Format(time.RFC3339),
+			CreatedBy:      "????????",
+			ProgressStatus: consts.ACTIVE_LOADBALANCER_STATUS,
+		})
+	}
+	pool.Members.Items = newMembers
+
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return nil
 }
 
 func (m *MockProvider) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {

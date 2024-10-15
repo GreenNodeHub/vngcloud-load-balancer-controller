@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -311,6 +312,8 @@ func (h *helperStruct) MergePoolMembers(lbID string, oldBuilder OldModelBuilder,
 	for _, member := range resultPoolMembers {
 		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
 	}
+
+	logrus.Debugf("Merge pool members: %v", convertMembers)
 	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, addBuilder.GetID()).WithMembers(convertMembers...), nil
 }
 

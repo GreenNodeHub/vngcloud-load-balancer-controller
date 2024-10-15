@@ -4,6 +4,11 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+
+	nwv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func MinInt(a, b int) int {
@@ -28,4 +33,20 @@ func StringListToString(s []string) string {
 
 func PointerOf[T any](t T) *T {
 	return &t
+}
+
+// namespacedName returns the namespaced name for k8s objects
+func namespacedName(obj metav1.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
+
+// serviceBackendToIntOrString converts a ServiceBackendPort (Ingress) to an IntOrString
+func serviceBackendToIntOrString(port nwv1.ServiceBackendPort) intstr.IntOrString {
+	if port.Name != "" {
+		return intstr.FromString(port.Name)
+	}
+	return intstr.FromInt(int(port.Number))
 }

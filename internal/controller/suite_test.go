@@ -86,6 +86,9 @@ var (
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: corev1.NodeHostName, Address: "mock-node-1"},
 			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
 		},
 	}
 
@@ -108,6 +111,9 @@ var (
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.2"},
 				{Type: corev1.NodeHostName, Address: "mock-node-2"},
+			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
 			},
 		},
 	}
@@ -132,6 +138,9 @@ var (
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.3"},
 				{Type: corev1.NodeHostName, Address: "mock-node-3"},
 			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
 		},
 	}
 
@@ -154,6 +163,9 @@ var (
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.4"},
 				{Type: corev1.NodeHostName, Address: "mock-node-4"},
+			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
 			},
 		},
 	}
