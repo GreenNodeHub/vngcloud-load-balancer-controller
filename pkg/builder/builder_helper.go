@@ -129,6 +129,7 @@ type BasicInfoHelper interface {
 	GetPackageID() string
 	GetScheme() loadbalancerv2.LoadBalancerScheme
 	GetLoadBalancerType() loadbalancerv2.LoadBalancerType
+	GetTags() map[string]string
 }
 
 var _ BasicInfoHelper = &basicInfoHelper{}
@@ -139,6 +140,7 @@ type basicInfoHelper struct {
 	loadBalancerType loadbalancerv2.LoadBalancerType
 	packageID        string
 	scheme           loadbalancerv2.LoadBalancerScheme
+	tags             map[string]string
 }
 
 func (l *basicInfoHelper) GetLoadBalancerID() string {
@@ -159,4 +161,8 @@ func (l *basicInfoHelper) GetScheme() loadbalancerv2.LoadBalancerScheme {
 
 func (l *basicInfoHelper) GetLoadBalancerType() loadbalancerv2.LoadBalancerType {
 	return l.loadBalancerType
+}
+
+func (l *basicInfoHelper) GetTags() map[string]string {
+	return l.tags
 }

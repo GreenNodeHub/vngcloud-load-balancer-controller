@@ -175,14 +175,53 @@ func (m *VNGCLOUD_Provider) GetSubnetCIDR() string {
 
 // // --------------------------- Tags ---------------------------
 
-// func (m *VNGCLOUD_Provider) GetTags(ctx context.Context,resourceID string) ([]*objects.ResourceTag, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context,resourceID string, tags map[string]string) error {
-// 	logger.Error("not implemented yet")
-// 	return errs.ErrorNotImplemented
-// }
+func (m *VNGCLOUD_Provider) ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error) {
+	logger := contexts.NewContext(ctx).Log()
+	opt := loadbalancerv2.NewListTagsRequest(resourceID)
+	tags, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListTags(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return tags, nil
+}
+
+func (m *VNGCLOUD_Provider) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create tags for resource %s", icon, resourceID)
+	opt := loadbalancerv2.NewCreateTagsRequest(resourceID)
+	arr := make([]string, 0)
+	for k, v := range tags {
+		arr = append(arr, k)
+		arr = append(arr, v)
+	}
+	opt.WithTags(arr...)
+
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateTags(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - CreateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
+
+func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error {
+	logger := contexts.NewContext(ctx).Log()
+	opt := loadbalancerv2.NewUpdateTagsRequest(resourceID)
+	arr := make([]string, 0)
+	for k, v := range tags {
+		arr = append(arr, k)
+		arr = append(arr, v)
+	}
+	opt.WithTags(arr...)
+
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateTags(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - UpdateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
 
 // func (m *VNGCLOUD_Provider) GetSubnet(ctx context.Context,subnetID string) (*objects.Subnet, error) {
 // 	logger.Error("not implemented yet")

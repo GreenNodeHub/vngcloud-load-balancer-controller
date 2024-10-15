@@ -32,6 +32,14 @@ func NewModelBuilderByIngress(
 			poolBuilders:     make([]*poolBuilderType, 0),
 			listenerBuilders: make([]*ListenerBuilderType, 0),
 		},
+		basicInfoHelper: basicInfoHelper{
+			loadBalancerID:   "",
+			loadBalancerName: "",
+			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer7,
+			packageID:        consts.DEFAULT_L7_PACKAGE_ID,
+			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
+			tags:             map[string]string{},
+		},
 
 		resourceType:      "ingress",
 		resourceName:      "",
@@ -51,11 +59,6 @@ func NewModelBuilderByIngress(
 
 		isIgnored: false,
 
-		loadBalancerID:             "",
-		loadBalancerName:           "",
-		loadBalancerType:           loadbalancerv2.LoadBalancerTypeLayer7,
-		packageID:                  consts.DEFAULT_L7_PACKAGE_ID,
-		scheme:                     loadbalancerv2.InternetLoadBalancerScheme,
 		idleTimeoutClient:          50,
 		idleTimeoutMember:          50,
 		idleTimeoutConnection:      5,
@@ -72,7 +75,6 @@ func NewModelBuilderByIngress(
 		healthcheckTimeoutSeconds:  5,
 		healthcheckIntervalSeconds: 30,
 		healthcheckPort:            0,
-		tags:                       map[string]string{},
 		targetNodeLabels:           map[string]string{},
 		IsAutoCreateSecurityGroup:  false,
 		securityGroups:             []string{},

@@ -11,9 +11,7 @@ import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -78,11 +76,6 @@ var _ ModelBuilder = &modelBuilder{}
 type modelBuilder struct {
 	// annotation configuration
 	isIgnored                  bool
-	loadBalancerID             string
-	loadBalancerName           string
-	loadBalancerType           loadbalancerv2.LoadBalancerType
-	packageID                  string
-	scheme                     loadbalancerv2.LoadBalancerScheme
 	idleTimeoutClient          int
 	idleTimeoutMember          int
 	idleTimeoutConnection      int
@@ -95,7 +88,6 @@ type modelBuilder struct {
 	healthyThresholdCount      int
 	unhealthyThresholdCount    int
 	poolAlgorithm              loadbalancerv2.PoolAlgorithm
-	tags                       map[string]string
 	targetNodeLabels           map[string]string
 	securityGroups             []string
 	healthcheckPort            int
@@ -135,6 +127,7 @@ type modelBuilder struct {
 	IsAutoCreateSecurityGroup bool
 
 	poolListenerHelper
+	basicInfoHelper
 }
 
 func (l *modelBuilder) GetName() string {
@@ -150,7 +143,7 @@ func (l *modelBuilder) GetPackageID() string {
 }
 
 func (l *modelBuilder) GetTags() map[string]string {
-	return l.tags
+	return l.basicInfoHelper.GetTags()
 }
 
 func (l *modelBuilder) GetSecurityGroupIDs() []string {
@@ -339,107 +332,6 @@ func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 		TrimString(realProtocol, 3),
 		pPort.Port)
 	return l.validateName(name)
-}
-
-// ---------------------------------------------------------- node k8s
-
-// filterByNodeLabel filters the given list of nodes by the given node labels.
-func (l *modelBuilder) filterByNodeLabel(nodes []*corev1.Node, nodeLabels map[string]string) []*corev1.Node {
-	var filtered []*corev1.Node
-	for _, node := range nodes {
-		if node == nil {
-			continue
-		}
-		if node.Labels == nil {
-			continue
-		}
-		if labels.Set(nodeLabels).AsSelector().Matches(labels.Set(node.Labels)) {
-			filtered = append(filtered, node)
-		}
-	}
-	return filtered
-}
-
-// getNodeMembersAddr returns array internal IP address of the nodes.
-func (l *modelBuilder) getNodeMembersAddr(nodeObjs []*corev1.Node) []*MemberAddress {
-	nodeAddr := make([]*MemberAddress, 0)
-	for _, node := range nodeObjs {
-		addr, err := l.getNodeInternalAddress(node)
-		if err != nil {
-			l.logger.Warnf("Failed to get internal IP address of node %s: %v, continue.", node.Name, err)
-			continue
-		}
-		nodeAddr = append(nodeAddr, &MemberAddress{IP: addr, Name: node.Name})
-	}
-	return nodeAddr
-}
-
-// getNodeInternalAddress returns the internal IP address of the node.
-func (l *modelBuilder) getNodeInternalAddress(node *corev1.Node) (string, error) {
-	addrs := node.Status.Addresses
-	if len(addrs) == 0 {
-		return "", errs.ErrorNodeNotHaveInternalIP
-	}
-	for _, addr := range addrs {
-		if addr.Type == corev1.NodeInternalIP {
-			return addr.Address, nil
-		}
-	}
-	return addrs[0].Address, nil
-}
-
-// ---------------------------------------------------------- endpoint k8s
-
-// getEndpointMembersAddr returns array internal IP address of the endpoint.
-func (l *modelBuilder) getEndpointMembersAddr(namespace, name string) ([]*MemberAddress, error) {
-	endpoint := &corev1.Endpoints{}
-	err := l.client.Get(l.context, client.ObjectKey{Namespace: namespace, Name: name}, endpoint)
-	if err != nil {
-		l.logger.Errorf("Failed to get endpoint %s/%s: %v", namespace, name, err)
-		return nil, err
-	}
-	addrs := make([]*MemberAddress, 0)
-	for _, subset := range endpoint.Subsets {
-		for _, addr := range subset.Addresses {
-			addrs = append(addrs, &MemberAddress{IP: addr.IP, Name: addr.TargetRef.Name})
-		}
-		for _, addr := range subset.NotReadyAddresses {
-			addrs = append(addrs, &MemberAddress{IP: addr.IP, Name: addr.TargetRef.Name})
-		}
-	}
-	return addrs, nil
-}
-
-// ---------------------------------------------------------- secgroup
-
-// addSecgroupRule adds a security group rule to the list.
-func (l *modelBuilder) addSecgroupRule(port int, protocol string) {
-	protocolType := ProtocolTypeTCP
-	p := strings.ToLower(protocol)
-	switch p {
-	case "udp":
-		protocolType = ProtocolTypeUDP
-	case "icmp":
-		protocolType = ProtocolTypeICMP
-	default:
-		protocolType = ProtocolTypeTCP
-	}
-	isExist := false
-	for _, rule := range l.secGroupRuleBuilders {
-		if rule.GetPortRangeMax() == port &&
-			rule.GetPortRangeMin() == port &&
-			rule.GetProtocol() == protocolType {
-			isExist = true
-			break
-		}
-	}
-	if !isExist {
-		l.secGroupRuleBuilders = append(l.secGroupRuleBuilders, &secGroupRuleBuilderType{
-			Protocol:     protocolType,
-			PortRangeMin: port,
-			PortRangeMax: port,
-		})
-	}
 }
 
 // func (l *modelBuilder)

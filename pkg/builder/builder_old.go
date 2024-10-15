@@ -65,9 +65,14 @@ func (l *oldListener) GetOldPolicyByName(name string) OldPolicy {
 // ------------------------------------------------------------
 
 type OldModelBuilder interface {
+	// from manage annotation
 	GetOldListeners() []OldListener
 	GetOldPools() []OldPool
 	GetDefaultPoolMembers() []*loadbalancerv2.Member
+
+	// from annotation in old object
+	GetOldTags() map[string]string
+
 	IsIgnored() bool
 	GetID() string
 }
@@ -80,6 +85,7 @@ type oldModelBuilder struct {
 	defaultPoolMembers []*loadbalancerv2.Member
 	isIgnored          bool
 	lbID               string
+	oldTags            map[string]string
 
 	annotationParser annotations.Parser
 }
@@ -112,29 +118,44 @@ func (m *oldModelBuilder) GetID() string {
 	return m.lbID
 }
 
+func (m *oldModelBuilder) GetOldTags() map[string]string {
+	return m.oldTags
+}
+
 // ------------------------------------------------------------
 
-func NewOldModelBuilder(annos map[string]string, annotationParser annotations.Parser) OldModelBuilder {
+// manage annotation to get listener, pool, default pool member, old object annotation to get tags,...
+func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParser annotations.Parser) OldModelBuilder {
 	model := &oldModelBuilder{
 		oldListeners:       make([]*oldListener, 0),
 		oldPools:           make([]*oldPool, 0),
 		defaultPoolMembers: make([]*loadbalancerv2.Member, 0),
+		oldTags:            make(map[string]string),
 		isIgnored:          false,
 		lbID:               "",
 		annotationParser:   annotationParser,
 	}
 
-	_ = model.build(annos)
+	err := model.build(annos, oldAnnotations)
+	if err != nil {
+		logrus.Errorf("Error building old model: %v, return empty.", err)
+		model.oldListeners = make([]*oldListener, 0)
+		model.oldPools = make([]*oldPool, 0)
+		model.defaultPoolMembers = make([]*loadbalancerv2.Member, 0)
+		model.oldTags = make(map[string]string)
 
-	logrus.Debugf("Old model: %v", model)
+		return model
+	}
+
 	logrus.Debugf("Old model listeners: %v", model.GetOldListeners())
 	logrus.Debugf("Old model pools: %v", model.GetOldPools())
 	logrus.Debugf("Old model pool default member: %v", model.GetDefaultPoolMembers())
+	logrus.Debugf("Old model tags: %v", model.GetOldTags())
 
 	return model
 }
 
-func (m *oldModelBuilder) build(annos map[string]string) error {
+func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
 	isIgnore := false
 	if exists, err := m.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, annos); exists && err == nil {
 		m.isIgnored = isIgnore
@@ -227,6 +248,12 @@ func (m *oldModelBuilder) build(annos map[string]string) error {
 				Name:        "",
 			})
 		}
+	}
+
+	// build old tags
+	oldTags := make(map[string]string)
+	if exists, err := m.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &oldTags, oldAnnotations); exists && err == nil {
+		m.oldTags = oldTags
 	}
 
 	return nil

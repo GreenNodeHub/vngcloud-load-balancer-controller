@@ -18,10 +18,14 @@ func TestNewOldModelBuilder(t *testing.T) {
 		fmt.Sprintf("%s/%s", prefix, annotations.SuffixManageListeners): "listener-1:listener-one:[policy-one],listener-2:listener-two:[policy-two|policy-three],l3:l3:[]",
 	}
 
+	oldAnnotations := map[string]string{
+		fmt.Sprintf("%s/%s", prefix, annotations.SuffixTags): "aaa=bbb,c=d",
+	}
+
 	annosParser := annotations.NewSuffixAnnotationParser(prefix)
 
 	// Call the function
-	model := NewOldModelBuilder(annos, annosParser)
+	model := NewOldModelBuilder(annos, oldAnnotations, annosParser)
 
 	// Assertions
 	assert.NotNil(t, model)
@@ -53,4 +57,10 @@ func TestNewOldModelBuilder(t *testing.T) {
 	assert.Equal(t, "l3", listeners[2].GetID())
 	assert.Equal(t, "l3", listeners[2].GetName())
 	assert.Len(t, listeners[2].GetOldPolicies(), 0)
+
+	// Check if tags were built correctly
+	tags := model.GetOldTags()
+	assert.Len(t, tags, 2)
+	assert.Equal(t, "bbb", tags["aaa"])
+	assert.Equal(t, "d", tags["c"])
 }

@@ -207,7 +207,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 }
 
-func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Service, _ interface{}) (ctrl.Result, error) {
+func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Service, oldObjInterface interface{}) (ctrl.Result, error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
@@ -265,23 +265,27 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	}
 
 	// inspect current loadbalancer in portal to compare with the new one
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetID(), r.Provider, r.annotationParser)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
 	if err != nil {
 		logger.Error("Failed to get current loadbalancer: ", err)
 		return ctrl.Result{}, err
 	}
 
-	// build oldBuilder
-	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, r.annotationParser)
+	// get old object annotations
+	oldAnnotations := make(map[string]string)
+	if oldObj, ok := oldObjInterface.(*corev1.Service); ok {
+		oldAnnotations = oldObj.Annotations
+	}
 
-	// // ensure tags
-	// tags := VNGHelper.MergeTags(ctx, currentBuilder, loadBalancerBuilder)
-	// if tags != nil {
-	// 	if err := r.Provider.UpdateTags(ctx, loadBalancerBuilder.GetID(), tags); err != nil {
-	// 		logger.Error("Failed to update tags: ", err)
-	// 		return ctrl.Result{}, err
-	// 	}
-	// }
+	// build oldBuilder
+	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
+
+	// ensure tags
+	err = currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
+	if err != nil {
+		logger.Error("Failed to ensure tags: ", err)
+		return ctrl.Result{}, err
+	}
 
 	// ensure package
 	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
@@ -373,7 +377,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
-	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, r.annotationParser)
+	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, map[string]string{}, r.annotationParser)
 
 	// ignore reconcile
 	if oldBuilder.IsIgnored() {
@@ -387,7 +391,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	}
 
 	// inspect current loadbalancer in portal to compare with
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetID(), r.Provider, r.annotationParser)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
 	if err != nil {
 		if errs.IsLoadBalancerNotFound(err) {
 			logger.Info("LoadBalancer not found, return.")

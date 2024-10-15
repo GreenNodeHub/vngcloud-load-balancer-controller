@@ -59,6 +59,7 @@ type MockProvider struct {
 	listeners     []*wrapListener
 	pools         []*wrapPool
 	policies      []*wrapPolicy
+	tags          map[string](map[string]string)
 
 	mu sync.Mutex
 }
@@ -135,14 +136,50 @@ func (m *MockProvider) GetSubnetCIDR() string {
 
 // // --------------------------- Tags ---------------------------
 
-// func (m *MockProvider) GetTags(ctx context.Context, resourceID string) ([]*objects.ResourceTag, error) {
-// 	logger.Error("not implemented yet", "GetTags")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error {
-// 	logger.Error("not implemented yet", "UpdateTags")
-// 	return errs.ErrorNotImplemented
-// }
+func (m *MockProvider) ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error) {
+	tags := make(map[string]string)
+	if t, ok := m.tags[resourceID]; ok {
+		tags = t
+	}
+
+	tagItems := make([]*entityv2.Tag, 0)
+	for k, v := range tags {
+		tagItems = append(tagItems, &entityv2.Tag{
+			Key:   k,
+			Value: v,
+		})
+	}
+	return &entityv2.ListTags{
+		Items: tagItems,
+	}, nil
+}
+
+func (m *MockProvider) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create tags for resource %s", icon, resourceID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tags == nil {
+		m.tags = make(map[string](map[string]string))
+	}
+	m.tags[resourceID] = tags
+	return nil
+}
+
+func (m *MockProvider) UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.tags == nil {
+		m.tags = make(map[string](map[string]string))
+	}
+	if m.tags[resourceID] == nil {
+		m.tags[resourceID] = make(map[string]string)
+	}
+	for k, v := range tags {
+		m.tags[resourceID][k] = v
+	}
+	return nil
+}
 
 // func (m *MockProvider) GetSubnet(ctx context.Context, subnetID string) (*objects.Subnet, error) {
 // 	logger.Error("not implemented yet", "GetSubnet")

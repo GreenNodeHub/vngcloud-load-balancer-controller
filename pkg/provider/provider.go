@@ -33,8 +33,11 @@ type Provider interface {
 	// DeleteSecurityGroupRule(secgroupID string, ruleID string) error
 	// ListSecurityGroupRules(secgroupID string) ([]*objects.SecgroupRule, error)
 
-	// GetTags(resourceID string) ([]*objects.ResourceTag, error)
-	// UpdateTags(resourceID string, tags map[string]string) error
+	ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error)
+	// overwrites the tags of the resource
+	CreateTags(ctx context.Context, resourceID string, tags map[string]string) error
+	// adding or updating the tags to the resource
+	UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error
 
 	// GetSubnet(subnetID string) (*objects.Subnet, error)
 

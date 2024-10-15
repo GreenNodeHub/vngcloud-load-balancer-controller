@@ -22,6 +22,7 @@ type LoadBalancerBuilder interface {
 
 	EnsurePool(pool *poolBuilderType, oldBuilder OldModelBuilder) error
 	EnsureListener(listener *ListenerBuilderType, oldBuilder OldModelBuilder) error
+	EnsureTags(tags map[string]string, oldBuilder OldModelBuilder) error
 
 	//
 	DeleteRedundantListeners(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error
@@ -39,18 +40,21 @@ func NewLoadBalancerBuilderByLoadBalancerID(
 	loadBalancerID string,
 	provider provider.Provider,
 	annotationParser annotations.Parser,
+	clusterID string,
 ) (LoadBalancerBuilder, error) {
 	model := &vngcloudLBBuilder{
 		provider:         provider,
 		context:          ctx,
 		logger:           contexts.NewContext(ctx).Log(),
 		annotationParser: annotationParser,
+		clusterID:        clusterID,
 		basicInfoHelper: basicInfoHelper{
 			loadBalancerID:   loadBalancerID,
 			loadBalancerName: "",
 			loadBalancerType: "",
 			packageID:        "",
 			scheme:           "",
+			tags:             map[string]string{},
 		},
 		poolListenerHelper: poolListenerHelper{
 			poolBuilders:     make([]*poolBuilderType, 0),
@@ -66,6 +70,8 @@ func NewLoadBalancerBuilderByLoadBalancerID(
 	return model, nil
 }
 
+var _ LoadBalancerBuilder = &vngcloudLBBuilder{}
+
 type vngcloudLBBuilder struct {
 	basicInfoHelper
 
@@ -75,6 +81,7 @@ type vngcloudLBBuilder struct {
 	context          context.Context
 	provider         provider.Provider
 	annotationParser annotations.Parser
+	clusterID        string
 }
 
 func (r *vngcloudLBBuilder) build() error {
@@ -116,6 +123,11 @@ func (r *vngcloudLBBuilder) build() error {
 			return err
 		}
 		r.listenerBuilders = append(r.listenerBuilders, listenerBuilder)
+	}
+
+	// Get tags
+	if err := r.buildTags(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -233,6 +245,25 @@ func (r *vngcloudLBBuilder) buildPolicy(policy *entityv2.Policy) (*policyBuilder
 	}
 	policyBuilder.Rules = rules
 	return policyBuilder, nil
+}
+
+func (r *vngcloudLBBuilder) buildTags() error {
+	tags, err := r.provider.ListTags(r.context, r.GetLoadBalancerID())
+	if err != nil {
+		return err
+	}
+
+	tagsMap := make(map[string]string)
+	for _, tag := range tags.Items {
+		if tag.SystemTag {
+			r.logger.Warnf("Have system tag: %s, skip this tag.", tag.Key)
+			continue
+		}
+		tagsMap[tag.Key] = tag.Value
+	}
+
+	r.tags = tagsMap
+	return nil
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------
