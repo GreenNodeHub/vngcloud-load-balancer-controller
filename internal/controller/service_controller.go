@@ -47,6 +47,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	periodicreconciler "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/periodic_reconciler"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // ServiceReconciler reconciles a Service object
@@ -76,6 +77,8 @@ type ServiceReconciler struct {
 	//  flag to check if the reconciler is initialized
 	initialized bool
 	initLock    sync.Mutex
+
+	cniMode utils.CNIType
 }
 
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
@@ -93,6 +96,8 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
 func (r *ServiceReconciler) isValid(obj interface{}) bool {
@@ -472,6 +477,14 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
 		return errs.ErrorNoNetworkInfo
 	}
+
+	// init cni mode
+	r.cniMode, err = utils.NewDetector(client).DetectCNIType()
+	if err != nil {
+		logrus.Error("Failed to detect CNI type: ", err)
+		return err
+	}
+	logrus.Infof("Detected CNI type: %s", r.cniMode)
 
 	r.initialized = true
 	return nil

@@ -48,6 +48,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	periodicreconciler "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/periodic_reconciler"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // IngressReconciler reconciles a Ingress object
@@ -77,6 +78,8 @@ type IngressReconciler struct {
 	//  flag to check if the reconciler is initialized
 	initialized bool
 	initLock    sync.Mutex
+
+	cniMode utils.CNIType
 }
 
 func (r *IngressReconciler) isValid(obj interface{}) bool {
@@ -458,6 +461,14 @@ func (r *IngressReconciler) Init(client client.Client) error {
 	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
 		return errs.ErrorNoNetworkInfo
 	}
+
+	// init cni mode
+	r.cniMode, err = utils.NewDetector(client).DetectCNIType()
+	if err != nil {
+		logrus.Error("Failed to detect CNI type: ", err)
+		return err
+	}
+	logrus.Infof("Detected CNI type: %s", r.cniMode)
 
 	r.initialized = true
 	return nil

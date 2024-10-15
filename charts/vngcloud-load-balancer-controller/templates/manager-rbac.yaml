@@ -6,6 +6,14 @@ metadata:
   {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
 rules:
 - apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ""
   resources:
   - endpoints
