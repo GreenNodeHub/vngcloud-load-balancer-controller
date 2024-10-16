@@ -97,7 +97,7 @@ func (h *helperStruct) MergeTags(ctx context.Context, current, new ModelBuilder)
 		return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
 	}
 
-	vksClusterValue := joinVKSTags(currentTags[consts.VKS_TAG_KEY], new.GetID())
+	vksClusterValue := joinVKSTags(currentTags[consts.VKS_TAG_KEY], new.GetLoadBalancerID())
 	if vksClusterValue != currentTags[consts.VKS_TAG_KEY] {
 		isNeedUpdate = true
 		mergeTags[consts.VKS_TAG_KEY] = vksClusterValue

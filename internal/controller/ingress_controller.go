@@ -219,9 +219,14 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	}
 
 	// create loadbalancer, update annotation and reconcile later
-	if loadBalancerBuilder.GetID() == "" {
+	if loadBalancerBuilder.GetLoadBalancerID() == "" {
 		// check if loadbalancer with the generate name exists, if exists, update annotation and return
-		lb, err := r.Provider.GetLoadBalancerByName(ctx, loadBalancerBuilder.GetName())
+		// check the name that user specified in the annotation first
+		lbName := loadBalancerBuilder.GetLoadBalancerName()
+		if lbName == "" {
+			lbName = loadBalancerBuilder.GetLoadBalancerDefaultName()
+		}
+		lb, err := r.Provider.GetLoadBalancerByName(ctx, lbName)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -240,14 +245,14 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		})
 		return ctrl.Result{}, nil
 	} else {
-		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
+		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
 			return ctrl.Result{}, err
 		}
 	}
 
 	// inspect current loadbalancer in portal to compare with the new one
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetLoadBalancerID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
 	if err != nil {
 		logger.Error("Failed to get current loadbalancer: ", err)
 		return ctrl.Result{}, err
@@ -273,11 +278,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
 		currentBuilder.GetPackageID() != "" &&
 		loadBalancerBuilder.GetPackageID() != "" {
-		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetID(), loadBalancerBuilder.GetPackageID()); err != nil {
+		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetLoadBalancerID(), loadBalancerBuilder.GetPackageID()); err != nil {
 			logger.Error("Failed to resize loadbalancer: ", err)
 			return ctrl.Result{}, err
 		}
-		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetID()); err != nil {
+		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
 			return ctrl.Result{}, err
 		}
@@ -331,7 +336,9 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		return ctrl.Result{}, err
 	}
 
-	r.resourceDependant.Set(obj, true)
+	// watch endpoint if target type is ip or cni mode is cilium native routing
+	r.resourceDependant.Set(obj, loadBalancerBuilder.GetTargetType() == builder.TargetTypeIP ||
+		r.cniMode == utils.CiliumNativeRouting)
 	return ctrl.Result{}, nil
 }
 
@@ -369,13 +376,13 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		return ctrl.Result{}, nil
 	}
 
-	if oldBuilder.GetID() == "" {
+	if oldBuilder.GetLoadBalancerID() == "" {
 		logger.Info("LoadBalancer ID is empty, return.")
 		return ctrl.Result{}, nil
 	}
 
 	// inspect current loadbalancer in portal to compare with
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
 	if err != nil {
 		if errs.IsLoadBalancerNotFound(err) {
 			logger.Info("LoadBalancer not found, return.")
@@ -400,11 +407,11 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	// oldBuilder and currentBuilder should be the same listeners' name, pool's name
 	// if can delete whole loadbalancer, delete loadbalancer and return
 	if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
-		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetID()); err != nil {
+		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to delete loadbalancer: ", err)
 			return ctrl.Result{}, err
 		}
-		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetID())
+		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
 		return ctrl.Result{}, nil
 	}
 

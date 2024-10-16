@@ -61,7 +61,7 @@ func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) Target
 }
 
 func (l *modelBuilder) parseAnnotationLoadBalancerName(annos map[string]string) string {
-	option := l.loadBalancerName
+	option := l.GetLoadBalancerName()
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, annos)
 	return option
 }

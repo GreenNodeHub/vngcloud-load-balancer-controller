@@ -16,9 +16,7 @@ import (
 )
 
 type LoadBalancerBuilder interface {
-	GetLoadBalancerID() string
-	GetName() string
-	GetPackageID() string
+	BasicInfoHelper
 
 	EnsurePool(pool *poolBuilderType, oldBuilder OldModelBuilder) error
 	EnsureListener(listener *ListenerBuilderType, oldBuilder OldModelBuilder) error

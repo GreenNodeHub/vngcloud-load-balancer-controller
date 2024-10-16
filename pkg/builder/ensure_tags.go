@@ -34,9 +34,9 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 	}
 
 	r.logger.Debug("EnsureTags: ")
-	r.logger.Debugf("oldTags:   %v", oldTags)
-	r.logger.Debugf("curTags:   %v", currentTags)
-	r.logger.Debugf("newTags:   %v", newTags)
+	r.logger.Debugf("   - oldTags:   %v", oldTags)
+	r.logger.Debugf("   - curTags:   %v", currentTags)
+	r.logger.Debugf("   - newTags:   %v", newTags)
 
 	// merge tags
 	mergeTags := make(map[string]string)

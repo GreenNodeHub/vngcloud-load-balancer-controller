@@ -72,9 +72,11 @@ type OldModelBuilder interface {
 
 	// from annotation in old object
 	GetOldTags() map[string]string
+	IsCreateDefaultSecgroup() bool
+	GetOldSecGroups() []string
 
 	IsIgnored() bool
-	GetID() string
+	GetLoadBalancerID() string
 }
 
 var _ OldModelBuilder = &oldModelBuilder{}
@@ -86,6 +88,9 @@ type oldModelBuilder struct {
 	isIgnored          bool
 	lbID               string
 	oldTags            map[string]string
+
+	isCreateDefaultSecgroup bool
+	oldSecGroups            []string
 
 	annotationParser annotations.Parser
 }
@@ -114,7 +119,7 @@ func (m *oldModelBuilder) IsIgnored() bool {
 	return m.isIgnored
 }
 
-func (m *oldModelBuilder) GetID() string {
+func (m *oldModelBuilder) GetLoadBalancerID() string {
 	return m.lbID
 }
 
@@ -122,18 +127,28 @@ func (m *oldModelBuilder) GetOldTags() map[string]string {
 	return m.oldTags
 }
 
+func (m *oldModelBuilder) IsCreateDefaultSecgroup() bool {
+	return m.isCreateDefaultSecgroup
+}
+
+func (m *oldModelBuilder) GetOldSecGroups() []string {
+	return m.oldSecGroups
+}
+
 // ------------------------------------------------------------
 
 // manage annotation to get listener, pool, default pool member, old object annotation to get tags,...
 func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParser annotations.Parser) OldModelBuilder {
 	model := &oldModelBuilder{
-		oldListeners:       make([]*oldListener, 0),
-		oldPools:           make([]*oldPool, 0),
-		defaultPoolMembers: make([]*loadbalancerv2.Member, 0),
-		oldTags:            make(map[string]string),
-		isIgnored:          false,
-		lbID:               "",
-		annotationParser:   annotationParser,
+		oldListeners:            make([]*oldListener, 0),
+		oldPools:                make([]*oldPool, 0),
+		defaultPoolMembers:      make([]*loadbalancerv2.Member, 0),
+		oldTags:                 make(map[string]string),
+		isIgnored:               false,
+		lbID:                    "",
+		annotationParser:        annotationParser,
+		isCreateDefaultSecgroup: true,
+		oldSecGroups:            make([]string, 0),
 	}
 
 	err := model.build(annos, oldAnnotations)
@@ -143,14 +158,18 @@ func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParse
 		model.oldPools = make([]*oldPool, 0)
 		model.defaultPoolMembers = make([]*loadbalancerv2.Member, 0)
 		model.oldTags = make(map[string]string)
+		model.isIgnored = false
+		model.isCreateDefaultSecgroup = true
+		model.oldSecGroups = make([]string, 0)
 
 		return model
 	}
 
-	logrus.Debugf("Old model listeners: %v", model.GetOldListeners())
-	logrus.Debugf("Old model pools: %v", model.GetOldPools())
-	logrus.Debugf("Old model pool default member: %v", model.GetDefaultPoolMembers())
-	logrus.Debugf("Old model tags: %v", model.GetOldTags())
+	logrus.Debugf("Old model: - listeners: %v", model.GetOldListeners())
+	logrus.Debugf("           - pools: %v", model.GetOldPools())
+	logrus.Debugf("           - pool default member: %v", model.GetDefaultPoolMembers())
+	logrus.Debugf("           - tags: %v", model.GetOldTags())
+	logrus.Debugf("           - secgroups: %v", model.GetOldSecGroups())
 
 	return model
 }
@@ -254,6 +273,13 @@ func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
 	oldTags := make(map[string]string)
 	if exists, err := m.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &oldTags, oldAnnotations); exists && err == nil {
 		m.oldTags = oldTags
+	}
+
+	// build old secgroups
+	oldSecGroups := make([]string, 0)
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixSecurityGroups, &oldSecGroups, oldAnnotations); exists {
+		m.oldSecGroups = oldSecGroups
+		m.isCreateDefaultSecgroup = false
 	}
 
 	return nil

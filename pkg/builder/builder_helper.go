@@ -125,7 +125,8 @@ func (l *poolListenerHelper) IsPoolInUseByOtherListener(poolID string) bool {
 
 type BasicInfoHelper interface {
 	GetLoadBalancerID() string
-	GetName() string
+	// return the real name in portal or the name that user specified in the annotation
+	GetLoadBalancerName() string
 	GetPackageID() string
 	GetScheme() loadbalancerv2.LoadBalancerScheme
 	GetLoadBalancerType() loadbalancerv2.LoadBalancerType
@@ -147,7 +148,8 @@ func (l *basicInfoHelper) GetLoadBalancerID() string {
 	return l.loadBalancerID
 }
 
-func (l *basicInfoHelper) GetName() string {
+// return the real name in portal or the name that user specified in the annotation
+func (l *basicInfoHelper) GetLoadBalancerName() string {
 	return l.loadBalancerName
 }
 
