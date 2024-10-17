@@ -8,6 +8,7 @@ import (
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -39,44 +40,57 @@ Note:
 
 func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBuilder OldModelBuilder) error {
 	// find default secgroup
-	defaultSecgroup, isExists, err := r.findSecgroupByName(newBuilder.GetLoadBalancerDefaultName())
+	defaultSecgroup, isExists, err := r.findSecgroupByName(r.GetLoadBalancerDefaultName())
 	if err != nil {
 		r.logger.Error("Fail to find default secgroup", err)
 		return err
 	}
 
-	// if default secgroup but newBuilder not use it, delete it
+	// if default secgroup but newBuilder not use it, should delete it
 	if isExists && !newBuilder.IsCreateDefaultSecgroup() &&
 		!slices.Contains(newBuilder.GetSecurityGroupIDs(), defaultSecgroup.Id) {
-		// delete default secgroup
-		err := r.provider.DeleteSecurityGroup(context.Background(), defaultSecgroup.Id)
+
+		r.logger.Infof("Default secgroup %s should be deleted", defaultSecgroup.Id)
+
+		// remove secgroups from all server in target node
+		err = r.ensureDeleteAddNodesSG([]string{defaultSecgroup.Id}, []string{}, r.knownNodes)
 		if err != nil {
-			r.logger.Error("Fail to delete default secgroup", err)
 			return err
+		}
+
+		// if default secgroup is not in use, delete it
+		_, isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
+		if err != nil {
+			return err
+		}
+		if !isInUse {
+			err = r.provider.DeleteSecurityGroup(context.Background(), defaultSecgroup.Id)
+			if err != nil {
+				r.logger.Error("Fail to delete default secgroup", err)
+				return err
+			}
+		} else {
+			r.logger.Warnf("Default secgroup %s is still in use, which should not be", defaultSecgroup.Id)
 		}
 	}
 
 	// get selector node
 	var nodes []*corev1.Node
 	if newBuilder.GetTargetType() == TargetTypeIP {
-		nodes, err = newBuilder.GetNodeBySelector(map[string]string{})
+		nodes = k8s.FilterNodeWithLabel(r.knownNodes, map[string]string{})
 	} else {
-		nodes, err = newBuilder.GetNodeBySelector(newBuilder.GetTargetNodeLabels())
-	}
-	if err != nil {
-		r.logger.Error("Fail to get node by selector", err)
-		return err
+		nodes = k8s.FilterNodeWithLabel(r.knownNodes, newBuilder.GetTargetNodeLabels())
 	}
 
 	// ensure all server using the secgroups, which are in the annotation
 	if !newBuilder.IsCreateDefaultSecgroup() {
-		r.ensureServerHaveSecurityGroup(oldBuilder.GetOldSecGroups(), newBuilder.GetSecurityGroupIDs(), nodes)
+		r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), newBuilder.GetSecurityGroupIDs(), nodes)
 		return nil
 	}
 
 	// if default secgroup not exists, create it
 	if !isExists {
-		_secG, err := r.provider.CreateSecurityGroup(context.Background(), newBuilder.GetLoadBalancerDefaultName(),
+		_secG, err := r.provider.CreateSecurityGroup(context.Background(), r.GetLoadBalancerDefaultName(),
 			"Automatically created using VNGCLOUD LoadBalancer Controller")
 		if err != nil {
 			r.logger.Error("Fail to create default secgroup", err)
@@ -107,7 +121,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 		if rule.Direction == string(networkv2.SecgroupRuleDirectionEgress) {
 			continue
 		}
-		r.logger.Debugf("   - current rule %v", rule)
+		r.logger.Debugf("   - current: %v", rule)
 	}
 
 	// ensure secgroup rules
@@ -119,10 +133,10 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	for _, rule := range needDelete {
-		r.logger.Debugf("   - delete rule: %v", rule)
+		r.logger.Debugf("   - delete : %v", rule)
 	}
 	for _, rule := range needCreate {
-		r.logger.Debugf("   - create rule: %v", rule)
+		r.logger.Debugf("   - create : %v", rule)
 	}
 
 	for _, rule := range needDelete {
@@ -143,38 +157,10 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	// ensure secgroup in server
-	err = r.ensureServerHaveSecurityGroup(oldBuilder.GetOldSecGroups(), []string{defaultSecgroup.Id}, nodes)
+	err = r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), []string{defaultSecgroup.Id}, nodes)
 	if err != nil {
 		r.logger.Error("Fail to ensure server have secgroup", err)
 		return err
-	}
-
-	return nil
-}
-
-func (r *vngcloudLBBuilder) ensureServerHaveSecurityGroup(oldSecgroups, newSecgroups []string, nodes []*corev1.Node) error {
-	err := r.validateSecurityGroup(newSecgroups)
-	if err != nil {
-		return err
-	}
-
-	// get instance id of all servers
-	instanceIDs := VNGHelper.GetListProviderID(nodes)
-	for _, instanceID := range instanceIDs {
-		err := r.ensureSecgroupForInstance(instanceID, oldSecgroups, newSecgroups)
-		if err != nil {
-			r.logger.Error("Fail to ensure secgroup for instance: ", err)
-			return err
-		}
-	}
-
-	// should wait until the server is ready because list secgroup of server is not immediately updated
-	for _, instanceID := range instanceIDs {
-		err := r.provider.WaitForServerActive(r.context, instanceID)
-		if err != nil {
-			r.logger.Error("Fail to wait for server active: ", err)
-			return err
-		}
 	}
 
 	return nil
@@ -221,6 +207,98 @@ func (m *vngcloudLBBuilder) validateSecurityGroup(ids []string) error {
 	return nil
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+
+/*
+- mode auto create secgroup:
+  - check default exist, if not return
+  - remove default from all server in target node
+  - if default not in use, delete it
+
+- mode manage secgroup:
+  - if default exist, remove default from all server in target node
+  - if default not in use, delete it
+  - remove list secgroups from all server in target node
+
+- if default secgroup is exist, remove it from all server and delete it
+- if mode is auto create secgroup, return
+*/
+func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilder) error {
+	// find default secgroup
+	defaultSecgroup, isExists, err := r.findSecgroupByName(r.GetLoadBalancerDefaultName())
+	if err != nil {
+		r.logger.Error("Fail to find default secgroup", err)
+		return err
+	}
+
+	removeList := make([]string, 0)
+
+	if isExists {
+		removeList = append(removeList, defaultSecgroup.Id)
+	}
+
+	// add all secgroups in oldBuilder to removeList
+	if !oldBuilder.IsCreateDefaultSecgroup() {
+		removeList = append(removeList, oldBuilder.GetOldSecGroups()...)
+	}
+
+	// remove secgroups from all server in target node
+	err = r.ensureDeleteAddNodesSG(removeList, []string{}, r.knownNodes)
+	if err != nil {
+		return err
+	}
+
+	// delete default secgroup if possible
+	if isExists {
+		// if default secgroup is not in use, delete it
+		_, isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
+		if err != nil {
+			return err
+		}
+		if !isInUse {
+			err = r.provider.DeleteSecurityGroup(context.Background(), defaultSecgroup.Id)
+			if err != nil {
+				r.logger.Error("Fail to delete default secgroup", err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+
+// ensure delete old secgroups and add new secgroups to nodes
+func (r *vngcloudLBBuilder) ensureDeleteAddNodesSG(oldSecgroups, newSecgroups []string, nodes []*corev1.Node) error {
+	err := r.validateSecurityGroup(newSecgroups)
+	if err != nil {
+		return err
+	}
+
+	// get instance id of all servers
+	instanceIDs := VNGHelper.GetListProviderID(nodes)
+	for _, instanceID := range instanceIDs {
+		err := r.ensureSecgroupForInstance(instanceID, oldSecgroups, newSecgroups)
+		if err != nil {
+			r.logger.Error("Fail to ensure secgroup for instance: ", err)
+			return err
+		}
+	}
+
+	// should wait until the server is ready because list secgroup of server is not immediately updated
+	for _, instanceID := range instanceIDs {
+		err := r.provider.WaitForServerActive(r.context, instanceID)
+		if err != nil {
+			r.logger.Error("Fail to wait for server active: ", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ensure secgroup for instance, remove old secgroups and add new secgroups
 func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecgroups, newSecgroups []string) error {
 	// get security groups of instance
 	instance, err := m.provider.GetServerByID(context.Background(), instanceID)
@@ -241,6 +319,7 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 	}
 
 	// update security groups of instance
+	m.logger.Infof("Update security groups of instance %s: %v -> %v", instanceID, currentSecgroups, newSecgroups)
 	_, err = m.provider.UpdateSecGroupsOfServer(context.Background(), instanceID, newSecgroups)
 	if err != nil {
 		m.logger.Error("Fail to update security groups of instance", err)
@@ -248,4 +327,20 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 	}
 
 	return nil
+}
+
+func (m *vngcloudLBBuilder) getServerUseSecgroup(secgroupID string) (*entityv2.ListServers, bool, error) {
+	listServer, err := m.provider.ListServerBySecgroupID(m.context, secgroupID)
+	if err != nil {
+		m.logger.Error("Fail to list server by secgroup", err)
+		return nil, true, err
+	}
+
+	if listServer == nil || listServer.Items == nil {
+		listServer = &entityv2.ListServers{
+			Items: []*entityv2.Server{},
+		}
+	}
+
+	return listServer, len(listServer.Items) > 0, nil
 }

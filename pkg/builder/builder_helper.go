@@ -1,8 +1,13 @@
 package builder
 
 import (
+	"fmt"
+	"strings"
+	"unicode"
+
 	"github.com/sirupsen/logrus"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
 type PoolListenerHelper interface {
@@ -167,4 +172,50 @@ func (l *basicInfoHelper) GetLoadBalancerType() loadbalancerv2.LoadBalancerType 
 
 func (l *basicInfoHelper) GetTags() map[string]string {
 	return l.tags
+}
+
+// ---------------------------------------------------------- generate name
+
+type NameHelper interface {
+	// return the generated name of the load balancer
+	GetLoadBalancerDefaultName() string
+}
+
+var _ NameHelper = &nameHelper{}
+
+type nameHelper struct {
+	// resource info
+	clusterID         string
+	resourceType      string // service, ingress
+	resourceName      string
+	resourceNamespace string
+}
+
+func (l *nameHelper) GetLoadBalancerDefaultName() string {
+	hash := l.generateHash()
+	name := fmt.Sprintf("%s_%s_%s_%s_%s",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		TrimString(l.clusterID, 10),
+		TrimString(l.resourceNamespace, 10),
+		TrimString(l.resourceName, 10),
+		hash)
+	return l.validateName(name)
+}
+
+func (l *nameHelper) generateHash() string {
+	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
+	hash := HashString(fullName)
+	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
+}
+
+func (l *nameHelper) validateName(newName string) string {
+	for _, char := range newName {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '-' && char != '.' {
+			newName = strings.ReplaceAll(newName, string(char), "-")
+		}
+	}
+	if len(newName) > consts.DEFAULT_PORTAL_NAME_LENGTH {
+		logrus.Warnf("The name %s is too long, it will be truncated", newName)
+	}
+	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
 }

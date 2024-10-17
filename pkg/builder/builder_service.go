@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"fmt"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -39,10 +40,12 @@ func NewModelBuilderByService(
 			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
 			tags:             map[string]string{},
 		},
-		resourceType:            "service",
-		resourceName:            "",
-		resourceNamespace:       "",
-		loadBalancerDefaultName: "",
+		nameHelper: nameHelper{
+			resourceType:      "service",
+			resourceName:      "",
+			resourceNamespace: "",
+			clusterID:         clusterID,
+		},
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
 
@@ -55,7 +58,6 @@ func NewModelBuilderByService(
 		networkID:  networkID,
 		subnetID:   subnetID,
 		subnetCIDR: subnetCIDR,
-		clusterID:  clusterID,
 
 		isIgnored: false,
 
@@ -92,7 +94,6 @@ func NewModelBuilderByService(
 
 	model.resourceName = service.Name
 	model.resourceNamespace = service.Namespace
-	model.loadBalancerDefaultName = model.objectToLBName()
 
 	model.parseAnnotation(service.Annotations)
 
@@ -113,7 +114,7 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
-		l.loadBalancerName = l.objectToLBName()
+		l.loadBalancerName = l.GetLoadBalancerDefaultName()
 	}
 
 	// Get members address, nodeIP or podIP
@@ -267,4 +268,44 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 		}
 	}
 	return opt
+}
+
+// genL4ListenerName generates the name of the listener.
+func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
+	hash := l.generateHash()
+	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		TrimString(l.clusterID, 10),
+		TrimString(l.resourceNamespace, 9),
+		TrimString(l.resourceName, 9),
+		hash,
+		TrimString(string(pPort.Protocol), 3),
+		pPort.Port)
+	return l.validateName(name)
+}
+
+// genL4PoolName generates the name of the pool.
+func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
+	realProtocol := l.mappingProtocol(pPort)
+
+	hash := l.generateHash()
+	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		TrimString(l.clusterID, 10),
+		TrimString(l.resourceNamespace, 9),
+		TrimString(l.resourceName, 9),
+		hash,
+		TrimString(realProtocol, 3),
+		pPort.Port)
+	return l.validateName(name)
+}
+
+// mappingProtocol maps the protocol TCP to the protocol PROXY if have configured.
+func (l *modelBuilder) mappingProtocol(pPort corev1.ServicePort) string {
+	for _, name := range l.enableProxyProtocol {
+		if (name == "*" || name == pPort.Name) && pPort.Protocol == corev1.ProtocolTCP {
+			return string(loadbalancerv2.PoolProtocolProxy)
+		}
+	}
+	return string(pPort.Protocol)
 }

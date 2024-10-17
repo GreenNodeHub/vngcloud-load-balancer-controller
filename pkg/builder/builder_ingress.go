@@ -42,11 +42,12 @@ func NewModelBuilderByIngress(
 			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
 			tags:             map[string]string{},
 		},
-
-		resourceType:            "ingress",
-		resourceName:            "",
-		resourceNamespace:       "",
-		loadBalancerDefaultName: "",
+		nameHelper: nameHelper{
+			resourceType:      "ingress",
+			resourceName:      "",
+			resourceNamespace: "",
+			clusterID:         clusterID,
+		},
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
 
@@ -59,7 +60,6 @@ func NewModelBuilderByIngress(
 		networkID:  networkID,
 		subnetID:   subnetID,
 		subnetCIDR: subnetCIDR,
-		clusterID:  clusterID,
 
 		isIgnored: false,
 
@@ -96,7 +96,6 @@ func NewModelBuilderByIngress(
 
 	model.resourceName = ingress.Name
 	model.resourceNamespace = ingress.Namespace
-	model.loadBalancerDefaultName = model.objectToLBName()
 
 	model.parseAnnotation(ingress.Annotations)
 
@@ -114,7 +113,7 @@ func NewModelBuilderByIngress(
 func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.Node) error {
 	// check if the service has a name or not, if not, generate a name
 	if l.loadBalancerName == "" {
-		l.loadBalancerName = l.objectToLBName()
+		l.loadBalancerName = l.GetLoadBalancerDefaultName()
 	}
 
 	// build default backend pool

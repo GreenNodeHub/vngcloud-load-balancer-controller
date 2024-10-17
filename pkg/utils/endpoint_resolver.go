@@ -133,7 +133,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 		return nil, err
 	}
 
-	r.logger.Debugf("found %d nodes with selector %v", len(nodeList.Items), resolveOpts.NodeSelector)
+	r.logger.Debugf("found %d nodes with selector: %v.", len(nodeList.Items), resolveOpts.NodeSelector)
 
 	var candidateNodes []*corev1.Node
 	for i := range nodeList.Items {
@@ -146,7 +146,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 		targetNodes = filterNodesByReadyConditionStatus(candidateNodes, corev1.ConditionUnknown)
 	}
 
-	r.logger.Debugf("found %d nodes after filtering by ready condition", len(targetNodes))
+	r.logger.Debugf("found %d nodes after filtering by ready condition.", len(targetNodes))
 
 	var endpoints []EndpointAddress
 	for _, node := range targetNodes {

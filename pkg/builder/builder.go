@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode"
 
 	"github.com/sirupsen/logrus"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -34,9 +33,7 @@ type MemberAddress struct {
 type ModelBuilder interface {
 	BasicInfoHelper
 	PoolListenerHelper
-
-	// return the generated name of the load balancer
-	GetLoadBalancerDefaultName() string
+	NameHelper
 
 	// manage security group
 	IsCreateDefaultSecgroup() bool
@@ -62,13 +59,12 @@ type ModelBuilder interface {
 
 	GetManageAnnotation() map[string]string
 
-	GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error)
+	// GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error)
 }
 
 var _ ModelBuilder = &modelBuilder{}
 
 type modelBuilder struct {
-	loadBalancerDefaultName string
 	// annotation configuration
 	isIgnored                  bool
 	idleTimeoutClient          int
@@ -109,12 +105,6 @@ type modelBuilder struct {
 	networkID  string
 	subnetID   string
 	subnetCIDR string
-	clusterID  string
-
-	// resource info
-	resourceType      string // service, ingress
-	resourceName      string
-	resourceNamespace string
 
 	// if user pass the security group annotation, don't create any security group, just use the given security group
 	isAutoCreateSecurityGroup bool
@@ -123,6 +113,7 @@ type modelBuilder struct {
 
 	poolListenerHelper
 	basicInfoHelper
+	nameHelper
 }
 
 func (l *modelBuilder) GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error) {
@@ -138,11 +129,6 @@ func (l *modelBuilder) GetNodeBySelector(selector map[string]string) ([]*corev1.
 	}
 
 	return nodes, nil
-}
-
-// return the generated name of the load balancer
-func (l *modelBuilder) GetLoadBalancerDefaultName() string {
-	return l.loadBalancerDefaultName
 }
 
 func (l *modelBuilder) IsIgnored() bool {
@@ -317,77 +303,6 @@ func (l *modelBuilder) EnsureSecgroupPING_UDP() {
 			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP)
 		}
 	}
-}
-
-// ---------------------------------------------------------- generate name
-
-func (l *modelBuilder) objectToLBName() string {
-	hash := l.generateHash()
-	name := fmt.Sprintf("%s_%s_%s_%s_%s",
-		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
-		TrimString(l.resourceNamespace, 10),
-		TrimString(l.resourceName, 10),
-		hash)
-	return l.validateName(name)
-}
-
-func (l *modelBuilder) generateHash() string {
-	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
-	hash := HashString(fullName)
-	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
-}
-
-func (l *modelBuilder) validateName(newName string) string {
-	for _, char := range newName {
-		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '-' && char != '.' {
-			newName = strings.ReplaceAll(newName, string(char), "-")
-		}
-	}
-	if len(newName) > consts.DEFAULT_PORTAL_NAME_LENGTH {
-		logrus.Warnf("The name %s is too long, it will be truncated", newName)
-	}
-	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
-}
-
-// mappingProtocol maps the protocol TCP to the protocol PROXY if have configured.
-func (l *modelBuilder) mappingProtocol(pPort corev1.ServicePort) string {
-	for _, name := range l.enableProxyProtocol {
-		if (name == "*" || name == pPort.Name) && pPort.Protocol == corev1.ProtocolTCP {
-			return string(loadbalancerv2.PoolProtocolProxy)
-		}
-	}
-	return string(pPort.Protocol)
-}
-
-// genL4ListenerName generates the name of the listener.
-func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
-	hash := l.generateHash()
-	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
-		TrimString(l.resourceNamespace, 9),
-		TrimString(l.resourceName, 9),
-		hash,
-		TrimString(string(pPort.Protocol), 3),
-		pPort.Port)
-	return l.validateName(name)
-}
-
-// genL4PoolName generates the name of the pool.
-func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
-	realProtocol := l.mappingProtocol(pPort)
-
-	hash := l.generateHash()
-	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
-		TrimString(l.resourceNamespace, 9),
-		TrimString(l.resourceName, 9),
-		hash,
-		TrimString(realProtocol, 3),
-		pPort.Port)
-	return l.validateName(name)
 }
 
 // func (l *modelBuilder)

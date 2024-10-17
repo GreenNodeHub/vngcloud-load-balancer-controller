@@ -7,6 +7,8 @@ import (
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -17,11 +19,14 @@ import (
 
 type LoadBalancerBuilder interface {
 	BasicInfoHelper
+	PoolListenerHelper
+	NameHelper
 
 	EnsurePool(pool *poolBuilderType, oldBuilder OldModelBuilder) error
 	EnsureListener(listener *ListenerBuilderType, oldBuilder OldModelBuilder) error
 	EnsureTags(tags map[string]string, oldBuilder OldModelBuilder) error
 	EnsureSecurityGroups(newBuilder ModelBuilder, oldBuilder OldModelBuilder) error
+	EnsureDeleteSecurityGroups(oldBuilder OldModelBuilder) error
 
 	//
 	DeleteRedundantListeners(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error
@@ -40,13 +45,14 @@ func NewLoadBalancerBuilderByLoadBalancerID(
 	provider provider.Provider,
 	annotationParser annotations.Parser,
 	clusterID string,
+	nodes []*corev1.Node,
+	object client.Object,
 ) (LoadBalancerBuilder, error) {
 	model := &vngcloudLBBuilder{
 		provider:         provider,
 		context:          ctx,
 		logger:           contexts.NewContext(ctx).Log(),
 		annotationParser: annotationParser,
-		clusterID:        clusterID,
 		basicInfoHelper: basicInfoHelper{
 			loadBalancerID:   loadBalancerID,
 			loadBalancerName: "",
@@ -55,10 +61,17 @@ func NewLoadBalancerBuilderByLoadBalancerID(
 			scheme:           "",
 			tags:             map[string]string{},
 		},
+		nameHelper: nameHelper{
+			clusterID:         clusterID,
+			resourceType:      strings.ToLower(object.GetObjectKind().GroupVersionKind().Kind),
+			resourceName:      object.GetName(),
+			resourceNamespace: object.GetNamespace(),
+		},
 		poolListenerHelper: poolListenerHelper{
 			poolBuilders:     make([]*poolBuilderType, 0),
 			listenerBuilders: make([]*ListenerBuilderType, 0),
 		},
+		knownNodes: nodes,
 	}
 
 	err := model.build()
@@ -73,14 +86,14 @@ var _ LoadBalancerBuilder = &vngcloudLBBuilder{}
 
 type vngcloudLBBuilder struct {
 	basicInfoHelper
-
 	poolListenerHelper
+	nameHelper
 
 	logger           *logrus.Entry
 	context          context.Context
 	provider         provider.Provider
 	annotationParser annotations.Parser
-	clusterID        string
+	knownNodes       []*corev1.Node
 }
 
 func (r *vngcloudLBBuilder) build() error {

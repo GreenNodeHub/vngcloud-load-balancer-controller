@@ -254,6 +254,12 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 	return err
 }
 
+func (m *MockProvider) ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
+
 // --------------------------- Load Balancer ---------------------------
 
 func (m *MockProvider) ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error) {

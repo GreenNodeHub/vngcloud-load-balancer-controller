@@ -159,7 +159,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + key)).GetContext()
 	logger := contexts.NewContext(ctx).Log()
-	defer logger.Info("------------------------------------")
+	defer logger.Info("------------------ DONE ------------------")
 
 	event := r.eventClassification.Classify(key)
 	if event == nil || event.Obj == nil {
@@ -253,7 +253,8 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	}
 
 	// inspect current loadbalancer in portal to compare with the new one
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetLoadBalancerID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetLoadBalancerID(),
+		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 	if err != nil {
 		logger.Error("Failed to get current loadbalancer: ", err)
 		return ctrl.Result{}, err
@@ -386,7 +387,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
-	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, map[string]string{}, r.annotationParser)
+	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, obj.Annotations, r.annotationParser)
 
 	// ignore reconcile
 	if oldBuilder.IsIgnored() {
@@ -400,7 +401,8 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	}
 
 	// inspect current loadbalancer in portal to compare with
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(), r.Provider, r.annotationParser, r.Config.Cluster.ClusterID)
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
+		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 	if err != nil {
 		if errs.IsLoadBalancerNotFound(err) {
 			logger.Info("LoadBalancer not found, return.")
@@ -431,24 +433,40 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 			return ctrl.Result{}, err
 		}
 		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
-		return ctrl.Result{}, nil
+	} else {
+		// delete redundant listeners
+		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
+		if err != nil {
+			logger.Error("Failed to delete redundant listeners: ", err)
+			return ctrl.Result{}, err
+		}
+
+		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
+		err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
+		if err != nil {
+			logger.Error("Failed to delete redundant pools: ", err)
+			return ctrl.Result{}, err
+		}
 	}
 
-	// delete redundant listeners
-	err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
+	// ensure delete security group with mutex
+	err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
 	if err != nil {
-		logger.Error("Failed to delete redundant listeners: ", err)
-		return ctrl.Result{}, err
-	}
-
-	// delete redundant pools, should check if pool is used by other listeners or policy then ignore
-	err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
-	if err != nil {
-		logger.Error("Failed to delete redundant pools: ", err)
+		logger.Error("Failed to ensure delete security group: ", err)
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *IngressReconciler) ensureDeleteSecurityGroup(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	secGroupMutex.Lock()
+	defer secGroupMutex.Unlock()
+	err := currentBuilder.EnsureDeleteSecurityGroups(oldBuilder)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *IngressReconciler) init() error {

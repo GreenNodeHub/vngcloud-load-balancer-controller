@@ -359,6 +359,18 @@ func (m *VNGCLOUD_Provider) WaitForServerActive(ctx context.Context, serverID st
 	return err
 }
 
+func (m *VNGCLOUD_Provider) ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	opt := networkv2.NewListAllServersBySecgroupIdRequest(secgroupID)
+	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return servers, nil
+}
+
 // --------------------------- Load Balancer ---------------------------
 
 func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error) {
@@ -592,8 +604,13 @@ func (m *VNGCLOUD_Provider) ListPool(ctx context.Context, lbID string) (*entityv
 }
 func (m *VNGCLOUD_Provider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
+	logger.Infof("%s Request update pool members of pool %s of load balancer %s", icon, poolID, lbID)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePoolMembers(members)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - UpdatePoolMembers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
 }
 
 func (m *VNGCLOUD_Provider) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {
