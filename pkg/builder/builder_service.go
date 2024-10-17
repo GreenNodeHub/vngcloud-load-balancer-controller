@@ -24,6 +24,7 @@ func NewModelBuilderByService(
 	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
+	cnitype utils.CNIType,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -38,9 +39,10 @@ func NewModelBuilderByService(
 			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
 			tags:             map[string]string{},
 		},
-		resourceType:      "service",
-		resourceName:      "",
-		resourceNamespace: "",
+		resourceType:            "service",
+		resourceName:            "",
+		resourceNamespace:       "",
+		loadBalancerDefaultName: "",
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
 
@@ -48,6 +50,7 @@ func NewModelBuilderByService(
 		context:          ctx,
 		client:           client,
 		logger:           contexts.NewContext(ctx).Log(),
+		cniType:          cnitype,
 
 		networkID:  networkID,
 		subnetID:   subnetID,
@@ -73,7 +76,6 @@ func NewModelBuilderByService(
 		healthcheckIntervalSeconds: 30,
 		healthcheckPort:            0,
 		targetNodeLabels:           map[string]string{},
-		IsAutoCreateSecurityGroup:  false,
 		securityGroups:             []string{},
 		enableProxyProtocol:        []string{},
 		enableAutoscale:            false,
@@ -81,6 +83,8 @@ func NewModelBuilderByService(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+
+		isAutoCreateSecurityGroup: true,
 	}
 	if service == nil {
 		return model, nil
@@ -88,6 +92,7 @@ func NewModelBuilderByService(
 
 	model.resourceName = service.Name
 	model.resourceNamespace = service.Namespace
+	model.loadBalancerDefaultName = model.objectToLBName()
 
 	model.parseAnnotation(service.Annotations)
 
@@ -131,6 +136,17 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 			if err != nil {
 				return err
 			}
+
+			// if cniType is cilium nr, add pod port to secgroup
+			if l.cniType == utils.CiliumNativeRouting {
+				podPorts, err := endpointResolver.GetListTargetPort(l.context, namespacedName(pService), intstr.FromInt(int(port.Port)))
+				if err != nil {
+					return err
+				}
+				for _, podPort := range podPorts {
+					l.addDefaultSecgroupRules(podPort, coreProtocolToSecgroupProtocol(port.Protocol))
+				}
+			}
 		} else {
 			membersAddr, err = endpointResolver.ResolvePodEndpoints(l.context,
 				namespacedName(pService), intstr.FromInt(int(port.Port)), resolveOpts...)
@@ -139,15 +155,28 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 			}
 		}
 
+		// if healthcheckPort is set, add to secgroup
+		if l.healthcheckPort != 0 {
+			l.addDefaultSecgroupRules(l.healthcheckPort, coreProtocolToSecgroupProtocol(port.Protocol))
+		}
+
 		// build pool members
 		poolMembers := make([]*loadbalancerv2.Member, 0)
 		for _, member := range membersAddr {
+			// L4 support TCP (TCP, HTTP, HTTPS), UDP (PING-UDP), PROXY (TCP, HTTP, HTTPS)
+			l.addDefaultSecgroupRules(member.Port, coreProtocolToSecgroupProtocol(port.Protocol))
+
+			monitorPort := member.Port
+			if l.healthcheckPort != 0 {
+				monitorPort = l.healthcheckPort
+			}
+
 			poolMembers = append(poolMembers, &loadbalancerv2.Member{
 				IpAddress:   member.IP,
 				Port:        member.Port,
 				Backup:      false,
 				Weight:      1,
-				MonitorPort: member.Port,
+				MonitorPort: monitorPort,
 				Name:        member.Name,
 			})
 		}

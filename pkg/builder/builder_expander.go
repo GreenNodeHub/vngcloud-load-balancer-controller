@@ -5,6 +5,7 @@ import (
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
 
 type commonBuilder struct {
@@ -238,36 +239,33 @@ type certificateBuilderType struct {
 
 // ------------------------------------------------------------
 
-type ProtocolType string
-
-const (
-	ProtocolTypeTCP  ProtocolType = "tcp"
-	ProtocolTypeUDP  ProtocolType = "udp"
-	ProtocolTypeICMP ProtocolType = "icmp"
-)
-
 type SecGroupRuleBuilder interface {
 	GetName() string
 	GetID() string
 	SetName(name string)
 	SetID(id string)
 
-	GetProtocol() ProtocolType
+	GetProtocol() networkv2.SecgroupRuleProtocol
 	GetPortRangeMin() int
 	GetPortRangeMax() int
+
+	GetICreateSecgroupRuleRequest(secgroupID string) *networkv2.CreateSecgroupRuleRequest
 }
 
 var _ SecGroupRuleBuilder = &secGroupRuleBuilderType{}
 
 type secGroupRuleBuilderType struct {
 	commonBuilder
-	Protocol     ProtocolType
-	PortRangeMin int
-	PortRangeMax int
-	// secgroup_rule.CreateOpts
+	Description    string                          `json:"description"`
+	Direction      networkv2.SecgroupRuleDirection `json:"direction"`
+	EtherType      networkv2.SecgroupRuleEtherType `json:"etherType"`
+	PortRangeMax   int                             `json:"portRangeMax"`
+	PortRangeMin   int                             `json:"portRangeMin"`
+	Protocol       networkv2.SecgroupRuleProtocol  `json:"protocol"`
+	RemoteIPPrefix string                          `json:"remoteIpPrefix"`
 }
 
-func (s *secGroupRuleBuilderType) GetProtocol() ProtocolType {
+func (s *secGroupRuleBuilderType) GetProtocol() networkv2.SecgroupRuleProtocol {
 	return s.Protocol
 }
 
@@ -277,6 +275,22 @@ func (s *secGroupRuleBuilderType) GetPortRangeMin() int {
 
 func (s *secGroupRuleBuilderType) GetPortRangeMax() int {
 	return s.PortRangeMax
+}
+
+func (s *secGroupRuleBuilderType) GetICreateSecgroupRuleRequest(secgroupID string) *networkv2.CreateSecgroupRuleRequest {
+	return &networkv2.CreateSecgroupRuleRequest{
+		SecurityGroupID: secgroupID,
+		SecgroupCommon: networkv2.SecgroupCommon{
+			SecgroupId: secgroupID,
+		},
+		Description:    s.Description,
+		Direction:      s.Direction,
+		EtherType:      s.EtherType,
+		PortRangeMax:   s.PortRangeMax,
+		PortRangeMin:   s.PortRangeMin,
+		Protocol:       s.Protocol,
+		RemoteIPPrefix: s.RemoteIPPrefix,
+	}
 }
 
 // ------------------------------------------------------------

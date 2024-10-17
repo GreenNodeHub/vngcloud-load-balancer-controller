@@ -11,6 +11,7 @@ import (
 	clone "github.com/huandu/go-clone"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -47,6 +48,9 @@ type wrapPolicy struct {
 	lbID       string
 	listenerID string
 }
+type wrapServer struct {
+	*entityv2.Server
+}
 
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
@@ -60,6 +64,7 @@ type MockProvider struct {
 	pools         []*wrapPool
 	policies      []*wrapPolicy
 	tags          map[string](map[string]string)
+	servers       []*wrapServer
 
 	mu sync.Mutex
 }
@@ -75,6 +80,8 @@ func NewMockProvider() *MockProvider {
 		listeners:     make([]*wrapListener, 0),
 		pools:         make([]*wrapPool, 0),
 		policies:      make([]*wrapPolicy, 0),
+		tags:          make(map[string](map[string]string)),
+		servers:       make([]*wrapServer, 0),
 	}
 }
 
@@ -100,39 +107,53 @@ func (m *MockProvider) GetSubnetCIDR() string {
 
 // // --------------------------- Security Group ---------------------------
 
-// func (m *MockProvider) ListSecurityGroups(ctx context.Context, ) ([]*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet", "ListSecurityGroups")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*objects.Server, error) {
-// 	logger.Error("not implemented yet", "UpdateSecGroupsOfServer")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) (*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet", "GetSecurityGroup")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
-// 	logger.Error("not implemented yet", "DeleteSecurityGroup")
-// 	return errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, description string) (*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet", "CreateSecurityGroup")
-// 	return nil, errs.ErrorNotImplemented
-// }
+func (m *MockProvider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
 
-// func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
-// 	logger.Error("not implemented yet", "CreateSecurityGroupRule")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
-// 	logger.Error("not implemented yet", "DeleteSecurityGroupRule")
-// 	return errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) ListSecurityGroupRules(ctx context.Context, secgroupID string) ([]*objects.SecgroupRule, error) {
-// 	logger.Error("not implemented yet", "ListSecurityGroupRules")
-// 	return nil, errs.ErrorNotImplemented
-// }
+func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return errs.ErrorNotImplemented
+}
+
+func (m *MockProvider) ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet")
+	return nil, errs.ErrorNotImplemented
+}
 
 // // --------------------------- Tags ---------------------------
 
@@ -188,17 +209,50 @@ func (m *MockProvider) UpdateTags(ctx context.Context, resourceID string, tags m
 
 // // --------------------------- Server ---------------------------
 
-// func (m *MockProvider) GetServerByID(ctx context.Context, serverID string) (*objects.Server, error) {
-// 	logger.Error("not implemented yet", "GetServerByID")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) ListServerByProviderIDs(ctx context.Context, providerIDs []string) ([]*objects.Server, error) {
-// 	logger.Error("not implemented yet", "ListServerByProviderIDs")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string) {
+func (m *MockProvider) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {
+	for _, s := range m.servers {
+		if s.Uuid == serverID {
+			return clone.Clone(s.Server).(*entityv2.Server), nil
+		}
+	}
+	return nil, errs.ErrorNotFound
+}
 
-// }
+func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Waiting for server %s to be ready", waitIcon, serverID)
+
+	var server *entityv2.Server
+	err := wait.ExponentialBackoff(wait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   1.2,
+		Steps:    30,
+	}, func() (done bool, err error) {
+		var _err error
+		server, _err = m.GetServerByID(ctx, serverID)
+		if _err != nil {
+			logger.Errorf("Error getting server %s when wait active: %v", serverID, _err)
+			return false, _err
+		}
+		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
+			logger.Infof("%s Server %s is ready", readyIcon, serverID)
+			return true, nil
+		}
+		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
+			logger.Errorf("Server %s is in error status", serverID)
+			return true, errs.ErrorLoadBalancerStatusError
+		}
+
+		logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, serverID)
+		return false, nil
+	})
+
+	if wait.Interrupted(err) {
+		logger.Errorf("timeout waiting for the loadbalancer %s with lb status %s", serverID, server.Status)
+	}
+
+	return err
+}
 
 // --------------------------- Load Balancer ---------------------------
 

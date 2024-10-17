@@ -9,9 +9,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -30,10 +33,16 @@ type MemberAddress struct {
 // just build the model, use to compare with the real load balancer
 type ModelBuilder interface {
 	BasicInfoHelper
+	PoolListenerHelper
 
 	// return the generated name of the load balancer
 	GetLoadBalancerDefaultName() string
+
+	// manage security group
+	IsCreateDefaultSecgroup() bool
 	GetSecurityGroupIDs() []string
+	GetListDefaultSecgroupRules() []*secGroupRuleBuilderType
+	EnsureSecgroupPING_UDP() // if use UDP protocol, must open ICMP protocol too
 
 	IsIgnored() bool
 	// It mays create lb, listener, pool (not policy) at the same time
@@ -42,6 +51,7 @@ type ModelBuilder interface {
 	// default subnet id of the network if not specified
 	GetSubnetID() (subnetID string)
 	GetNetworkID() (networkID string)
+	GetSubnetCIDR() string
 
 	GetTargetNodeLabels() map[string]string
 	GetTargetType() TargetType
@@ -50,20 +60,9 @@ type ModelBuilder interface {
 	JSONFormat() string
 	Print()
 
-	// GetPoolBuilders() []PoolBuilder
-	// GetPoolBuilderByName(name string) PoolBuilder
-
-	AddPoolBuilder(pool *poolBuilderType)
-	GetPoolBuilders() []*poolBuilderType
-	GetPoolBuilderByName(name string) *poolBuilderType
-	GetPoolBuilderByID(name string) *poolBuilderType
-
-	AddListenerBuilder(listener *ListenerBuilderType)
-	GetListenerBuilders() []*ListenerBuilderType
-	GetListenerBuilderByName(name string) *ListenerBuilderType
-	GetListenerBuilderByPort(port int) *ListenerBuilderType
-
 	GetManageAnnotation() map[string]string
+
+	GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error)
 }
 
 var _ ModelBuilder = &modelBuilder{}
@@ -85,7 +84,6 @@ type modelBuilder struct {
 	unhealthyThresholdCount    int
 	poolAlgorithm              loadbalancerv2.PoolAlgorithm
 	targetNodeLabels           map[string]string
-	securityGroups             []string
 	healthcheckPort            int
 	healthcheckHttpMethod      loadbalancerv2.HealthCheckMethod
 	healthcheckTimeoutSeconds  int
@@ -106,13 +104,12 @@ type modelBuilder struct {
 	context          context.Context
 	client           client.Client
 	logger           *logrus.Entry
+	cniType          utils.CNIType
 
 	networkID  string
 	subnetID   string
 	subnetCIDR string
 	clusterID  string
-
-	secGroupRuleBuilders []*secGroupRuleBuilderType
 
 	// resource info
 	resourceType      string // service, ingress
@@ -120,19 +117,32 @@ type modelBuilder struct {
 	resourceNamespace string
 
 	// if user pass the security group annotation, don't create any security group, just use the given security group
-	IsAutoCreateSecurityGroup bool
+	isAutoCreateSecurityGroup bool
+	securityGroups            []string
+	secGroupRuleBuilders      []*secGroupRuleBuilderType
 
 	poolListenerHelper
 	basicInfoHelper
 }
 
+func (l *modelBuilder) GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error) {
+	nodeSelector := labels.SelectorFromSet(labels.Set(selector))
+	nodeList := &corev1.NodeList{}
+	if err := l.client.List(l.context, nodeList, client.MatchingLabelsSelector{Selector: nodeSelector}); err != nil {
+		return nil, err
+	}
+
+	nodes := make([]*corev1.Node, len(nodeList.Items))
+	for i := range nodeList.Items {
+		nodes = append(nodes, &nodeList.Items[i])
+	}
+
+	return nodes, nil
+}
+
 // return the generated name of the load balancer
 func (l *modelBuilder) GetLoadBalancerDefaultName() string {
 	return l.loadBalancerDefaultName
-}
-
-func (l *modelBuilder) GetSecurityGroupIDs() []string {
-	return l.securityGroups
 }
 
 func (l *modelBuilder) IsIgnored() bool {
@@ -175,6 +185,10 @@ func (l *modelBuilder) GetNetworkID() string {
 
 func (l *modelBuilder) GetSubnetID() string {
 	return l.subnetID
+}
+
+func (l *modelBuilder) GetSubnetCIDR() string {
+	return l.subnetCIDR
 }
 
 func (l *modelBuilder) GetTargetNodeLabels() map[string]string {
@@ -249,6 +263,59 @@ func (l *modelBuilder) GetManageAnnotation() map[string]string {
 		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManagePools):      strings.Join(poolInfos, ","),
 		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManageListeners):  strings.Join(listenerInfos, ","),
 		fmt.Sprintf("%s/%s", l.annotationParser.GetPrefix(), annotations.SuffixManageDFPMembers): strings.Join(defaultPoolMembers, ","),
+	}
+}
+
+// ---------------------------------------------------------- security group
+
+func (l *modelBuilder) IsCreateDefaultSecgroup() bool {
+	return l.isAutoCreateSecurityGroup
+}
+
+func (l *modelBuilder) GetSecurityGroupIDs() []string {
+	return l.securityGroups
+}
+
+func (l *modelBuilder) GetListDefaultSecgroupRules() []*secGroupRuleBuilderType {
+	return l.secGroupRuleBuilders
+}
+
+// only support add default secgroup rules for ingress
+func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.SecgroupRuleProtocol) bool {
+	isExist := false
+	for _, rule := range l.secGroupRuleBuilders {
+		if rule.PortRangeMax == port &&
+			rule.PortRangeMin == port &&
+			rule.Protocol == protocol {
+			isExist = true
+			break
+		}
+	}
+	if isExist {
+		return true
+	}
+	l.secGroupRuleBuilders = append(l.secGroupRuleBuilders, &secGroupRuleBuilderType{
+		commonBuilder: commonBuilder{
+			name: "",
+			id:   "",
+		},
+		Description:    "",
+		Direction:      networkv2.SecgroupRuleDirectionIngress,
+		EtherType:      networkv2.SecgroupRuleEtherTypeIPv4,
+		PortRangeMax:   port,
+		PortRangeMin:   port,
+		Protocol:       protocol,
+		RemoteIPPrefix: l.GetSubnetCIDR(),
+	})
+	return false
+}
+
+// ensurePING_UDP
+func (l *modelBuilder) EnsureSecgroupPING_UDP() {
+	for _, rule := range l.secGroupRuleBuilders {
+		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
+			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP)
+		}
 	}
 }
 

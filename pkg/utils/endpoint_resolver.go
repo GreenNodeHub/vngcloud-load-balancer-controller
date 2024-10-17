@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -32,10 +33,13 @@ type EndpointResolver interface {
 		opts ...EndpointResolveOption) ([]EndpointAddress, error)
 	ResolveNodePortEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
 		opts ...EndpointResolveOption) ([]EndpointAddress, error)
+
+	// GetListTargetPort returns the list of target ports of a service's port.
+	GetListTargetPort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]int, error)
 }
 
 // NewDefaultEndpointResolver constructs new defaultEndpointResolver
-func NewDefaultEndpointResolver(context context.Context, k8sClient client.Client) *defaultEndpointResolver {
+func NewDefaultEndpointResolver(context context.Context, k8sClient client.Client) EndpointResolver {
 	return &defaultEndpointResolver{
 		k8sClient: k8sClient,
 		context:   context,
@@ -215,6 +219,49 @@ func (r *defaultEndpointResolver) getNodeInternalIP(node *corev1.Node) (string, 
 	}
 
 	return "", ErrNodeDoesNotHaveInternalAddress
+}
+
+func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]int, error) {
+	_, svcPort, err := r.findServiceAndServicePort(ctx, svcKey, port)
+	if err != nil {
+		return nil, err
+	}
+
+	endpoints := &corev1.Endpoints{}
+	if err := r.k8sClient.Get(ctx, svcKey, endpoints); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("%w: %v", ErrNotFound, err.Error())
+		}
+		return nil, err
+	}
+
+	var ports []int
+	for _, subset := range endpoints.Subsets {
+		for _, addr := range subset.Addresses {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+				continue
+			}
+			for _, port := range subset.Ports {
+				if port.Name == svcPort.Name && !slices.Contains(ports, int(port.Port)) {
+					ports = append(ports, int(port.Port))
+				}
+			}
+		}
+
+		for _, addr := range subset.NotReadyAddresses {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+				continue
+			}
+			for _, port := range subset.Ports {
+				if port.Name == svcPort.Name && !slices.Contains(ports, int(port.Port)) {
+					ports = append(ports, int(port.Port))
+				}
+			}
+		}
+	}
+
+	r.logger.Debugf("found %d target ports for service %s: %v", len(ports), svcKey, ports)
+	return ports, nil
 }
 
 // namespacedName returns the namespaced name for k8s objects

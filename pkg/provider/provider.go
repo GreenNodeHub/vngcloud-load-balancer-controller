@@ -5,6 +5,7 @@ import (
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
 
 func PointerOf[T any](t T) *T {
@@ -23,15 +24,15 @@ type Provider interface {
 	// projectID
 	// networkID
 
-	// ListSecurityGroups() ([]*objects.Secgroup, error)
-	// UpdateSecGroupsOfServer(instanceID string, secgroups []string) (*objects.Server, error)
-	// GetSecurityGroup(secgroupID string) (*objects.Secgroup, error)
-	// DeleteSecurityGroup(secgroupID string) error
-	// CreateSecurityGroup(name string, description string) (*objects.Secgroup, error)
+	ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error)
+	UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) // should check if server is not active yet
+	GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error)
+	DeleteSecurityGroup(ctx context.Context, secgroupID string) error
+	CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error)
 
-	// CreateSecurityGroupRule(secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error)
-	// DeleteSecurityGroupRule(secgroupID string, ruleID string) error
-	// ListSecurityGroupRules(secgroupID string) ([]*objects.SecgroupRule, error)
+	CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error)
+	DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error
+	ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error)
 
 	ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error)
 	// overwrites the tags of the resource
@@ -41,9 +42,8 @@ type Provider interface {
 
 	// GetSubnet(subnetID string) (*objects.Subnet, error)
 
-	// GetServerByID(serverID string) (*objects.Server, error)
-	// ListServerByProviderIDs(providerIDs []string) ([]*objects.Server, error)
-	// WaitForServerActive(serverID string)
+	GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error)
+	WaitForServerActive(ctx context.Context, serverID string) error
 
 	ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error)
 	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)

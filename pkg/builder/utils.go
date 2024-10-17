@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
+	corev1 "k8s.io/api/core/v1"
 	nwv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,4 +51,15 @@ func serviceBackendToIntOrString(port nwv1.ServiceBackendPort) intstr.IntOrStrin
 		return intstr.FromString(port.Name)
 	}
 	return intstr.FromInt(int(port.Number))
+}
+
+func coreProtocolToSecgroupProtocol(protocol corev1.Protocol) networkv2.SecgroupRuleProtocol {
+	switch protocol {
+	case corev1.ProtocolTCP:
+		return networkv2.SecgroupRuleProtocolTCP
+	case corev1.ProtocolUDP:
+		return networkv2.SecgroupRuleProtocolUDP
+	default:
+		return networkv2.SecgroupRuleProtocolTCP
+	}
 }

@@ -23,10 +23,16 @@ var (
 	ErrorNotImplemented = errors.New("not implemented yet")
 	ErrorNotFound       = errors.New("not found")
 
-	ErrorMissingCertificates = errors.New("missing certificates, need to specific through annotaion")
+	ErrorMissingCertificates = errors.New("missing certificates, need to specific through annotation")
+
+	ErrorSecurityGroupNotFound = errors.New("security group not found")
 )
 
 func IsLoadBalancerNotFound(err error) bool {
 	// if have prefix "Cannot get load balancer with id" then consider as not found
 	return strings.HasPrefix(err.Error(), "Cannot get load balancer with id")
+}
+
+func IsExceededSecurityGroupPerServerQuota(err error) bool {
+	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
 }

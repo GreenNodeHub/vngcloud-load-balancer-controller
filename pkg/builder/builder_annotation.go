@@ -318,6 +318,7 @@ func (l *modelBuilder) parseAnnotationSecurityGroups(annos map[string]string) []
 	if !exist {
 		return l.securityGroups
 	}
+	l.isAutoCreateSecurityGroup = false
 	return option
 }
 

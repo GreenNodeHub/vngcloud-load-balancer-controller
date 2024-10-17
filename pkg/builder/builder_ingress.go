@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
@@ -26,6 +27,7 @@ func NewModelBuilderByIngress(
 	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
+	cniType utils.CNIType,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -41,9 +43,10 @@ func NewModelBuilderByIngress(
 			tags:             map[string]string{},
 		},
 
-		resourceType:      "ingress",
-		resourceName:      "",
-		resourceNamespace: "",
+		resourceType:            "ingress",
+		resourceName:            "",
+		resourceNamespace:       "",
+		loadBalancerDefaultName: "",
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
 
@@ -51,6 +54,7 @@ func NewModelBuilderByIngress(
 		context:          ctx,
 		client:           client,
 		logger:           contexts.NewContext(ctx).Log(),
+		cniType:          cniType,
 
 		networkID:  networkID,
 		subnetID:   subnetID,
@@ -76,7 +80,6 @@ func NewModelBuilderByIngress(
 		healthcheckIntervalSeconds: 30,
 		healthcheckPort:            0,
 		targetNodeLabels:           map[string]string{},
-		IsAutoCreateSecurityGroup:  false,
 		securityGroups:             []string{},
 		enableProxyProtocol:        []string{},
 		enableAutoscale:            false,
@@ -84,6 +87,8 @@ func NewModelBuilderByIngress(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+
+		isAutoCreateSecurityGroup: true,
 	}
 	if ingress == nil {
 		return model, nil
@@ -91,6 +96,7 @@ func NewModelBuilderByIngress(
 
 	model.resourceName = ingress.Name
 	model.resourceNamespace = ingress.Namespace
+	model.loadBalancerDefaultName = model.objectToLBName()
 
 	model.parseAnnotation(ingress.Annotations)
 
@@ -267,6 +273,18 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 		if err != nil {
 			return nil, err
 		}
+
+		// if cniType is cilium nr, add pod port to secgroup
+		if l.cniType == utils.CiliumNativeRouting {
+			podPorts, err := endpointResolver.GetListTargetPort(l.context, types.NamespacedName{Namespace: l.resourceNamespace, Name: service.Name},
+				serviceBackendToIntOrString(service.Port))
+			if err != nil {
+				return nil, err
+			}
+			for _, podPort := range podPorts {
+				l.addDefaultSecgroupRules(podPort, networkv2.SecgroupRuleProtocolTCP)
+			}
+		}
 	} else {
 		membersAddr, err = endpointResolver.ResolvePodEndpoints(l.context,
 			types.NamespacedName{Namespace: l.resourceNamespace, Name: service.Name},
@@ -276,10 +294,17 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 		}
 	}
 
+	// if healthcheckPort is set, add to secgroup
+	if l.healthcheckPort != 0 {
+		l.addDefaultSecgroupRules(l.healthcheckPort, networkv2.SecgroupRuleProtocolTCP)
+	}
+
 	// build members
 	poolMembers := make([]*loadbalancerv2.Member, 0)
 	for _, member := range membersAddr {
-		// get monitor port
+		// L7 pool only support TCP and HTTP healthcheck
+		l.addDefaultSecgroupRules(member.Port, networkv2.SecgroupRuleProtocolTCP)
+
 		monitorPort := member.Port
 		if l.healthcheckPort != 0 {
 			monitorPort = l.healthcheckPort

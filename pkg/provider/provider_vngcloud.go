@@ -10,7 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/client"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/sdk_error"
+	computev2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/compute/v2"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	portalv1 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/portal/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -139,39 +142,116 @@ func (m *VNGCLOUD_Provider) GetSubnetCIDR() string {
 
 // // --------------------------- Security Group ---------------------------
 
-// func (m *VNGCLOUD_Provider) ListSecurityGroups(ctx context.Context,) ([]*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(ctx context.Context,instanceID string, secgroups []string) (*objects.Server, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) GetSecurityGroup(ctx context.Context,secgroupID string) (*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) DeleteSecurityGroup(ctx context.Context,secgroupID string) error {
-// 	logger.Error("not implemented yet")
-// 	return errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) CreateSecurityGroup(ctx context.Context,name string, description string) (*objects.Secgroup, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
+func (m *VNGCLOUD_Provider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error) {
+	logger := contexts.NewContext(ctx).Log()
 
-// func (m *VNGCLOUD_Provider) CreateSecurityGroupRule(ctx context.Context,secgroupID string, opts *secgroup_rule.CreateOpts) (*objects.SecgroupRule, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(ctx context.Context,secgroupID string, ruleID string) error {
-// 	logger.Error("not implemented yet")
-// 	return errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) ListSecurityGroupRules(ctx context.Context,secgroupID string) ([]*objects.SecgroupRule, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
+	secgroups, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroup(networkv2.NewListSecgroupRequest())
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListSecurityGroups: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return secgroups, nil
+}
+
+func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request update security groups of server %s", icon, instanceID)
+
+	opt := computev2.NewUpdateServerSecgroupsRequest(instanceID, secgroups...)
+	IsServerNotReady := func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "Cannot change security group of server with status")
+	}
+
+	var sdkErr sdk_error.IError
+	var server *entityv2.Server
+	for i := 0; i < 3; i++ {
+		server, sdkErr = m.client.VServerGateway().V2().ComputeService().UpdateServerSecgroupsByServerId(opt)
+		if sdkErr != nil {
+			if IsServerNotReady(sdkErr.GetError()) {
+				logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, instanceID)
+				time.Sleep(5 * time.Second)
+				continue
+			} else {
+				logger.Error("[ERROR] - UpdateSecGroupsOfServer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+				return nil, sdkErr.GetError()
+			}
+		} else {
+			return server, nil
+		}
+	}
+	return nil, sdkErr.GetError()
+}
+
+func (m *VNGCLOUD_Provider) GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSecgroupById(networkv2.NewGetSecgroupByIdRequest(secgroupID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return secgroup, nil
+}
+
+func (m *VNGCLOUD_Provider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request delete security group %s", icon, secgroupID)
+
+	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupById(networkv2.NewDeleteSecgroupByIdRequest(secgroupID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - DeleteSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
+
+func (m *VNGCLOUD_Provider) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create security group %s", icon, name)
+
+	opt := networkv2.NewCreateSecgroupRequest(name, description)
+	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroup(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - CreateSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return secgroup, nil
+}
+
+func (m *VNGCLOUD_Provider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create security group rule of security group %s", icon, secgroupID)
+
+	rule, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroupRule(opts)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - CreateSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return rule, nil
+}
+
+func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request delete security group rule %s of security group %s", icon, ruleID, secgroupID)
+
+	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupRuleById(networkv2.NewDeleteSecgroupRuleByIdRequest(ruleID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - DeleteSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
+
+func (m *VNGCLOUD_Provider) ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	rules, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroupRulesBySecgroupId(networkv2.NewListSecgroupRulesBySecgroupIdRequest(secgroupID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListSecurityGroupRules: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return rules, nil
+}
 
 // // --------------------------- Tags ---------------------------
 
@@ -207,6 +287,7 @@ func (m *VNGCLOUD_Provider) CreateTags(ctx context.Context, resourceID string, t
 
 func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request update tags for resource %s", icon, resourceID)
 	opt := loadbalancerv2.NewUpdateTagsRequest(resourceID)
 	arr := make([]string, 0)
 	for k, v := range tags {
@@ -230,17 +311,53 @@ func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, t
 
 // // --------------------------- Server ---------------------------
 
-// func (m *VNGCLOUD_Provider) GetServerByID(ctx context.Context,serverID string) (*objects.Server, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) ListServerByProviderIDs(ctx context.Context,providerIDs []string) ([]*objects.Server, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
-// func (m *VNGCLOUD_Provider) WaitForServerActive(ctx context.Context,serverID string) {
+func (m *VNGCLOUD_Provider) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {
+	logger := contexts.NewContext(ctx).Log()
 
-// }
+	opt := computev2.NewGetServerByIdRequest(serverID)
+	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return server, nil
+}
+
+func (m *VNGCLOUD_Provider) WaitForServerActive(ctx context.Context, serverID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Waiting for server %s to be ready", waitIcon, serverID)
+
+	var server *entityv2.Server
+	err := wait.ExponentialBackoff(wait.Backoff{
+		Duration: 5 * time.Second,
+		Factor:   1.2,
+		Steps:    30,
+	}, func() (done bool, err error) {
+		var _err error
+		server, _err = m.GetServerByID(ctx, serverID)
+		if _err != nil {
+			logger.Errorf("Error getting server %s when wait active: %v", serverID, _err)
+			return false, _err
+		}
+		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
+			logger.Infof("%s Server %s is ready", readyIcon, serverID)
+			return true, nil
+		}
+		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
+			logger.Errorf("Server %s is in error status", serverID)
+			return true, errs.ErrorLoadBalancerStatusError
+		}
+
+		logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, serverID)
+		return false, nil
+	})
+
+	if wait.Interrupted(err) {
+		logger.Errorf("timeout waiting for the loadbalancer %s with lb status %s", serverID, server.Status)
+	}
+
+	return err
+}
 
 // --------------------------- Load Balancer ---------------------------
 

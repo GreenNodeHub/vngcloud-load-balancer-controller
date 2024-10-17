@@ -21,6 +21,7 @@ type LoadBalancerBuilder interface {
 	EnsurePool(pool *poolBuilderType, oldBuilder OldModelBuilder) error
 	EnsureListener(listener *ListenerBuilderType, oldBuilder OldModelBuilder) error
 	EnsureTags(tags map[string]string, oldBuilder OldModelBuilder) error
+	EnsureSecurityGroups(newBuilder ModelBuilder, oldBuilder OldModelBuilder) error
 
 	//
 	DeleteRedundantListeners(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error

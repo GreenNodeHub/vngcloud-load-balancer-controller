@@ -7,8 +7,10 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	corev1 "k8s.io/api/core/v1"
@@ -473,4 +475,86 @@ func (h *helperStruct) checkIfL7RuleExist(rules []loadbalancerv2.L7RuleRequest, 
 		}
 	}
 	return false
+}
+
+func (h *helperStruct) CompareSecgroupRule(current []*entityv2.SecgroupRule, new []*secGroupRuleBuilderType) ([]*entityv2.SecgroupRule, []*secGroupRuleBuilderType, error) {
+	// get only ingress rules
+	currentIngressRules := make([]*entityv2.SecgroupRule, 0)
+	for _, rule := range current {
+		if strings.EqualFold(string(rule.Direction), string(networkv2.SecgroupRuleDirectionIngress)) {
+			currentIngressRules = append(currentIngressRules, rule)
+		}
+	}
+
+	needDelete := make([]*entityv2.SecgroupRule, 0)
+	needCreate := make([]*secGroupRuleBuilderType, 0)
+
+	// mark all rule not in use
+	ruleInUse := make(map[string]bool)
+	for _, rule := range currentIngressRules {
+		ruleInUse[rule.Id] = false
+	}
+
+	// check if the rule is in new
+	for _, rule := range new {
+		found := false
+		for _, currentRule := range currentIngressRules {
+			if rule.Description == currentRule.Description &&
+				strings.EqualFold(string(rule.Direction), currentRule.Direction) &&
+				strings.EqualFold(string(rule.EtherType), currentRule.EtherType) &&
+				strings.EqualFold(string(rule.Protocol), currentRule.Protocol) &&
+				rule.PortRangeMax == currentRule.PortRangeMax &&
+				rule.PortRangeMin == currentRule.PortRangeMin &&
+				rule.RemoteIPPrefix == currentRule.RemoteIPPrefix {
+
+				ruleInUse[currentRule.Id] = true
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			needCreate = append(needCreate, rule)
+		}
+	}
+
+	// check if the rule is not in use
+	for _, rule := range currentIngressRules {
+		if !ruleInUse[rule.Id] {
+			needDelete = append(needDelete, rule)
+		}
+	}
+
+	return needDelete, needCreate, nil
+}
+
+func (h *helperStruct) MergeStringArray(ctx context.Context, current, remove, add []string) ([]string, bool) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("current: %v", current)
+	logger.Infof("remove:  %v", remove)
+	logger.Infof("add:     %v", add)
+
+	mapCurrent := make(map[string]bool)
+	for _, c := range current {
+		mapCurrent[c] = true
+	}
+	for _, r := range remove {
+		delete(mapCurrent, r)
+	}
+	for _, a := range add {
+		mapCurrent[a] = true
+	}
+	ret := make([]string, 0)
+	for k := range mapCurrent {
+		ret = append(ret, k)
+	}
+	if len(ret) != len(current) {
+		return ret, true
+	}
+	for _, c := range current {
+		if !mapCurrent[c] {
+			return ret, true
+		}
+	}
+	return ret, false
 }

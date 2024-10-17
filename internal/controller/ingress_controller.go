@@ -203,6 +203,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		r.netwotkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
+		r.cniMode,
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)
@@ -330,6 +331,13 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		return ctrl.Result{}, err
 	}
 
+	// ensure security group with mutex
+	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
+	if err != nil {
+		logger.Error("Failed to ensure security group: ", err)
+		return ctrl.Result{}, err
+	}
+
 	// update management annotations
 	if err := r.updateObjectAnnotation(ctx, obj, loadBalancerBuilder.GetManageAnnotation()); err != nil {
 		logger.Error("Failed to update management annotations: ", err)
@@ -340,6 +348,16 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	r.resourceDependant.Set(obj, loadBalancerBuilder.GetTargetType() == builder.TargetTypeIP ||
 		r.cniMode == utils.CiliumNativeRouting)
 	return ctrl.Result{}, nil
+}
+
+func (r *IngressReconciler) ensureSecurityGroup(currentBuilder builder.LoadBalancerBuilder, loadBalancerBuilder builder.ModelBuilder, oldBuilder builder.OldModelBuilder) error {
+	secGroupMutex.Lock()
+	defer secGroupMutex.Unlock()
+	err := currentBuilder.EnsureSecurityGroups(loadBalancerBuilder, oldBuilder)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *IngressReconciler) deleteObject(ctx context.Context, obj *networkingv1.Ingress) (ctrl.Result, error) {
@@ -397,6 +415,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		r.netwotkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
+		r.cniMode,
 	)
 	if err != nil {
 		logger.Error("Failed to create new model builder: ", err)
