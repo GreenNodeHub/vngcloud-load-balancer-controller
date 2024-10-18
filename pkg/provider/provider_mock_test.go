@@ -57,6 +57,7 @@ func templateCreateListenerRequest() *loadbalancerv2.CreateListenerRequest {
 		CertificateAuthorities:      nil,
 		ClientCertificate:           nil,
 		DefaultCertificateAuthority: nil,
+		Headers:                     nil,
 		// LoadBalancerCommon: common.LoadBalancerCommon{
 		// 	LoadBalancerId: "loadBalancerId",
 		// },

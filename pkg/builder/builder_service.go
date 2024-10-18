@@ -85,6 +85,7 @@ func NewModelBuilderByService(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+		headers:                    []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
 
 		isAutoCreateSecurityGroup: true,
 	}
@@ -219,6 +220,7 @@ func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name stri
 			TimeoutMember:               l.idleTimeoutMember,
 			TimeoutConnection:           l.idleTimeoutConnection,
 			AllowedCidrs:                StringListToString(l.inboundCIDRs),
+			Headers:                     []string{},
 		},
 	}
 	return opt

@@ -87,6 +87,7 @@ func NewModelBuilderByIngress(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+		headers:                    []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
 
 		isAutoCreateSecurityGroup: true,
 	}
@@ -150,9 +151,6 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 		if err != nil {
 			return err
 		}
-		httpsListener.DefaultCertificateAuthority = &l.certificateIDs[0]
-		httpsListener.CertificateAuthorities = &l.certificateIDs
-		httpsListener.ClientCertificate = PointerOf("")
 		if isHaveDefaultBackend {
 			httpListener.ReferPoolName = defaultPoolBuilder.GetName()
 		}
@@ -216,9 +214,10 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 			TimeoutConnection:           l.idleTimeoutConnection,
 			TimeoutMember:               l.idleTimeoutMember,
 			DefaultPoolId:               PointerOf(""),
-			CertificateAuthorities:      nil,
+			CertificateAuthorities:      PointerOf([]string{}),
 			ClientCertificate:           nil,
 			DefaultCertificateAuthority: nil,
+			Headers:                     l.headers,
 		},
 	}
 	if isHTTPS {
@@ -226,6 +225,15 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 		opt.ListenerName = consts.DEFAULT_HTTPS_LISTENER_NAME
 		opt.ListenerProtocol = loadbalancerv2.ListenerProtocolHTTPS
 		opt.ListenerProtocolPort = 443
+		opt.DefaultCertificateAuthority = nil
+		opt.CertificateAuthorities = PointerOf([]string{})
+
+		if len(l.certificateIDs) > 0 {
+			opt.DefaultCertificateAuthority = &l.certificateIDs[0]
+		}
+		if len(l.certificateIDs) > 1 {
+			opt.CertificateAuthorities = PointerOf(l.certificateIDs[1:])
+		}
 	}
 	return opt, nil
 }

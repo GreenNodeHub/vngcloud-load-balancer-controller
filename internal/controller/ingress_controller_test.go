@@ -141,7 +141,7 @@ var _ = Describe("Ingress Controller", func() {
 		})
 	})
 
-	Context("When update annotaion", func() {
+	Context("When update annotation", func() {
 		It("should reconcile immediately", func() {
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -232,19 +232,7 @@ var _ = Describe("Ingress Controller", func() {
 		It("created load balancer shoud have specific attribute", func() {
 			mockIngressReconciler.modeTest = false
 
-			type stepType struct {
-				name          string
-				updateObjects func() []client.Object
-				expect        func(lb *entity.LoadBalancer)
-			}
-
-			tests := []struct {
-				name            string
-				generateDepends func() []client.Object
-				generateObj     func() client.Object
-				expect          func(lb *entity.LoadBalancer)
-				steps           []stepType
-			}{
+			testss := []TestType[*networkingv1.Ingress]{
 				{
 					name: "create with default annotation",
 					generateDepends: func() []client.Object {
@@ -254,7 +242,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{service}
 					},
-					generateObj: func() client.Object {
+					generateObj: func() *networkingv1.Ingress {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -351,7 +339,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{service}
 					},
-					generateObj: func() client.Object {
+					generateObj: func() *networkingv1.Ingress {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = nil
@@ -463,7 +451,7 @@ var _ = Describe("Ingress Controller", func() {
 							}
 						}
 					},
-					steps: []stepType{
+					steps: []StepType{
 						{
 							name: "update rule to new service port",
 							updateObjects: func() []client.Object {
@@ -603,7 +591,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() client.Object {
+					generateObj: func() *networkingv1.Ingress {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -721,7 +709,7 @@ var _ = Describe("Ingress Controller", func() {
 							}
 						}
 					},
-					steps: []stepType{
+					steps: []StepType{
 						{
 							name: "update backend to service port name (80 -> http), should nothing change",
 							updateObjects: func() []client.Object {
@@ -1010,71 +998,11 @@ var _ = Describe("Ingress Controller", func() {
 						},
 					},
 				},
-				// {name: "______________________"},
-				// {name: "______________________"},
-				// {name: "______________________"},
-				// {name: "______________________"},
-				// {name: "______________________"},
-				// {name: "______________________"},
-				// {name: "______________________"},
 			}
 
-			for _, tt := range tests {
-				logrus.Info("------------------- ", tt.name, " -------------------")
-				depends := tt.generateDepends()
-				for _, depend := range depends {
-					Expect(depend).NotTo(BeNil())
-					Expect(k8sClient.Create(ctx, depend)).Should(Succeed())
-				}
-
-				obj := tt.generateObj()
-				Expect(obj).NotTo(BeNil())
-				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
-
-				// get load balancer id in the annotation
-				loadbalancerID := ""
-				Eventually(func() bool {
-					getObj := &networkingv1.Ingress{}
-					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)).Should(Succeed())
-					loadbalancerID = getObj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-					return loadbalancerID != ""
-				}, timeout, interval).Should(BeTrue())
-
-				// expect load balancer attribute in the mock provider
-				loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-				Expect(err).ShouldNot(HaveOccurred())
-				tt.expect(loadbalancer)
-
-				if tt.steps != nil {
-					for _, step := range tt.steps {
-						logrus.Info("###### STEP: ", step.name)
-						updateObjs := step.updateObjects()
-						for _, obj := range updateObjs {
-							Expect(obj).NotTo(BeNil())
-							Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
-						}
-
-						// expect load balancer attribute in the mock provider
-						step.expect(loadbalancer)
-					}
-				}
-
-				// clean up
-				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
-				Eventually(func() bool {
-					getObj := &networkingv1.Ingress{}
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)
-					return err != nil
-				}, 2*timeout, interval).Should(BeTrue())
-				_, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-				Expect(err).Should(HaveOccurred())
-
-				for _, depend := range depends {
-					Expect(k8sClient.Delete(ctx, depend)).Should(Succeed())
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: depend.GetName(), Namespace: depend.GetNamespace()}, depend)
-					Expect(err).Should(HaveOccurred())
-				}
-				printEndTest()
+			for _, tt := range testss {
+				logrus.Info("Running test: ", tt.name)
+				RunMultiStepTest[*networkingv1.Ingress](tt)
 			}
 		})
 	})
@@ -1097,26 +1025,10 @@ var _ = Describe("Ingress Controller", func() {
 				Expect(mockProvider.DeleteSecurityGroup(ctx, blackpinkSec.Id)).Should(Succeed())
 			}()
 
-			type stepType struct {
-				name          string                        // step name
-				updateObjects func() []client.Object        // update objects such as ingress, service, endpoint,...
-				expect        func(lb *entity.LoadBalancer) // expect after update
-			}
-
-			tests := []struct {
-				preTest         func()                        // prepare test
-				name            string                        // test name
-				generateDepends func() []client.Object        // generate depend objects such as service, endpoint,...
-				generateObj     func() client.Object          // generate main object
-				expect          func(lb *entity.LoadBalancer) // expect after create
-				steps           []stepType                    // update and expect for each step
-				postTest        func()                        // expect after clean up
-			}{
+			tests := []TestType[*networkingv1.Ingress]{
 				{
-					preTest: func() {
-						mockIngressReconciler.cniMode = utils.CiliumNativeRouting
-					},
-					name: "create with default annotations of cilium native routing",
+					preTest: func() { mockIngressReconciler.cniMode = utils.CiliumNativeRouting },
+					name:    "create with default annotations of cilium native routing",
 					generateDepends: func() []client.Object {
 						endpoint := newEndpointResource("test-service-gogsf", "default")
 						endpoint.Subsets = []corev1.EndpointSubset{
@@ -1157,7 +1069,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() client.Object {
+					generateObj: func() *networkingv1.Ingress {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -1229,7 +1141,7 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(serverSecgroups).Should(ContainElement(secgroupID))
 						}
 					},
-					steps: []stepType{
+					steps: []StepType{
 						{
 							name: "update endpoint, should update secgroup rule",
 							updateObjects: func() []client.Object {
@@ -1459,7 +1371,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() client.Object {
+					generateObj: func() *networkingv1.Ingress {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -1531,7 +1443,7 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(serverSecgroups).Should(ContainElement(secgroupID))
 						}
 					},
-					steps: []stepType{
+					steps: []StepType{
 						{
 							name: "update tags (add more tags) and secgroups annotations (delete default secgroup and add additional secgroups)",
 							updateObjects: func() []client.Object {
@@ -1635,73 +1547,24 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			for _, tt := range tests {
-				logrus.Info("------------------- ", tt.name, " -------------------")
-				if tt.preTest != nil {
-					tt.preTest()
-				}
-				depends := tt.generateDepends()
-				for _, depend := range depends {
-					Expect(depend).NotTo(BeNil())
-					Expect(k8sClient.Create(ctx, depend)).Should(Succeed())
-				}
-
-				obj := tt.generateObj()
-				Expect(obj).NotTo(BeNil())
-				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
-
-				// get load balancer id in the annotation
-				loadbalancerID := ""
-				Eventually(func() bool {
-					getObj := &networkingv1.Ingress{}
-					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)).Should(Succeed())
-					loadbalancerID = getObj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-					return loadbalancerID != ""
-				}, timeout, interval).Should(BeTrue())
-
-				// expect load balancer attribute in the mock provider
-				loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-				Expect(err).ShouldNot(HaveOccurred())
-				tt.expect(loadbalancer)
-
-				if tt.steps != nil {
-					for _, step := range tt.steps {
-						logrus.Info("###### STEP: ", step.name)
-						updateObjs := step.updateObjects()
-						for _, obj := range updateObjs {
-							Expect(obj).NotTo(BeNil())
-							Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
-						}
-
-						// expect load balancer attribute in the mock provider
-						step.expect(loadbalancer)
-					}
-				}
-
-				// clean up
-				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
-				Eventually(func() bool {
-					getObj := &networkingv1.Ingress{}
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)
-					return err != nil
-				}, 2*timeout, interval).Should(BeTrue())
-				_, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-				Expect(err).Should(HaveOccurred())
-
-				for _, depend := range depends {
-					Expect(k8sClient.Delete(ctx, depend)).Should(Succeed())
-					err := k8sClient.Get(ctx, client.ObjectKey{Name: depend.GetName(), Namespace: depend.GetNamespace()}, depend)
-					Expect(err).Should(HaveOccurred())
-				}
-				if tt.postTest != nil {
-					tt.postTest()
-				}
-				printEndTest()
+				logrus.Info("Running test: ", tt.name)
+				RunMultiStepTest[*networkingv1.Ingress](tt)
 			}
 		})
 	})
 
-	// Context("aaaaaaaaaaaaaaaa", func() {
-	// 	It("aaaaaaaaaaaaaaaaaaaaaa", func() {
+	// Context("When create and update https listener", func() {
+	// 	It("it should work as expectation", func() {
+	// 		mockIngressReconciler.modeTest = false
+
+	// 		tests := []TestType[*networkingv1.Ingress]{
+	// 			{},
+	// 		}
+
+	// 		for _, tt := range tests {
+	// logrus.Info("Running test: ", tt.name)
+	// 			RunMultiStepTest[*networkingv1.Ingress](tt)
+	// 		}
 	// 	})
 	// })
 })
@@ -1729,6 +1592,7 @@ func newIngressResource(name, namespace string) *networkingv1.Ingress {
 	}
 }
 
+// should not use in mockProvider test
 func updateIngressAnnotation(name, namespace, key, value string) {
 	ingress := &networkingv1.Ingress{}
 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, ingress)).Should(Succeed())

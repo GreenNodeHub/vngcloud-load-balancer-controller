@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -336,17 +337,18 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		TimeoutConnection:           new.TimeoutConnection,
 		DefaultPoolId:               *new.DefaultPoolId,
 		DefaultCertificateAuthority: new.DefaultCertificateAuthority,
-		// CertificateAuthorities:      new.CertificateAuthorities, // ....................................................... add this field to sdk
+		CertificateAuthorities:      nil,
 
 		// not support update these fields
-		// Headers:           current.Headers,           // L7: if this field is nil, it will update empty ? => set it nil in L4 // ....................................................... add this field to sdk
+		Headers:           current.Headers,           // L7: if this field is nil, it will update empty ? => set it nil in L4
 		ClientCertificate: current.ClientCertificate, // L7: if this field is nil, it will update empty ? => set it nil in L4
 	}
 	if new.IsL4 {
 		updateOptions.Headers = nil
 		updateOptions.ClientCertificate = nil
 		updateOptions.DefaultCertificateAuthority = nil
-		// updateOptions.CertificateAuthorities = nil // ....................................................... add this field to sdk
+		updateOptions.CertificateAuthorities = nil
+		updateOptions.Headers = nil
 	}
 
 	if current.AllowedCidrs != new.AllowedCidrs {
@@ -373,33 +375,36 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		message = append(message, fmt.Sprintf("default pool id (%s -> %s)", *current.DefaultPoolId, *new.DefaultPoolId))
 		isNeedUpdate = true
 	}
+
 	if new.IsL4 && new.DefaultCertificateAuthority != nil &&
 		(current.DefaultCertificateAuthority == nil || *(current.DefaultCertificateAuthority) != *(new.DefaultCertificateAuthority)) {
 		message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)", *current.DefaultCertificateAuthority, *new.DefaultCertificateAuthority))
 		isNeedUpdate = true
 	}
 
-	// .......................................
-	// if len(current.CertificateAuthorities) > 0 && new.CertificateAuthorities == nil {
-	// 	isNeedUpdate = true
-	// } else if new.CertificateAuthorities != nil {
-	// 	if len(current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
-	// 		klog.Infof("listener need update certificate authorities")
-	// 		isNeedUpdate = true
-	// 	} else {
-	// 		maps := make(map[string]bool)
-	// 		for _, ca := range current.CertificateAuthorities {
-	// 			maps[ca] = true
-	// 		}
-	// 		for _, ca := range *new.CertificateAuthorities {
-	// 			if _, ok := maps[ca]; !ok {
-	// 				klog.Infof("listener need update certificate authorities")
-	// 				isNeedUpdate = true
-	// 				break
-	// 			}
-	// 		}
-	// 	}
-	// }
+	if !new.IsL4 {
+		updateOptions.CertificateAuthorities = new.CertificateAuthorities
+
+		if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
+			current.CertificateAuthorities != new.CertificateAuthorities {
+			message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+			isNeedUpdate = true
+		} else {
+			// CertificateAuthorities is not nil
+			if len(*current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
+				message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+				isNeedUpdate = true
+			} else {
+				for _, ca := range *new.CertificateAuthorities {
+					if !slices.Contains(*current.CertificateAuthorities, ca) {
+						message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+						isNeedUpdate = true
+						break
+					}
+				}
+			}
+		}
+	}
 
 	if !isNeedUpdate {
 		return nil, nil

@@ -86,6 +86,7 @@ type modelBuilder struct {
 	healthcheckIntervalSeconds int
 	enableAutoscale            bool
 	targetType                 TargetType
+	headers                    []string
 
 	// annotation configuration for L4 only
 	enableProxyProtocol []string

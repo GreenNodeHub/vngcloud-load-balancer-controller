@@ -99,7 +99,7 @@ func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
 		if isValidVKSID(tag) {
 			tagsValid[tag] = true
 		} else {
-			r.logger.Warnf("Invalid VKS cluster id tag: %s", tag)
+			r.logger.Warnf("Invalid VKS cluster id tag: %s.", tag)
 		}
 	}
 	if isValidVKSID(id) {
