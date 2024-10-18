@@ -19,6 +19,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
+const (
+	MockProjectID  = "projectID"
+	MockNetID      = "netID"
+	MockSubnetID   = "subnetID"
+	MockSubnetCIDR = "199.0.0.0/24"
+)
+
 func randID() string {
 	number := randRange(1000000, 3999999)
 	return fmt.Sprint(number)
@@ -51,6 +58,12 @@ type wrapPolicy struct {
 type wrapServer struct {
 	*entityv2.Server
 }
+type wrapSecgroup struct {
+	*entityv2.Secgroup
+}
+type wrapSecgroupRule struct {
+	*entityv2.SecgroupRule
+}
 
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
@@ -65,16 +78,19 @@ type MockProvider struct {
 	policies      []*wrapPolicy
 	tags          map[string](map[string]string)
 	servers       []*wrapServer
+	secgroups     []*wrapSecgroup
+	secgroupRules []*wrapSecgroupRule
 
-	mu sync.Mutex
+	mu            sync.Mutex
+	WaitAfterTime time.Duration
 }
 
 func NewMockProvider() *MockProvider {
 	return &MockProvider{
-		projectID:  "projectID",
-		netID:      "netID",
-		subnetID:   "subnetID",
-		subnetCIDR: "subnetCIDR",
+		projectID:  MockProjectID,
+		netID:      MockNetID,
+		subnetID:   MockSubnetID,
+		subnetCIDR: MockSubnetCIDR,
 
 		loadBalancers: make([]*entityv2.LoadBalancer, 0),
 		listeners:     make([]*wrapListener, 0),
@@ -82,10 +98,48 @@ func NewMockProvider() *MockProvider {
 		policies:      make([]*wrapPolicy, 0),
 		tags:          make(map[string](map[string]string)),
 		servers:       make([]*wrapServer, 0),
+		secgroups:     make([]*wrapSecgroup, 0),
+		secgroupRules: make([]*wrapSecgroupRule, 0),
+
+		WaitAfterTime: 0,
 	}
 }
 
-func (m *MockProvider) Init(providerIDs []string) error {
+func (m *MockProvider) Init(_ []string) error {
+	// add server mock
+	serverIDs := []string{
+		"ins-00000000-0000-0000-0000-000000000001",
+		"ins-00000000-0000-0000-0000-000000000002",
+		"ins-00000000-0000-0000-0000-000000000003",
+		"ins-00000000-0000-0000-0000-000000000004",
+	}
+	for _, id := range serverIDs {
+		m.servers = append(m.servers, &wrapServer{
+			Server: &entityv2.Server{
+				Uuid:               id,
+				BootVolumeId:       "",
+				CreatedAt:          time.Now().Format(time.RFC3339),
+				EncryptionVolume:   false,
+				Licence:            false,
+				Location:           "",
+				Metadata:           "",
+				MigrateState:       "",
+				Name:               "mock-server-1",
+				Product:            "",
+				ServerGroupId:      "",
+				ServerGroupName:    "",
+				SshKeyName:         "",
+				Status:             consts.ACTIVE_LOADBALANCER_STATUS,
+				StopBeforeMigrate:  false,
+				User:               "",
+				Image:              entityv2.Image{},
+				Flavor:             entityv2.Flavor{},
+				SecGroups:          []entityv2.ServerSecgroup{},
+				ExternalInterfaces: []entityv2.NetworkInterface{},
+				InternalInterfaces: []entityv2.NetworkInterface{},
+			},
+		})
+	}
 	return nil
 }
 
@@ -108,51 +162,179 @@ func (m *MockProvider) GetSubnetCIDR() string {
 // // --------------------------- Security Group ---------------------------
 
 func (m *MockProvider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	secgroups := make([]*entityv2.Secgroup, 0)
+	for _, s := range m.secgroups {
+		secgroups = append(secgroups, clone.Clone(s.Secgroup).(*entityv2.Secgroup))
+	}
+	return &entityv2.ListSecgroups{
+		Items: secgroups,
+	}, nil
 }
 
 func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	logger.Infof("%s Request update security groups of server %s", icon, instanceID)
+
+	var server *entityv2.Server
+	for _, s := range m.servers {
+		if s.Uuid == instanceID {
+			server = s.Server
+			break
+		}
+	}
+	if server == nil {
+		return nil, errs.ErrorNotFound
+	}
+
+	// check secgroups is valid
+	secG := make([]entityv2.ServerSecgroup, 0)
+	for _, secgroupID := range secgroups {
+		s, err := m.GetSecurityGroup(ctx, secgroupID)
+		if err != nil {
+			return nil, err
+		}
+		secG = append(secG, entityv2.ServerSecgroup{
+			Uuid: s.Id,
+			Name: s.Name,
+		})
+	}
+
+	server.SecGroups = secG
+	return clone.Clone(server).(*entityv2.Server), nil
 }
 
 func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	for _, s := range m.secgroups {
+		if s.Id == secgroupID {
+			return clone.Clone(s.Secgroup).(*entityv2.Secgroup), nil
+		}
+	}
+	return nil, errs.ErrorNotFound
 }
 
 func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
+	// valid secgroupID
+	servers, err := m.ListServerBySecgroupID(ctx, secgroupID)
+	if err != nil {
+		return err
+	}
+
+	if len(servers.Items) > 0 {
+		return errs.ErrorSecurityGroupInUse
+	}
+
+	// delete secgroup
+	newSecgroups := make([]*wrapSecgroup, 0)
+	for i, s := range m.secgroups {
+		if s.Id != secgroupID {
+			newSecgroups = append(newSecgroups, m.secgroups[i])
+		}
+	}
+
+	m.mu.Lock()
+	m.secgroups = newSecgroups
+	m.mu.Unlock()
+	return nil
 }
 
 func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	logger.Infof("%s Request create security group %s", icon, name)
+
+	secgroupID := "secgroup-" + randID()
+	newSecgroup := &wrapSecgroup{
+		&entityv2.Secgroup{
+			Id:          secgroupID,
+			Name:        name,
+			Description: description,
+			Status:      consts.ACTIVE_LOADBALANCER_STATUS,
+		},
+	}
+
+	m.mu.Lock()
+	m.secgroups = append(m.secgroups, newSecgroup)
+	m.mu.Unlock()
+	return clone.Clone(newSecgroup.Secgroup).(*entityv2.Secgroup), nil
 }
 
 func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	logger.Infof("%s Request create security group rule for security group %s", icon, secgroupID)
+
+	// valid secgroupID
+	_, err := m.GetSecurityGroup(ctx, secgroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	rule := opts.(*networkv2.CreateSecgroupRuleRequest)
+	newRule := &wrapSecgroupRule{
+		&entityv2.SecgroupRule{
+			Id:             "sec-rule-" + randID(),
+			SecgroupId:     secgroupID,
+			Direction:      string(rule.Direction),
+			EtherType:      string(rule.EtherType),
+			Protocol:       string(rule.Protocol),
+			Description:    rule.Description,
+			RemoteIPPrefix: rule.RemoteIPPrefix,
+			PortRangeMax:   rule.PortRangeMax,
+			PortRangeMin:   rule.PortRangeMin,
+		},
+	}
+
+	m.mu.Lock()
+	m.secgroupRules = append(m.secgroupRules, newRule)
+	m.mu.Unlock()
+	return clone.Clone(newRule.SecgroupRule).(*entityv2.SecgroupRule), nil
 }
 
 func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
+	logger.Infof("%s Request delete security group rule %s of security group %s", icon, ruleID, secgroupID)
+
+	// valid secgroupID
+	_, err := m.GetSecurityGroup(ctx, secgroupID)
+	if err != nil {
+		return err
+	}
+
+	// delete rule
+	isFound := false
+	newRules := make([]*wrapSecgroupRule, 0)
+	for i, r := range m.secgroupRules {
+		if r.SecgroupId != secgroupID || r.Id != ruleID {
+			newRules = append(newRules, m.secgroupRules[i])
+		} else {
+			isFound = true
+		}
+	}
+
+	if !isFound {
+		return errs.ErrorNotFound
+	}
+
+	m.mu.Lock()
+	m.secgroupRules = newRules
+	m.mu.Unlock()
+	return nil
 }
 
 func (m *MockProvider) ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	// valid secgroupID
+	_, err := m.GetSecurityGroup(ctx, secgroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	rules := make([]*entityv2.SecgroupRule, 0)
+	for _, r := range m.secgroupRules {
+		if r.SecgroupId == secgroupID {
+			rules = append(rules, clone.Clone(r.SecgroupRule).(*entityv2.SecgroupRule))
+		}
+	}
+	return &entityv2.ListSecgroupRules{
+		Items: rules,
+	}, nil
 }
 
 // // --------------------------- Tags ---------------------------
@@ -255,9 +437,25 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 }
 
 func (m *MockProvider) ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, errs.ErrorNotImplemented
+	// valid secgroupID
+	_, err := m.GetSecurityGroup(ctx, secgroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	// get servers by secgroup
+	servers := make([]*entityv2.Server, 0)
+	for _, s := range m.servers {
+		for _, sg := range s.SecGroups {
+			if sg.Uuid == secgroupID {
+				servers = append(servers, clone.Clone(s.Server).(*entityv2.Server))
+				break
+			}
+		}
+	}
+	return &entityv2.ListServers{
+		Items: servers,
+	}, nil
 }
 
 // --------------------------- Load Balancer ---------------------------
@@ -366,6 +564,14 @@ func (m *MockProvider) updatingStatus(lbID string) {
 		return
 	}
 
+	if m.WaitAfterTime == 0 {
+		m.mu.Lock()
+		o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
+		o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
+		m.mu.Unlock()
+		return
+	}
+
 	m.mu.Lock()
 	o.DisplayStatus = consts.CREATED_LOADBALANCER_STATUS
 	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
@@ -373,6 +579,9 @@ func (m *MockProvider) updatingStatus(lbID string) {
 }
 
 func (m *MockProvider) readyAfterTime(lbID string) {
+	if m.WaitAfterTime == 0 {
+		return
+	}
 	logger := contexts.NewContext(context.TODO()).Log()
 	var o *entityv2.LoadBalancer
 	for _, lb := range m.loadBalancers {
@@ -386,7 +595,7 @@ func (m *MockProvider) readyAfterTime(lbID string) {
 		return
 	}
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(m.WaitAfterTime)
 	m.mu.Lock()
 	o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
 	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS

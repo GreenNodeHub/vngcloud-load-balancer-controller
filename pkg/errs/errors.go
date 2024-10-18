@@ -26,6 +26,7 @@ var (
 	ErrorMissingCertificates = errors.New("missing certificates, need to specific through annotation")
 
 	ErrorSecurityGroupNotFound = errors.New("security group not found")
+	ErrorSecurityGroupInUse    = errors.New("security group in use")
 )
 
 func IsLoadBalancerNotFound(err error) bool {

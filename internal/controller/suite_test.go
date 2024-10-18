@@ -63,7 +63,7 @@ var (
 		Cluster: struct {
 			ClusterName string "mapstructure:\"clusterName\""
 			ClusterID   string "mapstructure:\"clusterID\""
-		}{ClusterName: "test-cluster", ClusterID: "test-cluster-id"},
+		}{ClusterName: "test-cluster", ClusterID: "k8s-00000000-0000-0000-0000-000000000000"},
 	}
 
 	mockNode1 = &corev1.Node{
@@ -177,6 +177,10 @@ const (
 	interval = time.Millisecond * 250
 )
 
+var (
+	timeWaitRecocile = 2 * time.Second
+)
+
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -277,6 +281,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sClient.Create(ctx, mockNode4)
 	Expect(err).ToNot(HaveOccurred())
+
+	// // comment these line to make the test run faster
+	// mockProvider.WaitAfterTime = 3 * time.Second
+	// timeWaitRecocile = 20 * time.Second
 })
 
 var _ = AfterSuite(func() {
@@ -290,4 +298,41 @@ func printEndTest() {
 	logrus.Info("======================================================")
 	logrus.Info("======================================================")
 	logrus.Info()
+}
+
+func newEndpointResource(name, namespace string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "172.172.172.0",
+						Hostname: "test",
+						NodeName: PointerOf("test"),
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Namespace: namespace,
+							Name:      "pod-1",
+						},
+					},
+				},
+				Ports: []corev1.EndpointPort{
+					{
+						Name:        "http",
+						Port:        80,
+						Protocol:    corev1.ProtocolTCP,
+						AppProtocol: PointerOf("http"),
+					},
+				},
+			},
+		},
+	}
 }

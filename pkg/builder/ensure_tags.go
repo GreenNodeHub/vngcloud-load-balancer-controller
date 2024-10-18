@@ -29,7 +29,7 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
 	if !strings.Contains(vksClusterTags, r.clusterID) {
 		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
-		vksClusterTags = joinVKSTag(vksClusterTags, r.clusterID)
+		vksClusterTags = r.joinVKSTag(vksClusterTags, r.clusterID)
 		newTags[consts.VKS_TAG_KEY] = vksClusterTags
 	}
 
@@ -92,12 +92,14 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 	return nil
 }
 
-func joinVKSTag(current, id string) string {
+func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
 	tags := strings.Split(current, consts.VKS_TAGS_SEPARATOR)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
 			tagsValid[tag] = true
+		} else {
+			r.logger.Warnf("Invalid VKS cluster id tag: %s", tag)
 		}
 	}
 	if isValidVKSID(id) {
