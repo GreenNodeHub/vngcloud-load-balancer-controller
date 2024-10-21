@@ -98,6 +98,7 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
 func (r *ServiceReconciler) isValid(obj interface{}) bool {
