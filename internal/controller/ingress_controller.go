@@ -47,7 +47,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/event_classification"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
-	periodicreconciler "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/periodic_reconciler"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -83,6 +82,10 @@ type IngressReconciler struct {
 
 	cniMode          utils.CNIType
 	defaultPackageID string
+
+	updateTracker       *UpdateTracker
+	numCurrentReconcile int
+	numCurrentLock      sync.Mutex
 }
 
 func (r *IngressReconciler) isValid(obj interface{}) bool {
@@ -125,24 +128,73 @@ func (r *IngressReconciler) getObjectByKey(key string) (interface{}, bool) {
 	return resource, true
 }
 
-func (r *IngressReconciler) updateObjectAnnotation(ctx context.Context, obj *networkingv1.Ingress, annos map[string]string) error {
+func (r *IngressReconciler) updateObjectAnnotation(ctx context.Context, obj client.Object, annos map[string]string) error {
 	if obj == nil {
 		return nil
 	}
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("Update annotation for object %s/%s: %v", obj.Namespace, obj.Name, annos)
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
+
+	// get object again to avoid conflict
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	if err != nil {
+		logger.Error("Failed to get object: ", err)
+		return err
+	}
+
+	logger.Debugf("Update annotation for object %s/%s: %v", obj.GetNamespace(), obj.GetName(), annos)
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
 	}
 	for k, v := range annos {
-		obj.Annotations[k] = v
+		annotations[k] = v
 	}
+	obj.SetAnnotations(annotations)
 	return r.Update(ctx, obj, &client.UpdateOptions{})
 }
 
-// getReconcileRequests returns a list of reconcile requests periodically (which LoadBalancer have changed and need to be reconciled)
-func (r *IngressReconciler) getReconcileRequestsPeriodically() []reconcile.Request {
-	return []reconcile.Request{}
+func (r *IngressReconciler) startBackgroundGoroutine(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if r.numCurrentReconcile > 0 {
+					logrus.Debug("Skip reconcile periodically.")
+				} else {
+					// get all loadbalancers
+					loadBalancers, err := r.Provider.ListLoadBalancers(context.Background())
+					if err != nil {
+						logrus.Error("Failed to list loadbalancers: ", err)
+						continue
+					}
+
+					// get all resources need to reconcile
+					requests := r.updateTracker.GetReconcileRequests(loadBalancers)
+					for _, req := range requests {
+						r.Enqueue(req)
+					}
+				}
+
+			case <-ctx.Done():
+				// Exit the Goroutine when the context is cancelled (e.g., operator shutdown)
+				return
+			}
+		}
+	}()
+}
+
+// Enqueue will trigger the reconcile manually
+func (r *IngressReconciler) Enqueue(req reconcile.Request) {
+	key := genKey(req.Namespace, req.Name)
+	obj, exists := r.getObjectByKey(key)
+	if !exists {
+		return
+	}
+	r.updateObjectAnnotation(context.Background(), obj.(client.Object),
+		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -158,6 +210,16 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !r.initialized {
 		return ctrl.Result{Requeue: true}, nil
 	}
+
+	// add one more reconcile to the counter
+	r.numCurrentLock.Lock()
+	r.numCurrentReconcile++
+	r.numCurrentLock.Unlock()
+	defer func() {
+		r.numCurrentLock.Lock()
+		r.numCurrentReconcile--
+		r.numCurrentLock.Unlock()
+	}()
 
 	result, err := r.reconcile(ctx, req)
 	if err != nil {
@@ -411,6 +473,14 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	// watch endpoint if target type is ip or cni mode is cilium native routing
 	r.resourceDependant.Set(obj, loadBalancerBuilder.GetTargetType() == builder.TargetTypeIP ||
 		r.cniMode == utils.CiliumNativeRouting)
+
+	// get lb updated time and add to update tracker
+	lb, err := r.Provider.GetLoadBalancerByID(ctx, loadBalancerBuilder.GetLoadBalancerID())
+	if err != nil {
+		logger.Error("Failed to get loadbalancer: ", err)
+		return ctrl.Result{}, err
+	}
+	r.updateTracker.AddUpdateTracker(loadBalancerBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName(), lb.UpdatedAt)
 	return ctrl.Result{}, nil
 }
 
@@ -538,10 +608,10 @@ func (r *IngressReconciler) init() error {
 	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
 	r.resourceDependant = NewIngressDependant(r.Client)
+	r.updateTracker = NewUpdateTracker()
 
-	periodicReconciler := periodicreconciler.NewPeriodicReconciler(r, 60*time.Second, r.getReconcileRequestsPeriodically)
 	ctx := context.Background()
-	periodicReconciler.Start(ctx)
+	r.startBackgroundGoroutine(ctx)
 
 	return nil
 }
