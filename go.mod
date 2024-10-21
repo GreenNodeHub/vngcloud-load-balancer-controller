@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.9.0
-	github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241018100930-28a2176a5a07
+	github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241021034342-72defb336be1
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0

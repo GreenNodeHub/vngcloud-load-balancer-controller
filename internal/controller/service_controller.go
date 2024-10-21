@@ -78,7 +78,8 @@ type ServiceReconciler struct {
 	initialized bool
 	initLock    sync.Mutex
 
-	cniMode utils.CNIType
+	cniMode          utils.CNIType
+	defaultPackageID string
 }
 
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
@@ -223,6 +224,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
+		r.defaultPackageID,
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)
@@ -435,6 +437,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
+		r.defaultPackageID,
 	)
 	if err != nil {
 		logger.Error("Failed to create new model builder: ", err)
@@ -534,6 +537,13 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 		return err
 	}
 	logrus.Infof("Detected CNI type: %s", r.cniMode)
+
+	// get default package id
+	r.defaultPackageID, _, err = r.Provider.GetDefaultPackage()
+	if err != nil {
+		logrus.Error("Failed to get default package: ", err)
+		return err
+	}
 
 	r.initialized = true
 	return nil

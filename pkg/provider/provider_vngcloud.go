@@ -115,12 +115,32 @@ func (m *VNGCLOUD_Provider) setupPortalInfo(pmetadataService metadata.IMetadata)
 	return nil
 }
 
-// get network id, subnet id, subnet cidr
+// depend on the instances ids, get the network information. Must guarantee that at least one instance id is existed
 func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
-	// TODO .................................................
-	m.netID = "net-eada1b00-1d66-480f-a83f-ffc2218df569"
-	m.subnetID = "sub-511ef030-c961-45b5-baac-9d2dadf7e44c"
-	m.subnetCIDR = "10.255.0.0/24"
+	instanceID := providerIDs[0]
+	server, err := m.GetServerByID(context.Background(), instanceID)
+	if err != nil {
+		return err
+	}
+	if server == nil {
+		return errs.ErrorNotFound
+	}
+	m.netID = server.InternalInterfaces[0].NetworkUuid
+	m.subnetID = server.InternalInterfaces[0].SubnetUuid
+
+	if m.netID == "" || m.subnetID == "" {
+		logrus.Errorf("[ERROR] - getNetworkInformation: failed to get network information, netID: %s, subnetID: %s", m.netID, m.subnetID)
+		return errs.ErrorNotFound
+	}
+
+	subnet, err := m.GetSubnetByID(context.Background(), m.netID, m.subnetID)
+	if err != nil {
+		return err
+	}
+	if subnet == nil {
+		return errs.ErrorNotFound
+	}
+	m.subnetCIDR = subnet.Cidr
 	return nil
 }
 
@@ -138,6 +158,45 @@ func (m *VNGCLOUD_Provider) GetSubnetID() string {
 
 func (m *VNGCLOUD_Provider) GetSubnetCIDR() string {
 	return m.subnetCIDR
+}
+
+func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
+	logger := contexts.NewContext(context.TODO()).Log()
+
+	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
+	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetDefaultPackage: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return "", "", sdkErr.GetError()
+	}
+	if len(packages.Items) == 0 {
+		return "", "", errs.ErrorNotFound
+	}
+
+	getFirst := func(name, lbType string) string {
+		for _, p := range packages.Items {
+			if p.Name == name && p.LbType == lbType {
+				return p.UUID
+			}
+		}
+		return ""
+	}
+
+	// get the default package for l4
+	l4PackageID := getFirst("NLB_Small", "L4")
+	if l4PackageID == "" {
+		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L4, using the default value")
+		l4PackageID = DEFAULT_L4_PACKAGE_ID
+	}
+
+	// get the default package for l7
+	l7PackageID := getFirst("ALB_Small", "L7")
+	if l7PackageID == "" {
+		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L7, using the default value")
+		l7PackageID = DEFAULT_L7_PACKAGE_ID
+	}
+
+	return l4PackageID, l7PackageID, nil
 }
 
 // // --------------------------- Security Group ---------------------------
@@ -304,10 +363,15 @@ func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, t
 	return nil
 }
 
-// func (m *VNGCLOUD_Provider) GetSubnet(ctx context.Context,subnetID string) (*objects.Subnet, error) {
-// 	logger.Error("not implemented yet")
-// 	return nil, errs.ErrorNotImplemented
-// }
+func (m *VNGCLOUD_Provider) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
+	logger := contexts.NewContext(ctx).Log()
+	subnet, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return subnet, nil
+}
 
 // // --------------------------- Server ---------------------------
 
@@ -431,8 +495,15 @@ func (m *VNGCLOUD_Provider) DeleteLoadBalancer(ctx context.Context, lbID string)
 }
 func (m *VNGCLOUD_Provider) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return errs.ErrorNotImplemented
+	logger.Infof("%s Request resize load balancer %s to package %s", icon, lbID, packageID)
+
+	opt := loadbalancerv2.NewResizeLoadBalancerRequest(lbID, packageID)
+	_, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ResizeLoadBalancer(opt)
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ResizeLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
 }
 func (m *VNGCLOUD_Provider) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()

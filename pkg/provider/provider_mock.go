@@ -26,6 +26,10 @@ const (
 	MockSubnetCIDR = "199.0.0.0/24"
 )
 
+var (
+	MockCerts = []string{"cert1", "cert2", "cert3"}
+)
+
 func randID() string {
 	number := randRange(1000000, 3999999)
 	return fmt.Sprint(number)
@@ -80,6 +84,7 @@ type MockProvider struct {
 	servers       []*wrapServer
 	secgroups     []*wrapSecgroup
 	secgroupRules []*wrapSecgroupRule
+	lbcert        []string
 
 	mu            sync.Mutex
 	WaitAfterTime time.Duration
@@ -100,6 +105,7 @@ func NewMockProvider() *MockProvider {
 		servers:       make([]*wrapServer, 0),
 		secgroups:     make([]*wrapSecgroup, 0),
 		secgroupRules: make([]*wrapSecgroupRule, 0),
+		lbcert:        MockCerts,
 
 		WaitAfterTime: 0,
 	}
@@ -157,6 +163,10 @@ func (m *MockProvider) GetSubnetID() string {
 
 func (m *MockProvider) GetSubnetCIDR() string {
 	return m.subnetCIDR
+}
+
+func (m *MockProvider) GetDefaultPackage() (string, string, error) {
+	return DEFAULT_L4_PACKAGE_ID, DEFAULT_L7_PACKAGE_ID, nil
 }
 
 // // --------------------------- Security Group ---------------------------
@@ -384,10 +394,11 @@ func (m *MockProvider) UpdateTags(ctx context.Context, resourceID string, tags m
 	return nil
 }
 
-// func (m *MockProvider) GetSubnet(ctx context.Context, subnetID string) (*objects.Subnet, error) {
-// 	logger.Error("not implemented yet", "GetSubnet")
-// 	return nil, errs.ErrorNotImplemented
-// }
+func (m *MockProvider) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet", "GetSubnetByID")
+	return nil, errs.ErrorNotImplemented
+}
 
 // // --------------------------- Server ---------------------------
 

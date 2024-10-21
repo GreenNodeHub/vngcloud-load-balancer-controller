@@ -260,7 +260,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 						Expect(loadbalancer.Internal).Should(Equal(false))
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -374,7 +374,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 						Expect(loadbalancer.Internal).Should(Equal(false))
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -468,7 +468,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 								Expect(loadbalancer.Internal).Should(Equal(false))
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-								Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -631,7 +631,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 						Expect(loadbalancer.Internal).Should(Equal(false))
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-						Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -727,7 +727,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 								Expect(loadbalancer.Internal).Should(Equal(false))
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-								Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -825,7 +825,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 								Expect(loadbalancer.Internal).Should(Equal(false))
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-								Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -919,7 +919,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 								Expect(loadbalancer.Internal).Should(Equal(false))
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
-								Expect(loadbalancer.PackageID).Should(Equal(consts.DEFAULT_L7_PACKAGE_ID))
+								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
@@ -1562,7 +1562,22 @@ var _ = Describe("Ingress Controller", func() {
 	// 		}
 
 	// 		for _, tt := range tests {
-	// logrus.Info("Running test: ", tt.name)
+	// 			logrus.Info("Running test: ", tt.name)
+	// 			RunMultiStepTest[*networkingv1.Ingress](tt)
+	// 		}
+	// 	})
+	// })
+
+	// Context("When create and update https listener", func() {
+	// 	It("it should work as expectation", func() {
+	// 		mockIngressReconciler.modeTest = false
+
+	// 		tests := []TestType[*networkingv1.Ingress]{
+	// 			{},
+	// 		}
+
+	// 		for _, tt := range tests {
+	// 			logrus.Info("Running test: ", tt.name)
 	// 			RunMultiStepTest[*networkingv1.Ingress](tt)
 	// 		}
 	// 	})

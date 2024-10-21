@@ -42,8 +42,6 @@ const (
 	DEFAULT_VLB_ID_PIECE_LENGTH       = 8
 	DEFAULT_HASH_NAME_LENGTH          = 5
 	DEFAULT_NAME_DEFAULT_POOL         = "vks_default_pool"
-	DEFAULT_L7_PACKAGE_ID             = "lbp-f562b658-0fd4-4fa6-9c57-c1a803ccbf86"
-	DEFAULT_L4_PACKAGE_ID             = "lbp-96b6b072-aadb-4b58-9d5f-c16ad69d36aa" // ...............................
 	DEFAULT_HTTPS_LISTENER_NAME       = "vks_https_listener"
 	DEFAULT_HTTP_LISTENER_NAME        = "vks_http_listener"
 	VKS_TAG_KEY                       = "vks-cluster-ids"

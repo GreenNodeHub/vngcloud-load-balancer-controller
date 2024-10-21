@@ -28,6 +28,7 @@ func NewModelBuilderByIngress(
 	clusterID string,
 	nodes []*corev1.Node,
 	cniType utils.CNIType,
+	packageID string,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -38,7 +39,7 @@ func NewModelBuilderByIngress(
 			loadBalancerID:   "",
 			loadBalancerName: "",
 			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer7,
-			packageID:        consts.DEFAULT_L7_PACKAGE_ID,
+			packageID:        packageID,
 			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
 			tags:             map[string]string{},
 		},

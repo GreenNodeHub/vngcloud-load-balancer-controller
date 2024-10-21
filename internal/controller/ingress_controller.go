@@ -79,7 +79,8 @@ type IngressReconciler struct {
 	initialized bool
 	initLock    sync.Mutex
 
-	cniMode utils.CNIType
+	cniMode          utils.CNIType
+	defaultPackageID string
 }
 
 func (r *IngressReconciler) isValid(obj interface{}) bool {
@@ -204,6 +205,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
+		r.defaultPackageID,
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)
@@ -418,6 +420,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
+		r.defaultPackageID,
 	)
 	if err != nil {
 		logger.Error("Failed to create new model builder: ", err)
@@ -517,6 +520,13 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		return err
 	}
 	logrus.Infof("Detected CNI type: %s", r.cniMode)
+
+	// get default package id
+	_, r.defaultPackageID, err = r.Provider.GetDefaultPackage()
+	if err != nil {
+		logrus.Error("Failed to get default package: ", err)
+		return err
+	}
 
 	r.initialized = true
 	return nil

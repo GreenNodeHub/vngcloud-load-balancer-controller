@@ -8,6 +8,12 @@ import (
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
 
+const (
+	// hcm zone
+	DEFAULT_L7_PACKAGE_ID = "lbp-f562b658-0fd4-4fa6-9c57-c1a803ccbf86"
+	DEFAULT_L4_PACKAGE_ID = "lbp-96b6b072-aadb-4b58-9d5f-c16ad69d36aa"
+)
+
 func PointerOf[T any](t T) *T {
 	return &t
 }
@@ -19,6 +25,7 @@ type Provider interface {
 	GetNetworkID() string
 	GetSubnetID() string
 	GetSubnetCIDR() string
+	GetDefaultPackage() (string, string, error)
 	// clientServer
 	// clientLoadBalancer
 	// projectID
@@ -40,7 +47,7 @@ type Provider interface {
 	// adding or updating the tags to the resource
 	UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error
 
-	// GetSubnet(subnetID string) (*objects.Subnet, error)
+	GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error)
 
 	GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error)
 	WaitForServerActive(ctx context.Context, serverID string) error

@@ -26,6 +26,7 @@ func NewModelBuilderByService(
 	clusterID string,
 	nodes []*corev1.Node,
 	cnitype utils.CNIType,
+	packageID string,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -36,7 +37,7 @@ func NewModelBuilderByService(
 			loadBalancerID:   "",
 			loadBalancerName: "",
 			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer4,
-			packageID:        consts.DEFAULT_L4_PACKAGE_ID,
+			packageID:        packageID,
 			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
 			tags:             map[string]string{},
 		},

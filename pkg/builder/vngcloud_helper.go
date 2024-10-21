@@ -336,19 +336,20 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		TimeoutMember:               new.TimeoutMember,
 		TimeoutConnection:           new.TimeoutConnection,
 		DefaultPoolId:               *new.DefaultPoolId,
-		DefaultCertificateAuthority: new.DefaultCertificateAuthority,
+		DefaultCertificateAuthority: nil,
 		CertificateAuthorities:      nil,
 
 		// not support update these fields
-		Headers:           current.Headers,           // L7: if this field is nil, it will update empty ? => set it nil in L4
-		ClientCertificate: current.ClientCertificate, // L7: if this field is nil, it will update empty ? => set it nil in L4
+		Headers:           nil, // L7: if this field is nil, it will update empty ? => set it nil in L4
+		ClientCertificate: nil, // L7: if this field is nil, it will update empty ? => set it nil in L4
 	}
-	if new.IsL4 {
-		updateOptions.Headers = nil
-		updateOptions.ClientCertificate = nil
-		updateOptions.DefaultCertificateAuthority = nil
-		updateOptions.CertificateAuthorities = nil
-		updateOptions.Headers = nil
+
+	// set current value
+	if !new.IsL4 {
+		updateOptions.Headers = current.Headers
+		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
+			updateOptions.ClientCertificate = current.ClientCertificate
+		}
 	}
 
 	if current.AllowedCidrs != new.AllowedCidrs {
@@ -376,13 +377,18 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		isNeedUpdate = true
 	}
 
-	if new.IsL4 && new.DefaultCertificateAuthority != nil &&
+	// default certificate
+	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS &&
+		new.DefaultCertificateAuthority != nil &&
 		(current.DefaultCertificateAuthority == nil || *(current.DefaultCertificateAuthority) != *(new.DefaultCertificateAuthority)) {
+
+		updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
 		message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)", *current.DefaultCertificateAuthority, *new.DefaultCertificateAuthority))
 		isNeedUpdate = true
 	}
 
-	if !new.IsL4 {
+	// SNI certificate
+	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
 		updateOptions.CertificateAuthorities = new.CertificateAuthorities
 
 		if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
