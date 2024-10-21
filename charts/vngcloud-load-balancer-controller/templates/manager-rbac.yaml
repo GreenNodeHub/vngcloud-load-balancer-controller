@@ -25,6 +25,7 @@ rules:
   - ""
   resources:
   - endpoints
+  - events
   - nodes
   - services
   verbs:

@@ -98,6 +98,16 @@ func main() {
 				return "", fileName
 			},
 		})
+	} else {
+		logrus.SetReportCaller(true)
+		logrus.SetFormatter(&logrus.TextFormatter{
+			DisableTimestamp: false,
+			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
+				fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
+				//return frame.Function, fileName
+				return "", fileName
+			},
+		})
 	}
 
 	err := conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")

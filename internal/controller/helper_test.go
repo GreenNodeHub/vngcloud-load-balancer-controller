@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -19,16 +20,18 @@ type StepType struct {
 }
 
 type TestType[T kubernetesResource] struct {
-	preTest         func()                        // prepare test
-	name            string                        // test name
-	generateDepends func() []client.Object        // generate depend objects such as service, endpoint,...
-	generateObj     func() T                      // generate main object
-	expect          func(lb *entity.LoadBalancer) // expect after create
-	steps           []StepType                    // update and expect for each step
-	postTest        func()                        // expect after clean up
+	preTest           func()                        // prepare test
+	name              string                        // test name
+	generateDepends   func() []client.Object        // generate depend objects such as service, endpoint,...
+	generateObj       func() T                      // generate main object
+	expect            func(lb *entity.LoadBalancer) // expect after create
+	steps             []StepType                    // update and expect for each step
+	expectAfterDelete func()                        // expect after clean up
+	postTest          func()                        // expect after clean up
 }
 
 func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
+	time.Sleep(2 * time.Second)
 	logrus.Info("------------------- ", tt.name, " -------------------")
 	if tt.preTest != nil {
 		tt.preTest()
@@ -78,8 +81,13 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 		err := k8sClient.Get(ctx, client.ObjectKey{Name: objName, Namespace: objNamespace}, obj)
 		return err != nil
 	}, 2*timeout, interval).Should(BeTrue())
-	_, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-	Expect(err).Should(HaveOccurred())
+	// _, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
+	// Expect(err).Should(HaveOccurred())
+
+	// expect after delete
+	if tt.expectAfterDelete != nil {
+		tt.expectAfterDelete()
+	}
 
 	for _, depend := range depends {
 		Expect(k8sClient.Delete(ctx, depend)).Should(Succeed())

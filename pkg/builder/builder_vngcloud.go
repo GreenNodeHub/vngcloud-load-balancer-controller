@@ -179,6 +179,12 @@ func (r *vngcloudLBBuilder) buildPool(pool *entityv2.Pool, isL4 bool) (*poolBuil
 		return nil, err
 	}
 
+	if members == nil || members.Items == nil {
+		members = &entityv2.ListMembers{
+			Items: make([]*entityv2.Member, 0),
+		}
+	}
+
 	for _, member := range members.Items {
 		poolBuilder.Members = append(poolBuilder.Members, &loadbalancerv2.Member{
 			Name:        member.Name,
@@ -462,12 +468,12 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 	for _, oldListener := range oldBuilder.GetOldListeners() {
 		currentListener := r.GetListenerBuilderByName(oldListener.GetName())
 		newListener := newBuilder.GetListenerBuilderByName(oldListener.GetName())
-		if currentListener == nil || currentListener.IsDeleted() || newListener != nil {
+		if currentListener == nil || currentListener.IsDeleted() {
 			continue
 		}
 
-		// delete whole listener
-		if r.CanDeleteWholeListener(oldListener) {
+		// delete whole listener if new not used and can delete whole
+		if newListener == nil && r.CanDeleteWholeListener(oldListener) {
 			if err := r.provider.DeleteListener(r.context, r.GetLoadBalancerID(), oldListener.GetID()); err != nil {
 				r.logger.Error("Failed to delete listener: ", err)
 				return err
@@ -483,7 +489,10 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 		// delete redundant policy
 		for _, policy := range oldListener.GetOldPolicies() {
 			currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName())
-			newPolicy := newListener.GetPolicyBuilderByName(policy.GetName())
+			var newPolicy *policyBuilderType
+			if newListener != nil {
+				newPolicy = newListener.GetPolicyBuilderByName(policy.GetName())
+			}
 
 			if currentPolicy == nil || currentPolicy.IsDeleted() || newPolicy != nil {
 				continue

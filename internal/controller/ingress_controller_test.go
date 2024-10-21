@@ -1553,6 +1553,227 @@ var _ = Describe("Ingress Controller", func() {
 		})
 	})
 
+	Context("Load balaner already exist, update annotation to this load balancer", func() {
+		It("it should work as expectation", func() {
+			mockIngressReconciler.modeTest = false
+
+			// ensure no load balancer
+			lists, err := mockProvider.ListLoadBalancers(ctx)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(lists).ShouldNot(BeNil())
+			Expect(len(lists.Items)).Should(Equal(0))
+
+			// create load balancer
+			healthMonitorOpt := &loadbalancerv2.HealthMonitor{
+				HealthCheckProtocol: "HTTP",
+				HealthyThreshold:    2,
+				UnhealthyThreshold:  3,
+				Interval:            5,
+				Timeout:             5,
+				HealthCheckMethod:   nil,
+				HttpVersion:         nil,
+				HealthCheckPath:     nil,
+				DomainName:          nil,
+				SuccessCode:         nil,
+			}
+			poolOpt := &loadbalancerv2.CreatePoolRequest{
+				Algorithm:     loadbalancerv2.PoolAlgorithmLeastConn,
+				PoolName:      "test-pool-gogsf",
+				PoolProtocol:  "tcp",
+				Stickiness:    nil,
+				TLSEncryption: nil,
+				HealthMonitor: healthMonitorOpt,
+				Members:       nil,
+			}
+			listenerOpt := &loadbalancerv2.CreateListenerRequest{
+				AllowedCidrs:                "0.0.0.0/0",
+				ListenerName:                "vks_http_listener",
+				ListenerProtocol:            "HTTP",
+				ListenerProtocolPort:        80,
+				TimeoutClient:               50000,
+				TimeoutConnection:           50000,
+				TimeoutMember:               50000,
+				Headers:                     []string{},
+				CertificateAuthorities:      nil,
+				ClientCertificate:           nil,
+				DefaultCertificateAuthority: nil,
+			}
+			opt := &loadbalancerv2.CreateLoadBalancerRequest{
+				Name:         "test-service-gogsf",
+				PackageID:    provider.DEFAULT_L7_PACKAGE_ID,
+				Scheme:       "internal",
+				AutoScalable: true,
+				SubnetID:     provider.MockSubnetID,
+				Type:         loadbalancerv2.LoadBalancerTypeLayer7,
+			}
+			LB, err := mockProvider.CreateLoadBalancer(ctx, opt.WithPool(poolOpt).WithListener(listenerOpt))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(LB).ShouldNot(BeNil())
+			Expect(LB.UUID).ShouldNot(Equal(""))
+			LB, err = mockProvider.GetLoadBalancerByID(ctx, LB.UUID)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(LB).ShouldNot(BeNil())
+			Expect(LB.Name).Should(Equal("test-service-gogsf"))
+
+			// check pool
+			pools, err := mockProvider.ListPool(ctx, LB.UUID)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(pools).ShouldNot(BeNil())
+			Expect(len(pools.Items)).Should(Equal(1))
+			Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
+
+			// check listener
+			listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(listeners).ShouldNot(BeNil())
+			Expect(len(listeners.Items)).Should(Equal(1))
+			Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
+
+			// create policy
+			policyOpt := &loadbalancerv2.CreatePolicyRequest{
+				Name: "test-policy-gogsf",
+			}
+			policy, err := mockProvider.CreatePolicy(ctx, LB.UUID, listeners.Items[0].UUID, policyOpt)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(policy).ShouldNot(BeNil())
+
+			// delete load balancer after test
+			defer func() {
+				err := mockProvider.DeleteLoadBalancer(ctx, LB.UUID)
+				Expect(err).ShouldNot(HaveOccurred())
+			}()
+
+			tests := TestType[*networkingv1.Ingress]{
+				preTest: func() {},
+				name:    "create with id annotation",
+				generateDepends: func() []client.Object {
+					endpoint := newEndpointResource("test-service-gogsf", "default")
+					endpoint.Subsets = []corev1.EndpointSubset{
+						// endpointSubset is for Deployment,... which is in use by service
+						{
+							Addresses: []corev1.EndpointAddress{
+								{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+								{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+								{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+							},
+							Ports: []corev1.EndpointPort{
+								{Name: "http", Port: 80},
+								{Name: "https", Port: 443},
+							},
+						},
+						{
+							Addresses: []corev1.EndpointAddress{
+								{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+								{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+							},
+							NotReadyAddresses: []corev1.EndpointAddress{
+								{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+								{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+							},
+							Ports: []corev1.EndpointPort{
+								{Name: "http", Port: 8080},
+								{Name: "https", Port: 6443},
+							},
+						},
+					}
+
+					service := newServiceNodePortResource("test-service-gogsf", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{endpoint, service}
+				},
+				generateObj: func() *networkingv1.Ingress {
+					ingress := newIngressResource("test-service-gogsf", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = nil
+					ingress.Spec.Rules = []networkingv1.IngressRule{
+						{
+							Host: "test.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											PathType: func() *networkingv1.PathType { pt := networkingv1.PathTypePrefix; return &pt }(),
+											Path:     "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "test-service-gogsf",
+													Port: networkingv1.ServiceBackendPort{Number: 80},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					if ingress.Annotations == nil {
+						ingress.Annotations = map[string]string{}
+					}
+					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = LB.UUID
+					return ingress
+				},
+				expect: func(loadbalancer *entity.LoadBalancer) {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					Expect(loadbalancer).ShouldNot(BeNil())
+					Expect(loadbalancer.Name).Should(Equal(LB.Name))
+					Expect(loadbalancer.UUID).Should(Equal(LB.UUID))
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+					for _, pool := range pools.Items {
+						Expect(pool.Name).Should(BeElementOf(
+							"vks-bea48-default-test-service-gogsf-80",
+							"test-pool-gogsf"))
+					}
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+					for _, listener := range listeners.Items {
+						Expect(listener.Protocol).Should(Equal("HTTP"))
+						Expect(listener.ProtocolPort).Should(Equal(80))
+					}
+				},
+				steps: []StepType{},
+				expectAfterDelete: func() {
+					LB, err := mockProvider.GetLoadBalancerByID(ctx, LB.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(LB).ShouldNot(BeNil())
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, LB.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect(len(pools.Items)).Should(Equal(1))
+					Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect(len(listeners.Items)).Should(Equal(1))
+					Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
+				},
+				postTest: func() {},
+			}
+
+			logrus.Info("Running test: ", tests.name)
+			RunMultiStepTest[*networkingv1.Ingress](tests)
+		})
+	})
+
 	// Context("When create and update https listener", func() {
 	// 	It("it should work as expectation", func() {
 	// 		mockIngressReconciler.modeTest = false
@@ -1563,7 +1784,7 @@ var _ = Describe("Ingress Controller", func() {
 
 	// 		for _, tt := range tests {
 	// 			logrus.Info("Running test: ", tt.name)
-	// 			RunMultiStepTest[*networkingv1.Ingress](tt)
+	// RunMultiStepTest[*networkingv1.Ingress](tt)
 	// 		}
 	// 	})
 	// })
@@ -1578,7 +1799,7 @@ var _ = Describe("Ingress Controller", func() {
 
 	// 		for _, tt := range tests {
 	// 			logrus.Info("Running test: ", tt.name)
-	// 			RunMultiStepTest[*networkingv1.Ingress](tt)
+	// RunMultiStepTest[*networkingv1.Ingress](tt)
 	// 		}
 	// 	})
 	// })
