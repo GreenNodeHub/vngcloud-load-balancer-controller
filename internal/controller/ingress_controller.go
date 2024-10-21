@@ -29,6 +29,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	k8sBuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,6 +56,7 @@ import (
 type IngressReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
+	Recorder         record.EventRecorder
 	Config           *config.Config
 	FinalizerManager k8s.FinalizerManager
 
@@ -156,6 +158,41 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !r.initialized {
 		return ctrl.Result{Requeue: true}, nil
 	}
+
+	result, err := r.reconcile(ctx, req)
+	if err != nil {
+		// handle some particular errors
+		if errs.IsExceededSecurityGroupPerServerQuota(err) {
+			return ctrl.Result{}, nil
+		}
+		if errs.IsLoadBalancerNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+
+		switch err {
+		// misconfiguration, ignore these errors, reconcile again when resource is updated
+		case
+			errs.ErrorMissingCertificates,
+			errs.ErrorServicePortNotFound,
+			errs.ErrorSecurityGroupNotFound,
+			errs.ErrorServicePortEmpty:
+			return ctrl.Result{}, nil
+
+		// no need to reconcile again
+		case
+			errs.ErrorSecurityGroupInUse:
+			return ctrl.Result{}, nil
+
+		// sleep 5 seconds and requeue
+		default:
+			time.Sleep(5 * time.Second)
+			return ctrl.Result{}, err
+		}
+	}
+	return result, nil
+}
+
+func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	key := genKey(req.Namespace, req.Name)
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + key)).GetContext()
@@ -182,11 +219,35 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	switch event.Type {
 	case event_classification.DeleteEvent:
-		return r.deleteObject(ctx, event.Obj.(*networkingv1.Ingress))
+		obj := event.Obj.(*networkingv1.Ingress)
+		r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleting", key)
+		result, err := r.deleteObject(ctx, obj)
+		if err == nil {
+			r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleted", key)
+		} else {
+			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedDelete", err.Error())
+		}
+		return result, err
 	case event_classification.CreateEvent:
-		return r.ensureObject(ctx, event.Obj.(*networkingv1.Ingress), event.OldObj)
+		obj := event.Obj.(*networkingv1.Ingress)
+		r.Recorder.Event(obj, corev1.EventTypeNormal, "Creating", key)
+		result, err := r.ensureObject(ctx, obj, nil)
+		if err == nil {
+			r.Recorder.Event(obj, corev1.EventTypeNormal, "Created", key)
+		} else {
+			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedCreate", err.Error())
+		}
+		return result, err
 	default:
-		return r.ensureObject(ctx, event.Obj.(*networkingv1.Ingress), event.OldObj)
+		obj := event.Obj.(*networkingv1.Ingress)
+		r.Recorder.Event(obj, corev1.EventTypeNormal, "Updating", key)
+		result, err := r.ensureObject(ctx, obj, event.OldObj)
+		if err == nil {
+			r.Recorder.Event(obj, corev1.EventTypeNormal, "Updated", key)
+		} else {
+			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedUpdate", err.Error())
+		}
+		return result, err
 	}
 }
 

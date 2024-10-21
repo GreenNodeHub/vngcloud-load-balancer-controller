@@ -176,9 +176,10 @@ func main() {
 	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
 
 	if err = (&controller.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: conf,
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:   conf,
 		Provider: &provider.VNGCLOUD_Provider{
 			Config: conf,
 		},
@@ -188,9 +189,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.IngressReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Config: conf,
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:   conf,
 		Provider: &provider.VNGCLOUD_Provider{
 			Config: conf,
 		},

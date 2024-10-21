@@ -246,6 +246,7 @@ var _ = BeforeSuite(func() {
 		modeTest: true,
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
 
 		Config:           mockConfig,
 		Provider:         mockProvider,
@@ -258,6 +259,7 @@ var _ = BeforeSuite(func() {
 		modeTest: true,
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
 
 		Config:           mockConfig,
 		Provider:         mockProvider,
