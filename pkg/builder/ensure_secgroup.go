@@ -59,7 +59,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 		}
 
 		// if default secgroup is not in use, delete it
-		_, isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
+		isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
 		if err != nil {
 			return err
 		}
@@ -251,7 +251,7 @@ func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilde
 	// delete default secgroup if possible
 	if isExists {
 		// if default secgroup is not in use, delete it
-		_, isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
+		isInUse, err := r.getServerUseSecgroup(defaultSecgroup.Id)
 		if err != nil {
 			return err
 		}
@@ -331,11 +331,12 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 	return nil
 }
 
-func (m *vngcloudLBBuilder) getServerUseSecgroup(secgroupID string) (*entityv2.ListServers, bool, error) {
+// return true if secgroup is in use
+func (m *vngcloudLBBuilder) getServerUseSecgroup(secgroupID string) (bool, error) {
 	listServer, err := m.provider.ListServerBySecgroupID(m.context, secgroupID)
 	if err != nil {
 		m.logger.Error("Fail to list server by secgroup", err)
-		return nil, true, err
+		return true, err
 	}
 
 	if listServer == nil || listServer.Items == nil {
@@ -344,5 +345,5 @@ func (m *vngcloudLBBuilder) getServerUseSecgroup(secgroupID string) (*entityv2.L
 		}
 	}
 
-	return listServer, len(listServer.Items) > 0, nil
+	return len(listServer.Items) > 0, nil
 }

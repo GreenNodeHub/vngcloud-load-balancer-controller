@@ -94,7 +94,7 @@ func main() {
 			DisableTimestamp: true,
 			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
 				fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
-				//return frame.Function, fileName
+				// return frame.Function, fileName
 				return "", fileName
 			},
 		})
@@ -104,7 +104,7 @@ func main() {
 			DisableTimestamp: false,
 			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
 				fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
-				//return frame.Function, fileName
+				// return frame.Function, fileName
 				return "", fileName
 			},
 		})

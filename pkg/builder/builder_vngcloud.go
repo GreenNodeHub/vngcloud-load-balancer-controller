@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -240,6 +241,9 @@ func (r *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*Listene
 }
 
 func (r *vngcloudLBBuilder) buildPolicy(policy *entityv2.Policy) (*policyBuilderType, error) {
+	if policy == nil {
+		return nil, errors.New("policy is nil")
+	}
 	policyBuilder := &policyBuilderType{
 		commonBuilder: commonBuilder{
 			name: policy.Name,

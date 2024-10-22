@@ -145,7 +145,7 @@ func (h *helperStruct) ParseHealthCheckProtocol(pPoolProtocol corev1.Protocol, p
 
 // ParsePoolProtocol parse string to pool protocol
 func (h *helperStruct) ParsePoolProtocol(pPoolProtocol string) loadbalancerv2.PoolProtocol {
-	opt := strings.TrimSpace(strings.ToUpper(string(pPoolProtocol)))
+	opt := strings.TrimSpace(strings.ToUpper(pPoolProtocol))
 	switch opt {
 	case string(loadbalancerv2.PoolProtocolProxy):
 		return loadbalancerv2.PoolProtocolProxy
@@ -492,7 +492,7 @@ func (h *helperStruct) CompareSecgroupRule(current []*entityv2.SecgroupRule, new
 	// get only ingress rules
 	currentIngressRules := make([]*entityv2.SecgroupRule, 0)
 	for _, rule := range current {
-		if strings.EqualFold(string(rule.Direction), string(networkv2.SecgroupRuleDirectionIngress)) {
+		if strings.EqualFold(rule.Direction, string(networkv2.SecgroupRuleDirectionIngress)) {
 			currentIngressRules = append(currentIngressRules, rule)
 		}
 	}

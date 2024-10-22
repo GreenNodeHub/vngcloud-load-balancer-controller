@@ -266,7 +266,7 @@ var _ = Describe("Service Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -277,15 +277,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -295,7 +295,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address,
 								mockNode2.Status.Addresses[0].Address,
@@ -307,7 +307,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -361,7 +361,7 @@ var _ = Describe("Service Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("test-lb"))
-						Expect(loadbalancer.Internal).Should(Equal(true))
+						Expect(loadbalancer.Internal).Should(BeTrue())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
 						Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -372,15 +372,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("SOURCE_IP"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("PING-UDP"))
@@ -390,7 +390,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(103))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address,
 								mockNode2.Status.Addresses[0].Address,
@@ -402,7 +402,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -440,7 +440,7 @@ var _ = Describe("Service Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -451,15 +451,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -469,7 +469,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(1)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(1)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address))
 						}
@@ -478,7 +478,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -516,7 +516,7 @@ var _ = Describe("Service Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -527,15 +527,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -545,7 +545,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(1)) // number of member in pool = number of node OR number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(1)) // number of member in pool = number of node OR number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address))
 						}
@@ -554,7 +554,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -592,7 +592,7 @@ var _ = Describe("Service Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-75a17"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -603,15 +603,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-PRO-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("PROXY"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -621,7 +621,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address,
 								mockNode2.Status.Addresses[0].Address,
@@ -633,7 +633,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -674,7 +674,7 @@ var _ = Describe("Service Controller", func() {
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-75a17"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -685,15 +685,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -703,7 +703,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 								mockNode1.Status.Addresses[0].Address,
 								mockNode2.Status.Addresses[0].Address,
@@ -715,7 +715,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -756,7 +756,7 @@ var _ = Describe("Service Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-75a17"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -767,15 +767,15 @@ var _ = Describe("Service Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
 									Expect(pool.Description).Should(Equal("????????"))
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("TCP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -785,7 +785,7 @@ var _ = Describe("Service Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 									Expect(pool.Members.Items[0].Address).Should(BeElementOf(
 										mockNode1.Status.Addresses[0].Address,
 										mockNode2.Status.Addresses[0].Address,
@@ -797,7 +797,7 @@ var _ = Describe("Service Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("TCP"))
 									Expect(listener.ProtocolPort).Should(Equal(81))
@@ -873,7 +873,7 @@ var _ = Describe("Service Controller", func() {
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-75a17"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -884,15 +884,15 @@ var _ = Describe("Service Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
 							Expect(pool.Description).Should(Equal("????????"))
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("TCP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -902,7 +902,7 @@ var _ = Describe("Service Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							for _, member := range pool.Members.Items {
 								Expect(member.ProtocolPort).Should(Equal(31000))
 								Expect(member.MonitorPort).Should(Equal(31000))
@@ -918,7 +918,7 @@ var _ = Describe("Service Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("TCP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -960,7 +960,7 @@ var _ = Describe("Service Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-75a17"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -971,15 +971,15 @@ var _ = Describe("Service Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
 									Expect(pool.Description).Should(Equal("????????"))
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("TCP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -989,7 +989,7 @@ var _ = Describe("Service Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(8)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(8)) // number of member in pool = number of node or number of endpoint
 									for _, member := range pool.Members.Items {
 										Expect(member.ProtocolPort).Should(BeElementOf(80, 8080))
 										Expect(member.MonitorPort).Should(BeElementOf(80, 8080))
@@ -1004,7 +1004,7 @@ var _ = Describe("Service Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("TCP"))
 									Expect(listener.ProtocolPort).Should(Equal(80))
@@ -1205,7 +1205,7 @@ var _ = Describe("Service Controller", func() {
 						tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
-						Expect(len(tags.Items)).Should(Equal(1))
+						Expect((tags.Items)).Should(HaveLen(1))
 						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1213,7 +1213,7 @@ var _ = Describe("Service Controller", func() {
 						secgroups, err := mockProvider.ListSecurityGroups(ctx)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(secgroups).ShouldNot(BeNil())
-						Expect(len(secgroups.Items)).Should(Equal(3))
+						Expect((secgroups.Items)).Should(HaveLen(3))
 						expectName := []string{"vks-k8s-000000-default-test-servi-4d0e7", bigbangSec.Name, blackpinkSec.Name}
 						secgroupID := ""
 						for _, secgroup := range secgroups.Items {
@@ -1228,7 +1228,7 @@ var _ = Describe("Service Controller", func() {
 						rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect(len(rules.Items)).Should(Equal(3))
+						Expect((rules.Items)).Should(HaveLen(3))
 						expectPortRangeMax := []int{80, 8080, 31000} // cilium should only have nodeport + podport
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1244,7 +1244,7 @@ var _ = Describe("Service Controller", func() {
 						server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(server).ShouldNot(BeNil())
-						Expect(len(server.Items)).Should(Equal(4))
+						Expect((server.Items)).Should(HaveLen(4))
 						for _, item := range server.Items {
 							serverSecgroups := make([]string, 0)
 							for _, secgroup := range item.SecGroups {
@@ -1289,7 +1289,7 @@ var _ = Describe("Service Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(1))
+								Expect((tags.Items)).Should(HaveLen(1))
 								Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 								Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1297,7 +1297,7 @@ var _ = Describe("Service Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(3))
+								Expect((secgroups.Items)).Should(HaveLen(3))
 								expectName := []string{"vks-k8s-000000-default-test-servi-4d0e7", bigbangSec.Name, blackpinkSec.Name}
 								secgroupID := ""
 								for _, secgroup := range secgroups.Items {
@@ -1312,7 +1312,7 @@ var _ = Describe("Service Controller", func() {
 								rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(rules).ShouldNot(BeNil())
-								Expect(len(rules.Items)).Should(Equal(2))
+								Expect((rules.Items)).Should(HaveLen(2))
 								expectPortRangeMax := []int{80, 31000} // cilium should only have nodeport + podport
 								for _, rule := range rules.Items {
 									Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1328,7 +1328,7 @@ var _ = Describe("Service Controller", func() {
 								server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 								for _, item := range server.Items {
 									serverSecgroups := make([]string, 0)
 									for _, secgroup := range item.SecGroups {
@@ -1347,7 +1347,7 @@ var _ = Describe("Service Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", bigbangSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1361,7 +1361,7 @@ var _ = Describe("Service Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
@@ -1375,13 +1375,13 @@ var _ = Describe("Service Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should delete default secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should delete default secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 						{
@@ -1393,7 +1393,7 @@ var _ = Describe("Service Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", blackpinkSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1407,7 +1407,7 @@ var _ = Describe("Service Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
@@ -1421,18 +1421,18 @@ var _ = Describe("Service Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should not delete secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should not delete secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(0))
+								Expect((server.Items)).Should(BeEmpty())
 
 								server, err = mockProvider.ListServerBySecgroupID(ctx, blackpinkSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 					},
@@ -1497,7 +1497,7 @@ var _ = Describe("Service Controller", func() {
 						tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
-						Expect(len(tags.Items)).Should(Equal(1))
+						Expect((tags.Items)).Should(HaveLen(1))
 						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1505,7 +1505,7 @@ var _ = Describe("Service Controller", func() {
 						secgroups, err := mockProvider.ListSecurityGroups(ctx)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(secgroups).ShouldNot(BeNil())
-						Expect(len(secgroups.Items)).Should(Equal(3))
+						Expect((secgroups.Items)).Should(HaveLen(3))
 						expectName := []string{"vks-k8s-000000-default-test-servi-4d0e7", bigbangSec.Name, blackpinkSec.Name}
 						secgroupID := ""
 						for _, secgroup := range secgroups.Items {
@@ -1520,7 +1520,7 @@ var _ = Describe("Service Controller", func() {
 						rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect(len(rules.Items)).Should(Equal(1))
+						Expect((rules.Items)).Should(HaveLen(1))
 						expectPortRangeMax := []int{30000} // calico overlay should only have nodeport
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1536,7 +1536,7 @@ var _ = Describe("Service Controller", func() {
 						server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(server).ShouldNot(BeNil())
-						Expect(len(server.Items)).Should(Equal(4))
+						Expect((server.Items)).Should(HaveLen(4))
 						for _, item := range server.Items {
 							serverSecgroups := make([]string, 0)
 							for _, secgroup := range item.SecGroups {
@@ -1555,7 +1555,7 @@ var _ = Describe("Service Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", bigbangSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1569,7 +1569,7 @@ var _ = Describe("Service Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
@@ -1583,13 +1583,13 @@ var _ = Describe("Service Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should delete default secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should delete default secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 						{
@@ -1601,7 +1601,7 @@ var _ = Describe("Service Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", blackpinkSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1615,7 +1615,7 @@ var _ = Describe("Service Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
@@ -1629,18 +1629,18 @@ var _ = Describe("Service Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should not delete secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should not delete secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(0))
+								Expect((server.Items)).Should(BeEmpty())
 
 								server, err = mockProvider.ListServerBySecgroupID(ctx, blackpinkSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 					},
@@ -1727,6 +1727,8 @@ var _ = Describe("Service Controller", func() {
 	// 	})
 	// })
 })
+
+var _ = newServiceResource("placeholder", "placeholder")
 
 func newServiceResource(name, namespace string) *corev1.Service {
 	return &corev1.Service{

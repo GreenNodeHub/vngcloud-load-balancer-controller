@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	. "github.com/onsi/gomega"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -412,7 +413,8 @@ func Test_defaultEndpointResolver_ResolvePodEndpoints(t *testing.T) {
 			defer ctrl.Finish()
 
 			k8sSchema := runtime.NewScheme()
-			clientgoscheme.AddToScheme(k8sSchema)
+			err := clientgoscheme.AddToScheme(k8sSchema)
+			Expect(err).ToNot(HaveOccurred())
 			k8sClient := testclient.NewClientBuilder().WithScheme(k8sSchema).Build()
 
 			ctx := context.Background()

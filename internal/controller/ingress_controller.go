@@ -190,8 +190,11 @@ func (r *IngressReconciler) Enqueue(req reconcile.Request) {
 	if !exists {
 		return
 	}
-	r.updateObjectAnnotation(context.Background(), obj,
+	err := r.updateObjectAnnotation(context.Background(), obj,
 		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
+	if err != nil {
+		logrus.Error("Failed to update annotation: ", err)
+	}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -286,13 +289,13 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 	case event_classification.DeleteEvent:
 		obj := event.Obj.(*networkingv1.Ingress)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleting", key)
-		result, err := r.deleteObject(ctx, obj)
+		err := r.deleteObject(ctx, obj)
 		if err == nil {
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleted", key)
 		} else {
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedDelete", err.Error())
 		}
-		return result, err
+		return ctrl.Result{}, err
 	case event_classification.CreateEvent:
 		obj := event.Obj.(*networkingv1.Ingress)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Creating", key)
@@ -495,28 +498,28 @@ func (r *IngressReconciler) ensureSecurityGroup(currentBuilder builder.LoadBalan
 	return nil
 }
 
-func (r *IngressReconciler) deleteObject(ctx context.Context, obj *networkingv1.Ingress) (ctrl.Result, error) {
+func (r *IngressReconciler) deleteObject(ctx context.Context, obj *networkingv1.Ingress) error {
 	logger := contexts.NewContext(ctx).Log()
 	r.resourceDependant.Clear(obj)
 
 	if !k8s.HasFinalizer(obj, consts.IngressFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
-	_, err := r.subDeleteObject(ctx, obj)
+	err := r.subDeleteObject(ctx, obj)
 	if err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
 		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
-		return ctrl.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
-func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networkingv1.Ingress) (ctrl.Result, error) {
+func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networkingv1.Ingress) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
@@ -525,12 +528,12 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	// ignore reconcile
 	if oldBuilder.IsIgnored() {
 		logger.Info("Ingress is ignored")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	if oldBuilder.GetLoadBalancerID() == "" {
 		logger.Info("LoadBalancer ID is empty, return.")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	// remove from update tracker
@@ -542,10 +545,10 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	if err != nil {
 		if errs.IsLoadBalancerNotFound(err) {
 			logger.Info("LoadBalancer not found, return.")
-			return ctrl.Result{}, nil
+			return nil
 		}
 		logger.Error("Failed to get current loadbalancer: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// build loadbalancer model, pass nil to object to create a model with default values
@@ -558,7 +561,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	)
 	if err != nil {
 		logger.Error("Failed to create new model builder: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// check if can delete whole loadbalancer
@@ -567,7 +570,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
 		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to delete loadbalancer: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
 	} else {
@@ -575,14 +578,14 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
 		if err != nil {
 			logger.Error("Failed to delete redundant listeners: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 
 		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
 		err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
 		if err != nil {
 			logger.Error("Failed to delete redundant pools: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -590,10 +593,10 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure delete security group: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *IngressReconciler) ensureDeleteSecurityGroup(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
@@ -820,7 +823,12 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// In case of delete, there will first be an update event with nonzero deletionTimestamp set on the object. Since
 				// deletion is already taken care of during update event, we will ignore this event.
 				case *networkingv1.Ingress:
-					return false
+					if object := e.Object.(*networkingv1.Ingress); object.Spec.IngressClassName == nil ||
+						*object.Spec.IngressClassName != consts.IngressClass {
+						return false
+					}
+					logrus.Info("Detect delete Ingress event.")
+					return true
 				case *corev1.Service:
 					logrus.Info("Detect delete Service event.")
 					return true

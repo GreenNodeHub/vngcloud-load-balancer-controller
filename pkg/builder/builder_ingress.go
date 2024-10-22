@@ -252,6 +252,7 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 	// find service port
 	var servicePort *corev1.ServicePort
 	for _, port := range findService.Spec.Ports {
+		port := port
 		if service.Port.Name != "" && service.Port.Name == port.Name {
 			servicePort = &port
 			break

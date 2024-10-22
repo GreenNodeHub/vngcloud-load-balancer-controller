@@ -195,7 +195,7 @@ var _ = BeforeSuite(func() {
 		DisableTimestamp: true,
 		CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
 			fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
-			//return frame.Function, fileName
+			// return frame.Function, fileName
 			return "", fileName
 		},
 	})
@@ -301,6 +301,8 @@ func printEndTest() {
 	logrus.Info("======================================================")
 	logrus.Info()
 }
+
+var _ = newEndpointResource("placeholder", "placeholder")
 
 func newEndpointResource(name, namespace string) *corev1.Endpoints {
 	return &corev1.Endpoints{

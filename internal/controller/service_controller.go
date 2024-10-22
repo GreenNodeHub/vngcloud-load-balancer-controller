@@ -87,9 +87,9 @@ type ServiceReconciler struct {
 	numCurrentLock      sync.Mutex
 }
 
-//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get;update;patch
@@ -104,8 +104,8 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
 func (r *ServiceReconciler) isValid(obj client.Object) bool {
@@ -210,8 +210,11 @@ func (r *ServiceReconciler) Enqueue(req reconcile.Request) {
 	if !exists {
 		return
 	}
-	r.updateObjectAnnotation(context.Background(), obj,
+	err := r.updateObjectAnnotation(context.Background(), obj,
 		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
+	if err != nil {
+		logrus.Error("Failed to update annotation: ", err)
+	}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -306,13 +309,13 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 	case event_classification.DeleteEvent:
 		obj := event.Obj.(*corev1.Service)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleting", key)
-		result, err := r.deleteObject(ctx, obj)
+		err := r.deleteObject(ctx, obj)
 		if err == nil {
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleted", key)
 		} else {
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedDelete", err.Error())
 		}
-		return result, err
+		return ctrl.Result{}, err
 	case event_classification.CreateEvent:
 		obj := event.Obj.(*corev1.Service)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Creating", key)
@@ -513,28 +516,28 @@ func (r *ServiceReconciler) ensureSecurityGroup(currentBuilder builder.LoadBalan
 	return nil
 }
 
-func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Service) (ctrl.Result, error) {
+func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Service) error {
 	logger := contexts.NewContext(ctx).Log()
 	r.resourceDependant.Clear(obj)
 
 	if !k8s.HasFinalizer(obj, consts.ServiceFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
-	_, err := r.subDeleteObject(ctx, obj)
+	err := r.subDeleteObject(ctx, obj)
 	if err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
 		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedRemoveFinalizer, fmt.Sprintf("Failed remove finalizer due to %v", err))
-		return ctrl.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
-func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Service) (ctrl.Result, error) {
+func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Service) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
@@ -543,12 +546,12 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	// ignore reconcile
 	if oldBuilder.IsIgnored() {
 		logger.Info("Service is ignored")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	if oldBuilder.GetLoadBalancerID() == "" {
 		logger.Info("LoadBalancer ID is empty, return.")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	// remove from update tracker
@@ -560,10 +563,10 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	if err != nil {
 		if errs.IsLoadBalancerNotFound(err) {
 			logger.Info("LoadBalancer not found, return.")
-			return ctrl.Result{}, nil
+			return nil
 		}
 		logger.Error("Failed to get current loadbalancer: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// build loadbalancer model, pass nil to object to create a model with default values
@@ -576,7 +579,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	)
 	if err != nil {
 		logger.Error("Failed to create new model builder: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// check if can delete whole loadbalancer
@@ -585,7 +588,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
 		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to delete loadbalancer: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
 	} else {
@@ -593,14 +596,14 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
 		if err != nil {
 			logger.Error("Failed to delete redundant listeners: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 
 		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
 		err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
 		if err != nil {
 			logger.Error("Failed to delete redundant pools: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -608,10 +611,10 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure delete security group: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *ServiceReconciler) ensureDeleteSecurityGroup(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
@@ -823,7 +826,11 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				// In case of delete, there will first be an update event with nonzero deletionTimestamp set on the object. Since
 				// deletion is already taken care of during update event, we will ignore this event.
 				case *corev1.Service:
-					return false
+					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
+						return false
+					}
+					logrus.Info("Detect delete Service event.")
+					return true
 				case *corev1.Endpoints:
 					logrus.Info("Detect delete Endpoints event.")
 					return true

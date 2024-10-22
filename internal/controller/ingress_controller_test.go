@@ -258,7 +258,7 @@ var _ = Describe("Ingress Controller", func() {
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -269,7 +269,7 @@ var _ = Describe("Ingress Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(BeElementOf(
 								consts.DEFAULT_NAME_DEFAULT_POOL,
@@ -278,8 +278,8 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("HTTP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -289,7 +289,7 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							for _, member := range pool.Members.Items {
 								Expect(member.ProtocolPort).Should(Equal(30000))
 								Expect(member.MonitorPort).Should(Equal(30000))
@@ -305,7 +305,7 @@ var _ = Describe("Ingress Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("HTTP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -372,7 +372,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -383,7 +383,7 @@ var _ = Describe("Ingress Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(BeElementOf(
 								"vks-bea48-default-test-service-gogsf-80"))
@@ -391,8 +391,8 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("HTTP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -402,7 +402,7 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							for _, member := range pool.Members.Items {
 								Expect(member.ProtocolPort).Should(Equal(30000))
 								Expect(member.MonitorPort).Should(Equal(30000))
@@ -418,7 +418,7 @@ var _ = Describe("Ingress Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("HTTP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -444,7 +444,7 @@ var _ = Describe("Ingress Controller", func() {
 							policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 							Expect(err).ShouldNot(HaveOccurred())
 							Expect(policies).ShouldNot(BeNil())
-							Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+							Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 							for _, policy := range policies.Items {
 								Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 								Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -466,7 +466,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -477,7 +477,7 @@ var _ = Describe("Ingress Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(1)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(BeElementOf(
 										"vks-bea48-default-test-service-gogsf-443"))
@@ -485,8 +485,8 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("HTTP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -496,7 +496,7 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 									for _, member := range pool.Members.Items {
 										Expect(member.ProtocolPort).Should(Equal(30001))
 										Expect(member.MonitorPort).Should(Equal(30001))
@@ -512,7 +512,7 @@ var _ = Describe("Ingress Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("HTTP"))
 									Expect(listener.ProtocolPort).Should(Equal(80))
@@ -538,7 +538,7 @@ var _ = Describe("Ingress Controller", func() {
 									policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 									Expect(err).ShouldNot(HaveOccurred())
 									Expect(policies).ShouldNot(BeNil())
-									Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+									Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 									for _, policy := range policies.Items {
 										Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 										Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -629,7 +629,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-						Expect(loadbalancer.Internal).Should(Equal(false))
+						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -640,7 +640,7 @@ var _ = Describe("Ingress Controller", func() {
 						pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(pools).ShouldNot(BeNil())
-						Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+						Expect((pools.Items)).Should(HaveLen(2)) // number of pool
 						for _, pool := range pools.Items {
 							Expect(pool.Name).Should(BeElementOf(
 								consts.DEFAULT_NAME_DEFAULT_POOL,
@@ -649,8 +649,8 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.Status).Should(Equal("ACTIVE"))
 							Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 							Expect(pool.Protocol).Should(Equal("HTTP"))
-							Expect(pool.Stickiness).Should(Equal(false))
-							Expect(pool.TLSEncryption).Should(Equal(false))
+							Expect(pool.Stickiness).Should(BeFalse())
+							Expect(pool.TLSEncryption).Should(BeFalse())
 
 							Expect(pool.HealthMonitor).ShouldNot(BeNil())
 							Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -660,7 +660,7 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 							Expect(pool.Members).ShouldNot(BeNil())
-							Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							for _, member := range pool.Members.Items {
 								Expect(member.ProtocolPort).Should(Equal(30000))
 								Expect(member.MonitorPort).Should(Equal(30000))
@@ -676,7 +676,7 @@ var _ = Describe("Ingress Controller", func() {
 						listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(listeners).ShouldNot(BeNil())
-						Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+						Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 						for _, listener := range listeners.Items {
 							Expect(listener.Protocol).Should(Equal("HTTP"))
 							Expect(listener.ProtocolPort).Should(Equal(80))
@@ -702,7 +702,7 @@ var _ = Describe("Ingress Controller", func() {
 							policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 							Expect(err).ShouldNot(HaveOccurred())
 							Expect(policies).ShouldNot(BeNil())
-							Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+							Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 							for _, policy := range policies.Items {
 								Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 								Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -725,7 +725,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -736,7 +736,7 @@ var _ = Describe("Ingress Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(2)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(BeElementOf(
 										consts.DEFAULT_NAME_DEFAULT_POOL,
@@ -745,8 +745,8 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("HTTP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -756,7 +756,7 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(4)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 									for _, member := range pool.Members.Items {
 										Expect(member.ProtocolPort).Should(Equal(30000))
 										Expect(member.MonitorPort).Should(Equal(30000))
@@ -772,7 +772,7 @@ var _ = Describe("Ingress Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("HTTP"))
 									Expect(listener.ProtocolPort).Should(Equal(80))
@@ -798,7 +798,7 @@ var _ = Describe("Ingress Controller", func() {
 									policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 									Expect(err).ShouldNot(HaveOccurred())
 									Expect(policies).ShouldNot(BeNil())
-									Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+									Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 									for _, policy := range policies.Items {
 										Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 										Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -823,7 +823,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -834,7 +834,7 @@ var _ = Describe("Ingress Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(2)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(BeElementOf(
 										consts.DEFAULT_NAME_DEFAULT_POOL,
@@ -843,8 +843,8 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("HTTP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -854,7 +854,7 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(8)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(8)) // number of member in pool = number of node or number of endpoint
 									for _, member := range pool.Members.Items {
 										Expect(member.ProtocolPort).Should(BeElementOf(80, 8080))
 										Expect(member.MonitorPort).Should(BeElementOf(80, 8080))
@@ -868,7 +868,7 @@ var _ = Describe("Ingress Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("HTTP"))
 									Expect(listener.ProtocolPort).Should(Equal(80))
@@ -894,7 +894,7 @@ var _ = Describe("Ingress Controller", func() {
 									policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 									Expect(err).ShouldNot(HaveOccurred())
 									Expect(policies).ShouldNot(BeNil())
-									Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+									Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 									for _, policy := range policies.Items {
 										Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 										Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -917,7 +917,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
-								Expect(loadbalancer.Internal).Should(Equal(false))
+								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
 								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
@@ -928,7 +928,7 @@ var _ = Describe("Ingress Controller", func() {
 								pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(pools).ShouldNot(BeNil())
-								Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+								Expect((pools.Items)).Should(HaveLen(2)) // number of pool
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(BeElementOf(
 										consts.DEFAULT_NAME_DEFAULT_POOL,
@@ -937,8 +937,8 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.Status).Should(Equal("ACTIVE"))
 									Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 									Expect(pool.Protocol).Should(Equal("HTTP"))
-									Expect(pool.Stickiness).Should(Equal(false))
-									Expect(pool.TLSEncryption).Should(Equal(false))
+									Expect(pool.Stickiness).Should(BeFalse())
+									Expect(pool.TLSEncryption).Should(BeFalse())
 
 									Expect(pool.HealthMonitor).ShouldNot(BeNil())
 									Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
@@ -948,7 +948,7 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 
 									Expect(pool.Members).ShouldNot(BeNil())
-									Expect(len(pool.Members.Items)).Should(Equal(8)) // number of member in pool = number of node or number of endpoint
+									Expect((pool.Members.Items)).Should(HaveLen(8)) // number of member in pool = number of node or number of endpoint
 									for _, member := range pool.Members.Items {
 										Expect(member.ProtocolPort).Should(BeElementOf(443, 6443))
 										Expect(member.MonitorPort).Should(BeElementOf(443, 6443))
@@ -962,7 +962,7 @@ var _ = Describe("Ingress Controller", func() {
 								listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(listeners).ShouldNot(BeNil())
-								Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+								Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 								for _, listener := range listeners.Items {
 									Expect(listener.Protocol).Should(Equal("HTTP"))
 									Expect(listener.ProtocolPort).Should(Equal(80))
@@ -988,7 +988,7 @@ var _ = Describe("Ingress Controller", func() {
 									policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
 									Expect(err).ShouldNot(HaveOccurred())
 									Expect(policies).ShouldNot(BeNil())
-									Expect(len(policies.Items)).Should(Equal(1)) // number of policy
+									Expect((policies.Items)).Should(HaveLen(1)) // number of policy
 									for _, policy := range policies.Items {
 										Expect(policy.Name).Should(Equal("vks-bea48-false-r0-p0"))
 										Expect(policy.Action).Should(Equal(string(loadbalancerv2.PolicyActionREDIRECTTOPOOL)))
@@ -1093,7 +1093,7 @@ var _ = Describe("Ingress Controller", func() {
 						tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
-						Expect(len(tags.Items)).Should(Equal(1))
+						Expect((tags.Items)).Should(HaveLen(1))
 						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1101,7 +1101,7 @@ var _ = Describe("Ingress Controller", func() {
 						secgroups, err := mockProvider.ListSecurityGroups(ctx)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(secgroups).ShouldNot(BeNil())
-						Expect(len(secgroups.Items)).Should(Equal(3))
+						Expect((secgroups.Items)).Should(HaveLen(3))
 						expectName := []string{"vks-k8s-000000-default-test-servi-bea48", bigbangSec.Name, blackpinkSec.Name}
 						secgroupID := ""
 						for _, secgroup := range secgroups.Items {
@@ -1116,7 +1116,7 @@ var _ = Describe("Ingress Controller", func() {
 						rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect(len(rules.Items)).Should(Equal(3))
+						Expect((rules.Items)).Should(HaveLen(3))
 						expectPortRangeMax := []int{80, 8080, 30000} // cilium should only have nodeport + podport
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1132,7 +1132,7 @@ var _ = Describe("Ingress Controller", func() {
 						server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(server).ShouldNot(BeNil())
-						Expect(len(server.Items)).Should(Equal(4))
+						Expect((server.Items)).Should(HaveLen(4))
 						for _, item := range server.Items {
 							serverSecgroups := make([]string, 0)
 							for _, secgroup := range item.SecGroups {
@@ -1177,7 +1177,7 @@ var _ = Describe("Ingress Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(1))
+								Expect((tags.Items)).Should(HaveLen(1))
 								Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 								Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1185,7 +1185,7 @@ var _ = Describe("Ingress Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(3))
+								Expect((secgroups.Items)).Should(HaveLen(3))
 								expectName := []string{"vks-k8s-000000-default-test-servi-bea48", bigbangSec.Name, blackpinkSec.Name}
 								secgroupID := ""
 								for _, secgroup := range secgroups.Items {
@@ -1200,7 +1200,7 @@ var _ = Describe("Ingress Controller", func() {
 								rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(rules).ShouldNot(BeNil())
-								Expect(len(rules.Items)).Should(Equal(2))
+								Expect((rules.Items)).Should(HaveLen(2))
 								expectPortRangeMax := []int{80, 30000} // cilium should only have nodeport + podport
 								for _, rule := range rules.Items {
 									Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1216,7 +1216,7 @@ var _ = Describe("Ingress Controller", func() {
 								server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 								for _, item := range server.Items {
 									serverSecgroups := make([]string, 0)
 									for _, secgroup := range item.SecGroups {
@@ -1235,7 +1235,7 @@ var _ = Describe("Ingress Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", bigbangSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1249,7 +1249,7 @@ var _ = Describe("Ingress Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
@@ -1263,13 +1263,13 @@ var _ = Describe("Ingress Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should delete default secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should delete default secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 						{
@@ -1281,7 +1281,7 @@ var _ = Describe("Ingress Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", blackpinkSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1295,7 +1295,7 @@ var _ = Describe("Ingress Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
@@ -1309,18 +1309,18 @@ var _ = Describe("Ingress Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should not delete secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should not delete secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(0))
+								Expect((server.Items)).Should(BeEmpty())
 
 								server, err = mockProvider.ListServerBySecgroupID(ctx, blackpinkSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 					},
@@ -1395,7 +1395,7 @@ var _ = Describe("Ingress Controller", func() {
 						tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
-						Expect(len(tags.Items)).Should(Equal(1))
+						Expect((tags.Items)).Should(HaveLen(1))
 						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
 						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -1403,7 +1403,7 @@ var _ = Describe("Ingress Controller", func() {
 						secgroups, err := mockProvider.ListSecurityGroups(ctx)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(secgroups).ShouldNot(BeNil())
-						Expect(len(secgroups.Items)).Should(Equal(3))
+						Expect((secgroups.Items)).Should(HaveLen(3))
 						expectName := []string{"vks-k8s-000000-default-test-servi-bea48", bigbangSec.Name, blackpinkSec.Name}
 						secgroupID := ""
 						for _, secgroup := range secgroups.Items {
@@ -1418,7 +1418,7 @@ var _ = Describe("Ingress Controller", func() {
 						rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect(len(rules.Items)).Should(Equal(1))
+						Expect((rules.Items)).Should(HaveLen(1))
 						expectPortRangeMax := []int{30000} // calico overlay should only have nodeport
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
@@ -1434,7 +1434,7 @@ var _ = Describe("Ingress Controller", func() {
 						server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(server).ShouldNot(BeNil())
-						Expect(len(server.Items)).Should(Equal(4))
+						Expect((server.Items)).Should(HaveLen(4))
 						for _, item := range server.Items {
 							serverSecgroups := make([]string, 0)
 							for _, secgroup := range item.SecGroups {
@@ -1453,7 +1453,7 @@ var _ = Describe("Ingress Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", bigbangSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1467,7 +1467,7 @@ var _ = Describe("Ingress Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
@@ -1481,13 +1481,13 @@ var _ = Describe("Ingress Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should delete default secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should delete default secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 						{
@@ -1499,7 +1499,7 @@ var _ = Describe("Ingress Controller", func() {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = fmt.Sprintf("%s", blackpinkSec.Id)
+								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1513,7 +1513,7 @@ var _ = Describe("Ingress Controller", func() {
 								tags, err := mockProvider.ListTags(ctx, loadbalancer.UUID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
-								Expect(len(tags.Items)).Should(Equal(3))
+								Expect((tags.Items)).Should(HaveLen(3))
 								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
@@ -1527,18 +1527,18 @@ var _ = Describe("Ingress Controller", func() {
 								secgroups, err := mockProvider.ListSecurityGroups(ctx)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(secgroups).ShouldNot(BeNil())
-								Expect(len(secgroups.Items)).Should(Equal(2)) // should not delete secgroup
+								Expect((secgroups.Items)).Should(HaveLen(2)) // should not delete secgroup
 
 								// check server have secgroup
 								server, err := mockProvider.ListServerBySecgroupID(ctx, bigbangSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(0))
+								Expect((server.Items)).Should(BeEmpty())
 
 								server, err = mockProvider.ListServerBySecgroupID(ctx, blackpinkSec.Id)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(server).ShouldNot(BeNil())
-								Expect(len(server.Items)).Should(Equal(4))
+								Expect((server.Items)).Should(HaveLen(4))
 							},
 						},
 					},
@@ -1561,7 +1561,7 @@ var _ = Describe("Ingress Controller", func() {
 			lists, err := mockProvider.ListLoadBalancers(ctx)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(lists).ShouldNot(BeNil())
-			Expect(len(lists.Items)).Should(Equal(0))
+			Expect(lists.Items).Should(BeEmpty())
 
 			// create load balancer
 			healthMonitorOpt := &loadbalancerv2.HealthMonitor{
@@ -1619,14 +1619,14 @@ var _ = Describe("Ingress Controller", func() {
 			pools, err := mockProvider.ListPool(ctx, LB.UUID)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(pools).ShouldNot(BeNil())
-			Expect(len(pools.Items)).Should(Equal(1))
+			Expect((pools.Items)).Should(HaveLen(1))
 			Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
 
 			// check listener
 			listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(listeners).ShouldNot(BeNil())
-			Expect(len(listeners.Items)).Should(Equal(1))
+			Expect((listeners.Items)).Should(HaveLen(1))
 			Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
 
 			// create policy
@@ -1729,7 +1729,7 @@ var _ = Describe("Ingress Controller", func() {
 					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(pools).ShouldNot(BeNil())
-					Expect(len(pools.Items)).Should(Equal(2)) // number of pool
+					Expect((pools.Items)).Should(HaveLen(2)) // number of pool
 					for _, pool := range pools.Items {
 						Expect(pool.Name).Should(BeElementOf(
 							"vks-bea48-default-test-service-gogsf-80",
@@ -1740,7 +1740,7 @@ var _ = Describe("Ingress Controller", func() {
 					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(listeners).ShouldNot(BeNil())
-					Expect(len(listeners.Items)).Should(Equal(1)) // number of listener
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
 					for _, listener := range listeners.Items {
 						Expect(listener.Protocol).Should(Equal("HTTP"))
 						Expect(listener.ProtocolPort).Should(Equal(80))
@@ -1756,14 +1756,14 @@ var _ = Describe("Ingress Controller", func() {
 					pools, err := mockProvider.ListPool(ctx, LB.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(pools).ShouldNot(BeNil())
-					Expect(len(pools.Items)).Should(Equal(1))
+					Expect((pools.Items)).Should(HaveLen(1))
 					Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
 
 					// check listener
 					listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(listeners).ShouldNot(BeNil())
-					Expect(len(listeners.Items)).Should(Equal(1))
+					Expect((listeners.Items)).Should(HaveLen(1))
 					Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
 				},
 				postTest: func() {},
@@ -1804,6 +1804,8 @@ var _ = Describe("Ingress Controller", func() {
 	// 	})
 	// })
 })
+
+var _ = newIngressResource("placeholder", "placeholder")
 
 func newIngressResource(name, namespace string) *networkingv1.Ingress {
 	return &networkingv1.Ingress{
@@ -1851,6 +1853,8 @@ func updateIngressAnnotation(name, namespace, key, value string) {
 		}, timeout, interval).Should(BeTrue())
 	}
 }
+
+var _ = newServiceNodePortResource("placeholder", "placeholder")
 
 func newServiceNodePortResource(name, namespace string) *corev1.Service {
 	return &corev1.Service{

@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const PodKind = "Pod"
+
 var ErrNotFound = errors.New("backend not found")
 var ErrNodeDoesNotHaveInternalAddress = errors.New("node does not have internal address")
 
@@ -79,7 +81,7 @@ func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKe
 	var podEndpoints []EndpointAddress
 	for _, subset := range endpoints.Subsets {
 		for _, addr := range subset.Addresses {
-			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != PodKind {
 				continue
 			}
 			for _, port := range subset.Ports {
@@ -94,7 +96,7 @@ func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKe
 		}
 
 		for _, addr := range subset.NotReadyAddresses {
-			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != PodKind {
 				continue
 			}
 			for _, port := range subset.Ports {
@@ -135,7 +137,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 
 	r.logger.Debugf("found %d nodes with selector: %v.", len(nodeList.Items), resolveOpts.NodeSelector)
 
-	var candidateNodes []*corev1.Node
+	candidateNodes := make([]*corev1.Node, 0)
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
 		candidateNodes = append(candidateNodes, node)
@@ -148,7 +150,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 
 	r.logger.Debugf("found %d nodes after filtering by ready condition.", len(targetNodes))
 
-	var endpoints []EndpointAddress
+	endpoints := make([]EndpointAddress, 0)
 	for _, node := range targetNodes {
 		nodeIP, err := r.getNodeInternalIP(node)
 		if err != nil {
@@ -238,7 +240,7 @@ func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey 
 	var ports []int
 	for _, subset := range endpoints.Subsets {
 		for _, addr := range subset.Addresses {
-			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != PodKind {
 				continue
 			}
 			for _, port := range subset.Ports {
@@ -249,7 +251,7 @@ func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey 
 		}
 
 		for _, addr := range subset.NotReadyAddresses {
-			if addr.TargetRef == nil || addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef == nil || addr.TargetRef.Kind != PodKind {
 				continue
 			}
 			for _, port := range subset.Ports {
