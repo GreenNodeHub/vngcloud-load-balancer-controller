@@ -87,7 +87,7 @@ func (c *UpdateTracker) GetReconcileRequests(lbs *entityv2.ListLoadBalancers) []
 		}
 	}
 	if len(reapplyRequests) == 0 {
-		logrus.Debug("Nothing change.")
+		logrus.Info("Nothing change.")
 	}
 	return reapplyRequests
 }

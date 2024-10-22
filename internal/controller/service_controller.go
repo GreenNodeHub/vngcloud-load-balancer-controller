@@ -288,6 +288,8 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
+	logger.Infof("Event = %v", event.Type)
+
 	// for testing
 	if r.modeTest {
 		switch event.Type {
@@ -341,8 +343,6 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
 		return ctrl.Result{}, err
 	}
-
-	logger.Info("Reconcile Object ", genKey(obj.Namespace, obj.Name))
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByService(ctx, obj, r.annotationParser, r.Client,
 		r.netwotkID, r.subnetID, r.subnetCIDR,
@@ -521,8 +521,6 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Servic
 		logger.Warn("Finalizer is not found, return.")
 		return ctrl.Result{}, nil
 	}
-
-	logger.Info("Delete Object ", genKey(obj.Namespace, obj.Name))
 
 	_, err := r.subDeleteObject(ctx, obj)
 	if err != nil {
