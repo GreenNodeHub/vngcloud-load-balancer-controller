@@ -541,9 +541,9 @@ func (h *helperStruct) CompareSecgroupRule(current []*entityv2.SecgroupRule, new
 
 func (h *helperStruct) MergeStringArray(ctx context.Context, current, remove, add []string) ([]string, bool) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("current: %v", current)
-	logger.Infof("remove:  %v", remove)
-	logger.Infof("add:     %v", add)
+	logger.Debugf("   current: %v", current)
+	logger.Debugf("   remove:  %v", remove)
+	logger.Debugf("   add:     %v", add)
 
 	mapCurrent := make(map[string]bool)
 	for _, c := range current {

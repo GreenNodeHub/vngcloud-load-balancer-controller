@@ -64,7 +64,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 			return err
 		}
 		if !isInUse {
-			err = r.provider.DeleteSecurityGroup(context.Background(), defaultSecgroup.Id)
+			err = r.provider.DeleteSecurityGroup(r.context, defaultSecgroup.Id)
 			if err != nil {
 				r.logger.Error("Fail to delete default secgroup", err)
 				return err
@@ -306,6 +306,8 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 		m.logger.Error("Fail to get instance", err)
 		return err
 	}
+
+	m.logger.Infof("Ensure security groups for instance %s", instanceID)
 
 	currentSecgroups := make([]string, 0)
 	for _, secgroup := range instance.SecGroups {

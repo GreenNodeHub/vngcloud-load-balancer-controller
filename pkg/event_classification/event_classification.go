@@ -1,14 +1,14 @@
 package event_classification
 
 import (
-// "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type EventType string
 
 const (
 	CreateEvent EventType = "CREATE"
-	// UpdateEvent EventType = "UPDATE"
 	DeleteEvent EventType = "DELETE"
 	SyncEvent   EventType = "SYNC"
 )
@@ -16,19 +16,19 @@ const (
 // Event holds the context of an event
 type Event struct {
 	Type   EventType
-	Obj    interface{}
-	OldObj interface{}
+	Obj    client.Object
+	OldObj client.Object
 }
 
 type EventClassification struct {
-	cache            map[string]interface{}
-	getResourceByKey func(key string) (interface{}, bool)
-	isValid          func(obj interface{}) bool
+	cache            map[string]client.Object
+	getResourceByKey func(key string) (client.Object, bool)
+	isValid          func(obj client.Object) bool
 }
 
-func NewEventClassification(getResourceByKey func(key string) (interface{}, bool), isValid func(obj interface{}) bool) *EventClassification {
+func NewEventClassification(getResourceByKey func(key string) (client.Object, bool), isValid func(obj client.Object) bool) *EventClassification {
 	return &EventClassification{
-		cache:            make(map[string]interface{}),
+		cache:            make(map[string]client.Object),
 		getResourceByKey: getResourceByKey,
 		isValid:          isValid,
 	}
@@ -40,14 +40,25 @@ func (ec *EventClassification) Classify(key string) *Event {
 
 	objGetValid, objCacheValid := ec.isValid(objGet), ec.isValid(objCache)
 
-	// logrus.Infof("okGet: %v, objGetValid: %v", okGet, objGetValid)
-	// logrus.Infof("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
+	// logrus.Infof("objGet: %v, objCache: %v", objGet, objCache)
+	logrus.Debugf("okGet:   %v, objGetValid:   %v", okGet, objGetValid)
+	logrus.Debugf("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
 
+	// if objGet is deleted, but objCache is exist, then delete
 	if okCache && !okGet {
 		delete(ec.cache, key)
 		return &Event{
 			Type: DeleteEvent,
 			Obj:  objCache,
+		}
+	}
+
+	// if objGet, objCache is exist, but objGet have deletionTimestamp, then delete
+	if okGet && isHaveDeleteTimestamp(objGet) {
+		delete(ec.cache, key)
+		return &Event{
+			Type: DeleteEvent,
+			Obj:  objGet,
 		}
 	}
 
@@ -88,10 +99,15 @@ func (ec *EventClassification) Classify(key string) *Event {
 		}
 	}
 
+	// okCache && okGet && objGetValid && objCacheValid
 	ec.cache[key] = objGet
 	return &Event{
 		Type:   SyncEvent,
 		Obj:    objGet,
 		OldObj: objCache,
 	}
+}
+
+func isHaveDeleteTimestamp(obj client.Object) bool {
+	return !obj.GetDeletionTimestamp().IsZero()
 }

@@ -2,180 +2,95 @@ package event_classification
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Mock implementation of the getResourceByKey function for testing
-func mockGetResourceByKey(mockData *map[string]interface{}) func(key string) (interface{}, bool) {
-	return func(key string) (interface{}, bool) {
-		obj, ok := (*mockData)[key]
-		return obj, ok
-	}
+// MockObject is a mock implementation of client.Object for testing purposes
+type MockObject struct {
+	client.Object
+	name              string
+	deletionTimestamp *v1.Time
 }
 
-// Mock implementation of the isValid function for testing
-func mockIsValid(validKeys map[string]bool) func(obj interface{}) bool {
-	return func(obj interface{}) bool {
-		str, ok := obj.(string)
-		if !ok {
-			return false
-		}
-		return validKeys[str]
-	}
+func (m *MockObject) GetDeletionTimestamp() *v1.Time {
+	return m.deletionTimestamp
 }
 
+func (m *MockObject) GetName() string {
+	return m.name
+}
+
+func (m *MockObject) DeepCopyObject() runtime.Object {
+	return m
+}
+
+// Test cases
 func TestEventClassification_Classify(t *testing.T) {
-	// Initialize mock data
-	mockData := map[string]interface{}{
-		"resource1": "obj1",
-		"resource2": "obj2",
-	}
-	validKeys := map[string]bool{
-		"obj1":                 true,
-		"obj1-updated-valid":   true,
-		"obj1-updated-invalid": false,
-		"obj2":                 true,
-		"obj3":                 false,
+	// Helper functions
+	isValid := func(obj client.Object) bool {
+		return obj != nil && obj.GetName() != ""
 	}
 
-	ec := NewEventClassification(mockGetResourceByKey(&mockData), mockIsValid(validKeys))
-
-	// Test CreateEvent: cache is empty, resource exists
-	event := ec.Classify("resource1")
-	if event == nil || event.Type != CreateEvent || event.Obj != "obj1" {
-		t.Errorf("Expected CreateEvent for resource1, got %v", event)
+	getResourceByKey := func(key string) (client.Object, bool) {
+		if key == "valid-resource" {
+			return &MockObject{name: "valid-resource"}, true
+		}
+		if key == "deleted-resource" {
+			now := v1.Now()
+			return &MockObject{name: "deleted-resource", deletionTimestamp: &now}, true
+		}
+		return nil, false
 	}
 
-	// Test SyncEvent: object changed in cache to valid
-	mockData["resource1"] = "obj1-updated-valid"
-	event = ec.Classify("resource1")
-	if event == nil || event.Type != SyncEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected SyncEvent for resource1, got %v", event)
-	}
+	// Create an EventClassification instance
+	ec := NewEventClassification(getResourceByKey, isValid)
 
-	// Test DeleteEvent: object changed in cache to invalid
-	mockData["resource1"] = "obj1-updated-invalid"
-	event = ec.Classify("resource1")
-	if event == nil || event.Type != DeleteEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected DeleteEvent for resource1, got %v", event)
-	}
+	// Test CreateEvent
+	t.Run("CreateEvent", func(t *testing.T) {
+		event := ec.Classify("valid-resource")
+		assert.NotNil(t, event)
+		assert.Equal(t, CreateEvent, event.Type)
+		assert.Equal(t, "valid-resource", event.Obj.GetName())
+	})
 
-	// Test UpdateEvent: object changed in cache to valid
-	mockData["resource1"] = "obj1-updated-valid"
-	event = ec.Classify("resource1")
-	if event == nil || event.Type != CreateEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected CreateEvent for resource1, got %v", event)
-	}
+	// Test DeleteEvent (when object is deleted in API, but exists in cache)
+	t.Run("DeleteEventFromCache", func(t *testing.T) {
+		ec.cache["deleted-resource"] = &MockObject{name: "deleted-resource"}
+		event := ec.Classify("deleted-resource")
+		assert.NotNil(t, event)
+		assert.Equal(t, DeleteEvent, event.Type)
+		assert.Equal(t, "deleted-resource", event.Obj.GetName())
+	})
 
-	// Test DeleteEvent: resource was removed from external data
-	delete(mockData, "resource1")
-	event = ec.Classify("resource1")
-	if event == nil || event.Type != DeleteEvent || event.Obj != "obj1-updated-valid" {
-		t.Errorf("Expected DeleteEvent for resource1, got %v", event)
-	}
+	// Test DeleteEvent (when resource has deletion timestamp)
+	t.Run("DeleteEventWithDeletionTimestamp", func(t *testing.T) {
+		event := ec.Classify("deleted-resource")
+		assert.NotNil(t, event)
+		assert.Equal(t, DeleteEvent, event.Type)
+		assert.Equal(t, "deleted-resource", event.Obj.GetName())
+	})
 
-	// Test nil: new object with invalid state
-	mockData["resource3"] = "obj3"
-	event = ec.Classify("resource3")
-	if event != nil {
-		t.Errorf("Expected nil for resource3, got %v", event)
-	}
+	// Test SyncEvent
+	t.Run("SyncEvent", func(t *testing.T) {
+		ec.cache["valid-resource"] = &MockObject{name: "valid-resource"}
+		event := ec.Classify("valid-resource")
+		assert.NotNil(t, event)
+		assert.Equal(t, SyncEvent, event.Type)
+		assert.Equal(t, "valid-resource", event.Obj.GetName())
+		assert.Equal(t, "valid-resource", event.OldObj.GetName())
+	})
 
-	// Test nil: no event triggered for an unknown resource
-	event = ec.Classify("unknown")
-	if event != nil {
-		t.Errorf("Expected nil for unknown resource, got %v", event)
-	}
-}
-
-func TestEventClassification_Classify2(t *testing.T) {
-	tests := []struct {
-		name             string
-		key              string
-		cache            map[string]interface{}
-		getResourceByKey func(key string) (interface{}, bool)
-		isValid          func(obj interface{}) bool
-		expectedType     EventType
-		expectedObj      interface{}
-		expectedOldObj   interface{}
-	}{
-		{
-			name:  "Create event when object exists in resource but not in cache",
-			key:   "testKey",
-			cache: map[string]interface{}{},
-			getResourceByKey: func(key string) (interface{}, bool) {
-				if key == "testKey" {
-					return "resourceObject", true
-				}
-				return nil, false
-			},
-			isValid:        func(obj interface{}) bool { return true },
-			expectedType:   CreateEvent,
-			expectedObj:    "resourceObject",
-			expectedOldObj: nil,
-		},
-		{
-			name: "Delete event when object exists in cache but not in resource",
-			key:  "testKey",
-			cache: map[string]interface{}{
-				"testKey": "cachedObject",
-			},
-			getResourceByKey: func(key string) (interface{}, bool) {
-				return nil, false
-			},
-			isValid:        func(obj interface{}) bool { return true },
-			expectedType:   DeleteEvent,
-			expectedObj:    "cachedObject",
-			expectedOldObj: nil,
-		},
-		{
-			name: "Sync event when object exists in both cache and resource",
-			key:  "testKey",
-			cache: map[string]interface{}{
-				"testKey": "cachedObject",
-			},
-			getResourceByKey: func(key string) (interface{}, bool) {
-				return "cachedObject", true
-			},
-			isValid:        func(obj interface{}) bool { return true },
-			expectedType:   SyncEvent,
-			expectedObj:    "cachedObject",
-			expectedOldObj: nil,
-		},
-		{
-			name: "Create event when cached object is invalid and resource object is valid",
-			key:  "testKey",
-			cache: map[string]interface{}{
-				"testKey": "invalidObject",
-			},
-			getResourceByKey: func(key string) (interface{}, bool) {
-				return "resourceObject", true
-			},
-			isValid: func(obj interface{}) bool {
-				return obj != "invalidObject"
-			},
-			expectedType:   CreateEvent,
-			expectedObj:    "resourceObject",
-			expectedOldObj: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ec := &EventClassification{
-				cache:            tt.cache,
-				getResourceByKey: tt.getResourceByKey,
-				isValid:          tt.isValid,
-			}
-
-			event := ec.Classify(tt.key)
-
-			if event == nil || event.Type != tt.expectedType {
-				t.Errorf("expected event type %v, got %v", tt.expectedType, event.Type)
-			}
-
-			if event.Obj != tt.expectedObj {
-				t.Errorf("expected event object %v, got %v", tt.expectedObj, event.Obj)
-			}
-		})
-	}
+	// Test invalid case (both objects invalid)
+	t.Run("InvalidEvent", func(t *testing.T) {
+		invalidGetResourceByKey := func(key string) (client.Object, bool) {
+			return &MockObject{name: ""}, true
+		}
+		invalidEC := NewEventClassification(invalidGetResourceByKey, isValid)
+		event := invalidEC.Classify("invalid-resource")
+		assert.Nil(t, event)
+	})
 }

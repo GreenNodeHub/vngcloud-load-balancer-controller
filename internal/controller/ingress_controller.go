@@ -88,15 +88,12 @@ type IngressReconciler struct {
 	numCurrentLock      sync.Mutex
 }
 
-func (r *IngressReconciler) isValid(obj interface{}) bool {
+func (r *IngressReconciler) isValid(obj client.Object) bool {
 	object, ok := obj.(*networkingv1.Ingress)
 	if !ok {
 		return false
 	}
 	if *object.Spec.IngressClassName != consts.IngressClass {
-		return false
-	}
-	if !object.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 	return true
@@ -118,7 +115,7 @@ func (r *IngressReconciler) getNodes(client client.Client) ([]*corev1.Node, erro
 	return filteredNodes, nil
 }
 
-func (r *IngressReconciler) getObjectByKey(key string) (interface{}, bool) {
+func (r *IngressReconciler) getObjectByKey(key string) (client.Object, bool) {
 	namespace, name := revertKey(key)
 	resource := &networkingv1.Ingress{}
 	err := r.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, resource)
@@ -193,7 +190,7 @@ func (r *IngressReconciler) Enqueue(req reconcile.Request) {
 	if !exists {
 		return
 	}
-	r.updateObjectAnnotation(context.Background(), obj.(client.Object),
+	r.updateObjectAnnotation(context.Background(), obj,
 		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
 }
 
@@ -259,11 +256,15 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + key)).GetContext()
 	logger := contexts.NewContext(ctx).Log()
+	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")
 
 	event := r.eventClassification.Classify(key)
-	if event == nil || event.Obj == nil {
+	if event == nil {
 		logger.Info("Event is nil, return.")
+		return ctrl.Result{}, nil
+	} else if event.Obj == nil {
+		logger.Infof("Event=%v but object is nil, return.", event.Type)
 		return ctrl.Result{}, nil
 	}
 
@@ -499,6 +500,7 @@ func (r *IngressReconciler) deleteObject(ctx context.Context, obj *networkingv1.
 	r.resourceDependant.Clear(obj)
 
 	if !k8s.HasFinalizer(obj, consts.IngressFinalizer) {
+		logger.Warn("Finalizer is not found, return.")
 		return ctrl.Result{}, nil
 	}
 
@@ -532,6 +534,9 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		logger.Info("LoadBalancer ID is empty, return.")
 		return ctrl.Result{}, nil
 	}
+
+	// remove from update tracker
+	r.updateTracker.RemoveUpdateTracker(oldBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName())
 
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
@@ -813,13 +818,11 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				switch e.Object.(type) {
+				// We attach a finalizer during reconcile, and handle the user triggered delete action during the update event.
+				// In case of delete, there will first be an update event with nonzero deletionTimestamp set on the object. Since
+				// deletion is already taken care of during update event, we will ignore this event.
 				case *networkingv1.Ingress:
-					if object := e.Object.(*networkingv1.Ingress); object.Spec.IngressClassName == nil ||
-						*object.Spec.IngressClassName != consts.IngressClass {
-						return false
-					}
-					logrus.Info("Detect delete Ingress event.")
-					return true
+					return false
 				case *corev1.Service:
 					logrus.Info("Detect delete Service event.")
 					return true

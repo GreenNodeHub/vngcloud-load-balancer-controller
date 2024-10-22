@@ -108,15 +108,12 @@ type ServiceReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 
 // +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
-func (r *ServiceReconciler) isValid(obj interface{}) bool {
+func (r *ServiceReconciler) isValid(obj client.Object) bool {
 	object, ok := obj.(*corev1.Service)
 	if !ok {
 		return false
 	}
 	if object.Spec.Type != corev1.ServiceTypeLoadBalancer {
-		return false
-	}
-	if !object.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 	return true
@@ -138,7 +135,7 @@ func (r *ServiceReconciler) getNodes(client client.Client) ([]*corev1.Node, erro
 	return filteredNodes, nil
 }
 
-func (r *ServiceReconciler) getObjectByKey(key string) (interface{}, bool) {
+func (r *ServiceReconciler) getObjectByKey(key string) (client.Object, bool) {
 	namespace, name := revertKey(key)
 	resource := &corev1.Service{}
 	err := r.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, resource)
@@ -213,7 +210,7 @@ func (r *ServiceReconciler) Enqueue(req reconcile.Request) {
 	if !exists {
 		return
 	}
-	r.updateObjectAnnotation(context.Background(), obj.(client.Object),
+	r.updateObjectAnnotation(context.Background(), obj,
 		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
 }
 
@@ -279,11 +276,15 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("s/" + key)).GetContext()
 	logger := contexts.NewContext(ctx).Log()
+	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")
 
 	event := r.eventClassification.Classify(key)
-	if event == nil || event.Obj == nil {
+	if event == nil {
 		logger.Info("Event is nil, return.")
+		return ctrl.Result{}, nil
+	} else if event.Obj == nil {
+		logger.Infof("Event=%v but object is nil, return.", event.Type)
 		return ctrl.Result{}, nil
 	}
 
@@ -517,6 +518,7 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Servic
 	r.resourceDependant.Clear(obj)
 
 	if !k8s.HasFinalizer(obj, consts.ServiceFinalizer) {
+		logger.Warn("Finalizer is not found, return.")
 		return ctrl.Result{}, nil
 	}
 
@@ -550,6 +552,9 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		logger.Info("LoadBalancer ID is empty, return.")
 		return ctrl.Result{}, nil
 	}
+
+	// remove from update tracker
+	r.updateTracker.RemoveUpdateTracker(oldBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName())
 
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
@@ -816,12 +821,11 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 			DeleteFunc: func(e event.DeleteEvent) bool {
 				switch e.Object.(type) {
+				// We attach a finalizer during reconcile, and handle the user triggered delete action during the update event.
+				// In case of delete, there will first be an update event with nonzero deletionTimestamp set on the object. Since
+				// deletion is already taken care of during update event, we will ignore this event.
 				case *corev1.Service:
-					if object := e.Object.(*corev1.Service); object.Spec.Type != corev1.ServiceTypeLoadBalancer {
-						return false
-					}
-					logrus.Info("Detect delete Service event.")
-					return true
+					return false
 				case *corev1.Endpoints:
 					logrus.Info("Detect delete Endpoints event.")
 					return true
