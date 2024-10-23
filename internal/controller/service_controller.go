@@ -480,13 +480,6 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		return ctrl.Result{}, err
 	}
 
-	// ensure security group with mutex
-	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
-	if err != nil {
-		logger.Error("Failed to ensure security group: ", err)
-		return ctrl.Result{}, err
-	}
-
 	// update management annotations
 	if err := r.updateObjectAnnotation(ctx, obj, loadBalancerBuilder.GetManageAnnotation()); err != nil {
 		logger.Error("Failed to update management annotations: ", err)
@@ -504,6 +497,14 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		return ctrl.Result{}, err
 	}
 	r.updateTracker.AddUpdateTracker(loadBalancerBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName(), lb.UpdatedAt)
+
+	// ensure security group with mutex
+	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
+	if err != nil {
+		logger.Error("Failed to ensure security group: ", err)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
