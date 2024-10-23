@@ -41,8 +41,9 @@ func (ec *EventClassification) Classify(key string) *Event {
 	objGetValid, objCacheValid := ec.isValid(objGet), ec.isValid(objCache)
 
 	// logrus.Infof("objGet: %v, objCache: %v", objGet, objCache)
-	logrus.Debugf("okGet:   %v, objGetValid:   %v", okGet, objGetValid)
-	logrus.Debugf("okCache: %v, objCacheValid: %v", okCache, objCacheValid)
+	logrus.Debug("Event Classification")
+	logrus.Debugf("   okGet:   %v, objGetValid:   %v", okGet, objGetValid)
+	logrus.Debugf("   okCache: %v, objCacheValid: %v", okCache, objCacheValid)
 
 	// if objGet is deleted, but objCache is exist, then delete
 	if okCache && !okGet {

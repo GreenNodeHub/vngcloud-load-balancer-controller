@@ -106,9 +106,6 @@ func NewModelBuilderByIngress(
 		return nil, err
 	}
 
-	model.logger.Debugf("New model listeners: len(%d)", len(model.listenerBuilders))
-	model.logger.Debugf("New model pools: (%d)", len(model.poolBuilders))
-
 	return model, nil
 }
 

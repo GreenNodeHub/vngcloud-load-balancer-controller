@@ -151,8 +151,6 @@ func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParse
 		oldSecGroups:            make([]string, 0),
 	}
 
-	logrus.Debugf("Old annotations: %v", oldAnnotations)
-
 	err := model.build(annos, oldAnnotations)
 	if err != nil {
 		logrus.Errorf("Error building old model: %v, return empty.", err)

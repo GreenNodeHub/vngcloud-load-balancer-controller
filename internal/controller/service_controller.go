@@ -159,8 +159,10 @@ func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 		return err
 	}
 
-	logger.Debugf("Update annotation for object %s/%s: %v", obj.GetNamespace(), obj.GetName(), annos)
 	annotations := obj.GetAnnotations()
+	logger.Debugf("Update annotation for object %s/%s", obj.GetNamespace(), obj.GetName())
+	debugCompareMapString(annotations, annos)
+
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
@@ -798,8 +800,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					if !reflect.DeepEqual(oldAnnotations, newAnnotations) {
 						logrus.Info("Detect update Service Annotations event.")
-						logrus.Debugf("Old annotations: %v", oldObj.Annotations)
-						logrus.Debugf("New annotations: %v", newObj.Annotations)
+						debugCompareMapString(oldAnnotations, newAnnotations)
 						return true
 					}
 					if !reflect.DeepEqual(oldObj.DeletionTimestamp.IsZero(), newObj.DeletionTimestamp.IsZero()) {

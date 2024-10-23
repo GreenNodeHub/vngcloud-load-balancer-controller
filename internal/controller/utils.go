@@ -3,6 +3,8 @@ package controller
 import (
 	"fmt"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 func genKey(namespace, name string) string {
@@ -25,4 +27,24 @@ func removeFisrt[T comparable](slice []T, value T) []T {
 		}
 	}
 	return slice
+}
+
+func debugCompareMapString[T comparable](a, b map[string]T) {
+	// get all keys
+	keys := make(map[string]struct{})
+	for k := range a {
+		keys[k] = struct{}{}
+	}
+	for k := range b {
+		keys[k] = struct{}{}
+	}
+
+	// log the difference
+	for k := range keys {
+		if a[k] != b[k] {
+			logrus.Debugf("   - %s: (%v -> %v)", k, a[k], b[k])
+		} else {
+			logrus.Debugf("   - %s: %v", k, a[k])
+		}
+	}
 }

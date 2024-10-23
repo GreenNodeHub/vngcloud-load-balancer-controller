@@ -2000,8 +2000,8 @@ var _ = Describe("Ingress Controller", func() {
 							return &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf-2", Namespace: "default"}}
 						},
 						expect: func() {
-							// wait until reconcile done
-							time.Sleep(timeWaitRecocile)
+							// wait until reconcile done, periodical reconcile
+							time.Sleep(2 * timeWaitRecocile)
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
