@@ -45,3 +45,11 @@ jobs:
             ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.sha }}
             ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ env.VERSION }}
           # target: vngcloud-load-balancer-controller
+
+      - name: Push charts
+        env:
+          CHANGED_CHARTS: "charts/vngcloud-load-balancer-controller"
+        run: |
+          echo "$CHANGED_CHARTS"
+          echo ${{ github.workspace }}
+          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS

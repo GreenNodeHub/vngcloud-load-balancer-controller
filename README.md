@@ -118,7 +118,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-## Develop guide
+## Developing guide
+
+To install dev version through helm:
+
+```sh
+helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller \
+  --version 0.1.0 \
+  --set mysecret.cluster.clusterID="____________________" \
+  --set mysecret.global.clientID="____________________" \
+  --set mysecret.global.clientSecret="____________________"
+```
 
 To run locally, make sure you have this file `/etc/vngcloud-load-balancer-controller/config.yaml` with the following content:
 

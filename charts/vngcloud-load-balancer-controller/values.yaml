@@ -32,4 +32,11 @@ metricsService:
     targetPort: 8443
   type: ClusterIP
 mysecret:
-  configYaml: ""
+  cluster:
+    clusterID: 
+    clusterName: 
+  global:
+    clientID: 
+    clientSecret: 
+    identityURL: https://iamapis.vngcloud.vn/accounts-api
+    vserverURL: https://hcm-3.api.vngcloud.vn/vserver
