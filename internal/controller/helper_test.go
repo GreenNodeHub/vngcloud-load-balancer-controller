@@ -8,26 +8,41 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/gomega"
 )
 
+type kindStep string
+
+const (
+	createStep kindStep = "create"
+	updateStep kindStep = "update"
+	deleteStep kindStep = "delete"
+)
+
 type StepType struct {
-	name          string                        // step name
-	updateObjects func() []client.Object        // update objects such as ingress, service, endpoint,...
-	expect        func(lb *entity.LoadBalancer) // expect after update
+	kindStep  kindStep             // create, update, delete
+	name      string               // step name
+	getObject func() client.Object // update objects such as ingress, service, endpoint,...
+	expect    func()               // expect after update
+}
+
+type ObjectAndExpect[T kubernetesResource] struct {
+	obj    T
+	expect func()
 }
 
 type TestType[T kubernetesResource] struct {
-	preTest           func()                        // prepare test
-	name              string                        // test name
-	generateDepends   func() []client.Object        // generate depend objects such as service, endpoint,...
-	generateObj       func() T                      // generate main object
-	expect            func(lb *entity.LoadBalancer) // expect after create
-	steps             []StepType                    // update and expect for each step
-	expectAfterDelete func()                        // expect after clean up
-	postTest          func()                        // expect after clean up
+	preTest           func()                      // prepare test
+	name              string                      // test name
+	generateDepends   func() []client.Object      // generate depend objects such as service, endpoint,...
+	generateObj       func() []ObjectAndExpect[T] // generate object and expect
+	expect            func()                      // expect after create all objects
+	steps             []StepType                  // update and expect for each step
+	expectAfterDelete func()                      // expect after delete all
+	postTest          func()                      // clean up the preTest
 }
 
 func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
@@ -42,47 +57,51 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 		Expect(k8sClient.Create(ctx, depend)).Should(Succeed())
 	}
 
-	obj := tt.generateObj()
-	objName := obj.GetName()
-	objNamespace := obj.GetNamespace()
-	Expect(obj).NotTo(BeNil())
-	Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
+	objs := tt.generateObj()
+	Expect(objs).NotTo(BeNil())
+	for _, obj := range objs {
+		Expect(obj.obj).NotTo(BeNil())
+		Expect(k8sClient.Create(ctx, obj.obj)).Should(Succeed())
+		obj.expect()
+	}
 
-	// get load balancer id in the annotation
-	loadbalancerID := ""
-	Eventually(func() bool {
-		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: objName, Namespace: objNamespace}, obj)).Should(Succeed())
-		loadbalancerID = obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-		return loadbalancerID != ""
-	}, timeout, interval).Should(BeTrue())
-
-	// expect load balancer attribute in the mock provider
-	loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-	Expect(err).ShouldNot(HaveOccurred())
-	tt.expect(loadbalancer)
+	if tt.expect != nil {
+		tt.expect()
+	}
 
 	if tt.steps != nil {
 		for _, step := range tt.steps {
-			logrus.Info("###### STEP: ", step.name)
-			updateObjs := step.updateObjects()
-			for _, obj := range updateObjs {
-				Expect(obj).NotTo(BeNil())
+			logrus.Infof("###### STEP: %s, kind: %s", step.name, step.kindStep)
+			obj := step.getObject()
+			Expect(obj).NotTo(BeNil())
+			if step.kindStep == createStep {
+				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
+			} else if step.kindStep == deleteStep {
+				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
+			} else if step.kindStep == updateStep {
 				Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
+			} else {
+				logrus.Fatalf("Unknown step kind: %s of STEP %s", step.kindStep, step.name)
 			}
 
 			// expect load balancer attribute in the mock provider
-			step.expect(loadbalancer)
+			step.expect()
 		}
 	}
 
-	// clean up
-	Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: objName, Namespace: objNamespace}, obj)
-		return err != nil
-	}, 2*timeout, interval).Should(BeTrue())
-	// _, err = mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-	// Expect(err).Should(HaveOccurred())
+	// clean up, delete in reverse order, ignore error if object not found
+	for i := len(objs) - 1; i >= 0; i-- {
+		obj := objs[i].obj
+		err := k8sClient.Delete(ctx, obj)
+		Expect(err == nil || apierrors.IsNotFound(err)).To(BeTrue())
+
+		// wait for reconcile
+		time.Sleep(timeWaitRecocile)
+
+		// get will return error
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
+	}
 
 	// expect after delete
 	if tt.expectAfterDelete != nil {
@@ -90,12 +109,25 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 	}
 
 	for _, depend := range depends {
-		Expect(k8sClient.Delete(ctx, depend)).Should(Succeed())
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: depend.GetName(), Namespace: depend.GetNamespace()}, depend)
-		Expect(err).Should(HaveOccurred())
+		err := k8sClient.Delete(ctx, depend)
+		Expect(err == nil || apierrors.IsNotFound(err)).To(BeTrue())
+
+		// get will return error
+		err = k8sClient.Get(ctx, client.ObjectKeyFromObject(depend), depend)
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 	}
 	if tt.postTest != nil {
 		tt.postTest()
 	}
 	printEndTest()
+}
+
+// get load balancer by id in resource annotation
+func getLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.LoadBalancer {
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
+	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+	Expect(loadbalancerID).ShouldNot(BeEmpty())
+	loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
+	Expect(err).ShouldNot(HaveOccurred())
+	return loadbalancer
 }

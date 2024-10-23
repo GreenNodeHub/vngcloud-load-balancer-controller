@@ -254,10 +254,10 @@ func (h *helperStruct) checkIfPoolMemberExist(mems []*loadbalancerv2.Member, mem
 	for _, r := range mems {
 		if r.IpAddress == mem.IpAddress &&
 			r.Port == mem.Port &&
-			r.MonitorPort == mem.MonitorPort &&
-			r.Backup == mem.Backup &&
+			// r.Backup == mem.Backup &&
 			// r.Name == mem.Name &&
-			r.Weight == mem.Weight {
+			// r.Weight == mem.Weight &&
+			r.MonitorPort == mem.MonitorPort {
 			return true
 		}
 	}
@@ -317,7 +317,7 @@ func (h *helperStruct) MergePoolMembers(lbID string, oldBuilder OldModelBuilder,
 	}
 
 	logrus.Debugf("Merge pool members: %v", convertMembers)
-	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, addBuilder.GetID()).WithMembers(convertMembers...), nil
+	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, currentBuilder.GetID()).WithMembers(convertMembers...), nil
 }
 
 // CompareListenerBuilder compares two listener options.

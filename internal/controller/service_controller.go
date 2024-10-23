@@ -83,6 +83,7 @@ type ServiceReconciler struct {
 	defaultPackageID string
 
 	updateTracker       *UpdateTracker
+	timeReconcilePeriod time.Duration
 	numCurrentReconcile int
 	numCurrentLock      sync.Mutex
 }
@@ -172,7 +173,7 @@ func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 
 func (r *ServiceReconciler) startBackgroundGoroutine(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(60 * time.Second)
+		ticker := time.NewTicker(r.timeReconcilePeriod)
 		defer ticker.Stop()
 
 		for {
@@ -633,6 +634,9 @@ func (r *ServiceReconciler) init() error {
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 	r.resourceDependant = NewServiceDependant(r.Client)
 	r.updateTracker = NewUpdateTracker()
+	if r.timeReconcilePeriod == 0 {
+		r.timeReconcilePeriod = 60 * time.Second
+	}
 
 	ctx := context.Background()
 	r.startBackgroundGoroutine(ctx)

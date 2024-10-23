@@ -526,6 +526,65 @@ func (r *vngcloudLBBuilder) DeleteRedundantPools(oldBuilder OldModelBuilder, new
 			if currentPool.IsDeleted() {
 				continue
 			}
+
+			// check if this pool is default pool, should check members
+			var (
+				isDefaultPool  bool
+				isMembersMatch bool
+			)
+			if currentPool.GetName() == consts.DEFAULT_NAME_DEFAULT_POOL {
+				isDefaultPool = true
+
+				// check if default pool members match
+				if VNGHelper.ComparePoolMembers(oldBuilder.GetDefaultPoolMembers(), currentPool.Members, true) {
+					isMembersMatch = true
+				}
+			}
+
+			if isDefaultPool {
+				if isMembersMatch {
+					// then delete this pool
+					if r.IsPoolInUseByOtherListener(currentPool.GetID()) {
+						r.logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
+						continue
+					}
+					if err := r.provider.DeletePool(r.context, r.GetLoadBalancerID(), pool.GetID()); err != nil {
+						r.logger.Error("Failed to delete pool: ", err)
+						return err
+					}
+					currentPool.SetIsDeleted(true)
+					if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
+						r.logger.Error("Failed to wait for loadbalancer active: ", err)
+						return err
+					}
+				} else {
+					// just update members (delete the old members)
+					updateOptions, err := VNGHelper.MergePoolMembers(r.GetLoadBalancerID(),
+						oldBuilder,
+						currentPool,
+						nil)
+					if err != nil {
+						r.logger.Error("Failed to merge pool members: ", err)
+						return err
+					}
+					if updateOptions == nil {
+						return nil
+					}
+					err = r.provider.UpdatePoolMembers(r.context, r.GetLoadBalancerID(), currentPool.GetID(),
+						updateOptions)
+					if err != nil {
+						r.logger.Error("Failed to update pool members: ", err)
+						return err
+					}
+					if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
+						r.logger.Error("Failed to wait for loadbalancer active: ", err)
+						return err
+					}
+				}
+				continue
+			}
+
+			// check as normal pool
 			if r.IsPoolInUseByOtherListener(currentPool.GetID()) {
 				r.logger.Infof("pool \"%s\" is used by other listeners, ignore delete.", pool.GetName())
 				continue
@@ -584,6 +643,22 @@ func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilde
 			return false
 		}
 	}
+
+	// if default pool members not match, return false
+	if defaultPool := r.GetPoolBuilderByName(consts.DEFAULT_NAME_DEFAULT_POOL); defaultPool != nil {
+		currentMembers := defaultPool.Members
+		oldMembers := oldBuilder.GetDefaultPoolMembers()
+		if len(oldMembers) < len(currentMembers) {
+			r.logger.Debugf("Can't delete whole loadbalancer, len(oldDFMembers) < len(currentDFMembers) (%d < %d)",
+				len(oldMembers), len(currentMembers))
+			return false
+		}
+		if !VNGHelper.ComparePoolMembers(oldMembers, currentMembers, true) {
+			r.logger.Debugf("Can't delete whole loadbalancer, default pool members not match")
+			return false
+		}
+	}
+
 	r.logger.Debug("Can delete whole loadbalancer")
 	return true
 }

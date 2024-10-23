@@ -48,9 +48,7 @@ func (c *UpdateTracker) GetReconcileRequests(lbs *entityv2.ListLoadBalancers) []
 		lbIDs = append(lbIDs, key)
 		isCheck[key] = false
 	}
-	if len(lbIDs) != 0 {
-		logrus.Debugf("Watching these loadbalancers: %s.", strings.Join(lbIDs, ", "))
-	}
+	logrus.Debugf("Watching these loadbalancers: %s.", strings.Join(lbIDs, ", "))
 
 	reapplyRequests := make([]reconcile.Request, 0)
 	for _, lb := range lbs.Items {

@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -242,7 +241,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{service}
 					},
-					generateObj: func() *networkingv1.Ingress {
+					generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -253,9 +252,16 @@ var _ = Describe("Ingress Controller", func() {
 								},
 							},
 						}
-						return ingress
+						return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 					},
-					expect: func(loadbalancer *entity.LoadBalancer) {
+					expect: func() {
+						// wait until reconcile done
+						time.Sleep(timeWaitRecocile)
+
+						// get load balancer by id in resource annotation
+						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 						Expect(loadbalancer.Internal).Should(BeFalse())
@@ -339,7 +345,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{service}
 					},
-					generateObj: func() *networkingv1.Ingress {
+					generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = nil
@@ -364,11 +370,15 @@ var _ = Describe("Ingress Controller", func() {
 								},
 							},
 						}
-						return ingress
+						return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 					},
-					expect: func(loadbalancer *entity.LoadBalancer) {
+					expect: func() {
 						// wait until reconcile done
 						time.Sleep(timeWaitRecocile)
+
+						// get load balancer by id in resource annotation
+						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -453,16 +463,21 @@ var _ = Describe("Ingress Controller", func() {
 					},
 					steps: []StepType{
 						{
-							name: "update rule to new service port",
-							updateObjects: func() []client.Object {
+							name:     "update rule to new service port",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								object.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number = 443
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -591,7 +606,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() *networkingv1.Ingress {
+					generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -621,11 +636,15 @@ var _ = Describe("Ingress Controller", func() {
 								},
 							},
 						}
-						return ingress
+						return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 					},
-					expect: func(loadbalancer *entity.LoadBalancer) {
+					expect: func() {
 						// wait until reconcile done
 						time.Sleep(timeWaitRecocile)
+
+						// get load balancer by id in resource annotation
+						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -711,17 +730,22 @@ var _ = Describe("Ingress Controller", func() {
 					},
 					steps: []StepType{
 						{
-							name: "update backend to service port name (80 -> http), should nothing change",
-							updateObjects: func() []client.Object {
+							name:     "update backend to service port name (80 -> http), should nothing change",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								object.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port = networkingv1.ServiceBackendPort{Name: "http"}
 								object.Spec.DefaultBackend.Service.Port = networkingv1.ServiceBackendPort{Name: "http"}
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -807,19 +831,24 @@ var _ = Describe("Ingress Controller", func() {
 							},
 						},
 						{
-							name: "update annotation target type to ip, it should update the pool member",
-							updateObjects: func() []client.Object {
+							name:     "update annotation target type to ip, it should update the pool member",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								if object.Annotations == nil {
 									object.Annotations = map[string]string{}
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetType)] = string(builder.TargetTypeIP)
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -903,17 +932,22 @@ var _ = Describe("Ingress Controller", func() {
 							},
 						},
 						{
-							name: "update backend to service port name (http -> https), should create new pool change the port number in the pool member",
-							updateObjects: func() []client.Object {
+							name:     "update backend to service port name (http -> https), should create new pool change the port number in the pool member",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								object.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port = networkingv1.ServiceBackendPort{Name: "https"}
 								object.Spec.DefaultBackend.Service.Port = networkingv1.ServiceBackendPort{Name: "https"}
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1069,7 +1103,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() *networkingv1.Ingress {
+					generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -1080,11 +1114,15 @@ var _ = Describe("Ingress Controller", func() {
 								},
 							},
 						}
-						return ingress
+						return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 					},
-					expect: func(loadbalancer *entity.LoadBalancer) {
+					expect: func() {
 						// wait until reconcile done
 						time.Sleep(timeWaitRecocile)
+
+						// get load balancer by id in resource annotation
+						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1143,8 +1181,9 @@ var _ = Describe("Ingress Controller", func() {
 					},
 					steps: []StepType{
 						{
-							name: "update endpoint, should update secgroup rule",
-							updateObjects: func() []client.Object {
+							name:     "update endpoint, should update secgroup rule",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := corev1.Endpoints{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								object.Subsets = []corev1.EndpointSubset{
@@ -1164,11 +1203,15 @@ var _ = Describe("Ingress Controller", func() {
 										},
 									},
 								}
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1227,8 +1270,9 @@ var _ = Describe("Ingress Controller", func() {
 							},
 						},
 						{
-							name: "update tags (add more tags) and secgroups annotations (delete default secgroup and add additional secgroups)",
-							updateObjects: func() []client.Object {
+							name:     "update tags (add more tags) and secgroups annotations (delete default secgroup and add additional secgroups)",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								if object.Annotations == nil {
@@ -1236,11 +1280,15 @@ var _ = Describe("Ingress Controller", func() {
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1273,8 +1321,9 @@ var _ = Describe("Ingress Controller", func() {
 							},
 						},
 						{
-							name: "update tags (remove, update, add tags) and secgroups annotations (remove and add secgroups in server)",
-							updateObjects: func() []client.Object {
+							name:     "update tags (remove, update, add tags) and secgroups annotations (remove and add secgroups in server)",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								if object.Annotations == nil {
@@ -1282,11 +1331,15 @@ var _ = Describe("Ingress Controller", func() {
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1371,7 +1424,7 @@ var _ = Describe("Ingress Controller", func() {
 						}
 						return []client.Object{endpoint, service}
 					},
-					generateObj: func() *networkingv1.Ingress {
+					generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 						ingress := newIngressResource("test-service-gogsf", "default")
 						Expect(ingress).NotTo(BeNil())
 						ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
@@ -1382,11 +1435,15 @@ var _ = Describe("Ingress Controller", func() {
 								},
 							},
 						}
-						return ingress
+						return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 					},
-					expect: func(loadbalancer *entity.LoadBalancer) {
+					expect: func() {
 						// wait until reconcile done
 						time.Sleep(timeWaitRecocile)
+
+						// get load balancer by id in resource annotation
+						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1445,8 +1502,9 @@ var _ = Describe("Ingress Controller", func() {
 					},
 					steps: []StepType{
 						{
-							name: "update tags (add more tags) and secgroups annotations (delete default secgroup and add additional secgroups)",
-							updateObjects: func() []client.Object {
+							name:     "update tags (add more tags) and secgroups annotations (delete default secgroup and add additional secgroups)",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								if object.Annotations == nil {
@@ -1454,11 +1512,15 @@ var _ = Describe("Ingress Controller", func() {
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1491,8 +1553,9 @@ var _ = Describe("Ingress Controller", func() {
 							},
 						},
 						{
-							name: "update tags (remove, update, add tags) and secgroups annotations (remove and add secgroups in server)",
-							updateObjects: func() []client.Object {
+							name:     "update tags (remove, update, add tags) and secgroups annotations (remove and add secgroups in server)",
+							kindStep: updateStep,
+							getObject: func() client.Object {
 								object := networkingv1.Ingress{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-gogsf", Namespace: "default"}, &object)).Should(Succeed())
 								if object.Annotations == nil {
@@ -1500,11 +1563,15 @@ var _ = Describe("Ingress Controller", func() {
 								}
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
 								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
-								return []client.Object{&object}
+								return &object
 							},
-							expect: func(loadbalancer *entity.LoadBalancer) {
+							expect: func() {
 								// wait until reconcile done
 								time.Sleep(timeWaitRecocile)
+
+								// get load balancer by id in resource annotation
+								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1686,7 +1753,7 @@ var _ = Describe("Ingress Controller", func() {
 					}
 					return []client.Object{endpoint, service}
 				},
-				generateObj: func() *networkingv1.Ingress {
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
 					ingress := newIngressResource("test-service-gogsf", "default")
 					Expect(ingress).NotTo(BeNil())
 					ingress.Spec.DefaultBackend = nil
@@ -1715,11 +1782,15 @@ var _ = Describe("Ingress Controller", func() {
 						ingress.Annotations = map[string]string{}
 					}
 					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = LB.UUID
-					return ingress
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
 				},
-				expect: func(loadbalancer *entity.LoadBalancer) {
+				expect: func() {
 					// wait until reconcile done
 					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
 
 					Expect(loadbalancer).ShouldNot(BeNil())
 					Expect(loadbalancer.Name).Should(Equal(LB.Name))
@@ -1774,33 +1845,231 @@ var _ = Describe("Ingress Controller", func() {
 		})
 	})
 
+	Context("When 2 resource use a same lb with default annotation", func() {
+		It("it should add to the same default pool, delete pool member after resource delete", func() {
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest:  func() { mockIngressReconciler.timeReconcilePeriod = 1 * time.Second },
+				postTest: func() { mockIngressReconciler.timeReconcilePeriod = 60 * time.Second },
+				name:     "create 2 resource with default annotation",
+				generateDepends: func() []client.Object {
+					service := newServiceNodePortResource("test-service-gogsf", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					service2 := newServiceNodePortResource("test-service-gogsf-2", "default")
+					service2.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30001},
+					}
+					return []client.Object{service, service2}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-service-gogsf", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: "test-service-gogsf",
+							Port: networkingv1.ServiceBackendPort{
+								Number: 80,
+							},
+						},
+					}
+
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+					for _, pool := range pools.Items {
+						Expect(pool.Name).Should(BeElementOf(
+							consts.DEFAULT_NAME_DEFAULT_POOL,
+						))
+						Expect(pool.Members).ShouldNot(BeNil())
+						Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
+						expectAddress := []string{
+							mockNode1.Status.Addresses[0].Address,
+							mockNode2.Status.Addresses[0].Address,
+							mockNode3.Status.Addresses[0].Address,
+							mockNode4.Status.Addresses[0].Address}
+						for _, member := range pool.Members.Items {
+							Expect(member.ProtocolPort).Should(Equal(30000))
+							Expect(member.MonitorPort).Should(Equal(30000))
+							Expect(member.Address).Should(BeElementOf(expectAddress))
+							expectAddress = removeFisrt(expectAddress, member.Address)
+						}
+					}
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+				},
+				steps: []StepType{
+					{
+						kindStep: createStep,
+						name:     "create 2nd resource with default annotation + load balancer id",
+						getObject: func() client.Object {
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+
+							ingress2 := newIngressResource("test-service-gogsf-2", "default")
+							Expect(ingress2).NotTo(BeNil())
+							ingress2.Spec.DefaultBackend = &networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "test-service-gogsf-2",
+									Port: networkingv1.ServiceBackendPort{
+										Number: 80,
+									},
+								},
+							}
+
+							// add annotation to load balancer id
+							if ingress2.Annotations == nil {
+								ingress2.Annotations = map[string]string{}
+							}
+							ingress2.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = loadbalancer.UUID
+
+							return ingress2
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf-2", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+							for _, pool := range pools.Items {
+								Expect(pool.Name).Should(BeElementOf(
+									consts.DEFAULT_NAME_DEFAULT_POOL,
+								))
+								Expect(pool.Members).ShouldNot(BeNil())
+								Expect((pool.Members.Items)).Should(HaveLen(8)) // number of member in pool = number of node or number of endpoint
+								expectAddress := []string{
+									mockNode1.Status.Addresses[0].Address,
+									mockNode2.Status.Addresses[0].Address,
+									mockNode3.Status.Addresses[0].Address,
+									mockNode4.Status.Addresses[0].Address,
+									mockNode1.Status.Addresses[0].Address,
+									mockNode2.Status.Addresses[0].Address,
+									mockNode3.Status.Addresses[0].Address,
+									mockNode4.Status.Addresses[0].Address}
+								expectProtocolPort := []int{30000, 30001, 30000, 30001, 30000, 30001, 30000, 30001}
+								for _, member := range pool.Members.Items {
+									Expect(member.MonitorPort).Should(Equal(member.ProtocolPort))
+									Expect(member.ProtocolPort).Should(BeElementOf(expectProtocolPort))
+									expectProtocolPort = removeFisrt(expectProtocolPort, member.ProtocolPort)
+									Expect(member.Address).Should(BeElementOf(expectAddress))
+									expectAddress = removeFisrt(expectAddress, member.Address)
+								}
+							}
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+						},
+					},
+					{
+						kindStep: deleteStep,
+						name:     "delete 2nd resource, everything like first expect after periodical reconcile",
+						getObject: func() client.Object {
+							return &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf-2", Namespace: "default"}}
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+							for _, pool := range pools.Items {
+								Expect(pool.Name).Should(BeElementOf(
+									consts.DEFAULT_NAME_DEFAULT_POOL,
+								))
+								Expect(pool.Members).ShouldNot(BeNil())
+								Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
+								expectAddress := []string{
+									mockNode1.Status.Addresses[0].Address,
+									mockNode2.Status.Addresses[0].Address,
+									mockNode3.Status.Addresses[0].Address,
+									mockNode4.Status.Addresses[0].Address}
+								for _, member := range pool.Members.Items {
+									Expect(member.ProtocolPort).Should(Equal(30000))
+									Expect(member.MonitorPort).Should(Equal(30000))
+									Expect(member.Address).Should(BeElementOf(expectAddress))
+									expectAddress = removeFisrt(expectAddress, member.Address)
+								}
+							}
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
 	// Context("When create and update https listener", func() {
 	// 	It("it should work as expectation", func() {
 	// 		mockIngressReconciler.modeTest = false
 
-	// 		tests := []TestType[*networkingv1.Ingress]{
-	// 			{},
+	// 		test := TestType[*networkingv1.Ingress]{
+	// 			preTest:  func() {},
+	// 			postTest: func() {},
+	// 			name:     "create 2 resource with default annotation",
+	// 			generateDepends: func() []client.Object {
+	// 				return nil
+	// 			},
+	// 			generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+	// 				return []ObjectAndExpect[*networkingv1.Ingress]{}
+	// 			},
+	// 			expect:            func() {},
+	// 			steps:             []StepType{},
+	// 			expectAfterDelete: func() {},
 	// 		}
 
-	// 		for _, tt := range tests {
-	// 			logrus.Info("Running test: ", tt.name)
-	// RunMultiStepTest[*networkingv1.Ingress](tt)
-	// 		}
-	// 	})
-	// })
-
-	// Context("When create and update https listener", func() {
-	// 	It("it should work as expectation", func() {
-	// 		mockIngressReconciler.modeTest = false
-
-	// 		tests := []TestType[*networkingv1.Ingress]{
-	// 			{},
-	// 		}
-
-	// 		for _, tt := range tests {
-	// 			logrus.Info("Running test: ", tt.name)
-	// RunMultiStepTest[*networkingv1.Ingress](tt)
-	// 		}
+	// 		logrus.Info("Running test: ", test.name)
+	//RunMultiStepTest[*networkingv1.Ingress](test)
 	// 	})
 	// })
 })

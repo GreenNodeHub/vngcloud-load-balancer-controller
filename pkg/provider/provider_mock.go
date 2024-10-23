@@ -577,6 +577,7 @@ func (m *MockProvider) updatingStatus(lbID string) {
 
 	if m.WaitAfterTime == 0 {
 		m.mu.Lock()
+		o.UpdatedAt = time.Now().Format(time.RFC3339)
 		o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
 		o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
 		m.mu.Unlock()
@@ -608,6 +609,7 @@ func (m *MockProvider) readyAfterTime(lbID string) {
 
 	time.Sleep(m.WaitAfterTime)
 	m.mu.Lock()
+	o.UpdatedAt = time.Now().Format(time.RFC3339)
 	o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
 	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
 	m.mu.Unlock()

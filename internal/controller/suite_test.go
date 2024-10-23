@@ -248,9 +248,10 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
 
-		Config:           mockConfig,
-		Provider:         mockProvider,
-		FinalizerManager: finalizerManager,
+		Config:              mockConfig,
+		Provider:            mockProvider,
+		FinalizerManager:    finalizerManager,
+		timeReconcilePeriod: 2 * time.Second,
 	}
 	err = mockIngressReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -261,9 +262,10 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
 
-		Config:           mockConfig,
-		Provider:         mockProvider,
-		FinalizerManager: finalizerManager,
+		Config:              mockConfig,
+		Provider:            mockProvider,
+		FinalizerManager:    finalizerManager,
+		timeReconcilePeriod: 2 * time.Second,
 	}
 	err = mockServiceReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
