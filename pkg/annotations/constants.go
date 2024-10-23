@@ -40,4 +40,6 @@ const (
 	SuffixManagePools      = "manage-pools"
 	SuffixManageListeners  = "manage-listeners"
 	SuffixManageDFPMembers = "manage-dfp-members"
+
+	SuffixIsPOC = "is-poc" // is poc
 )

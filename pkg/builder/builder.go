@@ -87,6 +87,7 @@ type modelBuilder struct {
 	enableAutoscale            bool
 	targetType                 TargetType
 	headers                    []string
+	isPOC                      bool
 
 	// annotation configuration for L4 only
 	enableProxyProtocol []string
@@ -143,7 +144,8 @@ func (l *modelBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBal
 	}
 	opts := loadbalancerv2.NewCreateLoadBalancerRequest(lbName, l.GetPackageID(), l.GetSubnetID()).
 		WithScheme(l.scheme).
-		WithType(l.loadBalancerType)
+		WithType(l.loadBalancerType).
+		WithPoc(l.isPOC)
 
 	// if have pool, create first pool, but in L7, only create default pool in this step
 	if len(l.GetPoolBuilders()) > 0 {

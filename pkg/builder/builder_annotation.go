@@ -41,6 +41,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.healthcheckHttpMethod = l.parseAnnotationHealthcheckHttpMethod(annos)
 	l.healthcheckTimeoutSeconds = l.parseAnnotationHealthcheckTimeoutSeconds(annos)
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
+	l.isPOC = l.parseAnnotationIsPOC(annos)
 }
 
 func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
@@ -430,6 +431,20 @@ func (l *modelBuilder) parseAnnotationHealthcheckIntervalSeconds(annos map[strin
 		return l.healthcheckIntervalSeconds
 	}
 	return int(optionsInt64)
+}
+
+func (l *modelBuilder) parseAnnotationIsPOC(annos map[string]string) bool {
+	option := false
+	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixIsPOC, &option, annos)
+	if !exists {
+		return l.isPOC
+	}
+	if err != nil {
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean, using default value %t",
+			annotations.SuffixIsPOC, l.isPOC)
+		return l.enableAutoscale
+	}
+	return option
 }
 
 // func (l *modelBuilder) parseAnnotation

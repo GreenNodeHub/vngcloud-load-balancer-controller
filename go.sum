@@ -188,6 +188,8 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241021034342-72defb336be1 h1:N7Q3erirdv/OrjnpWJNWjWw1zhrkDMX32Myqa5nKjUU=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241021034342-72defb336be1/go.mod h1:pdpx6eYGwbSdB7tOZZuHdb9pJl5nXDy2+E4m+rck7s8=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241023040930-44442b7da99d h1:WN4Yj9pOIndOzb4uoPs3VWmz9bjrA7YPiXDt9/strLQ=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241023040930-44442b7da99d/go.mod h1:pdpx6eYGwbSdB7tOZZuHdb9pJl5nXDy2+E4m+rck7s8=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
