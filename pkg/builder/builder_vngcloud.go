@@ -385,6 +385,7 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 		listenerInPortal = r.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
 	} else {
 		listenerBuilder.SetID(listenerInPortal.GetID())
+		listenerBuilder.SetName(listenerInPortal.GetName())
 
 		// if mismatch listener protocol, return error => user must delete listener in portal ..........................
 		if listenerInPortal.ListenerProtocol != listenerBuilder.ListenerProtocol {

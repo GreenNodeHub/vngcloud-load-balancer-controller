@@ -1654,7 +1654,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 			listenerOpt := &loadbalancerv2.CreateListenerRequest{
 				AllowedCidrs:                "0.0.0.0/0",
-				ListenerName:                "vks_http_listener",
+				ListenerName:                "listener-foo",
 				ListenerProtocol:            "HTTP",
 				ListenerProtocolPort:        80,
 				TimeoutClient:               50000,
@@ -1694,7 +1694,7 @@ var _ = Describe("Ingress Controller", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(listeners).ShouldNot(BeNil())
 			Expect((listeners.Items)).Should(HaveLen(1))
-			Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
+			Expect(listeners.Items[0].Name).Should(Equal("listener-foo"))
 
 			// create policy
 			policyOpt := &loadbalancerv2.CreatePolicyRequest{
@@ -1823,19 +1823,19 @@ var _ = Describe("Ingress Controller", func() {
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(LB).ShouldNot(BeNil())
 
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1))
+					Expect(listeners.Items[0].Name).Should(Equal("listener-foo"))
+
 					// check pool
 					pools, err := mockProvider.ListPool(ctx, LB.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(pools).ShouldNot(BeNil())
 					Expect((pools.Items)).Should(HaveLen(1))
 					Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
-
-					// check listener
-					listeners, err := mockProvider.ListListenerOfLB(ctx, LB.UUID)
-					Expect(err).ShouldNot(HaveOccurred())
-					Expect(listeners).ShouldNot(BeNil())
-					Expect((listeners.Items)).Should(HaveLen(1))
-					Expect(listeners.Items[0].Name).Should(Equal("vks_http_listener"))
 				},
 				postTest: func() {},
 			}
