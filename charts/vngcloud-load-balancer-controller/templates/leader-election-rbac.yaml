@@ -49,5 +49,5 @@ roleRef:
   name: '{{ include "vngcloud-load-balancer-controller.fullname" . }}-leader-election-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "vngcloud-load-balancer-controller.fullname" . }}-controller-manager'
+  name: '{{ include "vngcloud-load-balancer-controller.fullname" . }}-manager'
   namespace: '{{ .Release.Namespace }}'

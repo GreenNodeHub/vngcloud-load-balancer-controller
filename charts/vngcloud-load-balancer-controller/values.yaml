@@ -1,4 +1,5 @@
-controllerManager:
+kubernetesClusterDomain: cluster.local
+manager:
   manager:
     args:
     - --metrics-bind-address=:8443
@@ -23,7 +24,6 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
-kubernetesClusterDomain: cluster.local
 metricsService:
   ports:
   - name: https

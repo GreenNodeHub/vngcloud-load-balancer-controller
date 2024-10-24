@@ -3,12 +3,12 @@ kind: Service
 metadata:
   name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-metrics-service
   labels:
-    control-plane: controller-manager
+    control-plane: manager
   {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.metricsService.type }}
   selector:
-    control-plane: controller-manager
+    control-plane: manager
   {{- include "vngcloud-load-balancer-controller.selectorLabels" . | nindent 4 }}
   ports:
 	{{- .Values.metricsService.ports | toYaml | nindent 2 -}}

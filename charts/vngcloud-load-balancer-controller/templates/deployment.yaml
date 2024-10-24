@@ -1,34 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-controller-manager
+  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
   labels:
-    control-plane: controller-manager
+    control-plane: manager
   {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.controllerManager.replicas }}
+  replicas: {{ .Values.manager.replicas }}
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: manager
     {{- include "vngcloud-load-balancer-controller.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        control-plane: controller-manager
+        control-plane: manager
       {{- include "vngcloud-load-balancer-controller.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
       containers:
-      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+      - args: {{- toYaml .Values.manager.manager.args | nindent 8 }}
         command:
         - /manager
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
-        image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
+        image: {{ .Values.manager.manager.image.repository }}:{{ .Values.manager.manager.image.tag
           | default .Chart.AppVersion }}
-        imagePullPolicy: {{ .Values.controllerManager.manager.imagePullPolicy }}
+        imagePullPolicy: {{ .Values.manager.manager.imagePullPolicy }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -42,17 +42,16 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
-          }}
-        securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
-          | nindent 10 }}
+        resources: {{- toYaml .Values.manager.manager.resources | nindent 10 }}
+        securityContext: {{- toYaml .Values.manager.manager.containerSecurityContext |
+          nindent 10 }}
         volumeMounts:
         - mountPath: /etc/vngcloud-load-balancer-controller
           name: secret
           readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-controller-manager
+      serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
       terminationGracePeriodSeconds: 10
       volumes:
       - name: secret

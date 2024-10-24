@@ -9,7 +9,7 @@ template:
 	rm -rf ./*.tgz
 	helm package .
 
-	rm -rf ./helm/vngcloud-controller-manager/templates
+	rm -rf ./helm/vngcloud-load-balancer-controller/templates
 
 	helm template vngcloud-load-balancer-controller ./*.tgz \
 		--namespace kube-system \
