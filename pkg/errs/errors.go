@@ -26,6 +26,8 @@ var (
 
 	ErrorSecurityGroupNotFound = errors.New("security group not found")
 	ErrorSecurityGroupInUse    = errors.New("security group in use")
+
+	ErrorAddressEmpty = errors.New("address is empty")
 )
 
 // if the error is due to load balancer not found

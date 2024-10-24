@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
 	"reflect"
 	"sync"
 	"time"
@@ -171,6 +172,36 @@ func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 	}
 	obj.SetAnnotations(annotations)
 	return r.Update(ctx, obj, &client.UpdateOptions{})
+}
+
+func (r *ServiceReconciler) updateObjectStatus(ctx context.Context, obj client.Object, address string) error {
+	if obj == nil {
+		return nil
+	}
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("Update status for object %s/%s = %s", obj.GetNamespace(), obj.GetName(), address)
+
+	// get object again to avoid conflict
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	if err != nil {
+		logger.Error("Failed to get object: ", err)
+		return err
+	}
+
+	// update status
+	if address == "" {
+		return errs.ErrorAddressEmpty
+	}
+
+	ingress := obj.(*corev1.Service)
+
+	addr := net.ParseIP(address)
+	if addr != nil {
+		ingress.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: address}}
+	} else {
+		ingress.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+	}
+	return r.Status().Update(ctx, obj)
 }
 
 func (r *ServiceReconciler) startBackgroundGoroutine(ctx context.Context) {
@@ -499,6 +530,13 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		return ctrl.Result{}, err
 	}
 	r.updateTracker.AddUpdateTracker(loadBalancerBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName(), lb.UpdatedAt)
+
+	// update status
+	err = r.updateObjectStatus(ctx, obj, lb.Address)
+	if err != nil {
+		logger.Error("Failed to update status: ", err)
+		return ctrl.Result{}, err
+	}
 
 	// ensure security group with mutex
 	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
