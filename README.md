@@ -125,7 +125,7 @@ To install dev version through helm:
 ```sh
 helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/60108-annd2-ingress/vks-helm-charts/vngcloud-load-balancer-controller \
   --namespace kube-system \
-  --set image.tag=v0.0.1 \
+  --set manager.manager.image.tag=v0.0.1 \
   --version 0.0.1 \
   --set mysecret.cluster.clusterID="____________________" \
   --set mysecret.global.clientID="____________________" \
