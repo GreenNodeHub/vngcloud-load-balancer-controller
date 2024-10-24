@@ -185,6 +185,10 @@ func (h *helperStruct) ComparePoolBuilder(lbID string, current, new *poolBuilder
 		TLSEncryption: nil,
 		HealthMonitor: healthMonitor,
 	}
+	if !new.IsL4 {
+		updateOptions.Stickiness = &new.Stickiness
+		updateOptions.TLSEncryption = &new.TLSEncryption
+	}
 	if current.Algorithm != new.Algorithm {
 		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.Algorithm, new.Algorithm))
 		isNeedUpdate = true
