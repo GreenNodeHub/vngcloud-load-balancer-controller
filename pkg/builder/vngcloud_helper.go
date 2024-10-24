@@ -353,6 +353,8 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		updateOptions.Headers = current.Headers
 		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
 			updateOptions.ClientCertificate = current.ClientCertificate
+			updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
+			updateOptions.CertificateAuthorities = new.CertificateAuthorities
 		}
 	}
 
@@ -385,16 +387,12 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS &&
 		new.DefaultCertificateAuthority != nil &&
 		(current.DefaultCertificateAuthority == nil || *(current.DefaultCertificateAuthority) != *(new.DefaultCertificateAuthority)) {
-
-		updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
 		message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)", *current.DefaultCertificateAuthority, *new.DefaultCertificateAuthority))
 		isNeedUpdate = true
 	}
 
 	// SNI certificate
 	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
-		updateOptions.CertificateAuthorities = new.CertificateAuthorities
-
 		if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
 			current.CertificateAuthorities != new.CertificateAuthorities {
 			message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))

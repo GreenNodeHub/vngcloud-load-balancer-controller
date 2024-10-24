@@ -130,29 +130,32 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	}
 
 	// build listener http
-	httpListener, err := l.buildL7Listener(false)
-	if err != nil {
-		return err
-	}
-	if isHaveDefaultBackend {
-		httpListener.ReferPoolName = defaultPoolBuilder.GetName()
-	}
-	l.AddListenerBuilder(httpListener)
-
-	// build listener https
-	var httpsListener *ListenerBuilderType
-	if len(ingress.Spec.TLS) > 0 {
-		if len(l.certificateIDs) < 1 {
-			return errs.ErrorMissingCertificates
-		}
-		httpsListener, err = l.buildL7Listener(true)
+	var err error
+	var httpListener *ListenerBuilderType
+	if l.checkNeedHTTPListener(ingress) {
+		httpListener, err = l.buildL7Listener(false)
 		if err != nil {
 			return err
 		}
 		if isHaveDefaultBackend {
 			httpListener.ReferPoolName = defaultPoolBuilder.GetName()
 		}
+		l.AddListenerBuilder(httpListener)
+	}
+
+	// build listener https
+	var httpsListener *ListenerBuilderType
+	if len(l.certificateIDs) > 0 {
+		httpsListener, err = l.buildL7Listener(true)
+		if err != nil {
+			return err
+		}
+		if isHaveDefaultBackend {
+			httpsListener.ReferPoolName = defaultPoolBuilder.GetName()
+		}
 		l.AddListenerBuilder(httpsListener)
+	} else if len(ingress.Spec.TLS) > 0 {
+		return errs.ErrorMissingCertificates
 	}
 
 	// which host using tls
@@ -191,6 +194,32 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	}
 
 	return nil
+}
+
+// if have default backend,
+// if have host not in tls,
+// if have host = ""
+func (l *modelBuilder) checkNeedHTTPListener(ingress *networkingv1.Ingress) bool {
+	if ingress.Spec.DefaultBackend != nil {
+		return true
+	}
+	for _, rule := range ingress.Spec.Rules {
+		if rule.Host == "" {
+			return true
+		}
+	}
+	tlsHosts := make(map[string]bool)
+	for _, tls := range ingress.Spec.TLS {
+		for _, host := range tls.Hosts {
+			tlsHosts[host] = true
+		}
+	}
+	for _, rule := range ingress.Spec.Rules {
+		if _, ok := tlsHosts[rule.Host]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 // buildL7Listener
