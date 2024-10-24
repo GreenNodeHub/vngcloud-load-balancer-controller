@@ -6,9 +6,12 @@ import (
 )
 
 // Version is set by the linker flags in the Makefile.
-var Version string
+var (
+	Version string
+	Commit  string
+)
 
 func PrintVersionAndExit() {
-	fmt.Printf("%s\n", Version)
+	fmt.Printf("%s\n%s\n", Version, Commit)
 	os.Exit(0)
 }

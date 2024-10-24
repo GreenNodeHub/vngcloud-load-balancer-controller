@@ -115,7 +115,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info(fmt.Sprintf("The version is [%s], chartVersion is [%s]", version.Version, conf.ChartVersion))
+	setupLog.Info(fmt.Sprintf("The commit is [%s], version is [%s], chartVersion is [%s]", version.Commit, version.Version, conf.ChartVersion))
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and

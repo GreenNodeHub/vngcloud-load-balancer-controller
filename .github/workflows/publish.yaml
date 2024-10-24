@@ -34,6 +34,12 @@ jobs:
           registry: vcr.vngcloud.vn
           username: ${{ secrets.VCR_USER_PRO }}
           password: ${{ secrets.VCR_PASSWORD_PRO }}
+      
+      - name: Set short git commit SHA
+        id: vars
+        run: |
+          calculatedSha=$(git rev-parse --short ${{ github.sha }})
+          echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
 
       - name: Debug
         run: echo ${{ github.ref_name }}
@@ -45,6 +51,7 @@ jobs:
           push: true
           build-args: |
             VERSION=v${{ github.ref_name }}
+            COMMIT=${{ env.COMMIT_SHORT_SHA }}
           # platforms: linux/amd64
           # outputs: type=registry
           tags: |

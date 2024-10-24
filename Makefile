@@ -1,5 +1,6 @@
 VERSION ?= v0.0.0
-LDFLAGS := "-w -s -X 'k8s.io/component-base/version.gitVersion=$(VERSION)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
+COMMIT  := "dev"
+LDFLAGS := "-w -s -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Commit=$(COMMIT)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
 # Image URL to use all building/pushing image targets
 IMG ?= vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -98,7 +99,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -224,3 +225,8 @@ logs:
 .PHONY: exec
 exec:
 	kubectl exec -it $$(kubectl get pods -n kube-system -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | grep vngcloud-load-balancer-controller) -n kube-system -- sh
+
+.PHONY: stg
+stg:
+	$(CONTAINER_TOOL) build --build-arg VERSION=v0.0.1 -t vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1 .
+	$(CONTAINER_TOOL) push vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1
