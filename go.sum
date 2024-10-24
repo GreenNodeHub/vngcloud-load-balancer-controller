@@ -190,6 +190,8 @@ github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241021034342-72defb336be1 h1:N
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241021034342-72defb336be1/go.mod h1:pdpx6eYGwbSdB7tOZZuHdb9pJl5nXDy2+E4m+rck7s8=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241023040930-44442b7da99d h1:WN4Yj9pOIndOzb4uoPs3VWmz9bjrA7YPiXDt9/strLQ=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241023040930-44442b7da99d/go.mod h1:pdpx6eYGwbSdB7tOZZuHdb9pJl5nXDy2+E4m+rck7s8=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241024033112-229d6024a7b3 h1:Y2BhFaTNgjs++r2IU1m9CUUA5d8Uf7Zefdu4cmMGMLQ=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.7.8-0.20241024033112-229d6024a7b3/go.mod h1:pdpx6eYGwbSdB7tOZZuHdb9pJl5nXDy2+E4m+rck7s8=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

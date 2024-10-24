@@ -221,7 +221,7 @@ func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name stri
 			TimeoutMember:               l.idleTimeoutMember,
 			TimeoutConnection:           l.idleTimeoutConnection,
 			AllowedCidrs:                StringListToString(l.inboundCIDRs),
-			Headers:                     []string{},
+			Headers:                     nil,
 		},
 	}
 	return opt

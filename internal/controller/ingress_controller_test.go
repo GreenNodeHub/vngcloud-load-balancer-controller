@@ -1660,7 +1660,7 @@ var _ = Describe("Ingress Controller", func() {
 				TimeoutClient:               50000,
 				TimeoutConnection:           50000,
 				TimeoutMember:               50000,
-				Headers:                     []string{},
+				Headers:                     &[]string{},
 				CertificateAuthorities:      nil,
 				ClientCertificate:           nil,
 				DefaultCertificateAuthority: nil,

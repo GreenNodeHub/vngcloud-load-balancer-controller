@@ -217,7 +217,7 @@ func (r *vngcloudLBBuilder) buildListener(listener *entityv2.Listener) (*Listene
 			CertificateAuthorities:      &listener.CertificateAuthorities,
 			ClientCertificate:           listener.ClientCertificateAuthentication,
 			DefaultCertificateAuthority: listener.DefaultCertificateAuthority,
-			Headers:                     listener.Headers,
+			Headers:                     &listener.Headers,
 		},
 		isDeleted:      false,
 		policyBuilders: make([]*policyBuilderType, 0),

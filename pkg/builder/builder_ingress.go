@@ -215,7 +215,7 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 			CertificateAuthorities:      PointerOf([]string{}),
 			ClientCertificate:           nil,
 			DefaultCertificateAuthority: nil,
-			Headers:                     l.headers,
+			Headers:                     &l.headers,
 		},
 	}
 	if isHTTPS {
