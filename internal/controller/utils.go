@@ -7,6 +7,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	successIcon = "✅"
+	errorIcon   = "❌"
+)
+
 func genKey(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }

@@ -28,7 +28,7 @@ import (
 const (
 	icon      = "🌐"
 	waitIcon  = "⏳"
-	readyIcon = "✅"
+	readyIcon = "👍"
 )
 
 // 🌱
