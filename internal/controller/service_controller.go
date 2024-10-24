@@ -348,7 +348,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Infof("%s Delete successfully.", successIcon)
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Deleted", key)
 		} else {
-			logger.Error("%s Delete failed: ", errorIcon, err)
+			logger.Errorf("%s Delete failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedDelete", err.Error())
 		}
 		return ctrl.Result{}, err
@@ -360,7 +360,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Infof("%s Create successfully.", successIcon)
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Created", key)
 		} else {
-			logger.Error("%s Create failed: ", errorIcon, err)
+			logger.Errorf("%s Create failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedCreate", err.Error())
 		}
 		return result, err
@@ -372,7 +372,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Infof("%s Update successfully.", successIcon)
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Updated", key)
 		} else {
-			logger.Error("%s Update failed: ", errorIcon, err)
+			logger.Errorf("%s Update failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedUpdate", err.Error())
 		}
 		return result, err
