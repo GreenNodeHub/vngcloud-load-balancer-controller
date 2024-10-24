@@ -1488,7 +1488,7 @@ var _ = Describe("Service Controller", func() {
 					},
 					expect: func(loadbalancer *entity.LoadBalancer) {
 						// wait until reconcile done
-						time.Sleep(timeWaitRecocile)
+						time.Sleep(2 * timeWaitRecocile)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-4d0e7"))

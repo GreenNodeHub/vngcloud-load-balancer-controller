@@ -1,11 +1,11 @@
 name: Release
 
-# RELEASE="v1.0.9" bash -c 'git tag $RELEASE && git push origin $RELEASE'
+# RELEASE="1.0.9" bash -c 'git tag $RELEASE && git push origin $RELEASE'
 
 on:
   push:
     tags:
-      - "v*" # Triggers on version tags, e.g., v1.0.0
+      - "*" # Triggers on version tags, e.g., v1.0.0
 
 env:
   REPO: vcr.vngcloud.vn/81-vks-public
@@ -44,15 +44,24 @@ jobs:
           context: .
           push: true
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=v${{ github.ref_name }}
           # platforms: linux/amd64
           # outputs: type=registry
           tags: |
             ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.sha }}
-            ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.ref_name }}
+            ghcr.io/vngcloud/vngcloud-load-balancer-controller:v${{ github.ref_name }}
             ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.sha }}
-            ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.ref_name }}
+            ${{ env.REPO }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
           # target: vngcloud-load-balancer-controller
+      
+      - name: Push charts
+        env:
+          CHANGED_CHARTS: "charts/vngcloud-load-balancer-controller"
+        run: |
+          echo "$CHANGED_CHARTS"
+          echo ${{ github.workspace }}
+          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS
+
   create_release:
     runs-on: ubuntu-latest
     permissions:

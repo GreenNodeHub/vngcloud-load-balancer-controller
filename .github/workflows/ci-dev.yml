@@ -4,6 +4,7 @@ on: push
 
 env:
   VERSION: v0.0.1
+  CHART_VERSION: 0.0.1
   REPO: vcr.vngcloud.vn/60108-annd2-ingress
 
 jobs:
@@ -52,4 +53,4 @@ jobs:
         run: |
           echo "$CHANGED_CHARTS"
           echo ${{ github.workspace }}
-          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS
+          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS ${{ env.CHART_VERSION }}
