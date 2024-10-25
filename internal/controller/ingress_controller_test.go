@@ -41,6 +41,10 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
+const (
+	skipIngressTest = false
+)
+
 var _ = Describe("Ingress Controller", func() {
 	Context("Wait 5 seconds before start test", func() {
 		It("should be alright", func() {
@@ -51,6 +55,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When update status", func() {
 		It("should not reconcile", func() {
+			if skipIngressTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -96,6 +103,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When update status inside reconcile", func() {
 		It("should not reconcile", func() {
+			if skipIngressTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -142,6 +152,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When update annotation", func() {
 		It("should reconcile immediately", func() {
+			if skipIngressTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -178,6 +191,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When update annotation in whitelist annotation", func() {
 		It("should not reconcile", func() {
+			if skipIngressTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -229,6 +245,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When create ingress with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
+			if skipIngressTest {
+				return
+			}
 			mockIngressReconciler.modeTest = false
 
 			testss := []TestType[*networkingv1.Ingress]{
@@ -1043,6 +1062,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When update tags and secgroups annotations", func() {
 		It("load balancer and server should do expect behavior", func() {
+			if skipIngressTest {
+				return
+			}
 			mockIngressReconciler.modeTest = false
 
 			// add 2 foo security group
@@ -1622,6 +1644,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("Load balaner already exist, update annotation to this load balancer", func() {
 		It("it should work as expectation", func() {
+			if skipIngressTest {
+				return
+			}
 			mockIngressReconciler.modeTest = false
 
 			// ensure no load balancer
@@ -1847,6 +1872,9 @@ var _ = Describe("Ingress Controller", func() {
 
 	Context("When 2 resource use a same lb with default annotation", func() {
 		It("it should add to the same default pool, delete pool member after resource delete", func() {
+			if skipIngressTest {
+				return
+			}
 			mockIngressReconciler.modeTest = false
 
 			test := TestType[*networkingv1.Ingress]{
@@ -2049,8 +2077,208 @@ var _ = Describe("Ingress Controller", func() {
 		})
 	})
 
+	Context("When create and update https listener", func() {
+		It("it should work as expectation", func() {
+			if skipIngressTest {
+				return
+			}
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest:  func() {},
+				postTest: func() {},
+				name:     "create ingress only have https listener",
+				generateDepends: func() []client.Object {
+					service := newServiceNodePortResource("service-foo", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{service}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-service-https", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = nil
+					ingress.Spec.TLS = []networkingv1.IngressTLS{
+						{Hosts: []string{"test.com"}},
+					}
+					ingress.Spec.Rules = []networkingv1.IngressRule{
+						{
+							Host: "test.com",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											PathType: func() *networkingv1.PathType { pt := networkingv1.PathTypePrefix; return &pt }(),
+											Path:     "/",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "service-foo",
+													Port: networkingv1.ServiceBackendPort{Number: 80},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					if ingress.Annotations == nil {
+						ingress.Annotations = map[string]string{}
+					}
+					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", provider.MockCerts[0], provider.MockCerts[1])
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-https", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+					for _, listener := range listeners.Items {
+						Expect(listener.Protocol).Should(Equal("HTTPS"))
+						Expect(listener.ProtocolPort).Should(Equal(443))
+						Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+						Expect(listener.DefaultPoolId).Should(Equal(""))   // no default pool
+						Expect(listener.DefaultPoolName).Should(Equal("")) // no default pool
+						Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTPS_LISTENER_NAME))
+						Expect(listener.TimeoutClient).Should(Equal(50))
+						Expect(listener.TimeoutConnection).Should(Equal(5))
+						Expect(listener.TimeoutMember).Should(Equal(50))
+						Expect(listener.Description).Should(Equal("????????"))
+						Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}))
+						Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[0]))
+						Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[1]}))
+						Expect(listener.ClientCertificateAuthentication).ShouldNot(Equal(nil))
+						// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+						// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+					}
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+					for _, pool := range pools.Items {
+						Expect(pool.Name).Should(BeElementOf(
+							"vks-146a6-default-service-foo-80"))
+						Expect(pool.Description).Should(Equal("????????"))
+						Expect(pool.Status).Should(Equal("ACTIVE"))
+						Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+						Expect(pool.Protocol).Should(Equal("HTTP"))
+						Expect(pool.Stickiness).Should(BeFalse())
+						Expect(pool.TLSEncryption).Should(BeFalse())
+
+						Expect(pool.HealthMonitor).ShouldNot(BeNil())
+						Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+						Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+						Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+						Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+						Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+					}
+
+				},
+				steps: []StepType{
+					{
+						kindStep: updateStep,
+						name:     "update listener with annotation",
+						getObject: func() client.Object {
+							ingress := &networkingv1.Ingress{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-https", Namespace: "default"}, ingress)).Should(Succeed())
+							if ingress.Annotations == nil {
+								ingress.Annotations = map[string]string{}
+							}
+							ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", provider.MockCerts[1], provider.MockCerts[2])
+							ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableTLSEncryption)] = "true"
+							ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableStickySession)] = "false"
+
+							return ingress
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-https", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+							for _, listener := range listeners.Items {
+								Expect(listener.Protocol).Should(Equal("HTTPS"))
+								Expect(listener.ProtocolPort).Should(Equal(443))
+								Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
+								Expect(listener.DefaultPoolId).Should(Equal(""))   // no default pool
+								Expect(listener.DefaultPoolName).Should(Equal("")) // no default pool
+								Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTPS_LISTENER_NAME))
+								Expect(listener.TimeoutClient).Should(Equal(50))
+								Expect(listener.TimeoutConnection).Should(Equal(5))
+								Expect(listener.TimeoutMember).Should(Equal(50))
+								Expect(listener.Description).Should(Equal("????????"))
+								Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}))
+								Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[1]))
+								Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[2]}))
+								Expect(listener.ClientCertificateAuthentication).ShouldNot(Equal(nil))
+								// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+								// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+								// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+								// Expect(listener.ConnectionLimit).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+								// Expect(listener.CreatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
+							}
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+							for _, pool := range pools.Items {
+								Expect(pool.Name).Should(BeElementOf(
+									"vks-146a6-default-service-foo-80"))
+								Expect(pool.Description).Should(Equal("????????"))
+								Expect(pool.Status).Should(Equal("ACTIVE"))
+								Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
+								Expect(pool.Protocol).Should(Equal("HTTP"))
+								Expect(pool.Stickiness).Should(BeFalse())
+								Expect(pool.TLSEncryption).Should(BeTrue())
+
+								Expect(pool.HealthMonitor).ShouldNot(BeNil())
+								Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+								Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(3))
+								Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(3))
+								Expect(pool.HealthMonitor.Interval).Should(Equal(30))
+								Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
+							}
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
 	// Context("When create and update https listener", func() {
 	// 	It("it should work as expectation", func() {
+	// if skipIngressTest {
+	// 	return
+	// }
 	// 		mockIngressReconciler.modeTest = false
 
 	// 		test := TestType[*networkingv1.Ingress]{

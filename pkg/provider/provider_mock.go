@@ -9,6 +9,7 @@ import (
 	"time"
 
 	clone "github.com/huandu/go-clone"
+	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
@@ -733,6 +734,27 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			ClientCertificateAuthentication: nil,
 		},
 	}
+	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS ||
+		listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTP {
+		if listener.Headers == nil {
+			return nil, errors.New("Missing Headers For HTTP/HTTPS Listener")
+		}
+		newListener.Listener.Headers = *listener.Headers
+	}
+	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
+		if listener.DefaultCertificateAuthority == nil || *listener.DefaultCertificateAuthority == "" {
+			return nil, errors.New("Missing Default Certificate Authority For HTTPS Listener")
+		}
+		if listener.CertificateAuthorities == nil {
+			return nil, errors.New("Missing Certificate Authorities For HTTPS Listener")
+		}
+		// if listener.ClientCertificate == nil {
+		// 	return nil, errors.New("Missing Client Certificate For HTTPS Listener")
+		// }
+		newListener.Listener.CertificateAuthorities = *listener.CertificateAuthorities
+		newListener.Listener.DefaultCertificateAuthority = listener.DefaultCertificateAuthority
+		newListener.Listener.ClientCertificateAuthentication = listener.ClientCertificate
+	}
 	if listener.DefaultPoolId != nil && *listener.DefaultPoolId != "" {
 		newListener.DefaultPoolId = *listener.DefaultPoolId
 		pool, _ := m.GetPoolByID(ctx, lbID, newListener.DefaultPoolId)
@@ -801,6 +823,28 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 	listener.Listener.TimeoutConnection = updateOpt.TimeoutConnection
 	listener.Listener.TimeoutMember = updateOpt.TimeoutMember
 	listener.Listener.AllowedCidrs = updateOpt.AllowedCidrs
+
+	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
+		listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
+		if updateOpt.Headers == nil {
+			return errors.New("Missing Headers For HTTP/HTTPS Listener")
+		}
+		listener.Listener.Headers = *updateOpt.Headers
+	}
+	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) {
+		if updateOpt.DefaultCertificateAuthority == nil || *updateOpt.DefaultCertificateAuthority == "" {
+			return errors.New("Missing Default Certificate Authority For HTTPS Listener")
+		}
+		if updateOpt.CertificateAuthorities == nil {
+			return errors.New("Missing Certificate Authorities For HTTPS Listener")
+		}
+		// if updateOpt.ClientCertificate == nil {
+		// 	return errors.New("Missing Client Certificate For HTTPS Listener")
+		// }
+		listener.Listener.CertificateAuthorities = *updateOpt.CertificateAuthorities
+		listener.Listener.DefaultCertificateAuthority = updateOpt.DefaultCertificateAuthority
+		listener.Listener.ClientCertificateAuthentication = updateOpt.ClientCertificate
+	}
 
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
@@ -1003,6 +1047,17 @@ func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbala
 		},
 	}
 
+	if pool.PoolProtocol == loadbalancerv2.PoolProtocolHTTP {
+		if pool.Stickiness == nil {
+			return nil, errors.New("Missing Stickiness For HTTP Pool")
+		}
+		if pool.TLSEncryption == nil {
+			return nil, errors.New("Missing TLSEncryption For HTTP Pool")
+		}
+		newPool.Pool.TLSEncryption = *pool.TLSEncryption
+		newPool.Pool.Stickiness = *pool.Stickiness
+	}
+
 	if pool.HealthMonitor != nil {
 		healthMonitor = pool.HealthMonitor.ToRequestBody().(*loadbalancerv2.HealthMonitor)
 		newHealthMonitor := &entityv2.HealthMonitor{
@@ -1178,6 +1233,17 @@ func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt 
 		return errs.ErrorNotFound
 	}
 	pool.Pool.LoadBalanceMethod = string(updateOpt.Algorithm)
+
+	if pool.Pool.Protocol == string(loadbalancerv2.PoolProtocolHTTP) {
+		if updateOpt.Stickiness == nil {
+			return errors.New("Missing Stickiness For HTTP Pool")
+		}
+		if updateOpt.TLSEncryption == nil {
+			return errors.New("Missing TLSEncryption For HTTP Pool")
+		}
+		pool.Pool.TLSEncryption = *updateOpt.TLSEncryption
+		pool.Pool.Stickiness = *updateOpt.Stickiness
+	}
 
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)

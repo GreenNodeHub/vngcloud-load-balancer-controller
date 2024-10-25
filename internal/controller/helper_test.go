@@ -85,7 +85,9 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 			}
 
 			// expect load balancer attribute in the mock provider
-			step.expect()
+			if step.expect != nil {
+				step.expect()
+			}
 		}
 	}
 
