@@ -201,10 +201,12 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 // if have host = ""
 func (l *modelBuilder) checkNeedHTTPListener(ingress *networkingv1.Ingress) bool {
 	if ingress.Spec.DefaultBackend != nil {
+		l.logger.Debugf("Need HTTP listener: has default backend")
 		return true
 	}
 	for _, rule := range ingress.Spec.Rules {
 		if rule.Host == "" {
+			l.logger.Debugf("Need HTTP listener: has rule with empty host")
 			return true
 		}
 	}
@@ -216,6 +218,7 @@ func (l *modelBuilder) checkNeedHTTPListener(ingress *networkingv1.Ingress) bool
 	}
 	for _, rule := range ingress.Spec.Rules {
 		if _, ok := tlsHosts[rule.Host]; !ok {
+			l.logger.Debugf("Need HTTP listener: has rule with host not in tls")
 			return true
 		}
 	}
@@ -291,7 +294,7 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 		return nil, errs.ErrorServicePortNotFound
 	}
 
-	poolName := l.genL7PoolName(int(servicePort.Port))
+	poolName := l.genL7PoolName(service.Name, int(servicePort.Port))
 
 	// Get members address, nodeIP or podIP
 	endpointResolver := utils.NewDefaultEndpointResolver(l.context, l.client)
@@ -394,12 +397,12 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 	return opt, nil
 }
 
-func (l *modelBuilder) genL7PoolName(port int) string {
+func (l *modelBuilder) genL7PoolName(serviceName string, port int) string {
 	hash := l.generateHash()
 	name := fmt.Sprintf("%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		hash,
-		TrimString(fmt.Sprintf("%s-%s", l.resourceNamespace, l.resourceName), 35),
+		TrimString(fmt.Sprintf("%s-%s", l.resourceNamespace, serviceName), 35),
 		port)
 	return l.validateName(name)
 }
