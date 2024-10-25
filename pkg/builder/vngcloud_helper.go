@@ -126,8 +126,8 @@ func (h *helperStruct) ParseListenerProtocol(pPort corev1.ServicePort) loadbalan
 
 // ParseMonitorProtocol parse monitor protocol to health check protocol
 func (h *helperStruct) ParseHealthCheckProtocol(pPoolProtocol corev1.Protocol, pMonitorProtocol string) loadbalancerv2.HealthCheckProtocol {
-	switch strings.TrimSpace(strings.ToUpper(string(pPoolProtocol))) {
-	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
+	switch pPoolProtocol {
+	case corev1.ProtocolUDP:
 		return loadbalancerv2.HealthCheckProtocolPINGUDP
 	}
 
