@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -12,6 +13,12 @@ const (
 	// hcm zone
 	DEFAULT_L7_PACKAGE_ID = "lbp-f562b658-0fd4-4fa6-9c57-c1a803ccbf86"
 	DEFAULT_L4_PACKAGE_ID = "lbp-96b6b072-aadb-4b58-9d5f-c16ad69d36aa"
+)
+
+var (
+	ErrorInvalidInput   = errors.New("invalid input")
+	ErrorNotImplemented = errors.New("not implemented yet")
+	ErrorNotFound       = errors.New("not found")
 )
 
 func PointerOf[T any](t T) *T {

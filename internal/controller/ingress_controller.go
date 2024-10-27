@@ -171,7 +171,7 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 
 	// update status
 	if address == "" {
-		return errs.ErrorAddressEmpty
+		return errors.New("address is empty")
 	}
 
 	ingress := obj.(*networkingv1.Ingress)
@@ -256,58 +256,36 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.numCurrentLock.Unlock()
 	}()
 
-	result, err := r.reconcile(ctx, req)
-	if err != nil {
-
-		var implementationSpecificError *errs.ImplementationSpecificError
-		// handle some particular errors on boolean
-		switch {
-		case errs.IsExceededSecurityGroupPerServerQuota(err):
-			return ctrl.Result{}, nil
-		case errs.IsLoadBalancerNotFound(err):
-			return ctrl.Result{}, nil
-		case errors.As(err, &implementationSpecificError):
-			return ctrl.Result{}, nil
-		}
-
-		switch err {
-		// misconfiguration, ignore these errors, reconcile again when resource is updated
-		case
-			errs.ErrorMissingCertificates,
-			errs.ErrorServicePortNotFound,
-			errs.ErrorSecurityGroupNotFound,
-			errs.ErrorServicePortEmpty:
-			return ctrl.Result{}, nil
-
-		// no need to reconcile again
-		case
-			errs.ErrorSecurityGroupInUse:
-			return ctrl.Result{}, nil
-
-		// sleep 5 seconds and requeue
-		default:
-			time.Sleep(5 * time.Second)
-			return ctrl.Result{}, err
-		}
-	}
-	return result, nil
-}
-
-func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	key := genKey(req.Namespace, req.Name)
-
-	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + key)).GetContext()
+	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + genKey(req.Namespace, req.Name))).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")
 
+	err := r.reconcile(ctx, req)
+
+	// some errors should not requeue
+	if err != nil {
+		switch {
+		case errs.IsExceededSecurityGroupPerServerQuota(err),
+			errs.IsLoadBalancerNotFound(err):
+			err = errs.NewNoNeedRequeue(err.Error())
+		}
+	}
+
+	return errs.HandleReconcileError(err, logger)
+}
+
+func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
+	logger := contexts.NewContext(ctx).Log()
+	key := genKey(req.Namespace, req.Name)
+
 	event := r.eventClassification.Classify(key)
 	if event == nil {
 		logger.Info("Event is nil, return.")
-		return ctrl.Result{}, nil
+		return nil
 	} else if event.Obj == nil {
 		logger.Infof("Event=%v but object is nil, return.", event.Type)
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	logger.Infof("Event = %v", event.Type)
@@ -317,10 +295,12 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 		switch event.Type {
 		case event_classification.DeleteEvent:
 			r.resourceDependant.Clear(event.Obj.(*networkingv1.Ingress))
-			return r.deleteTest(ctx, req)
+			_, err := r.deleteTest(ctx, req)
+			return err
 		default:
 			r.resourceDependant.Set(event.Obj.(*networkingv1.Ingress), true)
-			return r.ensureTest(ctx, req)
+			_, err := r.ensureTest(ctx, req)
+			return err
 		}
 	}
 
@@ -336,11 +316,11 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Errorf("%s Delete failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedDelete", err.Error())
 		}
-		return ctrl.Result{}, err
+		return err
 	case event_classification.CreateEvent:
 		obj := event.Obj.(*networkingv1.Ingress)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Creating", key)
-		result, err := r.ensureObject(ctx, obj, nil)
+		err := r.ensureObject(ctx, obj, nil)
 		if err == nil {
 			logger.Infof("%s Create successfully.", successIcon)
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Created", key)
@@ -348,11 +328,11 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Errorf("%s Create failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedCreate", err.Error())
 		}
-		return result, err
+		return err
 	default:
 		obj := event.Obj.(*networkingv1.Ingress)
 		r.Recorder.Event(obj, corev1.EventTypeNormal, "Updating", key)
-		result, err := r.ensureObject(ctx, obj, event.OldObj)
+		err := r.ensureObject(ctx, obj, event.OldObj)
 		if err == nil {
 			logger.Infof("%s Update successfully.", successIcon)
 			r.Recorder.Event(obj, corev1.EventTypeNormal, "Updated", key)
@@ -360,16 +340,16 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) (ct
 			logger.Errorf("%s Update failed: %v", errorIcon, err)
 			r.Recorder.Event(obj, corev1.EventTypeWarning, "FailedUpdate", err.Error())
 		}
-		return result, err
+		return err
 	}
 }
 
-func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.Ingress, oldObjInterface interface{}) (ctrl.Result, error) {
+func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.Ingress, oldObjInterface interface{}) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
 		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
-		return ctrl.Result{}, err
+		return err
 	}
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByIngress(ctx, obj, r.annotationParser, r.Client,
@@ -381,7 +361,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// logger.Info("ModelBuilder: ", loadBalancerBuilder.StringFormat(), " ", loadBalancerBuilder.JSONFormat())
@@ -390,7 +370,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	// ignore reconcile
 	if loadBalancerBuilder.IsIgnored() {
 		logger.Info("Object is ignored")
-		return ctrl.Result{}, nil
+		return nil
 	}
 
 	// create loadbalancer, update annotation and reconcile later
@@ -403,26 +383,26 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		}
 		lb, err := r.Provider.GetLoadBalancerByName(ctx, lbName)
 		if err != nil {
-			return ctrl.Result{}, err
+			return err
 		}
 		if lb == nil {
 			// create loadbalancer. It mays create lb, listener, pool at the same time
 			lb, err = r.Provider.CreateLoadBalancer(ctx, loadBalancerBuilder.CreateLoadBalancerOptions())
 			if err != nil {
-				return ctrl.Result{}, err
+				return err
 			}
 		}
 		if lb == nil || lb.UUID == "" {
-			return ctrl.Result{}, errs.ErrorLoadBalancerNotHaveUUID
+			return errors.New("load balancer not have UUID after find by name or create, need to retry")
 		}
 		r.updateObjectAnnotation(ctx, obj, map[string]string{
 			fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.UUID,
 		})
-		return ctrl.Result{}, nil
+		return nil
 	} else {
 		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -431,7 +411,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 	if err != nil {
 		logger.Error("Failed to get current loadbalancer: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// get old object annotations
@@ -447,7 +427,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	err = currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure tags: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// ensure package
@@ -456,11 +436,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		loadBalancerBuilder.GetPackageID() != "" {
 		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetLoadBalancerID(), loadBalancerBuilder.GetPackageID()); err != nil {
 			logger.Error("Failed to resize loadbalancer: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 		if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
 			logger.Error("Failed to wait for loadbalancer active: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -469,7 +449,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		err := currentBuilder.EnsurePool(poolBuilder, oldBuilder)
 		if err != nil {
 			logger.Error("Failed to ensure pool: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -488,7 +468,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		err := currentBuilder.EnsureListener(listenerBuilder, oldBuilder)
 		if err != nil {
 			logger.Error("Failed to ensure listener: ", err)
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -496,20 +476,20 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	err = currentBuilder.DeleteRedundantListeners(oldBuilder, loadBalancerBuilder)
 	if err != nil {
 		logger.Error("Failed to delete redundant listener: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// delete redundant pools, should check if pool is used by other listeners or policy then ignore
 	err = currentBuilder.DeleteRedundantPools(oldBuilder, loadBalancerBuilder)
 	if err != nil {
 		logger.Error("Failed to delete redundant pool: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// update management annotations
 	if err := r.updateObjectAnnotation(ctx, obj, loadBalancerBuilder.GetManageAnnotation()); err != nil {
 		logger.Error("Failed to update management annotations: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// watch endpoint if target type is ip or cni mode is cilium native routing
@@ -520,7 +500,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	lb, err := r.Provider.GetLoadBalancerByID(ctx, loadBalancerBuilder.GetLoadBalancerID())
 	if err != nil {
 		logger.Error("Failed to get loadbalancer: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 	r.updateTracker.AddUpdateTracker(loadBalancerBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName(), lb.UpdatedAt)
 
@@ -528,17 +508,17 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	err = r.updateObjectStatus(ctx, obj, lb.Address)
 	if err != nil {
 		logger.Error("Failed to update status: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
 	// ensure security group with mutex
 	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure security group: ", err)
-		return ctrl.Result{}, err
+		return err
 	}
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *IngressReconciler) ensureSecurityGroup(currentBuilder builder.LoadBalancerBuilder, loadBalancerBuilder builder.ModelBuilder, oldBuilder builder.OldModelBuilder) error {
@@ -690,7 +670,7 @@ func (r *IngressReconciler) Init(client client.Client) error {
 	}
 	providerIDs := builder.VNGHelper.GetListProviderID(r.knownNodes)
 	if len(r.knownNodes) == 0 || len(providerIDs) == 0 {
-		return errs.ErrorNoNodeAtInitTime
+		return errors.New("require at least 1 node to get network information")
 	}
 
 	// init provider
@@ -703,7 +683,7 @@ func (r *IngressReconciler) Init(client client.Client) error {
 	r.subnetID = r.Provider.GetSubnetID()
 	r.subnetCIDR = r.Provider.GetSubnetCIDR()
 	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
-		return errs.ErrorNoNetworkInfo
+		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
 	}
 
 	// init cni mode

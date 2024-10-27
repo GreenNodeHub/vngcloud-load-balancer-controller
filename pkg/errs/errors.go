@@ -1,34 +1,7 @@
 package errs
 
 import (
-	"errors"
-	"fmt"
 	"strings"
-)
-
-var (
-	ErrorNoConfig = errors.New("config is nil")
-
-	ErrorServicePortEmpty     = errors.New("service port is empty")
-	ErrorNoNetworkInfo        = errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
-	ErrorNoNodeAtInitTime     = errors.New("require at least 1 node to get network information")
-	ErrorServicePortNameEmpty = errors.New("service port name is empty")
-	ErrorServicePortNotFound  = errors.New("service port not found")
-
-	ErrorLoadBalancerNotHaveUUID        = errors.New("load balancer not have UUID after find by name or create, need to retry")
-	ErrorLoadBalancerStatusError        = errors.New("load balancer status is error")
-	ErrorLoadBalancerNotHaveInformation = errors.New("load balancer not have information")
-
-	ErrorInvalidInput   = errors.New("invalid input")
-	ErrorNotImplemented = errors.New("not implemented yet")
-	ErrorNotFound       = errors.New("not found")
-
-	ErrorMissingCertificates = errors.New("missing certificates, need to specific through annotation")
-
-	ErrorSecurityGroupNotFound = errors.New("security group not found")
-	ErrorSecurityGroupInUse    = errors.New("security group in use")
-
-	ErrorAddressEmpty = errors.New("address is empty")
 )
 
 // if the error is due to load balancer not found
@@ -40,20 +13,4 @@ func IsLoadBalancerNotFound(err error) bool {
 // if the error is due to exceeded security group per server quota
 func IsExceededSecurityGroupPerServerQuota(err error) bool {
 	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
-}
-
-type ImplementationSpecificError struct {
-	message string
-	params  []interface{}
-}
-
-func NewImplementationSpecificError(message string, params ...interface{}) error {
-	return &ImplementationSpecificError{
-		message: message,
-		params:  params,
-	}
-}
-
-func (e *ImplementationSpecificError) Error() string {
-	return fmt.Sprintf(e.message, e.params...)
 }

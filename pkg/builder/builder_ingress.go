@@ -157,7 +157,7 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 		}
 		l.AddListenerBuilder(httpsListener)
 	} else if len(ingress.Spec.TLS) > 0 {
-		return errs.ErrorMissingCertificates
+		return errs.NewNoNeedRequeue("missing certificates, need to specific through annotation")
 	}
 
 	// which host using tls
@@ -293,7 +293,7 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 		}
 	}
 	if servicePort == nil {
-		return nil, errs.ErrorServicePortNotFound
+		return nil, errs.NewNoNeedRequeue("service port not found")
 	}
 
 	poolName := l.genL7PoolName(service.Name, int(servicePort.Port))
@@ -474,7 +474,7 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 					string(loadbalancerv2.PolicyRuleTypeHOSTNAME),
 				}
 				if !slices.Contains(validRuleType, rule.RuleType) {
-					return nil, errs.NewImplementationSpecificError("invalid \"type\": \"%s\", must be one of %s", rule.RuleType, validRuleType)
+					return nil, errs.NewNoNeedRequeue(fmt.Sprintf("invalid \"type\": \"%s\", must be one of %s", rule.RuleType, validRuleType))
 				}
 
 				// validate compare type
@@ -486,7 +486,7 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 					string(loadbalancerv2.PolicyCompareTypeEQUALS),
 				}
 				if !slices.Contains(validCompareType, rule.Compare) {
-					return nil, errs.NewImplementationSpecificError("invalid \"compare\": \"%s\", must be one of %s", rule.Compare, validCompareType)
+					return nil, errs.NewNoNeedRequeue(fmt.Sprintf("invalid \"compare\": \"%s\", must be one of %s", rule.Compare, validCompareType))
 				}
 			}
 
@@ -497,16 +497,17 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 				string(loadbalancerv2.PolicyActionREJECT),
 			}
 			if !slices.Contains(validAction, config.Action.Action) {
-				return nil, errs.NewImplementationSpecificError("invalid \"action\": \"%s\", must be one of %s", config.Action.Action, validAction)
+				return nil, errs.NewNoNeedRequeue(fmt.Sprintf("invalid \"action\": \"%s\", must be one of %s", config.Action.Action, validAction))
+
 			}
 
 			// validate if action is redirect to url
 			if config.Action.Action == string(loadbalancerv2.PolicyActionREDIRECTTOURL) {
 				if _, err := url.ParseRequestURI(config.Action.RedirectURL); err != nil {
-					return nil, errs.NewImplementationSpecificError("invalid \"redirectUrl\": \"%s\"", config.Action.RedirectURL)
+					return nil, errs.NewNoNeedRequeue(fmt.Sprintf("invalid \"redirectUrl\": \"%s\"", config.Action.RedirectURL))
 				}
 				if !slices.Contains([]int{301, 302}, config.Action.RedirectHTTPCode) {
-					return nil, errs.NewImplementationSpecificError("invalid \"redirectHttpCode\": \"%d\", must be one of 301, 302", config.Action.RedirectHTTPCode)
+					return nil, errs.NewNoNeedRequeue(fmt.Sprintf("invalid \"redirectHttpCode\": \"%d\", must be one of 301, 302", config.Action.RedirectHTTPCode))
 				}
 			} else {
 				config.Action.RedirectURL = ""
@@ -520,7 +521,7 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 					if r.CompareType == loadbalancerv2.PolicyCompareType(rule.Compare) &&
 						r.RuleType == loadbalancerv2.PolicyRuleType(rule.RuleType) &&
 						r.RuleValue == rule.Value {
-						return nil, errs.NewImplementationSpecificError("duplicated rule: %v", rule)
+						return nil, errs.NewNoNeedRequeue(fmt.Sprintf("duplicated rule: %v", rule))
 					}
 				}
 				l7Rule = append(l7Rule, loadbalancerv2.L7RuleRequest{
@@ -545,5 +546,5 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 		}
 	}
 
-	return nil, errs.NewImplementationSpecificError("no implementation specific config found for path %s", path.Path)
+	return nil, errs.NewNoNeedRequeue("no implementation specific config found for path " + path.Path)
 }

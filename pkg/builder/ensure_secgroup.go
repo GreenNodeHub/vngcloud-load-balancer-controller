@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -201,8 +202,7 @@ func (m *vngcloudLBBuilder) validateSecurityGroup(ids []string) error {
 	}
 
 	if len(invalid) > 0 {
-		m.logger.Errorf("Security group IDs %v are invalid", strings.Join(invalid, ","))
-		return errs.ErrorSecurityGroupNotFound
+		return errs.NewNoNeedRequeue(fmt.Sprintf("security group IDs: %v are invalid", strings.Join(invalid, ",")))
 	}
 	return nil
 }

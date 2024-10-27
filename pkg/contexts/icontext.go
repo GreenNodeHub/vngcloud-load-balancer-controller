@@ -14,4 +14,8 @@ type ContextWrapper interface {
 	SetLogName(name string) ContextWrapper
 
 	GetContext() context.Context
+
+	// AddMessage(message string) ContextWrapper
+	// GetMessages() []string
+	// ClearMessages() ContextWrapper
 }

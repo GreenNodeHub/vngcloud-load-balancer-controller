@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -17,6 +18,8 @@ type IContext struct {
 	context.Context
 	logId string
 	name  string
+
+	mutex sync.Mutex
 }
 
 func NewContext(ctx context.Context) ContextWrapper {
@@ -52,6 +55,8 @@ func (s *IContext) Log() *logrus.Entry {
 }
 
 func (s *IContext) SetLogName(name string) ContextWrapper {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	s.name = name
 	s.Context = context.WithValue(s.Context, keyName, name)
 	return s

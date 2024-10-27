@@ -111,7 +111,7 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 	// Check if the service spec has any port, if not, return error
 	ports := pService.Spec.Ports
 	if len(ports) <= 0 {
-		return errs.ErrorServicePortEmpty
+		return errs.NewNoNeedRequeue("service has no port")
 	}
 
 	// check if the service has a name or not, if not, generate a name

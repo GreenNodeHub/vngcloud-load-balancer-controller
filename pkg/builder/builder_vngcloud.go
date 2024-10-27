@@ -103,7 +103,7 @@ func (r *vngcloudLBBuilder) build() error {
 		return err
 	}
 	if lb == nil {
-		return errs.ErrorLoadBalancerNotHaveInformation
+		return errs.NewRequeueNeeded("load balancer not have information")
 	}
 
 	r.loadBalancerID = lb.UUID
