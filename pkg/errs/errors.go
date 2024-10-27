@@ -2,6 +2,7 @@ package errs
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -39,4 +40,20 @@ func IsLoadBalancerNotFound(err error) bool {
 // if the error is due to exceeded security group per server quota
 func IsExceededSecurityGroupPerServerQuota(err error) bool {
 	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
+}
+
+type ImplementationSpecificError struct {
+	message string
+	params  []interface{}
+}
+
+func NewImplementationSpecificError(message string, params ...interface{}) error {
+	return &ImplementationSpecificError{
+		message: message,
+		params:  params,
+	}
+}
+
+func (e *ImplementationSpecificError) Error() string {
+	return fmt.Sprintf(e.message, e.params...)
 }

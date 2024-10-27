@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -257,11 +258,15 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	result, err := r.reconcile(ctx, req)
 	if err != nil {
-		// handle some particular errors
-		if errs.IsExceededSecurityGroupPerServerQuota(err) {
+
+		var implementationSpecificError *errs.ImplementationSpecificError
+		// handle some particular errors on boolean
+		switch {
+		case errs.IsExceededSecurityGroupPerServerQuota(err):
 			return ctrl.Result{}, nil
-		}
-		if errs.IsLoadBalancerNotFound(err) {
+		case errs.IsLoadBalancerNotFound(err):
+			return ctrl.Result{}, nil
+		case errors.As(err, &implementationSpecificError):
 			return ctrl.Result{}, nil
 		}
 

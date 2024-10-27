@@ -3,6 +3,8 @@ package builder
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"slices"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
@@ -423,8 +425,8 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 		compareType = loadbalancerv2.PolicyCompareTypeEQUALS
 	case networkingv1.PathTypePrefix:
 		compareType = loadbalancerv2.PolicyCompareTypeSTARTSWITH
-	// case networkingv1.PathTypeImplementationSpecific:
-	// 	compareType = loadbalancerv2.PolicyCompareTypeRegex
+	case networkingv1.PathTypeImplementationSpecific:
+		return l.buildPolicyByRegex(host, policyName, path)
 	default:
 		compareType = loadbalancerv2.PolicyCompareTypeEQUALS
 	}
@@ -457,4 +459,91 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 		isDeleted:     false,
 		ReferPoolName: "", // will be set later
 	}, nil
+}
+
+func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {
+	for _, config := range l.implementationSpecificConfigs {
+		if config.Path == path.Path {
+			l.logger.Debugf("Found implementation specific config for path %s: %v", path.Path, config)
+			// validate rules
+			for _, rule := range config.Rules {
+
+				// validate rule type
+				validRuleType := []string{
+					string(loadbalancerv2.PolicyRuleTypePATH),
+					string(loadbalancerv2.PolicyRuleTypeHOSTNAME),
+				}
+				if !slices.Contains(validRuleType, rule.RuleType) {
+					return nil, errs.NewImplementationSpecificError("invalid \"type\": \"%s\", must be one of %s", rule.RuleType, validRuleType)
+				}
+
+				// validate compare type
+				validCompareType := []string{
+					string(loadbalancerv2.PolicyCompareTypeCONTAINS),
+					string(loadbalancerv2.PolicyCompareTypeENDSWITH),
+					string(loadbalancerv2.PolicyCompareTypeSTARTSWITH),
+					string(loadbalancerv2.PolicyCompareTypeREGEX),
+					string(loadbalancerv2.PolicyCompareTypeEQUALS),
+				}
+				if !slices.Contains(validCompareType, rule.Compare) {
+					return nil, errs.NewImplementationSpecificError("invalid \"compare\": \"%s\", must be one of %s", rule.Compare, validCompareType)
+				}
+			}
+
+			// validate action
+			validAction := []string{
+				string(loadbalancerv2.PolicyActionREDIRECTTOPOOL),
+				string(loadbalancerv2.PolicyActionREDIRECTTOURL),
+				string(loadbalancerv2.PolicyActionREJECT),
+			}
+			if !slices.Contains(validAction, config.Action.Action) {
+				return nil, errs.NewImplementationSpecificError("invalid \"action\": \"%s\", must be one of %s", config.Action.Action, validAction)
+			}
+
+			// validate if action is redirect to url
+			if config.Action.Action == string(loadbalancerv2.PolicyActionREDIRECTTOURL) {
+				if _, err := url.ParseRequestURI(config.Action.RedirectURL); err != nil {
+					return nil, errs.NewImplementationSpecificError("invalid \"redirectUrl\": \"%s\"", config.Action.RedirectURL)
+				}
+				if !slices.Contains([]int{301, 302}, config.Action.RedirectHTTPCode) {
+					return nil, errs.NewImplementationSpecificError("invalid \"redirectHttpCode\": \"%d\", must be one of 301, 302", config.Action.RedirectHTTPCode)
+				}
+			} else {
+				config.Action.RedirectURL = ""
+				config.Action.RedirectHTTPCode = 301
+			}
+
+			l7Rule := make([]loadbalancerv2.L7RuleRequest, 0)
+			for _, rule := range config.Rules {
+				// check if rule is duplicated
+				for _, r := range l7Rule {
+					if r.CompareType == loadbalancerv2.PolicyCompareType(rule.Compare) &&
+						r.RuleType == loadbalancerv2.PolicyRuleType(rule.RuleType) &&
+						r.RuleValue == rule.Value {
+						return nil, errs.NewImplementationSpecificError("duplicated rule: %v", rule)
+					}
+				}
+				l7Rule = append(l7Rule, loadbalancerv2.L7RuleRequest{
+					CompareType: loadbalancerv2.PolicyCompareType(rule.Compare),
+					RuleType:    loadbalancerv2.PolicyRuleType(rule.RuleType),
+					RuleValue:   rule.Value,
+				})
+			}
+
+			return &policyBuilderType{
+				commonBuilder: commonBuilder{
+					name: policyName,
+				},
+				Action:           loadbalancerv2.PolicyAction(config.Action.Action),
+				Rules:            l7Rule,
+				RedirectURL:      config.Action.RedirectURL,
+				RedirectHTTPCode: config.Action.RedirectHTTPCode,
+				KeepQueryString:  config.Action.KeepQueryString,
+				isDeleted:        false,
+				ReferPoolName:    "", // will be set later
+			}, nil
+		}
+	}
+
+	return nil, errs.NewImplementationSpecificError("no implementation specific config found for path %s", path.Path)
 }

@@ -46,6 +46,9 @@ func debugCompareMapString[T comparable](a, b map[string]T) {
 
 	// log the difference
 	for k := range keys {
+		if k == "kubectl.kubernetes.io/last-applied-configuration" {
+			continue
+		}
 		if a[k] != b[k] {
 			logrus.Debugf("   - %s: (%v -> %v)", k, a[k], b[k])
 		} else {

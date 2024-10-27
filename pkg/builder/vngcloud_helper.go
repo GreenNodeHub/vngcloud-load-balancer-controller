@@ -445,22 +445,29 @@ func (h *helperStruct) ComparePolicyBuilder(lbID, lisID string, current, new *po
 		message = append(message, fmt.Sprintf("action (%s -> %s)", current.Action, new.Action))
 		isNeedUpdate = true
 	}
-	if current.RedirectPoolID != new.RedirectPoolID {
+
+	// options for redirect to pool
+	if new.Action == loadbalancerv2.PolicyActionREDIRECTTOPOOL && current.RedirectPoolID != new.RedirectPoolID {
 		message = append(message, fmt.Sprintf("redirect pool id (%s -> %s)", current.RedirectPoolID, new.RedirectPoolID))
 		isNeedUpdate = true
 	}
-	if current.RedirectURL != new.RedirectURL {
-		message = append(message, fmt.Sprintf("redirect url (%s -> %s)", current.RedirectURL, new.RedirectURL))
-		isNeedUpdate = true
+
+	// options for redirect to url
+	if new.Action == loadbalancerv2.PolicyActionREDIRECTTOURL {
+		if current.RedirectURL != new.RedirectURL {
+			message = append(message, fmt.Sprintf("redirect url (%s -> %s)", current.RedirectURL, new.RedirectURL))
+			isNeedUpdate = true
+		}
+		if current.RedirectHTTPCode != new.RedirectHTTPCode {
+			message = append(message, fmt.Sprintf("redirect http code (%d -> %d)", current.RedirectHTTPCode, new.RedirectHTTPCode))
+			isNeedUpdate = true
+		}
+		if current.KeepQueryString != new.KeepQueryString {
+			message = append(message, fmt.Sprintf("keep query string (%t -> %t)", current.KeepQueryString, new.KeepQueryString))
+			isNeedUpdate = true
+		}
 	}
-	if current.RedirectHTTPCode != new.RedirectHTTPCode {
-		message = append(message, fmt.Sprintf("redirect http code (%d -> %d)", current.RedirectHTTPCode, new.RedirectHTTPCode))
-		isNeedUpdate = true
-	}
-	if current.KeepQueryString != new.KeepQueryString {
-		message = append(message, fmt.Sprintf("keep query string (%t -> %t)", current.KeepQueryString, new.KeepQueryString))
-		isNeedUpdate = true
-	}
+
 	if len(current.Rules) != len(new.Rules) {
 		message = append(message, fmt.Sprintf("len(rules) (%d -> %d)", len(current.Rules), len(new.Rules)))
 		isNeedUpdate = true
@@ -473,6 +480,7 @@ func (h *helperStruct) ComparePolicyBuilder(lbID, lisID string, current, new *po
 			}
 		}
 	}
+
 	if !isNeedUpdate {
 		return nil, nil
 	}

@@ -64,6 +64,25 @@ type ModelBuilder interface {
 
 var _ ModelBuilder = &modelBuilder{}
 
+type rule struct {
+	RuleType string `json:"type"`
+	Compare  string `json:"compare"`
+	Value    string `json:"value"`
+}
+
+type action struct {
+	Action           string `json:"action"`
+	RedirectURL      string `json:"redirectUrl"`
+	RedirectHTTPCode int    `json:"redirectHttpCode"`
+	KeepQueryString  bool   `json:"keepQueryString"`
+}
+
+type implementationSpecificConfig struct {
+	Path   string `json:"path"`
+	Rules  []rule `json:"rules"`
+	Action action `json:"action"`
+}
+
 type modelBuilder struct {
 	// annotation configuration
 	isIgnored                  bool
@@ -93,9 +112,10 @@ type modelBuilder struct {
 	enableProxyProtocol []string
 
 	// annotation configuration for L7 only
-	enableStickySession bool
-	enableTLSEncryption bool
-	certificateIDs      []string
+	enableStickySession           bool
+	enableTLSEncryption           bool
+	certificateIDs                []string
+	implementationSpecificConfigs []implementationSpecificConfig
 
 	// helper components
 	annotationParser annotations.Parser

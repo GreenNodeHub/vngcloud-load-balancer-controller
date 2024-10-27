@@ -32,9 +32,10 @@ const (
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
 
 	// for l7 only
-	SuffixEnableStickySession = "enable-sticky-session"
-	SuffixEnableTLSEncryption = "enable-tls-encryption"
-	SuffixCertificateIDs      = "certificate-ids"
+	SuffixEnableStickySession          = "enable-sticky-session"
+	SuffixEnableTLSEncryption          = "enable-tls-encryption"
+	SuffixCertificateIDs               = "certificate-ids"
+	SuffixImplementationSpecificParams = "implementation-specific-params"
 
 	// for management
 	SuffixManagePools      = "manage-pools"

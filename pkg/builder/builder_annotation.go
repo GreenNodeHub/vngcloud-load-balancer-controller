@@ -42,6 +42,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.healthcheckTimeoutSeconds = l.parseAnnotationHealthcheckTimeoutSeconds(annos)
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
 	l.isPOC = l.parseAnnotationIsPOC(annos)
+	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
 }
 
 func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
@@ -447,7 +448,20 @@ func (l *modelBuilder) parseAnnotationIsPOC(annos map[string]string) bool {
 	return option
 }
 
-// func (l *modelBuilder) parseAnnotation
+func (l *modelBuilder) parseAnnotationImplementationSpecificConfigs(annos map[string]string) []implementationSpecificConfig {
+	option := make([]implementationSpecificConfig, 0)
+	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixImplementationSpecificParams, &option, annos)
+	if !exist {
+		return l.implementationSpecificConfigs
+	}
+	if err != nil {
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
+			annotations.SuffixImplementationSpecificParams, l.implementationSpecificConfigs)
+		return l.implementationSpecificConfigs
+	}
+	return option
+}
+
 // func (l *modelBuilder) parseAnnotation
 // func (l *modelBuilder) parseAnnotation
 // func (l *modelBuilder) parseAnnotation
