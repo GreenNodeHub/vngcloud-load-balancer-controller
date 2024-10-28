@@ -56,7 +56,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When update status", func() {
 		It("should not reconcile", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -104,7 +104,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When update status inside reconcile", func() {
 		It("should not reconcile", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -153,7 +153,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When update annotation", func() {
 		It("should reconcile immediately", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -192,7 +192,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When update annotation in whitelist annotation", func() {
 		It("should not reconcile", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -246,7 +246,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -1063,7 +1063,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When update tags and secgroups annotations", func() {
 		It("load balancer and server should do expect behavior", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -1645,7 +1645,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("Load balaner already exist, update annotation to this load balancer", func() {
 		It("it should work as expectation", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -1873,7 +1873,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When 2 resource use a same lb with default annotation", func() {
 		It("it should add to the same default pool, delete pool member after resource delete", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -2080,7 +2080,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create and update https listener", func() {
 		It("it should work as expectation", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -2277,7 +2277,7 @@ var _ = Describe("Ingress Controller", func() {
 	Context("Test ImplementSpecific path type", func() {
 		It("it should work as expectation", func() {
 			if skipIngressTest {
-				return
+				Skip("Skip test")
 			}
 			mockIngressReconciler.modeTest = false
 
@@ -2512,7 +2512,7 @@ var _ = Describe("Ingress Controller", func() {
 	// Context("When create and update https listener", func() {
 	// 	It("it should work as expectation", func() {
 	// if skipIngressTest {
-	// 	return
+	// 	Skip("Skip test")
 	// }
 	// 		mockIngressReconciler.modeTest = false
 

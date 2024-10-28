@@ -62,7 +62,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When create, update or delete a service", func() {
 		It("should successfully reconcile the resource", func() {
 			if skipServiceTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -130,7 +130,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When create, update or delete a endpoint", func() {
 		It("should successfully reconcile the resource", func() {
 			if skipServiceTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -188,7 +188,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When update Service LoadBalancer to NodePort", func() {
 		It("should create a delete event", func() {
 			if skipServiceTest {
-				return
+				Skip("Skip test")
 			}
 			countReconcile, countReconcileDelete := 0, 0
 			mockServiceReconciler.ensureTest = func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -255,7 +255,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When create service with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
 			if skipServiceTest {
-				return
+				Skip("Skip test")
 			}
 			mockServiceReconciler.modeTest = false
 
@@ -1133,7 +1133,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When update tags and secgroups annotations", func() {
 		It("load balancer and server should do expect behavior", func() {
 			if skipServiceTest {
-				return
+				Skip("Skip test")
 			}
 			mockServiceReconciler.modeTest = false
 
@@ -1733,6 +1733,76 @@ var _ = Describe("Service Controller", func() {
 				}
 				printEndTest()
 			}
+		})
+	})
+
+	Context("Test create LB error", func() {
+		It("it should work as expectation", func() {
+			if skipServiceTest {
+				Skip("Skip test")
+			}
+			mockServiceReconciler.modeTest = false
+
+			test := TestType[*corev1.Service]{
+				preTest:         func() {},
+				postTest:        func() {},
+				name:            "create service with name will be error",
+				generateDepends: func() []client.Object { return []client.Object{} },
+				generateObj: func() []ObjectAndExpect[*corev1.Service] {
+					service := newServiceResource("test-service-error", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					if service.Annotations == nil {
+						service.Annotations = map[string]string{}
+					}
+					service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName)] = provider.MockLBNameError
+					return []ObjectAndExpect[*corev1.Service]{{obj: service, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// it will create and delete load balancer continuously because of error
+					Eventually(func() int {
+						listLB, err := mockProvider.ListLoadBalancers(ctx)
+						Expect(err).ShouldNot(HaveOccurred())
+						return len(listLB.Items)
+					}, timeout, interval).Should(Equal(0))
+				},
+				steps: []StepType{
+					{
+						kindStep: updateStep,
+						name:     "update lb name to normal",
+						getObject: func() client.Object {
+							obj := &corev1.Service{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-error", Namespace: "default"}, obj)).Should(Succeed())
+							obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName)] = "normal-name"
+							return obj
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							Eventually(func() int {
+								listLB, err := mockProvider.ListLoadBalancers(ctx)
+								Expect(err).ShouldNot(HaveOccurred())
+								return len(listLB.Items)
+							}, timeout, interval).Should(Equal(1))
+
+							// get load balancer by id in resource annotation
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-error", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+							Expect(loadbalancer.Name).Should(Equal("normal-name"))
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*corev1.Service](test)
 		})
 	})
 

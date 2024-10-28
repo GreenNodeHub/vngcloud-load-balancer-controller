@@ -21,10 +21,11 @@ import (
 )
 
 const (
-	MockProjectID  = "projectID"
-	MockNetID      = "netID"
-	MockSubnetID   = "subnetID"
-	MockSubnetCIDR = "199.0.0.0/24"
+	MockProjectID   = "projectID"
+	MockNetID       = "netID"
+	MockSubnetID    = "subnetID"
+	MockSubnetCIDR  = "199.0.0.0/24"
+	MockLBNameError = "error-lb" // create lb with this name will be error
 )
 
 var (
@@ -581,6 +582,9 @@ func (m *MockProvider) updatingStatus(lbID string) {
 		o.UpdatedAt = time.Now().Format(time.RFC3339)
 		o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
 		o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
+		if o.Name == MockLBNameError {
+			o.DisplayStatus = consts.ERROR_LOADBALANCER_STATUS
+		}
 		m.mu.Unlock()
 		return
 	}
@@ -613,6 +617,9 @@ func (m *MockProvider) readyAfterTime(lbID string) {
 	o.UpdatedAt = time.Now().Format(time.RFC3339)
 	o.DisplayStatus = consts.ACTIVE_LOADBALANCER_STATUS
 	o.ProgressStatus = consts.CREATED_LOADBALANCER_STATUS
+	if o.Name == MockLBNameError {
+		o.DisplayStatus = consts.ERROR_LOADBALANCER_STATUS
+	}
 	m.mu.Unlock()
 }
 
@@ -677,10 +684,10 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 			resultLb = lb
 			return true, nil
 		}
-		if strings.ToUpper(lb.Status) == consts.ERROR_LOADBALANCER_STATUS {
+		if strings.ToUpper(lb.DisplayStatus) == consts.ERROR_LOADBALANCER_STATUS {
 			logger.Errorf("Load balancer %s is in error status", lbID)
 			resultLb = lb
-			return true, errors.New("load balancer status is error")
+			return true, ErrorLoadBalancerStatusError
 		}
 
 		logger.Infof("%s Load balancer %s is not ready yet, waiting...", waitIcon, lbID)

@@ -16,9 +16,10 @@ const (
 )
 
 var (
-	ErrorInvalidInput   = errors.New("invalid input")
-	ErrorNotImplemented = errors.New("not implemented yet")
-	ErrorNotFound       = errors.New("not found")
+	ErrorInvalidInput            = errors.New("invalid input")
+	ErrorNotImplemented          = errors.New("not implemented yet")
+	ErrorNotFound                = errors.New("not found")
+	ErrorLoadBalancerStatusError = errors.New("load balancer status is error")
 )
 
 func PointerOf[T any](t T) *T {

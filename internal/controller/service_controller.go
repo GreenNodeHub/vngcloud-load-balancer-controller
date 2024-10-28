@@ -420,6 +420,22 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		if lb == nil || lb.UUID == "" {
 			return errors.New("load balancer not have UUID after find by name or create, need to retry")
 		}
+
+		// wait for loadbalancer active, if lb is error, delete it and return error
+		if _, err := r.Provider.WaitForLBActive(ctx, lb.UUID); err != nil {
+			if err == provider.ErrorLoadBalancerStatusError {
+				if err := r.Provider.DeleteLoadBalancer(ctx, lb.UUID); err != nil {
+					logger.Error("Failed to delete loadbalancer: ", err)
+					return err
+				}
+				logger.Infof("Delete loadbalancer \"%s\" because of status error, recreate now.", lb.UUID)
+				return errs.NewRequeueNeeded("loadbalancer status is error, delete and recreate")
+			}
+			logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
+		}
+
+		// update object annotation, also trigger reconcile immediately
 		r.updateObjectAnnotation(ctx, obj, map[string]string{
 			fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.UUID,
 		})
