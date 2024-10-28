@@ -47,6 +47,10 @@ import (
 // 		-> controller should reconcile twice when create service and when update endpoint (ignore create endpoint)
 // 		-> but in test, it just reconcile once when create service
 
+const (
+	skipServiceTest = false
+)
+
 var _ = Describe("Service Controller", func() {
 	Context("Wait 5 seconds before start test", func() {
 		It("should be alright", func() {
@@ -57,6 +61,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When create, update or delete a service", func() {
 		It("should successfully reconcile the resource", func() {
+			if skipServiceTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -122,6 +129,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When create, update or delete a endpoint", func() {
 		It("should successfully reconcile the resource", func() {
+			if skipServiceTest {
+				return
+			}
 			countReconcile := 0
 			funcTest := func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -177,6 +187,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When update Service LoadBalancer to NodePort", func() {
 		It("should create a delete event", func() {
+			if skipServiceTest {
+				return
+			}
 			countReconcile, countReconcileDelete := 0, 0
 			mockServiceReconciler.ensureTest = func(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 				countReconcile++
@@ -241,6 +254,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When create service with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
+			if skipServiceTest {
+				return
+			}
 			mockServiceReconciler.modeTest = false
 
 			type stepType struct {
@@ -1116,6 +1132,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When update tags and secgroups annotations", func() {
 		It("load balancer and server should do expect behavior", func() {
+			if skipServiceTest {
+				return
+			}
 			mockServiceReconciler.modeTest = false
 
 			// add 2 foo security group

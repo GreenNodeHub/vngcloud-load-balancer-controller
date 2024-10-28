@@ -178,12 +178,6 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 		_, isHttpsListener := hostUsingTLS[rule.Host]
 
 		for pathIndex, path := range rule.HTTP.Paths {
-			// build pool
-			poolBuilder, err := l.buildIngressPool(path.Backend.Service, nodes)
-			if err != nil {
-				return err
-			}
-			l.AddPoolBuilder(poolBuilder)
 
 			// build policy
 			policyName := l.genL7PolicyName(isHttpsListener, ruleIndex, pathIndex)
@@ -191,12 +185,27 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 			if err != nil {
 				return err
 			}
-			policyBuilder.ReferPoolName = poolBuilder.GetName()
 			if isHttpsListener {
 				httpsListener.policyBuilders = append(httpsListener.policyBuilders, policyBuilder)
 			} else {
 				httpListener.policyBuilders = append(httpListener.policyBuilders, policyBuilder)
 			}
+
+			// check if action is redirect to url or reject then skip building pool
+			if policyBuilder.Action == loadbalancerv2.PolicyActionREDIRECTTOURL ||
+				policyBuilder.Action == loadbalancerv2.PolicyActionREJECT {
+				continue
+			}
+
+			// build pool
+			poolBuilder, err := l.buildIngressPool(path.Backend.Service, nodes)
+			if err != nil {
+				return err
+			}
+			l.AddPoolBuilder(poolBuilder)
+
+			// set policy refer to pool name
+			policyBuilder.ReferPoolName = poolBuilder.GetName()
 		}
 	}
 

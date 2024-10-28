@@ -2230,7 +2230,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(listener.TimeoutConnection).Should(Equal(5))
 								Expect(listener.TimeoutMember).Should(Equal(50))
 								Expect(listener.Description).Should(Equal("????????"))
-								Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}))
+								Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Port", "X-Forwarded-Proto"}))
 								Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[1]))
 								Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[2]}))
 								Expect(listener.ClientCertificateAuthentication).ShouldNot(Equal(nil))
@@ -2263,6 +2263,241 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(pool.HealthMonitor.Interval).Should(Equal(30))
 								Expect(pool.HealthMonitor.Timeout).Should(Equal(5))
 							}
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
+	Context("Test ImplementSpecific path type", func() {
+		It("it should work as expectation", func() {
+			if skipIngressTest {
+				return
+			}
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest:  func() {},
+				postTest: func() {},
+				name:     "create ingress with rule REJECT",
+				generateDepends: func() []client.Object {
+					service := newServiceNodePortResource("service-foo", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{service}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-ingress-implement-specific", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = nil
+					ingress.Spec.Rules = []networkingv1.IngressRule{
+						{
+							Host: "",
+							IngressRuleValue: networkingv1.IngressRuleValue{
+								HTTP: &networkingv1.HTTPIngressRuleValue{
+									Paths: []networkingv1.HTTPIngressPath{
+										{
+											PathType: func() *networkingv1.PathType { pt := networkingv1.PathTypeImplementationSpecific; return &pt }(),
+											Path:     "/haha",
+											Backend: networkingv1.IngressBackend{
+												Service: &networkingv1.IngressServiceBackend{
+													Name: "service-foo",
+													Port: networkingv1.ServiceBackendPort{Number: 80},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+					if ingress.Annotations == nil {
+						ingress.Annotations = map[string]string{}
+					}
+					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"PATH","compare":"EQUAL_TO","value":"/foo#"},{"type":"PATH","compare":"REGEX","value":"/foo#anchor"}],"action":{"action":"REJECT", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 301}}]`
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+					for _, listener := range listeners.Items {
+
+						// check policy
+						policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
+						Expect(err).ShouldNot(HaveOccurred())
+						Expect(policies).ShouldNot(BeNil())
+						Expect((policies.Items)).Should(HaveLen(1)) // number of policy
+						for _, policy := range policies.Items {
+							Expect(policy.Name).Should(Equal("vks-01f54-false-r0-p0"))
+							// Expect(policy.Description).Should(Equal("????????"))
+							Expect(policy.Action).Should(Equal("REJECT"))
+							// Expect(policy.RedirectUrl).Should(Equal("http://golang.cafe/a"))
+							// Expect(policy.RedirectHttpCode).Should(Equal(301))
+							// Expect(policy.Rules).ShouldNot(BeNil())
+							Expect((policy.L7Rules)).Should(HaveLen(2)) // number of rule
+							expectRuleType := []string{"PATH", "PATH"}
+							expectRuleCompare := []string{"EQUAL_TO", "REGEX"}
+							expectRuleValue := []string{"/foo#", "/foo#anchor"}
+							for _, rule := range policy.L7Rules {
+								Expect(rule.RuleType).Should(BeElementOf(expectRuleType))
+								Expect(rule.CompareType).Should(BeElementOf(expectRuleCompare))
+								Expect(rule.RuleValue).Should(BeElementOf(expectRuleValue))
+								expectRuleType = removeFisrt(expectRuleType, rule.RuleType)
+								expectRuleCompare = removeFisrt(expectRuleCompare, rule.CompareType)
+								expectRuleValue = removeFisrt(expectRuleValue, rule.RuleValue)
+							}
+						}
+					}
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(0)) // number of pool
+				},
+				steps: []StepType{
+					{
+						kindStep: updateStep,
+						name:     "update policy action to redirect to pool",
+						getObject: func() client.Object {
+							ingress := &networkingv1.Ingress{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress-implement-specific", Namespace: "default"}, ingress)).Should(Succeed())
+							if ingress.Annotations == nil {
+								ingress.Annotations = map[string]string{}
+							}
+							ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_POOL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
+
+							return ingress
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+							for _, listener := range listeners.Items {
+
+								// check policy
+								policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
+								Expect(err).ShouldNot(HaveOccurred())
+								Expect(policies).ShouldNot(BeNil())
+								Expect((policies.Items)).Should(HaveLen(1)) // number of policy
+								for _, policy := range policies.Items {
+									Expect(policy.Name).Should(Equal("vks-01f54-false-r0-p0"))
+									// Expect(policy.Description).Should(Equal("????????"))
+									Expect(policy.Action).Should(Equal("REDIRECT_TO_POOL"))
+									Expect((policy.L7Rules)).Should(HaveLen(2)) // number of rule
+									expectRuleType := []string{"HOST_NAME", "PATH"}
+									expectRuleCompare := []string{"ENDS_WITH", "STARTS_WITH"}
+									expectRuleValue := []string{"/hhh", "/kkk"}
+									for _, rule := range policy.L7Rules {
+										Expect(rule.RuleType).Should(BeElementOf(expectRuleType))
+										Expect(rule.CompareType).Should(BeElementOf(expectRuleCompare))
+										Expect(rule.RuleValue).Should(BeElementOf(expectRuleValue))
+										expectRuleType = removeFisrt(expectRuleType, rule.RuleType)
+										expectRuleCompare = removeFisrt(expectRuleCompare, rule.CompareType)
+										expectRuleValue = removeFisrt(expectRuleValue, rule.RuleValue)
+									}
+								}
+							}
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1))
+							for _, pool := range pools.Items {
+								Expect(pool.Name).Should(BeElementOf(
+									"vks-01f54-default-service-foo-80"))
+							}
+						},
+					},
+					{
+						kindStep: updateStep,
+						name:     "update policy action to redirect to http://golang.cafe/a",
+						getObject: func() client.Object {
+							ingress := &networkingv1.Ingress{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-ingress-implement-specific", Namespace: "default"}, ingress)).Should(Succeed())
+							if ingress.Annotations == nil {
+								ingress.Annotations = map[string]string{}
+							}
+							ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_URL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
+
+							return ingress
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+							for _, listener := range listeners.Items {
+
+								// check policy
+								policies, err := mockProvider.ListPolicyOfListener(ctx, loadbalancer.UUID, listener.UUID)
+								Expect(err).ShouldNot(HaveOccurred())
+								Expect(policies).ShouldNot(BeNil())
+								Expect((policies.Items)).Should(HaveLen(1)) // number of policy
+								for _, policy := range policies.Items {
+									Expect(policy.Name).Should(Equal("vks-01f54-false-r0-p0"))
+									// Expect(policy.Description).Should(Equal("????????"))
+									Expect(policy.Action).Should(Equal("REDIRECT_TO_URL"))
+									Expect(policy.RedirectURL).Should(Equal("http://golang.cafe/a"))
+									Expect(policy.RedirectHTTPCode).Should(Equal(302))
+									Expect(policy.KeepQueryString).Should(BeTrue())
+									Expect((policy.L7Rules)).Should(HaveLen(2)) // number of rule
+									expectRuleType := []string{"HOST_NAME", "PATH"}
+									expectRuleCompare := []string{"ENDS_WITH", "STARTS_WITH"}
+									expectRuleValue := []string{"/hhh", "/kkk"}
+									for _, rule := range policy.L7Rules {
+										Expect(rule.RuleType).Should(BeElementOf(expectRuleType))
+										Expect(rule.CompareType).Should(BeElementOf(expectRuleCompare))
+										Expect(rule.RuleValue).Should(BeElementOf(expectRuleValue))
+										expectRuleType = removeFisrt(expectRuleType, rule.RuleType)
+										expectRuleCompare = removeFisrt(expectRuleCompare, rule.CompareType)
+										expectRuleValue = removeFisrt(expectRuleValue, rule.RuleValue)
+									}
+								}
+							}
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(0))
 						},
 					},
 				},
