@@ -1,6 +1,8 @@
 package errs
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,5 +26,7 @@ func HandleReconcileError(err error, log *logrus.Entry) (ctrl.Result, error) {
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	log.Infof("requeue after 5 seconds + exponential back-off, reason: %v", err)
+	time.Sleep(5 * time.Second)
 	return ctrl.Result{}, err
 }

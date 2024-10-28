@@ -43,6 +43,8 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
 	l.isPOC = l.parseAnnotationIsPOC(annos)
 	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
+	l.headers = l.parseAnnotationHeader(annos)
+	l.clientCertificateID = l.parseAnnotationClientCertificateID(annos)
 }
 
 func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
@@ -462,8 +464,29 @@ func (l *modelBuilder) parseAnnotationImplementationSpecificConfigs(annos map[st
 	return option
 }
 
-// func (l *modelBuilder) parseAnnotation
-// func (l *modelBuilder) parseAnnotation
+func (l *modelBuilder) parseAnnotationHeader(annos map[string]string) headerConfig {
+	option := headerConfig{}
+	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixHeader, &option, annos)
+	if !exist {
+		return l.headers
+	}
+	if err != nil {
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
+			annotations.SuffixHeader, l.headers)
+		return l.headers
+	}
+	return option
+}
+
+func (l *modelBuilder) parseAnnotationClientCertificateID(annos map[string]string) string {
+	option := ""
+	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixClientCertificateID, &option, annos)
+	if !exist {
+		return l.clientCertificateID
+	}
+	return option
+}
+
 // func (l *modelBuilder) parseAnnotation
 // func (l *modelBuilder) parseAnnotation
 // func (l *modelBuilder) parseAnnotation

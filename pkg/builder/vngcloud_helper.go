@@ -342,17 +342,15 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		DefaultPoolId:               *new.DefaultPoolId,
 		DefaultCertificateAuthority: nil,
 		CertificateAuthorities:      nil,
-
-		// not support update these fields
-		Headers:           nil, // L7: if this field is nil, it will update empty ? => set it nil in L4
-		ClientCertificate: nil, // L7: if this field is nil, it will update empty ? => set it nil in L4
+		Headers:                     nil,
+		ClientCertificate:           nil,
 	}
 
 	// set current value
 	if !new.IsL4 {
-		updateOptions.Headers = current.Headers
+		updateOptions.Headers = new.Headers
 		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
-			updateOptions.ClientCertificate = current.ClientCertificate
+			updateOptions.ClientCertificate = new.ClientCertificate
 			updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
 			updateOptions.CertificateAuthorities = new.CertificateAuthorities
 		}
@@ -383,31 +381,49 @@ func (h *helperStruct) CompareListenerBuilder(lbID string, current, new *Listene
 		isNeedUpdate = true
 	}
 
-	// default certificate
-	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS &&
-		new.DefaultCertificateAuthority != nil &&
-		(current.DefaultCertificateAuthority == nil || *(current.DefaultCertificateAuthority) != *(new.DefaultCertificateAuthority)) {
-		message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)", *current.DefaultCertificateAuthority, *new.DefaultCertificateAuthority))
-		isNeedUpdate = true
-	}
+	if !new.IsL4 {
 
-	// SNI certificate
-	if !new.IsL4 && new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
-		if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
-			current.CertificateAuthorities != new.CertificateAuthorities {
-			message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+		// headers
+		slices.Sort(*current.Headers)
+		slices.Sort(*new.Headers)
+		if !slices.Equal(*current.Headers, *new.Headers) {
+			message = append(message, fmt.Sprintf("headers (%v -> %v)", *current.Headers, *new.Headers))
 			isNeedUpdate = true
-		} else {
-			// CertificateAuthorities is not nil
-			if len(*current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
+		}
+
+		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
+
+			// client certificate
+			if !comparePointer(current.ClientCertificate, new.ClientCertificate) {
+				message = append(message, fmt.Sprintf("client certificate (%v -> %v)",
+					pointerToString(current.ClientCertificate), pointerToString(new.ClientCertificate)))
+				isNeedUpdate = true
+			}
+
+			// default certificate authority
+			if !comparePointer(current.DefaultCertificateAuthority, new.DefaultCertificateAuthority) {
+				message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)",
+					pointerToString(current.DefaultCertificateAuthority), pointerToString(new.DefaultCertificateAuthority)))
+				isNeedUpdate = true
+			}
+
+			// certificate authorities
+			if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
+				current.CertificateAuthorities != new.CertificateAuthorities {
 				message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
 				isNeedUpdate = true
 			} else {
-				for _, ca := range *new.CertificateAuthorities {
-					if !slices.Contains(*current.CertificateAuthorities, ca) {
-						message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
-						isNeedUpdate = true
-						break
+				// CertificateAuthorities is not nil
+				if len(*current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
+					message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+					isNeedUpdate = true
+				} else {
+					for _, ca := range *new.CertificateAuthorities {
+						if !slices.Contains(*current.CertificateAuthorities, ca) {
+							message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
+							isNeedUpdate = true
+							break
+						}
 					}
 				}
 			}
@@ -578,4 +594,21 @@ func (h *helperStruct) MergeStringArray(ctx context.Context, current, remove, ad
 		}
 	}
 	return ret, false
+}
+
+func comparePointer[T comparable](current, new *T) bool {
+	if current == nil && new == nil {
+		return true
+	}
+	if current == nil || new == nil {
+		return false
+	}
+	return *current == *new
+}
+
+func pointerToString[T any](p *T) string {
+	if p == nil {
+		return "(nil)"
+	}
+	return fmt.Sprintf("&(%v)", *p)
 }

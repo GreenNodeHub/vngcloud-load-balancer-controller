@@ -90,9 +90,14 @@ func NewModelBuilderByIngress(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
-		headers:                    []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
 
-		isAutoCreateSecurityGroup: true,
+		isAutoCreateSecurityGroup:     true,
+		isPOC:                         false,
+		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
+		headers: headerConfig{
+			Http:  []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
+			Https: []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}},
+		clientCertificateID: "",
 	}
 	if ingress == nil {
 		return model, nil
@@ -249,22 +254,26 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 			CertificateAuthorities:      PointerOf([]string{}),
 			ClientCertificate:           nil,
 			DefaultCertificateAuthority: nil,
-			Headers:                     &l.headers,
+			Headers:                     &l.headers.Http,
 		},
 	}
 	if isHTTPS {
 		opt.name = consts.DEFAULT_HTTPS_LISTENER_NAME
-		opt.ListenerName = consts.DEFAULT_HTTPS_LISTENER_NAME
-		opt.ListenerProtocol = loadbalancerv2.ListenerProtocolHTTPS
-		opt.ListenerProtocolPort = 443
-		opt.DefaultCertificateAuthority = nil
-		opt.CertificateAuthorities = PointerOf([]string{})
+		opt.CreateListenerRequest.ListenerName = consts.DEFAULT_HTTPS_LISTENER_NAME
+		opt.CreateListenerRequest.ListenerProtocol = loadbalancerv2.ListenerProtocolHTTPS
+		opt.CreateListenerRequest.ListenerProtocolPort = 443
+		opt.CreateListenerRequest.DefaultCertificateAuthority = nil
+		opt.CreateListenerRequest.CertificateAuthorities = PointerOf([]string{})
+		opt.CreateListenerRequest.Headers = &l.headers.Https
 
 		if len(l.certificateIDs) > 0 {
 			opt.DefaultCertificateAuthority = &l.certificateIDs[0]
 		}
 		if len(l.certificateIDs) > 1 {
 			opt.CertificateAuthorities = PointerOf(l.certificateIDs[1:])
+		}
+		if l.clientCertificateID != "" {
+			opt.CreateListenerRequest.ClientCertificate = &l.clientCertificateID
 		}
 	}
 	return opt, nil

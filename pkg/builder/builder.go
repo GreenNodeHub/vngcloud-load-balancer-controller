@@ -83,6 +83,11 @@ type implementationSpecificConfig struct {
 	Action action `json:"action"`
 }
 
+type headerConfig struct {
+	Http  []string `json:"http"`
+	Https []string `json:"https"`
+}
+
 type modelBuilder struct {
 	// annotation configuration
 	isIgnored                  bool
@@ -105,7 +110,6 @@ type modelBuilder struct {
 	healthcheckIntervalSeconds int
 	enableAutoscale            bool
 	targetType                 TargetType
-	headers                    []string
 	isPOC                      bool
 
 	// annotation configuration for L4 only
@@ -116,6 +120,8 @@ type modelBuilder struct {
 	enableTLSEncryption           bool
 	certificateIDs                []string
 	implementationSpecificConfigs []implementationSpecificConfig
+	headers                       headerConfig
+	clientCertificateID           string
 
 	// helper components
 	annotationParser annotations.Parser

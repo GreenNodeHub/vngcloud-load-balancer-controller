@@ -162,12 +162,17 @@ func (r *ServiceReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 	}
 
 	annotations := obj.GetAnnotations()
-	logger.Debugf("Update annotation for object %s/%s", obj.GetNamespace(), obj.GetName())
-	debugCompareMapString(annotations, annos)
-
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
+
+	logger.Debugf("Update annotation for object %s/%s", obj.GetNamespace(), obj.GetName())
+	newAnnotation := clone.Clone(annotations).(map[string]string)
+	for k, v := range annos {
+		newAnnotation[k] = v
+	}
+	debugCompareMapString(annotations, newAnnotation)
+
 	for k, v := range annos {
 		annotations[k] = v
 	}

@@ -86,9 +86,12 @@ func NewModelBuilderByService(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
-		headers:                    []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
 
-		isAutoCreateSecurityGroup: true,
+		isAutoCreateSecurityGroup:     true,
+		isPOC:                         false,
+		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
+		headers:                       headerConfig{},
+		clientCertificateID:           "",
 	}
 	if service == nil {
 		return model, nil

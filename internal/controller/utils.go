@@ -50,7 +50,7 @@ func debugCompareMapString[T comparable](a, b map[string]T) {
 			continue
 		}
 		if a[k] != b[k] {
-			logrus.Debugf("   - %s: (%v -> %v)", k, a[k], b[k])
+			logrus.Debugf("   + %s: (%v -> %v)", k, a[k], b[k])
 		} else {
 			logrus.Debugf("   - %s: %v", k, a[k])
 		}

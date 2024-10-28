@@ -36,6 +36,8 @@ const (
 	SuffixEnableTLSEncryption          = "enable-tls-encryption"
 	SuffixCertificateIDs               = "certificate-ids"
 	SuffixImplementationSpecificParams = "implementation-specific-params"
+	SuffixHeader                       = "header"
+	SuffixClientCertificateID          = "client-certificate-id"
 
 	// for management
 	SuffixManagePools      = "manage-pools"
