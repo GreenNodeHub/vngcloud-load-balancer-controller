@@ -691,6 +691,22 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
 	}
 
+	// if clusterID is empty, get from node label
+	if r.Config.Cluster.ClusterID == "" {
+		clusterID := ""
+		for _, node := range r.knownNodes {
+			if node.Labels != nil && node.Labels["vks.vngcloud.vn/cluster-id"] != "" {
+				clusterID = node.Labels["vks.vngcloud.vn/cluster-id"]
+				break
+			}
+		}
+		if clusterID == "" {
+			return errors.New("no clusterID found, should exist in node label or specify in config")
+		}
+		r.Config.Cluster.ClusterID = clusterID
+		logrus.Infof("ClusterID is empty, get from node label: %s", r.Config.Cluster.ClusterID)
+	}
+
 	// init cni mode
 	r.cniMode, err = utils.NewDetector(client).DetectCNIType()
 	if err != nil {

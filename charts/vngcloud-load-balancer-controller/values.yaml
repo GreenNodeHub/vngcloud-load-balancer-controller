@@ -33,10 +33,10 @@ metricsService:
   type: ClusterIP
 mysecret:
   cluster:
-    clusterID: 
-    clusterName: 
+    clusterID: ""
+    clusterName: ""
   global:
-    clientID: 
-    clientSecret: 
+    clientID: ""
+    clientSecret: ""
     identityURL: https://iamapis.vngcloud.vn/accounts-api
     vserverURL: https://hcm-3.api.vngcloud.vn/vserver

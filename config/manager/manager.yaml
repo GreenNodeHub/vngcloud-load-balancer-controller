@@ -17,8 +17,8 @@ stringData:
   config.yaml: |
     chartVersion: 0.0.1
     cluster:
-      clusterID: ________________________________________
-      clusterName: ________________________________________
+      clusterID: ""
+      clusterName: ""
     global:
       clientID: ____________________________________
       clientSecret: ____________________________________

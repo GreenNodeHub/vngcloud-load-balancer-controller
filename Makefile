@@ -1,5 +1,5 @@
 VERSION ?= v0.0.0
-COMMIT  := "dev"
+COMMIT  := ""
 LDFLAGS := "-w -s -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Commit=$(COMMIT)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
 # Image URL to use all building/pushing image targets
 IMG ?= vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:$(VERSION)
@@ -99,7 +99,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT="dev" -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -228,5 +228,5 @@ exec:
 
 .PHONY: stg
 stg:
-	$(CONTAINER_TOOL) build --build-arg VERSION=v0.0.1 -t vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1 .
+	$(CONTAINER_TOOL) build --build-arg VERSION=v0.0.1 --build-arg COMMIT=stg -t vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1 .
 	$(CONTAINER_TOOL) push vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1

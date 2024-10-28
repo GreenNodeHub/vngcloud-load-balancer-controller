@@ -127,7 +127,6 @@ helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud
   --namespace kube-system \
   --set manager.manager.image.tag=v0.0.1 \
   --version 0.0.1 \
-  --set mysecret.cluster.clusterID="____________________" \
   --set mysecret.global.clientID="____________________" \
   --set mysecret.global.clientSecret="____________________"
 ```
@@ -136,8 +135,6 @@ To run locally, make sure you have this file `/etc/vngcloud-load-balancer-contro
 
 ```yaml
 chartVersion: 0.0.0
-cluster:
-  clusterID: k8s-________________________________
 global:
   clientID: ____________________________________
   clientSecret: ____________________________________
