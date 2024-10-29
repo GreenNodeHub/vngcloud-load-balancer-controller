@@ -46,4 +46,6 @@ const (
 
 	SuffixIsPOC  = "isPOC"  // is poc
 	SuffixIsPOC2 = "is-poc" // is poc but deprecated
+
+	SuffixTrigger = "trigger" // trigger
 )

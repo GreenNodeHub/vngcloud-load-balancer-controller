@@ -251,7 +251,7 @@ func (r *ServiceReconciler) Enqueue(req reconcile.Request) {
 		return
 	}
 	err := r.updateObjectAnnotation(context.Background(), obj,
-		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), "trigger"): fmt.Sprintf("%d", time.Now().Unix())})
+		map[string]string{fmt.Sprintf("%s/%s", r.annotationParser.GetPrefix(), annotations.SuffixTrigger): fmt.Sprintf("%d", time.Now().Unix())})
 	if err != nil {
 		logrus.Error("Failed to update annotation: ", err)
 	}
