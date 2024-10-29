@@ -44,5 +44,6 @@ const (
 	SuffixManageListeners  = "manage-listeners"
 	SuffixManageDFPMembers = "manage-dfp-members"
 
-	SuffixIsPOC = "is-poc" // is poc
+	SuffixIsPOC  = "isPOC"  // is poc
+	SuffixIsPOC2 = "is-poc" // is poc but deprecated
 )

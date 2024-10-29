@@ -281,7 +281,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.numCurrentLock.Unlock()
 	}()
 
-	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("i/" + genKey(req.Namespace, req.Name))).GetContext()
+	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("s/" + genKey(req.Namespace, req.Name))).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")

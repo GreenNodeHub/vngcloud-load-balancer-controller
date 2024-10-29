@@ -41,6 +41,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.healthcheckHttpMethod = l.parseAnnotationHealthcheckHttpMethod(annos)
 	l.healthcheckTimeoutSeconds = l.parseAnnotationHealthcheckTimeoutSeconds(annos)
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
+	l.isPOC = l.parseAnnotationIsPOC_old(annos) // isPOC2 is deprecated
 	l.isPOC = l.parseAnnotationIsPOC(annos)
 	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
 	l.headers = l.parseAnnotationHeader(annos)
@@ -445,7 +446,20 @@ func (l *modelBuilder) parseAnnotationIsPOC(annos map[string]string) bool {
 	if err != nil {
 		l.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean, using default value %t",
 			annotations.SuffixIsPOC, l.isPOC)
-		return l.enableAutoscale
+		return l.isPOC
+	}
+	return option
+}
+func (l *modelBuilder) parseAnnotationIsPOC_old(annos map[string]string) bool {
+	option := false
+	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixIsPOC2, &option, annos)
+	if !exists {
+		return l.isPOC
+	}
+	if err != nil {
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean, using default value %t",
+			annotations.SuffixIsPOC, l.isPOC)
+		return l.isPOC
 	}
 	return option
 }
