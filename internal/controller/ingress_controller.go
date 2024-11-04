@@ -445,7 +445,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
 
 	// ensure tags
-	err = currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
+	err = r.ensureTags(loadBalancerBuilder, currentBuilder, oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure tags: ", err)
 		return err
@@ -628,6 +628,13 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		}
 		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
 	} else {
+		// ensure delete tags
+		err = r.ensureDeleteTags(currentBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure delete tags: ", err)
+			return err
+		}
+
 		// delete redundant listeners
 		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
 		if err != nil {
@@ -661,6 +668,24 @@ func (r *IngressReconciler) ensureDeleteSecurityGroup(currentBuilder builder.Loa
 		return err
 	}
 	return nil
+}
+
+// ensureTags
+func (r *IngressReconciler) ensureTags(loadBalancerBuilder builder.ModelBuilder, currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	tagMutex.Lock()
+	defer tagMutex.Unlock()
+
+	err := currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
+	return err
+}
+
+// ensureDeleteTags
+func (r *IngressReconciler) ensureDeleteTags(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	tagMutex.Lock()
+	defer tagMutex.Unlock()
+
+	err := currentBuilder.EnsureDeleteTags(oldBuilder)
+	return err
 }
 
 func (r *IngressReconciler) init() error {

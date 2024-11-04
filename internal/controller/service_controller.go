@@ -465,7 +465,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
 
 	// ensure tags
-	err = currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
+	err = r.ensureTags(loadBalancerBuilder, currentBuilder, oldBuilder)
 	if err != nil {
 		logger.Error("Failed to ensure tags: ", err)
 		return err
@@ -646,6 +646,13 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		}
 		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
 	} else {
+		// ensure delete tags
+		err = r.ensureDeleteTags(currentBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure delete tags: ", err)
+			return err
+		}
+
 		// delete redundant listeners
 		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
 		if err != nil {
@@ -679,6 +686,24 @@ func (r *ServiceReconciler) ensureDeleteSecurityGroup(currentBuilder builder.Loa
 		return err
 	}
 	return nil
+}
+
+// ensureTags
+func (r *ServiceReconciler) ensureTags(loadBalancerBuilder builder.ModelBuilder, currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	tagMutex.Lock()
+	defer tagMutex.Unlock()
+
+	err := currentBuilder.EnsureTags(loadBalancerBuilder.GetTags(), oldBuilder)
+	return err
+}
+
+// ensureDeleteTags
+func (r *ServiceReconciler) ensureDeleteTags(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	tagMutex.Lock()
+	defer tagMutex.Unlock()
+
+	err := currentBuilder.EnsureDeleteTags(oldBuilder)
+	return err
 }
 
 func (r *ServiceReconciler) init() error {

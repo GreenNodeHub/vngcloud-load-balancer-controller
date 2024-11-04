@@ -33,6 +33,10 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 		newTags[consts.VKS_TAG_KEY] = vksClusterTags
 	}
 
+	return r.updateTag(currentTags, oldTags, newTags)
+}
+
+func (r *vngcloudLBBuilder) updateTag(currentTags, oldTags, newTags map[string]string) error {
 	r.logger.Debug("EnsureTags: ")
 	r.logger.Debugf("   - oldTags:   %v", oldTags)
 	r.logger.Debugf("   - curTags:   %v", currentTags)
@@ -111,7 +115,58 @@ func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
 	}
 	return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
 }
+func (r *vngcloudLBBuilder) removeVKSTag(current, id string) string {
+	tags := strings.Split(current, consts.VKS_TAGS_SEPARATOR)
+	tagsValid := make(map[string]bool)
+	for _, tag := range tags {
+		if isValidVKSID(tag) {
+			tagsValid[tag] = true
+		} else {
+			r.logger.Warnf("Invalid VKS cluster id tag: %s.", tag)
+		}
+	}
+	if isValidVKSID(id) {
+		delete(tagsValid, id)
+	}
+	newTags := make([]string, 0)
+	for tag := range tagsValid {
+		newTags = append(newTags, tag)
+	}
+	if len(newTags) == 0 {
+		return ""
+	}
+	return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
+}
 
 func isValidVKSID(id string) bool {
 	return len(id) == consts.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, consts.VKS_CLUSTER_ID_PREFIX)
+}
+
+func (r *vngcloudLBBuilder) EnsureDeleteTags(oldBuilder OldModelBuilder) error {
+	var (
+		oldTags     = make(map[string]string)
+		currentTags = make(map[string]string)
+		newTags     = make(map[string]string)
+	)
+	if oldBuilder != nil && oldBuilder.GetOldTags() != nil {
+		oldTags = oldBuilder.GetOldTags()
+	}
+	if r.tags != nil {
+		currentTags = r.tags
+	}
+
+	// ensure have cluster ids tag
+	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
+	if strings.Contains(vksClusterTags, r.clusterID) {
+		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
+		vksClusterTags = r.removeVKSTag(vksClusterTags, r.clusterID)
+		if vksClusterTags == "" {
+			// remove tag
+			oldTags[consts.VKS_TAG_KEY] = currentTags[consts.VKS_TAG_KEY]
+		} else {
+			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+		}
+	}
+
+	return r.updateTag(currentTags, oldTags, newTags)
 }
