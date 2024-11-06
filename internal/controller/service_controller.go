@@ -285,6 +285,8 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	logger := contexts.NewContext(ctx).Log()
 	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
 
 	err := r.reconcile(ctx, req)
 
