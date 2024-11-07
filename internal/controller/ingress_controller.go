@@ -179,13 +179,13 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 		return errors.New("address is empty")
 	}
 
-	ingress := obj.(*networkingv1.Ingress)
+	object := obj.(*networkingv1.Ingress)
 
 	addr := net.ParseIP(address)
 	if addr != nil {
-		ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: address}}
+		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: address}}
 	} else {
-		ingress.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
+		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
 	}
 	return r.Status().Update(ctx, obj)
 }

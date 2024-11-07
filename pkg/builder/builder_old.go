@@ -138,7 +138,7 @@ func (m *oldModelBuilder) GetOldSecGroups() []string {
 // ------------------------------------------------------------
 
 // manage annotation to get listener, pool, default pool member, old object annotation to get tags,...
-func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParser annotations.Parser) OldModelBuilder {
+func NewOldModelBuilder(currAnno, oldAnno map[string]string, annotationParser annotations.Parser) OldModelBuilder {
 	model := &oldModelBuilder{
 		oldListeners:            make([]*oldListener, 0),
 		oldPools:                make([]*oldPool, 0),
@@ -151,7 +151,7 @@ func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParse
 		oldSecGroups:            make([]string, 0),
 	}
 
-	err := model.build(annos, oldAnnotations)
+	err := model.build(currAnno, oldAnno)
 	if err != nil {
 		logrus.Errorf("Error building old model: %v, return empty.", err)
 		model.oldListeners = make([]*oldListener, 0)
@@ -175,20 +175,20 @@ func NewOldModelBuilder(annos, oldAnnotations map[string]string, annotationParse
 	return model
 }
 
-func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
+func (m *oldModelBuilder) build(currAnno, oldAnno map[string]string) error {
 	isIgnore := false
-	if exists, err := m.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, annos); exists && err == nil {
+	if exists, err := m.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, currAnno); exists && err == nil {
 		m.isIgnored = isIgnore
 	}
 
 	lbID := ""
-	if exists := m.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerID, &lbID, annos); exists {
+	if exists := m.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerID, &lbID, oldAnno); exists {
 		m.lbID = lbID
 	}
 
 	// build old pools
 	oldPools := make([]string, 0)
-	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManagePools, &oldPools, annos); exists {
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManagePools, &oldPools, currAnno); exists {
 		for _, poolIDName := range oldPools {
 			// poolIDName is in the format of "poolID:poolName"
 			poolIDNameParts := strings.Split(poolIDName, ":")
@@ -207,7 +207,7 @@ func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
 
 	// build old listeners
 	oldListeners := make([]string, 0)
-	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManageListeners, &oldListeners, annos); exists {
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManageListeners, &oldListeners, currAnno); exists {
 		for _, listenerIDName := range oldListeners {
 			// listenerIDName is in the format of "listenerID:listenerName:[policyName|policyName|...]"
 			listenerIDNameParts := strings.Split(listenerIDName, ":")
@@ -243,7 +243,7 @@ func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
 
 	// build default pool members
 	defaultPoolMembers := make([]string, 0)
-	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManageDFPMembers, &defaultPoolMembers, annos); exists {
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixManageDFPMembers, &defaultPoolMembers, currAnno); exists {
 		for _, member := range defaultPoolMembers {
 			// member is in the format of "IP:port:monitorPort"
 			memberParts := strings.Split(member, ":")
@@ -272,13 +272,13 @@ func (m *oldModelBuilder) build(annos, oldAnnotations map[string]string) error {
 
 	// build old tags
 	oldTags := make(map[string]string)
-	if exists, err := m.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &oldTags, oldAnnotations); exists && err == nil {
+	if exists, err := m.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &oldTags, oldAnno); exists && err == nil {
 		m.oldTags = oldTags
 	}
 
 	// build old secgroups
 	oldSecGroups := make([]string, 0)
-	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixSecurityGroups, &oldSecGroups, oldAnnotations); exists {
+	if exists := m.annotationParser.ParseStringSliceAnnotation(annotations.SuffixSecurityGroups, &oldSecGroups, oldAnno); exists {
 		m.oldSecGroups = oldSecGroups
 		m.isCreateDefaultSecgroup = false
 	}

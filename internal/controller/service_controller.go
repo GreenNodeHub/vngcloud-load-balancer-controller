@@ -199,13 +199,13 @@ func (r *ServiceReconciler) updateObjectStatus(ctx context.Context, obj client.O
 		return errors.New("address is empty")
 	}
 
-	ingress := obj.(*corev1.Service)
+	object := obj.(*corev1.Service)
 
 	addr := net.ParseIP(address)
 	if addr != nil {
-		ingress.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: address}}
+		object.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: address}}
 	} else {
-		ingress.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+		object.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
 	}
 	return r.Status().Update(ctx, obj)
 }
@@ -439,7 +439,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 
 		// update object annotation, also trigger reconcile immediately
 		r.updateObjectAnnotation(ctx, obj, map[string]string{
-			fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.UUID,
+			fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.UUID,
 		})
 		return nil
 	} else {
@@ -626,7 +626,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	}
 
 	// build loadbalancer model, pass nil to object to create a model with default values
-	newBuilder, err := builder.NewModelBuilderByIngress(ctx, nil, r.annotationParser, r.Client,
+	newBuilder, err := builder.NewModelBuilderByService(ctx, nil, r.annotationParser, r.Client,
 		r.netwotkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
