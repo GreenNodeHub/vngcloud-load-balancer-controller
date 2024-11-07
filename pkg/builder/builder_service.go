@@ -278,7 +278,7 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 
 // genL4ListenerName generates the name of the listener.
 func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
-	hash := l.generateHash()
+	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.clusterID, 10),
@@ -294,7 +294,7 @@ func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
 func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 	realProtocol := l.mappingProtocol(pPort)
 
-	hash := l.generateHash()
+	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.clusterID, 10),

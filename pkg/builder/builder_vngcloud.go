@@ -470,8 +470,38 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 }
 
 func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error {
-	// delete redundant listeners
+	// delete candidates include listeners in oldBuilder and all current listeners with name contains hash
+	deleteCandidate := make(map[string]OldListener)
 	for _, oldListener := range oldBuilder.GetOldListeners() {
+		deleteCandidate[oldListener.GetName()] = oldListener
+	}
+	hash := r.GenerateHash()
+	for _, listener := range r.GetListenerBuilders() {
+		if strings.Contains(listener.GetName(), hash) {
+			if ok := deleteCandidate[listener.GetName()]; ok == nil {
+				r.logger.Infof("Add listener \"%s\" to delete candidate", listener.GetName())
+				policies := make([]OldPolicy, 0)
+				for _, policy := range listener.GetPolicyBuilders() {
+					policies = append(policies, &oldPolicy{
+						commonBuilder: commonBuilder{
+							name: policy.GetName(),
+							id:   policy.GetID(),
+						},
+					})
+				}
+				deleteCandidate[listener.GetName()] = &oldListener{
+					oldPolicies: policies,
+					commonBuilder: commonBuilder{
+						name: listener.GetName(),
+						id:   listener.GetID(),
+					},
+				}
+			}
+		}
+	}
+
+	// delete redundant listeners
+	for _, oldListener := range deleteCandidate {
 		currentListener := r.GetListenerBuilderByName(oldListener.GetName())
 		newListener := newBuilder.GetListenerBuilderByName(oldListener.GetName())
 		if currentListener == nil || currentListener.IsDeleted() {
@@ -493,28 +523,55 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 		}
 
 		// delete redundant policy
-		for _, policy := range oldListener.GetOldPolicies() {
-			currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName())
-			var newPolicy *policyBuilderType
-			if newListener != nil {
-				newPolicy = newListener.GetPolicyBuilderByName(policy.GetName())
-			}
+		if err := r.deleteRedundantPolicies(oldListener, currentListener, newListener); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-			if currentPolicy == nil || currentPolicy.IsDeleted() || newPolicy != nil {
-				continue
+func (r *vngcloudLBBuilder) deleteRedundantPolicies(oldListener OldListener, currentListener, newListener *ListenerBuilderType) error {
+	// delete candidates include policies in oldListener and all current policies with name contains hash
+	deleteCandidate := make(map[string]OldPolicy)
+	for _, oldPolicy := range oldListener.GetOldPolicies() {
+		deleteCandidate[oldPolicy.GetName()] = oldPolicy
+	}
+	hash := r.GenerateHash()
+	for _, policy := range currentListener.GetPolicyBuilders() {
+		if strings.Contains(policy.GetName(), hash) {
+			if ok := deleteCandidate[policy.GetName()]; ok == nil {
+				r.logger.Infof("Add policy \"%s\" to delete candidate", policy.GetName())
+				deleteCandidate[policy.GetName()] = &oldPolicy{
+					commonBuilder: commonBuilder{
+						name: policy.GetName(),
+						id:   policy.GetID(),
+					},
+				}
 			}
+		}
+	}
 
-			// delete whole policy
-			if err := r.provider.DeletePolicy(r.context, r.GetLoadBalancerID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
-				r.logger.Error("Failed to delete policy: ", err)
-				return err
-			}
-			currentPolicy.SetIsDeleted(true)
-			if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
-				r.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
-			}
+	// delete redundant policy
+	for _, policy := range deleteCandidate {
+		currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName())
+		var newPolicy *policyBuilderType
+		if newListener != nil {
+			newPolicy = newListener.GetPolicyBuilderByName(policy.GetName())
+		}
 
+		if currentPolicy == nil || currentPolicy.IsDeleted() || newPolicy != nil {
+			continue
+		}
+
+		// delete whole policy
+		if err := r.provider.DeletePolicy(r.context, r.GetLoadBalancerID(), currentListener.GetID(), currentPolicy.GetID()); err != nil {
+			r.logger.Error("Failed to delete policy: ", err)
+			return err
+		}
+		currentPolicy.SetIsDeleted(true)
+		if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
+			r.logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
 		}
 	}
 	return nil
@@ -522,7 +579,28 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 
 // delete redundant pools, should check if pool is used by other listeners or policy then ignore
 func (r *vngcloudLBBuilder) DeleteRedundantPools(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error {
-	for _, pool := range oldBuilder.GetOldPools() {
+	// delete candidates include pools in oldBuilder and all current pools with name contains hash
+	deleteCandidate := make(map[string]OldPool)
+	for _, oldPool := range oldBuilder.GetOldPools() {
+		deleteCandidate[oldPool.GetName()] = oldPool
+	}
+	hash := r.GenerateHash()
+	for _, pool := range r.GetPoolBuilders() {
+		if strings.Contains(pool.GetName(), hash) {
+			if ok := deleteCandidate[pool.GetName()]; ok == nil {
+				r.logger.Infof("Add pool \"%s\" to delete candidate", pool.GetName())
+				deleteCandidate[pool.GetName()] = &oldPool{
+					commonBuilder: commonBuilder{
+						name: pool.GetName(),
+						id:   pool.GetID(),
+					},
+				}
+			}
+		}
+	}
+
+	// delete redundant pools
+	for _, pool := range deleteCandidate {
 		if currentPool := r.GetPoolBuilderByName(pool.GetName()); currentPool != nil &&
 			newBuilder.GetPoolBuilderByName(pool.GetName()) == nil {
 			if currentPool.IsDeleted() {

@@ -418,7 +418,7 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 }
 
 func (l *modelBuilder) genL7PoolName(serviceName string, port int) string {
-	hash := l.generateHash()
+	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		hash,
@@ -428,7 +428,7 @@ func (l *modelBuilder) genL7PoolName(serviceName string, port int) string {
 }
 
 func (l *modelBuilder) genL7PolicyName(mode bool, ruleIndex, pathIndex int) string {
-	hash := l.generateHash()
+	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%t_r%d_p%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		hash, mode, ruleIndex, pathIndex)

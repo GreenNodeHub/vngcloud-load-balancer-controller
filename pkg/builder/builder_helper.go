@@ -179,6 +179,7 @@ func (l *basicInfoHelper) GetTags() map[string]string {
 type NameHelper interface {
 	// return the generated name of the load balancer
 	GetLoadBalancerDefaultName() string
+	GenerateHash() string
 }
 
 var _ NameHelper = &nameHelper{}
@@ -192,7 +193,7 @@ type nameHelper struct {
 }
 
 func (l *nameHelper) GetLoadBalancerDefaultName() string {
-	hash := l.generateHash()
+	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s",
 		consts.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.clusterID, 10),
@@ -202,7 +203,7 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 	return l.validateName(name)
 }
 
-func (l *nameHelper) generateHash() string {
+func (l *nameHelper) GenerateHash() string {
 	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
 	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
