@@ -85,7 +85,7 @@ type IngressReconciler struct {
 	cniMode          utils.CNIType
 	defaultPackageID string
 
-	updateTracker       *UpdateTracker
+	UpdateTracker       *UpdateTracker
 	timeReconcilePeriod time.Duration
 	numCurrentReconcile int
 	numCurrentLock      sync.Mutex
@@ -187,7 +187,7 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 	} else {
 		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
 	}
-	return r.Status().Update(ctx, obj)
+	return r.Status().Update(ctx, object)
 }
 
 func (r *IngressReconciler) startBackgroundGoroutine(ctx context.Context) {
@@ -201,15 +201,8 @@ func (r *IngressReconciler) startBackgroundGoroutine(ctx context.Context) {
 				if r.numCurrentReconcile > 0 {
 					logrus.Debug("Skip reconcile periodically.")
 				} else {
-					// get all loadbalancers
-					loadBalancers, err := r.Provider.ListLoadBalancers(context.Background())
-					if err != nil {
-						logrus.Error("Failed to list loadbalancers: ", err)
-						continue
-					}
-
 					// get all resources need to reconcile
-					requests := r.updateTracker.GetReconcileRequests(loadBalancers)
+					requests := r.UpdateTracker.GetIngressRequests()
 					for _, req := range requests {
 						r.Enqueue(req)
 					}
@@ -543,7 +536,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		logger.Error("Failed to get loadbalancer: ", err)
 		return err
 	}
-	r.updateTracker.AddUpdateTracker(loadBalancerBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName(), lb.UpdatedAt)
+	r.UpdateTracker.AddIngress(loadBalancerBuilder.GetLoadBalancerID(), lb.UpdatedAt, obj)
 
 	// update status
 	err = r.updateObjectStatus(ctx, obj, lb.Address)
@@ -612,7 +605,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	}
 
 	// remove from update tracker
-	r.updateTracker.RemoveUpdateTracker(oldBuilder.GetLoadBalancerID(), obj.GetNamespace(), obj.GetName())
+	r.UpdateTracker.RemoveIngress(oldBuilder.GetLoadBalancerID(), obj)
 
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
@@ -720,7 +713,6 @@ func (r *IngressReconciler) init() error {
 	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
 	r.resourceDependant = NewIngressDependant(r.Client)
-	r.updateTracker = NewUpdateTracker()
 	if r.timeReconcilePeriod == 0 {
 		r.timeReconcilePeriod = 60 * time.Second
 	}
@@ -789,6 +781,8 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		logrus.Error("Failed to get default package: ", err)
 		return err
 	}
+
+	r.UpdateTracker.Start(context.Background())
 
 	r.initialized = true
 	return nil

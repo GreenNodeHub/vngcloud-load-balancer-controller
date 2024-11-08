@@ -187,6 +187,7 @@ func main() {
 	vngProvider := &provider.VNGCLOUD_Provider{
 		Config: conf,
 	}
+	updateTracker := controller.NewUpdateTracker(vngProvider)
 
 	if err = (&controller.ServiceReconciler{
 		Client:           mgr.GetClient(),
@@ -195,6 +196,7 @@ func main() {
 		Config:           conf,
 		Provider:         vngProvider,
 		FinalizerManager: finalizerManager,
+		UpdateTracker:    updateTracker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
@@ -206,6 +208,7 @@ func main() {
 		Config:           conf,
 		Provider:         vngProvider,
 		FinalizerManager: finalizerManager,
+		UpdateTracker:    updateTracker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
 		os.Exit(1)

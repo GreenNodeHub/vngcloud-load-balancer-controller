@@ -242,6 +242,7 @@ var _ = BeforeSuite(func() {
 
 	finalizerManager := k8s.NewDefaultFinalizerManager(k8sManager.GetClient(), ctrl.Log)
 	mockProvider = provider.NewMockProvider()
+	updateTracker := NewUpdateTracker(mockProvider)
 	mockIngressReconciler = &IngressReconciler{
 		modeTest: true,
 		Client:   k8sManager.GetClient(),
@@ -252,6 +253,7 @@ var _ = BeforeSuite(func() {
 		Provider:            mockProvider,
 		FinalizerManager:    finalizerManager,
 		timeReconcilePeriod: 2 * time.Second,
+		UpdateTracker:       updateTracker,
 	}
 	err = mockIngressReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -266,6 +268,7 @@ var _ = BeforeSuite(func() {
 		Provider:            mockProvider,
 		FinalizerManager:    finalizerManager,
 		timeReconcilePeriod: 2 * time.Second,
+		UpdateTracker:       updateTracker,
 	}
 	err = mockServiceReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
