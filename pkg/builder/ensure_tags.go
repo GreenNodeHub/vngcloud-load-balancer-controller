@@ -73,13 +73,13 @@ func (r *vngcloudLBBuilder) updateTag(currentTags, oldTags, newTags map[string]s
 	// compare and update tags
 	isNeedUpdate := false
 	if len(mergeTags) != len(currentTags) {
-		r.logger.Debugf("Need update tags: %v, (%d) -> (%d)", mergeTags, len(currentTags), len(mergeTags))
 		isNeedUpdate = true
 	}
-	for k, v := range mergeTags {
-		if currentTags[k] != v {
-			r.logger.Debugf("Need update tag %s: (%s -> %s)", k, currentTags[k], v)
-			isNeedUpdate = true
+	if !isNeedUpdate {
+		for k, v := range mergeTags {
+			if currentTags[k] != v {
+				isNeedUpdate = true
+			}
 		}
 	}
 
@@ -88,7 +88,7 @@ func (r *vngcloudLBBuilder) updateTag(currentTags, oldTags, newTags map[string]s
 		return nil
 	}
 
-	r.logger.Debugf("Update tags: %v", mergeTags)
+	r.logger.Infof("Need update tags: (%v) -> (%v)", currentTags, mergeTags)
 	if err := r.provider.CreateTags(r.context, r.loadBalancerID, mergeTags); err != nil {
 		r.logger.Errorf("Failed to update tags: %v", err)
 		return err

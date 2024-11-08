@@ -464,7 +464,25 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	}
 
 	// build oldBuilder
-	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
+	var oldBuilder builder.OldModelBuilder
+	oldBuilder = builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
+	if oldBuilder.GetLoadBalancerID() != loadBalancerBuilder.GetLoadBalancerID() && oldBuilder.GetLoadBalancerID() != "" {
+		oldBuilder = builder.NewOldModelBuilder(obj.Annotations, obj.Annotations, r.annotationParser)
+
+		// clean up old loadbalancer if exists
+		go func() {
+			oldObj, ok := oldObjInterface.(*corev1.Service)
+			if !ok {
+				return
+			}
+			err := r.subDeleteObject(ctx, oldObj, true, false, false)
+			if err != nil {
+				logger.Error("Failed to delete old loadbalancer: ", err)
+				return
+			}
+			logger.Infof("Ensure delete tags for old loadbalancer %s successfully.", oldBuilder.GetLoadBalancerID())
+		}()
+	}
 
 	// ensure tags
 	err = r.ensureTags(loadBalancerBuilder, currentBuilder, oldBuilder)
@@ -581,7 +599,7 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Servic
 		return nil
 	}
 
-	err := r.subDeleteObject(ctx, obj)
+	err := r.subDeleteObject(ctx, obj, true, true, true)
 	if err != nil {
 		return err
 	}
@@ -593,7 +611,8 @@ func (r *ServiceReconciler) deleteObject(ctx context.Context, obj *corev1.Servic
 	return nil
 }
 
-func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Service) error {
+func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Service,
+	deletetag, deleteResource, deleteSegroup bool) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
@@ -638,43 +657,49 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		return err
 	}
 
-	// check if can delete whole loadbalancer
-	// oldBuilder and currentBuilder should be the same listeners' name, pool's name
-	// if can delete whole loadbalancer, delete loadbalancer and return
-	if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
-		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
-			logger.Error("Failed to delete loadbalancer: ", err)
-			return err
-		}
-		logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
-	} else {
+	if deletetag {
 		// ensure delete tags
 		err = r.ensureDeleteTags(currentBuilder, oldBuilder)
 		if err != nil {
 			logger.Error("Failed to ensure delete tags: ", err)
 			return err
 		}
+	}
 
-		// delete redundant listeners
-		err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
-		if err != nil {
-			logger.Error("Failed to delete redundant listeners: ", err)
-			return err
-		}
+	if deleteResource {
+		// check if can delete whole loadbalancer
+		// oldBuilder and currentBuilder should be the same listeners' name, pool's name
+		// if can delete whole loadbalancer, delete loadbalancer and return
+		if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
+			if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
+				logger.Error("Failed to delete loadbalancer: ", err)
+				return err
+			}
+			logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
+		} else {
+			// delete redundant listeners
+			err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
+			if err != nil {
+				logger.Error("Failed to delete redundant listeners: ", err)
+				return err
+			}
 
-		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
-		err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
-		if err != nil {
-			logger.Error("Failed to delete redundant pools: ", err)
-			return err
+			// delete redundant pools, should check if pool is used by other listeners or policy then ignore
+			err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
+			if err != nil {
+				logger.Error("Failed to delete redundant pools: ", err)
+				return err
+			}
 		}
 	}
 
-	// ensure delete security group with mutex
-	err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
-	if err != nil {
-		logger.Error("Failed to ensure delete security group: ", err)
-		return err
+	if deleteSegroup {
+		// ensure delete security group with mutex
+		err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure delete security group: ", err)
+			return err
+		}
 	}
 
 	return nil
