@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	cuongpigerutils "github.com/cuongpiger/joat/utils"
@@ -49,36 +50,42 @@ type VNGCLOUD_Provider struct {
 	netID      string
 	subnetID   string
 	subnetCIDR string
+
+	once sync.Once
 }
 
 func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
-	if m.Config == nil {
-		return errors.New("config is nil")
-	}
-	metadator := metadata.GetMetadataProvider(m.Config.Metadata.SearchOrder)
-	err := m.setupPortalInfo(metadator)
-	if err != nil {
-		return err
-	}
+	var err error
+	m.once.Do(func() {
+		if m.Config == nil {
+			err = errors.New("config is nil")
+			return
+		}
+		metadator := metadata.GetMetadataProvider(m.Config.Metadata.SearchOrder)
+		err = m.setupPortalInfo(metadator)
+		if err != nil {
+			return
+		}
 
-	sdkConfig := client.NewSdkConfigure().
-		// WithZoneId(getValueOfEnv("VNGCLOUD_ZONE_ID")).
-		// WithVLBEndpoint(getValueOfEnv("URL_VLB_ENDPOINT")).
-		// WithVNetworkEndpoint(getValueOfEnv("URL_VNETWORK_ENDPOINT")).
-		WithProjectId(m.projectID).
-		WithClientId(m.Config.Global.ClientID).
-		WithClientSecret(m.Config.Global.ClientSecret).
-		WithIamEndpoint(m.Config.Global.IdentityURL).
-		WithVServerEndpoint(cuongpigerutils.NormalizeURL(m.Config.Global.VServerURL) + "vserver-gateway").
-		WithVLBEndpoint(cuongpigerutils.NormalizeURL(m.Config.Global.VServerURL) + "vlb-gateway")
+		sdkConfig := client.NewSdkConfigure().
+			// WithZoneId(getValueOfEnv("VNGCLOUD_ZONE_ID")).
+			// WithVLBEndpoint(getValueOfEnv("URL_VLB_ENDPOINT")).
+			// WithVNetworkEndpoint(getValueOfEnv("URL_VNETWORK_ENDPOINT")).
+			WithProjectId(m.projectID).
+			WithClientId(m.Config.Global.ClientID).
+			WithClientSecret(m.Config.Global.ClientSecret).
+			WithIamEndpoint(m.Config.Global.IdentityURL).
+			WithVServerEndpoint(cuongpigerutils.NormalizeURL(m.Config.Global.VServerURL) + "vserver-gateway").
+			WithVLBEndpoint(cuongpigerutils.NormalizeURL(m.Config.Global.VServerURL) + "vlb-gateway")
 
-	m.client = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
-	m.userAgent = fmt.Sprintf("vngcloud-loadbalancer-controller/%s (ChartVersion/%s)", version.Version, m.Config.ChartVersion)
-	err = m.getNetworkInformation(providerIDs)
-	if err != nil {
-		return err
-	}
-	return nil
+		m.client = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
+		m.userAgent = fmt.Sprintf("vngcloud-loadbalancer-controller/%s (ChartVersion/%s)", version.Version, m.Config.ChartVersion)
+		err = m.getNetworkInformation(providerIDs)
+		if err != nil {
+			return
+		}
+	})
+	return err
 }
 
 func (m *VNGCLOUD_Provider) setupPortalInfo(pmetadataService metadata.IMetadata) error {

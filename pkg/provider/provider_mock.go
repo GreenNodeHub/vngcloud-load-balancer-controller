@@ -90,6 +90,8 @@ type MockProvider struct {
 
 	mu            sync.Mutex
 	WaitAfterTime time.Duration
+
+	once sync.Once
 }
 
 func NewMockProvider() *MockProvider {
@@ -114,41 +116,44 @@ func NewMockProvider() *MockProvider {
 }
 
 func (m *MockProvider) Init(_ []string) error {
-	// add server mock
-	serverIDs := []string{
-		"ins-00000000-0000-0000-0000-000000000001",
-		"ins-00000000-0000-0000-0000-000000000002",
-		"ins-00000000-0000-0000-0000-000000000003",
-		"ins-00000000-0000-0000-0000-000000000004",
-	}
-	for _, id := range serverIDs {
-		m.servers = append(m.servers, &wrapServer{
-			Server: &entityv2.Server{
-				Uuid:               id,
-				BootVolumeId:       "",
-				CreatedAt:          time.Now().Format(time.RFC3339),
-				EncryptionVolume:   false,
-				Licence:            false,
-				Location:           "",
-				Metadata:           "",
-				MigrateState:       "",
-				Name:               "mock-server-1",
-				Product:            "",
-				ServerGroupId:      "",
-				ServerGroupName:    "",
-				SshKeyName:         "",
-				Status:             consts.ACTIVE_LOADBALANCER_STATUS,
-				StopBeforeMigrate:  false,
-				User:               "",
-				Image:              entityv2.Image{},
-				Flavor:             entityv2.Flavor{},
-				SecGroups:          []entityv2.ServerSecgroup{},
-				ExternalInterfaces: []entityv2.NetworkInterface{},
-				InternalInterfaces: []entityv2.NetworkInterface{},
-			},
-		})
-	}
-	return nil
+	var err error
+	m.once.Do(func() {
+		// add server mock
+		serverIDs := []string{
+			"ins-00000000-0000-0000-0000-000000000001",
+			"ins-00000000-0000-0000-0000-000000000002",
+			"ins-00000000-0000-0000-0000-000000000003",
+			"ins-00000000-0000-0000-0000-000000000004",
+		}
+		for _, id := range serverIDs {
+			m.servers = append(m.servers, &wrapServer{
+				Server: &entityv2.Server{
+					Uuid:               id,
+					BootVolumeId:       "",
+					CreatedAt:          time.Now().Format(time.RFC3339),
+					EncryptionVolume:   false,
+					Licence:            false,
+					Location:           "",
+					Metadata:           "",
+					MigrateState:       "",
+					Name:               "mock-server-1",
+					Product:            "",
+					ServerGroupId:      "",
+					ServerGroupName:    "",
+					SshKeyName:         "",
+					Status:             consts.ACTIVE_LOADBALANCER_STATUS,
+					StopBeforeMigrate:  false,
+					User:               "",
+					Image:              entityv2.Image{},
+					Flavor:             entityv2.Flavor{},
+					SecGroups:          []entityv2.ServerSecgroup{},
+					ExternalInterfaces: []entityv2.NetworkInterface{},
+					InternalInterfaces: []entityv2.NetworkInterface{},
+				},
+			})
+		}
+	})
+	return err
 }
 
 func (m *MockProvider) GetProjectID() string {

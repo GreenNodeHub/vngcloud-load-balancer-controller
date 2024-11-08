@@ -184,28 +184,27 @@ func main() {
 	}
 
 	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
+	vngProvider := &provider.VNGCLOUD_Provider{
+		Config: conf,
+	}
 
 	if err = (&controller.ServiceReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:   conf,
-		Provider: &provider.VNGCLOUD_Provider{
-			Config: conf,
-		},
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:           conf,
+		Provider:         vngProvider,
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
 	if err = (&controller.IngressReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:   conf,
-		Provider: &provider.VNGCLOUD_Provider{
-			Config: conf,
-		},
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:           conf,
+		Provider:         vngProvider,
 		FinalizerManager: finalizerManager,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
