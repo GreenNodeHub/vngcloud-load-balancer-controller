@@ -444,10 +444,10 @@ func (m *VNGCLOUD_Provider) ListServerBySecgroupID(ctx context.Context, secgroup
 
 // --------------------------- Load Balancer ---------------------------
 
-func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error) {
+func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error) {
 	logger := contexts.NewContext(ctx).Log()
 	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
-		ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultPageList, defaultPageSize))
+		ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultPageList, defaultPageSize).WithTags(tags...))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListLoadBalancers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -466,7 +466,7 @@ func (m *VNGCLOUD_Provider) GetLoadBalancerByID(ctx context.Context, lbID string
 }
 
 func (m *VNGCLOUD_Provider) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
-	allLBs, err := m.ListLoadBalancers(ctx)
+	allLBs, err := m.ListLoadBalancers(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

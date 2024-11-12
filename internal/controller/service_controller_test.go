@@ -1765,7 +1765,7 @@ var _ = Describe("Service Controller", func() {
 
 					// it will create and delete load balancer continuously because of error
 					Eventually(func() int {
-						listLB, err := mockProvider.ListLoadBalancers(ctx)
+						listLB, err := mockProvider.ListLoadBalancers(ctx, nil)
 						Expect(err).ShouldNot(HaveOccurred())
 						return len(listLB.Items)
 					}, timeout, interval).Should(Equal(0))
@@ -1785,7 +1785,7 @@ var _ = Describe("Service Controller", func() {
 							time.Sleep(timeWaitRecocile)
 
 							Eventually(func() int {
-								listLB, err := mockProvider.ListLoadBalancers(ctx)
+								listLB, err := mockProvider.ListLoadBalancers(ctx, nil)
 								Expect(err).ShouldNot(HaveOccurred())
 								return len(listLB.Items)
 							}, timeout, interval).Should(Equal(1))

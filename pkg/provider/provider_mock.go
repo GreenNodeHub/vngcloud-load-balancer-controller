@@ -478,7 +478,7 @@ func (m *MockProvider) ListServerBySecgroupID(ctx context.Context, secgroupID st
 
 // --------------------------- Load Balancer ---------------------------
 
-func (m *MockProvider) ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error) {
+func (m *MockProvider) ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error) {
 	lbs := &entityv2.ListLoadBalancers{
 		Items:     m.loadBalancers,
 		Page:      1,
@@ -498,7 +498,7 @@ func (m *MockProvider) GetLoadBalancerByID(ctx context.Context, lbID string) (*e
 }
 
 func (m *MockProvider) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
-	allLBs, err := m.ListLoadBalancers(ctx)
+	allLBs, err := m.ListLoadBalancers(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

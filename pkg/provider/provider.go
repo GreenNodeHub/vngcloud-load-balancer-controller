@@ -61,7 +61,7 @@ type Provider interface {
 	WaitForServerActive(ctx context.Context, serverID string) error
 	ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error)
 
-	ListLoadBalancers(ctx context.Context) (*entityv2.ListLoadBalancers, error)
+	ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error)
 	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 	GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error)
 	CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)

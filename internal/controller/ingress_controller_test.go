@@ -1650,7 +1650,7 @@ var _ = Describe("Ingress Controller", func() {
 			mockIngressReconciler.modeTest = false
 
 			// ensure no load balancer
-			lists, err := mockProvider.ListLoadBalancers(ctx)
+			lists, err := mockProvider.ListLoadBalancers(ctx, nil)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(lists).ShouldNot(BeNil())
 			Expect(lists.Items).Should(BeEmpty())

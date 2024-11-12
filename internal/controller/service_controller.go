@@ -473,7 +473,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 				logger.Error("Failed to delete old loadbalancer: ", err)
 				return
 			}
-			logger.Infof("Ensure delete tags for old loadbalancer %s successfully.", oldBuilder.GetLoadBalancerID())
+			logger.Infof("Successfully ensure delete tags for old loadbalancer %s.", oldBuilder.GetLoadBalancerID())
 		}()
 	}
 
@@ -800,7 +800,7 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 		return err
 	}
 
-	r.UpdateTracker.Start(context.Background())
+	r.UpdateTracker.Start(context.Background(), r.Config.Cluster.ClusterID)
 
 	r.initialized = true
 	return nil
