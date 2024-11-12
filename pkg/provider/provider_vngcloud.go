@@ -180,9 +180,9 @@ func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
 		return "", "", ErrorNotFound
 	}
 
-	getFirst := func(name, lbType string) string {
+	getFirst := func(name, lbType, mode string) string {
 		for _, p := range packages.Items {
-			if p.Name == name && p.LbType == lbType {
+			if p.Name == name && p.LbType == lbType && p.Mode == mode {
 				return p.UUID
 			}
 		}
@@ -190,14 +190,14 @@ func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
 	}
 
 	// get the default package for l4
-	l4PackageID := getFirst("NLB_Small", "L4")
+	l4PackageID := getFirst("NLB_Small", "L4", "ACTIVE/STANDBY")
 	if l4PackageID == "" {
 		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L4, using the default value")
 		l4PackageID = DEFAULT_L4_PACKAGE_ID
 	}
 
 	// get the default package for l7
-	l7PackageID := getFirst("ALB_Small", "L7")
+	l7PackageID := getFirst("ALB_Small", "L7", "ACTIVE/STANDBY")
 	if l7PackageID == "" {
 		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L7, using the default value")
 		l7PackageID = DEFAULT_L7_PACKAGE_ID

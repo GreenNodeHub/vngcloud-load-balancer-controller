@@ -488,6 +488,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
 		currentBuilder.GetPackageID() != "" &&
 		loadBalancerBuilder.GetPackageID() != "" {
+		logger.Infof("Need resize loadbalancer from package %s -> %s", currentBuilder.GetPackageID(), loadBalancerBuilder.GetPackageID())
 		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetLoadBalancerID(), loadBalancerBuilder.GetPackageID()); err != nil {
 			logger.Error("Failed to resize loadbalancer: ", err)
 			return err
@@ -795,6 +796,7 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 
 	// get default package id
 	r.defaultPackageID, _, err = r.Provider.GetDefaultPackage()
+	logrus.Infof("Default NLB package ID: %s", r.defaultPackageID)
 	if err != nil {
 		logrus.Error("Failed to get default package: ", err)
 		return err

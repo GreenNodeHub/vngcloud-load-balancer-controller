@@ -468,6 +468,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
 		currentBuilder.GetPackageID() != "" &&
 		loadBalancerBuilder.GetPackageID() != "" {
+		logger.Infof("Need resize loadbalancer from package %s -> %s", currentBuilder.GetPackageID(), loadBalancerBuilder.GetPackageID())
 		if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetLoadBalancerID(), loadBalancerBuilder.GetPackageID()); err != nil {
 			logger.Error("Failed to resize loadbalancer: ", err)
 			return err
@@ -777,6 +778,7 @@ func (r *IngressReconciler) Init(client client.Client) error {
 
 	// get default package id
 	_, r.defaultPackageID, err = r.Provider.GetDefaultPackage()
+	logrus.Infof("Default ALB package ID: %s", r.defaultPackageID)
 	if err != nil {
 		logrus.Error("Failed to get default package: ", err)
 		return err

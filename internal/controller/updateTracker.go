@@ -208,6 +208,10 @@ func (c *UpdateTracker) getRequests(lbs []*LoadBalancerWithTags, tracker map[str
 	// if lb is in lbs, check if it has been updated
 	reapplyRequests := make([]reconcile.Request, 0)
 	for lbID := range tracker {
+		if len(tracker[lbID]) == 0 {
+			delete(tracker, lbID)
+			continue
+		}
 		lb := getByID(lbID)
 
 		// lb has been deleted or updated tags
@@ -245,12 +249,13 @@ func (c *UpdateTracker) getRequests(lbs []*LoadBalancerWithTags, tracker map[str
 	// check if there is any redundant lb in lbs
 	for _, lb := range lbs {
 		if _, ok := tracker[lb.LoadBalancer.UUID]; !ok {
-			logrus.Infof("Loadbalancer %s has redundant tags, edit tags now.", lb.LoadBalancer.UUID)
 
-			tags := make(map[string]string)
+			currentTags := make(map[string]string)
+			newTags := make(map[string]string)
 			for _, tag := range lb.Tag {
+				currentTags[tag.Key] = tag.Value
 				if tag.Key != consts.VKS_TAG_KEY {
-					tags[tag.Key] = tag.Value
+					newTags[tag.Key] = tag.Value
 					continue
 				}
 				// remove cluster ID in tag value
@@ -265,11 +270,12 @@ func (c *UpdateTracker) getRequests(lbs []*LoadBalancerWithTags, tracker map[str
 				if len(v) < 3 || len(v) > 255 {
 					continue
 				}
-				tags[tag.Key] = strings.Join(newTagValue, consts.VKS_TAGS_SEPARATOR)
+				newTags[tag.Key] = strings.Join(newTagValue, consts.VKS_TAGS_SEPARATOR)
 			}
 
+			logrus.Infof("Loadbalancer %s has redundant tags, edit tags %+v -> %+v.", lb.LoadBalancer.UUID, currentTags, newTags)
 			// update tags
-			err := c.provider.CreateTags(context.Background(), lb.LoadBalancer.UUID, tags)
+			err := c.provider.CreateTags(context.Background(), lb.LoadBalancer.UUID, newTags)
 			if err != nil {
 				logrus.Errorf("Failed to update tags: %v", err)
 			}
