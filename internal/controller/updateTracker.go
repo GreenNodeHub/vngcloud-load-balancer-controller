@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -49,8 +48,7 @@ type UpdateTracker struct {
 	provider     provider.Provider
 	clusterID    string
 
-	once sync.Once
-	mu   sync.Mutex
+	mu sync.Mutex
 }
 
 func NewUpdateTracker(provider provider.Provider) *UpdateTracker {
@@ -64,17 +62,6 @@ func NewUpdateTracker(provider provider.Provider) *UpdateTracker {
 
 func (c *UpdateTracker) Start(ctx context.Context, clusterID string) {
 	c.clusterID = clusterID
-	c.once.Do(func() {
-		go func() {
-			for {
-				err := c.UpdateState(ctx)
-				if err != nil {
-					logrus.Errorf("Failed to update state: %v", err)
-				}
-				time.Sleep(60 * time.Second)
-			}
-		}()
-	})
 }
 
 func (c *UpdateTracker) UpdateState(ctx context.Context) error {
@@ -139,7 +126,6 @@ func (c *UpdateTracker) addObject(lbID, updateAt string, obj client.Object, trac
 			tracker[lbID][objKey] = updateAt
 		}
 	}
-	c.UpdateState(context.Background())
 }
 
 func (c *UpdateTracker) RemoveService(lbID string, service *corev1.Service) {
@@ -161,6 +147,7 @@ func (c *UpdateTracker) RemoveIngress(lbID string, ingress *networkingv1.Ingress
 }
 
 func (c *UpdateTracker) GetServiceRequests() []reconcile.Request {
+	c.UpdateState(context.Background())
 	lbs := make([]*LoadBalancerWithTags, 0)
 	for _, lb := range c.currentState {
 		if lb.LoadBalancer.Type == "Layer 4" {
@@ -176,6 +163,7 @@ func (c *UpdateTracker) GetServiceRequests() []reconcile.Request {
 }
 
 func (c *UpdateTracker) GetIngressRequests() []reconcile.Request {
+	c.UpdateState(context.Background())
 	lbs := make([]*LoadBalancerWithTags, 0)
 	for _, lb := range c.currentState {
 		if lb.LoadBalancer.Type == "Layer 7" {
