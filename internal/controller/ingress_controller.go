@@ -168,7 +168,8 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 	logger.Debugf("Update status for object %s/%s = %s", obj.GetNamespace(), obj.GetName(), address)
 
 	// get object again to avoid conflict
-	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	object := &networkingv1.Ingress{}
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, object)
 	if err != nil {
 		logger.Error("Failed to get object: ", err)
 		return err
@@ -178,8 +179,6 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 	if address == "" {
 		return errors.New("address is empty")
 	}
-
-	object := obj.(*networkingv1.Ingress)
 
 	addr := net.ParseIP(address)
 	if addr != nil {
