@@ -85,7 +85,7 @@ type IngressReconciler struct {
 	cniMode          utils.CNIType
 	defaultPackageID string
 
-	UpdateTracker       *UpdateTracker
+	UpdateTracker       UpdateTrackerInterface
 	timeReconcilePeriod time.Duration
 	numCurrentReconcile int
 	numCurrentLock      sync.Mutex

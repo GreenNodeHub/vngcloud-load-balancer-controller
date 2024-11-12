@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -113,30 +114,29 @@ func (c *UpdateTracker) UpdateState(ctx context.Context) error {
 }
 
 func (c *UpdateTracker) AddService(lbID, updateAt string, service *corev1.Service) {
-	namespace, name := service.Namespace, service.Name
-	if _, ok := c.serviceTracker[lbID]; !ok {
-		c.serviceTracker[lbID] = make(map[string]string)
-		c.serviceTracker[lbID][genKey(namespace, name)] = updateAt
-	} else {
-		if _, ok := c.serviceTracker[lbID][genKey(namespace, name)]; !ok {
-			c.serviceTracker[lbID][genKey(namespace, name)] = updateAt
-		} else {
-			c.serviceTracker[lbID][genKey(namespace, name)] = updateAt
-		}
-	}
-	c.UpdateState(context.Background())
+	c.addObject(lbID, updateAt, service, c.serviceTracker)
 }
 
 func (c *UpdateTracker) AddIngress(lbID, updateAt string, ingress *networkingv1.Ingress) {
-	namespace, name := ingress.Namespace, ingress.Name
-	if _, ok := c.ingressTracker[lbID]; !ok {
-		c.ingressTracker[lbID] = make(map[string]string)
-		c.ingressTracker[lbID][genKey(namespace, name)] = updateAt
+	c.addObject(lbID, updateAt, ingress, c.ingressTracker)
+}
+
+func (c *UpdateTracker) addObject(lbID, updateAt string, obj client.Object, tracker map[string]map[string]string) {
+	objKey := genKey(obj.GetNamespace(), obj.GetName())
+
+	// delete this key if it exists in tracker
+	for _, value := range tracker {
+		delete(value, objKey)
+	}
+
+	if _, ok := tracker[lbID]; !ok {
+		tracker[lbID] = make(map[string]string)
+		tracker[lbID][objKey] = updateAt
 	} else {
-		if _, ok := c.ingressTracker[lbID][genKey(namespace, name)]; !ok {
-			c.ingressTracker[lbID][genKey(namespace, name)] = updateAt
+		if _, ok := tracker[lbID][objKey]; !ok {
+			tracker[lbID][objKey] = updateAt
 		} else {
-			c.ingressTracker[lbID][genKey(namespace, name)] = updateAt
+			tracker[lbID][objKey] = updateAt
 		}
 	}
 	c.UpdateState(context.Background())
