@@ -182,7 +182,7 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 
 	addr := net.ParseIP(address)
 	if addr != nil {
-		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: address}}
+		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address + ".nip.io"}}
 	} else {
 		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
 	}
