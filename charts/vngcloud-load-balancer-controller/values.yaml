@@ -12,7 +12,7 @@ manager:
         - ALL
     image:
       repository: vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller
-      tag: "v0.1.0" # release
+      tag: "v0.1.2" # release
     imagePullPolicy: Always
     resources:
       limits:
