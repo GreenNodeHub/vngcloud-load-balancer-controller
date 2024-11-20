@@ -5,6 +5,7 @@
 domain: vks.vngcloud.vn
 layout:
 - go.kubebuilder.io/v4
+multigroup: true
 projectName: vngcloud-load-balancer-controller
 repo: github.com/vngcloud/vngcloud-load-balancer-controller
 resources:
