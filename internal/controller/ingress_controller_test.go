@@ -2157,7 +2157,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}))
 						Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[0]))
 						Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[1]}))
-						Expect(listener.ClientCertificateAuthentication).ShouldNot(Equal(nil))
+						Expect(listener.ClientCertificateAuthentication).ShouldNot(BeNil())
 						// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 						// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
@@ -2233,7 +2233,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Port", "X-Forwarded-Proto"}))
 								Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[1]))
 								Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[2]}))
-								Expect(listener.ClientCertificateAuthentication).ShouldNot(Equal(nil))
+								Expect(listener.ClientCertificateAuthentication).ShouldNot(BeNil())
 								// Expect(listener.DisplayStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 								// Expect(listener.ProgressStatus).Should(Equal(aaaaaaaaaaaaaaaaaaa))
 								// Expect(listener.UpdatedAt).Should(Equal(aaaaaaaaaaaaaaaaaaa))
@@ -2370,7 +2370,7 @@ var _ = Describe("Ingress Controller", func() {
 					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(pools).ShouldNot(BeNil())
-					Expect((pools.Items)).Should(HaveLen(0)) // number of pool
+					Expect((pools.Items)).Should(BeEmpty()) // number of pool
 				},
 				steps: []StepType{
 					{
@@ -2497,7 +2497,7 @@ var _ = Describe("Ingress Controller", func() {
 							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
 							Expect(err).ShouldNot(HaveOccurred())
 							Expect(pools).ShouldNot(BeNil())
-							Expect((pools.Items)).Should(HaveLen(0))
+							Expect((pools.Items)).Should(BeEmpty())
 						},
 					},
 				},

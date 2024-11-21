@@ -406,7 +406,7 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 			// need to update to current builder, avoid mismatch data later
 			listenerInPortal.DefaultPoolId = &updateOptions.DefaultPoolId
 			listenerInPortal.ReferPoolName = ""
-			if p := r.GetPoolBuilderByID(updateOptions.DefaultPoolId); p != nil { // in ensurePool, should update to the latest infomation
+			if p := r.GetPoolBuilderByID(updateOptions.DefaultPoolId); p != nil { // in ensurePool, should update to the latest information
 				listenerInPortal.ReferPoolName = p.GetName()
 			}
 			if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {

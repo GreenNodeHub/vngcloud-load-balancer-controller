@@ -189,7 +189,7 @@ func (p *suffixAnnotationParser) buildAnnotationKeys(suffix string, opts ...Pars
 }
 
 func splitCommaSeparatedString(commaSeparatedString string) []string {
-	var result []string
+	result := []string{}
 	parts := strings.Split(commaSeparatedString, ",")
 	for _, part := range parts {
 		part = strings.TrimSpace(part)

@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"k8s.io/klog/v2"
 )
 
 func GetMetadataProvider(order string) IMetadata {

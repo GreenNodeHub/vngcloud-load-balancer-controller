@@ -799,7 +799,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			k8sSchema := runtime.NewScheme()
-			clientgoscheme.AddToScheme(k8sSchema)
+			assert.NoError(t, clientgoscheme.AddToScheme(k8sSchema))
 			k8sClient := testclient.NewClientBuilder().WithScheme(k8sSchema).Build()
 			for _, node := range tt.env.nodes {
 				assert.NoError(t, k8sClient.Create(ctx, node.DeepCopy()))
