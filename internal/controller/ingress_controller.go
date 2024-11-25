@@ -135,13 +135,15 @@ func (r *IngressReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 	logger := contexts.NewContext(ctx).Log()
 
 	// get object again to avoid conflict
-	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
+	object := &networkingv1.Ingress{}
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, object)
 	if err != nil {
 		logger.Error("Failed to get object: ", err)
 		return err
 	}
+	objectOld := object.DeepCopy()
 
-	annotations := obj.GetAnnotations()
+	annotations := object.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
@@ -156,14 +158,18 @@ func (r *IngressReconciler) updateObjectAnnotation(ctx context.Context, obj clie
 	for k, v := range annos {
 		annotations[k] = v
 	}
-	obj.SetAnnotations(annotations)
-	return r.Update(ctx, obj, &client.UpdateOptions{})
+	object.SetAnnotations(annotations)
+	return r.Patch(ctx, object, client.MergeFrom(objectOld))
 }
 
 func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.Object, address string) error {
 	if obj == nil {
 		return nil
 	}
+	if address == "" {
+		return errors.New("address is empty")
+	}
+
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("Update status for object %s/%s = %s", obj.GetNamespace(), obj.GetName(), address)
 
@@ -174,11 +180,7 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 		logger.Error("Failed to get object: ", err)
 		return err
 	}
-
-	// update status
-	if address == "" {
-		return errors.New("address is empty")
-	}
+	objectOld := object.DeepCopy()
 
 	addr := net.ParseIP(address)
 	if addr != nil {
@@ -186,7 +188,7 @@ func (r *IngressReconciler) updateObjectStatus(ctx context.Context, obj client.O
 	} else {
 		object.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
 	}
-	return r.Status().Update(ctx, object)
+	return r.Client.Status().Patch(ctx, object, client.MergeFrom(objectOld))
 }
 
 func (r *IngressReconciler) startBackgroundGoroutine(ctx context.Context) {
