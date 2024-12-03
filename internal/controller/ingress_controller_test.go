@@ -2509,6 +2509,158 @@ var _ = Describe("Ingress Controller", func() {
 		})
 	})
 
+	Context("When node not ready then update condition to ready", func() {
+		It("LB should update pool member", func() {
+			if skipIngressTest {
+				Skip("Skip test")
+			}
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest: func() {
+					// set node not ready
+					node1 := &corev1.Node{}
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: mockNode1.Name}, node1)).Should(Succeed())
+					node1.Status.Conditions = []corev1.NodeCondition{
+						{Type: corev1.NodeReady, Status: corev1.ConditionFalse},
+					}
+					Expect(k8sClient.Status().Update(ctx, node1)).Should(Succeed())
+
+					node2 := &corev1.Node{}
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: mockNode2.Name}, node2)).Should(Succeed())
+					node2.Status.Conditions = []corev1.NodeCondition{
+						{Type: corev1.NodeReady, Status: corev1.ConditionFalse},
+					}
+					Expect(k8sClient.Status().Update(ctx, node2)).Should(Succeed())
+				},
+				postTest: func() {
+					// set node ready
+					node1 := &corev1.Node{}
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: mockNode1.Name}, node1)).Should(Succeed())
+					node1.Status.Conditions = []corev1.NodeCondition{
+						{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+					}
+					Expect(k8sClient.Status().Update(ctx, node1)).Should(Succeed())
+
+					node2 := &corev1.Node{}
+					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: mockNode2.Name}, node2)).Should(Succeed())
+					node2.Status.Conditions = []corev1.NodeCondition{
+						{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+					}
+					Expect(k8sClient.Status().Update(ctx, node2)).Should(Succeed())
+				},
+				name: "node not ready to ready, expect update pool member",
+				generateDepends: func() []client.Object {
+					// create service node port
+					service := newServiceNodePortResource("service-foo", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{service}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-service-gogsf", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: "service-foo",
+							Port: networkingv1.ServiceBackendPort{
+								Number: 80,
+							},
+						},
+					}
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+					for _, pool := range pools.Items {
+						Expect(pool.Name).Should(BeElementOf(
+							consts.DEFAULT_NAME_DEFAULT_POOL,
+						))
+						Expect(pool.Members).ShouldNot(BeNil())
+						Expect((pool.Members.Items)).Should(HaveLen(2)) // number of member in pool = number of node or number of endpoint
+						expectAddress := []string{
+							mockNode3.Status.Addresses[0].Address,
+							mockNode4.Status.Addresses[0].Address}
+						for _, member := range pool.Members.Items {
+							Expect(member.ProtocolPort).Should(Equal(30000))
+							Expect(member.MonitorPort).Should(Equal(30000))
+							Expect(member.Address).Should(BeElementOf(expectAddress))
+							expectAddress = removeFisrt(expectAddress, member.Address)
+						}
+					}
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+				},
+				steps: []StepType{
+					{
+						kindStep: updateStatusStep,
+						name:     "update node status to ready",
+						getObject: func() client.Object {
+							node1 := &corev1.Node{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: mockNode1.Name}, node1)).Should(Succeed())
+							node1.Status.Conditions = []corev1.NodeCondition{
+								{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+							}
+							return node1
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+							for _, pool := range pools.Items {
+								Expect(pool.Name).Should(BeElementOf(
+									consts.DEFAULT_NAME_DEFAULT_POOL,
+								))
+								Expect(pool.Members).ShouldNot(BeNil())
+								Expect((pool.Members.Items)).Should(HaveLen(3)) // number of member in pool = number of node or number of endpoint
+								expectAddress := []string{
+									mockNode1.Status.Addresses[0].Address,
+									mockNode3.Status.Addresses[0].Address,
+									mockNode4.Status.Addresses[0].Address}
+								for _, member := range pool.Members.Items {
+									Expect(member.MonitorPort).Should(Equal(member.ProtocolPort))
+									Expect(member.Address).Should(BeElementOf(expectAddress))
+									expectAddress = removeFisrt(expectAddress, member.Address)
+								}
+							}
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
 	// Context("When create and update https listener", func() {
 	// 	It("it should work as expectation", func() {
 	// if skipIngressTest {

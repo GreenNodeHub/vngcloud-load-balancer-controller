@@ -846,7 +846,7 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				}
 				return requests
 			}),
-			k8sBuilder.WithPredicates(predicate.AnnotationChangedPredicate{}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: 5, // ..................
@@ -925,14 +925,9 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					logrus.Info("Detect update Endpoints event.")
 					return true
 				case *corev1.Node:
-					oldObj := e.ObjectOld.(*corev1.Node)
-					newObj := e.ObjectNew.(*corev1.Node)
-					if oldObj.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != newObj.Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] {
-						logrus.Info("Detect update Node Annotations event.")
-						r.knownNodes, _ = r.getNodes(r.Client)
-						return true
-					}
-					return false
+					logrus.Info("Detect update Node event.")
+					r.knownNodes, _ = r.getNodes(r.Client)
+					return true
 				default:
 					logrus.Warn("Detect update object is of an unknown type: ", e.ObjectNew)
 					return false

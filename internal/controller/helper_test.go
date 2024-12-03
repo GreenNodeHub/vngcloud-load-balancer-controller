@@ -17,9 +17,10 @@ import (
 type kindStep string
 
 const (
-	createStep kindStep = "create"
-	updateStep kindStep = "update"
-	deleteStep kindStep = "delete"
+	createStep       kindStep = "create"
+	updateStep       kindStep = "update"
+	deleteStep       kindStep = "delete"
+	updateStatusStep kindStep = "updateStatus"
 )
 
 type StepType struct {
@@ -80,6 +81,8 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
 			} else if step.kindStep == updateStep {
 				Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
+			} else if step.kindStep == updateStatusStep {
+				Expect(k8sClient.Status().Update(ctx, obj)).Should(Succeed())
 			} else {
 				logrus.Fatalf("Unknown step kind: %s of STEP %s", step.kindStep, step.name)
 			}
