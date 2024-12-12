@@ -53,6 +53,8 @@ spec:
         runAsNonRoot: true
       serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
       terminationGracePeriodSeconds: 10
+      tolerations:
+      - operator: Exists
       volumes:
       - name: secret
         secret:

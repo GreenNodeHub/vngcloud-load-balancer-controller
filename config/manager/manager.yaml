@@ -120,3 +120,5 @@ spec:
       - secret:
           secretName: vngcloud-load-balancer-controller-mysecret
         name: secret
+      tolerations:
+      - operator: Exists
