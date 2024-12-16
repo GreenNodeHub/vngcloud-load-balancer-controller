@@ -49,6 +49,9 @@ spec:
         - mountPath: /etc/vngcloud-load-balancer-controller
           name: secret
           readOnly: true
+        - mountPath: /etc/hosts
+          name: add-hosts
+          readOnly: true
       securityContext:
         runAsNonRoot: true
       serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
@@ -59,3 +62,7 @@ spec:
       - name: secret
         secret:
           secretName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-mysecret
+      - hostPath:
+          path: /etc/hosts
+          type: ""
+        name: add-hosts

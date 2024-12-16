@@ -114,11 +114,18 @@ spec:
         - name: secret
           mountPath: /etc/vngcloud-load-balancer-controller
           readOnly: true
+        - mountPath: /etc/hosts
+          name: add-hosts
+          readOnly: true
       serviceAccountName: manager
       terminationGracePeriodSeconds: 10
       volumes:
       - secret:
           secretName: vngcloud-load-balancer-controller-mysecret
         name: secret
+      - hostPath:
+          path: /etc/hosts
+          type: ""
+        name: add-hosts
       tolerations:
       - operator: Exists
