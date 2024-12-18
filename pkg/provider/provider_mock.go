@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anngdinh/operator-helper/contexts"
 	clone "github.com/huandu/go-clone"
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -16,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 

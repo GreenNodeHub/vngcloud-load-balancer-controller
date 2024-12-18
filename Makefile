@@ -1,6 +1,6 @@
 VERSION ?= v0.0.0
 COMMIT  := ""
-LDFLAGS := "-w -s -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Commit=$(COMMIT)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
+LDFLAGS := "-w -s -X 'github.com/anngdinh/operator-helper/version.Commit=$(COMMIT)' -X 'github.com/anngdinh/operator-helper/version.Version=$(VERSION)'"
 # Image URL to use all building/pushing image targets
 IMG ?= vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.

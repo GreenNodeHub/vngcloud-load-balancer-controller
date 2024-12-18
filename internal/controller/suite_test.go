@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/anngdinh/operator-helper/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 
 	corev1 "k8s.io/api/core/v1"

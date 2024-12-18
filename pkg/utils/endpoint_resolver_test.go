@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/contexts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
