@@ -3,7 +3,7 @@ module github.com/vngcloud/vngcloud-load-balancer-controller
 go 1.22.5
 
 require (
-	github.com/anngdinh/operator-helper v0.0.1
+	github.com/anngdinh/operator-helper v0.0.2
 	github.com/cuongpiger/joat v1.0.14
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
@@ -104,7 +104,6 @@ require (
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
-	github.com/vngcloud/vngcloud-fleet-controller v0.0.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
