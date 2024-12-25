@@ -20,4 +20,8 @@ resources:
   kind: Ingress
   path: k8s.io/api/networking/v1
   version: v1
+- controller: true
+  domain: vks.vngcloud.vn
+  kind: VngcloudGlobalLoadBalancer
+  version: v1alpha1
 version: "3"

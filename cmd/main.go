@@ -29,6 +29,10 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/anngdinh/operator-helper/version"
+	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -39,9 +43,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/anngdinh/operator-helper/k8s"
-	"github.com/anngdinh/operator-helper/version"
-	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
@@ -55,6 +56,7 @@ var (
 )
 
 func init() {
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
@@ -211,6 +213,17 @@ func main() {
 		UpdateTracker:    updateTracker,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
+		os.Exit(1)
+	}
+	if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:           conf,
+		Provider:         vngProvider,
+		FinalizerManager: finalizerManager,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

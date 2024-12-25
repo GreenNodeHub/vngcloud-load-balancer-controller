@@ -28,6 +28,7 @@ const (
 	ServiceFinalizer = "service.kubernetes.io/load-balancer-cleanup"
 
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
+	GLBFinalizer     = "glb.vngcloud.vn/resources"
 
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
