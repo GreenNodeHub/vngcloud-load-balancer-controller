@@ -32,10 +32,15 @@ jobs:
           username: ${{ secrets.VCR_USER }}
           password: ${{ secrets.VCR_PASSWORD }}
       
-      - name: Set short git commit SHA
+      - name: Set variables
         id: vars
         run: |
+          branch_after_format=$(git rev-parse --abbrev-ref HEAD | sed 's/[^a-zA-Z0-9]/-/g')
+          echo $branch_after_format
+          echo "BRANCH_NAME=$branch_after_format" >> $GITHUB_ENV
+
           calculatedSha=$(git rev-parse --short ${{ github.sha }})
+          echo $calculatedSha
           echo "COMMIT_SHORT_SHA=$calculatedSha" >> $GITHUB_ENV
 
       - name: Build and push Docker image
@@ -52,6 +57,7 @@ jobs:
             ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.sha }}
             ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.sha }}
             ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ env.VERSION }}
+            ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ env.BRANCH_NAME }}
           # target: vngcloud-load-balancer-controller
 
       - name: Push charts
