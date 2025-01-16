@@ -72,7 +72,7 @@ type IngressReconciler struct {
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 
-	netwotkID  string
+	networkID  string
 	subnetID   string
 	subnetCIDR string
 
@@ -354,7 +354,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	}
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByIngress(ctx, obj, r.annotationParser, r.Client,
-		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.networkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
@@ -623,7 +623,7 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 
 	// build loadbalancer model, pass nil to object to create a model with default values
 	newBuilder, err := builder.NewModelBuilderByIngress(ctx, nil, r.annotationParser, r.Client,
-		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.networkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
@@ -735,7 +735,7 @@ func (r *IngressReconciler) Init(client client.Client) error {
 	if err != nil {
 		return err
 	}
-	providerIDs := builder.VNGHelper.GetListProviderID(r.knownNodes)
+	providerIDs := builder.GetListProviderID(r.knownNodes)
 	if len(r.knownNodes) == 0 || len(providerIDs) == 0 {
 		return errors.New("require at least 1 node to get network information")
 	}
@@ -746,10 +746,10 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		logrus.Error("Failed to init provider: ", err)
 		return err
 	}
-	r.netwotkID = r.Provider.GetNetworkID()
+	r.networkID = r.Provider.GetNetworkID()
 	r.subnetID = r.Provider.GetSubnetID()
 	r.subnetCIDR = r.Provider.GetSubnetCIDR()
-	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
+	if r.networkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
 		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
 	}
 

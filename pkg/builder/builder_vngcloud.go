@@ -310,7 +310,7 @@ func (r *vngcloudLBBuilder) EnsurePool(poolBuilder *poolBuilderType, oldBuilder 
 		r.AddClonePoolBuilder(poolBuilder)
 	} else {
 		poolBuilder.SetID(poolInPortal.GetID())
-		updateOptions, message := VNGHelper.ComparePoolBuilder(r.GetLoadBalancerID(), poolInPortal, poolBuilder)
+		updateOptions, message := poolInPortal.ComparePoolBuilder(r.GetLoadBalancerID(), poolBuilder)
 		if updateOptions != nil {
 			r.logger.Info("Need update pool: ", strings.Join(message, ", "))
 			err := r.provider.UpdatePool(r.context, r.GetLoadBalancerID(), poolInPortal.GetID(),
@@ -327,7 +327,7 @@ func (r *vngcloudLBBuilder) EnsurePool(poolBuilder *poolBuilderType, oldBuilder 
 
 		// ensure pool members, with default pool, should merge pool members, otherwise, should update
 		if poolBuilder.GetName() == consts.DEFAULT_NAME_DEFAULT_POOL {
-			updateOptions, err := VNGHelper.MergePoolMembers(r.GetLoadBalancerID(),
+			updateOptions, err := r.mergePoolMembers(r.GetLoadBalancerID(),
 				oldBuilder,
 				poolInPortal,
 				poolBuilder)
@@ -349,7 +349,7 @@ func (r *vngcloudLBBuilder) EnsurePool(poolBuilder *poolBuilderType, oldBuilder 
 				return err
 			}
 		} else // normal pool
-		if !VNGHelper.ComparePoolMembers(poolInPortal.Members, poolBuilder.Members, true) {
+		if !r.comparePoolMembers(poolInPortal.Members, poolBuilder.Members, true) {
 			err := r.provider.UpdatePoolMembers(r.context, r.GetLoadBalancerID(), poolInPortal.GetID(),
 				poolBuilder.GetIUpdatePoolMembersRequest(r.GetLoadBalancerID()))
 			if err != nil {
@@ -394,7 +394,7 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 			return nil
 		}
 
-		updateOptions, message := VNGHelper.CompareListenerBuilder(r.GetLoadBalancerID(), listenerInPortal, listenerBuilder)
+		updateOptions, message := listenerInPortal.CompareListenerBuilder(r.GetLoadBalancerID(), listenerBuilder)
 		if updateOptions != nil {
 			r.logger.Info("Need update listener: ", strings.Join(message, ", "))
 			err := r.provider.UpdateListener(r.context, r.GetLoadBalancerID(), listenerInPortal.GetID(), updateOptions)
@@ -441,8 +441,7 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 			}
 		} else {
 			policyBuilder.SetID(policyInPortal.GetID())
-			updateOptions, message := VNGHelper.ComparePolicyBuilder(r.GetLoadBalancerID(), listenerBuilder.GetID(),
-				policyInPortal, policyBuilder)
+			updateOptions, message := policyInPortal.ComparePolicyBuilder(r.GetLoadBalancerID(), listenerBuilder.GetID(), policyBuilder)
 			if updateOptions != nil {
 				r.logger.Info("Need update policy: ", strings.Join(message, ", "))
 				err := r.provider.UpdatePolicy(r.context, r.GetLoadBalancerID(), listenerBuilder.GetID(), policyInPortal.GetID(), updateOptions)
@@ -616,7 +615,7 @@ func (r *vngcloudLBBuilder) DeleteRedundantPools(oldBuilder OldModelBuilder, new
 				isDefaultPool = true
 
 				// check if default pool members match
-				if VNGHelper.ComparePoolMembers(oldBuilder.GetDefaultPoolMembers(), currentPool.Members, true) {
+				if r.comparePoolMembers(oldBuilder.GetDefaultPoolMembers(), currentPool.Members, true) {
 					isMembersMatch = true
 				}
 			}
@@ -639,7 +638,7 @@ func (r *vngcloudLBBuilder) DeleteRedundantPools(oldBuilder OldModelBuilder, new
 					}
 				} else {
 					// just update members (delete the old members)
-					updateOptions, err := VNGHelper.MergePoolMembers(r.GetLoadBalancerID(),
+					updateOptions, err := r.mergePoolMembers(r.GetLoadBalancerID(),
 						oldBuilder,
 						currentPool,
 						nil)
@@ -733,7 +732,7 @@ func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilde
 				len(oldMembers), len(currentMembers))
 			return false
 		}
-		if !VNGHelper.ComparePoolMembers(oldMembers, currentMembers, true) {
+		if !r.comparePoolMembers(oldMembers, currentMembers, true) {
 			r.logger.Debugf("Can't delete whole loadbalancer, default pool members not match")
 			return false
 		}
@@ -823,4 +822,75 @@ func (l *vngcloudLBBuilder) AddCloneListenerBuilder(listener *ListenerBuilderTyp
 		IsL4:          listener.IsL4,
 	}
 	l.AddListenerBuilder(clone)
+}
+
+// ComparePoolMembers compares two pool members.
+// mustBeEqual is true if the two pool members must be equal, otherwise, just check if the pool members exist in the other pool members.
+func (l *vngcloudLBBuilder) comparePoolMembers(parentSet, childSet []*loadbalancerv2.Member, mustBeEqual bool) bool {
+	if mustBeEqual && len(parentSet) != len(childSet) {
+		return false
+	}
+
+	for _, m := range childSet {
+		if !l.checkIfPoolMemberExist(parentSet, m) {
+			return false
+		}
+	}
+	return true
+}
+
+// checkIfPoolMemberExist checks if the pool member exists in the pool members.
+func (l *vngcloudLBBuilder) checkIfPoolMemberExist(mems []*loadbalancerv2.Member, mem *loadbalancerv2.Member) bool {
+	for _, r := range mems {
+		if r.IpAddress == mem.IpAddress &&
+			r.Port == mem.Port &&
+			// r.Backup == mem.Backup &&
+			// r.Name == mem.Name &&
+			// r.Weight == mem.Weight &&
+			r.MonitorPort == mem.MonitorPort {
+			return true
+		}
+	}
+	return false
+}
+
+// MergePoolMembers merges the pool members.
+func (l *vngcloudLBBuilder) mergePoolMembers(lbID string, oldBuilder OldModelBuilder, currentBuilder, addBuilder *poolBuilderType) (loadbalancerv2.IUpdatePoolMembersRequest, error) {
+	currentSet := make([]*loadbalancerv2.Member, 0)
+	deleteSet := make([]*loadbalancerv2.Member, 0)
+	addSet := make([]*loadbalancerv2.Member, 0)
+	if currentBuilder != nil {
+		currentSet = currentBuilder.Members
+	}
+	if oldBuilder != nil {
+		deleteSet = oldBuilder.GetDefaultPoolMembers()
+	}
+	if addBuilder != nil {
+		addSet = addBuilder.Members
+	}
+
+	resultPoolMembers := make([]*loadbalancerv2.Member, 0)
+	for _, member := range currentSet {
+		if l.checkIfPoolMemberExist(addSet, member) || !l.checkIfPoolMemberExist(deleteSet, member) {
+			resultPoolMembers = append(resultPoolMembers, member)
+		}
+	}
+	for _, member := range addSet {
+		if !l.checkIfPoolMemberExist(resultPoolMembers, member) {
+			resultPoolMembers = append(resultPoolMembers, member)
+		}
+	}
+
+	// if the pool members are equal, return nil
+	if l.comparePoolMembers(resultPoolMembers, currentSet, true) {
+		return nil, nil
+	}
+
+	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
+	for _, member := range resultPoolMembers {
+		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
+	}
+
+	logrus.Debugf("Merge pool members: %v", convertMembers)
+	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, currentBuilder.GetID()).WithMembers(convertMembers...), nil
 }

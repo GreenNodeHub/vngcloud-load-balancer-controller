@@ -1,12 +1,12 @@
 package builder
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"strings"
 
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/anngdinh/operator-helper/contexts"
 	nwv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,13 +53,52 @@ func serviceBackendToIntOrString(port nwv1.ServiceBackendPort) intstr.IntOrStrin
 	return intstr.FromInt(int(port.Number))
 }
 
-func coreProtocolToSecgroupProtocol(protocol corev1.Protocol) networkv2.SecgroupRuleProtocol {
-	switch protocol {
-	case corev1.ProtocolTCP:
-		return networkv2.SecgroupRuleProtocolTCP
-	case corev1.ProtocolUDP:
-		return networkv2.SecgroupRuleProtocolUDP
-	default:
-		return networkv2.SecgroupRuleProtocolTCP
+
+
+func mergeStringArray(ctx context.Context, current, remove, add []string) ([]string, bool) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("  - current: %v", current)
+	logger.Debugf("  - remove:  %v", remove)
+	logger.Debugf("  - add:     %v", add)
+
+	mapCurrent := make(map[string]bool)
+	for _, c := range current {
+		mapCurrent[c] = true
 	}
+	for _, r := range remove {
+		delete(mapCurrent, r)
+	}
+	for _, a := range add {
+		mapCurrent[a] = true
+	}
+	ret := make([]string, 0)
+	for k := range mapCurrent {
+		ret = append(ret, k)
+	}
+	if len(ret) != len(current) {
+		return ret, true
+	}
+	for _, c := range current {
+		if !mapCurrent[c] {
+			return ret, true
+		}
+	}
+	return ret, false
+}
+
+func comparePointer[T comparable](current, new *T) bool {
+	if current == nil && new == nil {
+		return true
+	}
+	if current == nil || new == nil {
+		return false
+	}
+	return *current == *new
+}
+
+func pointerToString[T any](p *T) string {
+	if p == nil {
+		return "(nil)"
+	}
+	return fmt.Sprintf("&(%v)", *p)
 }

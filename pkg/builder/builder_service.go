@@ -3,9 +3,11 @@ package builder
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
@@ -150,7 +152,7 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 					return err
 				}
 				for _, podPort := range podPorts {
-					l.addDefaultSecgroupRules(podPort, coreProtocolToSecgroupProtocol(port.Protocol))
+					l.addDefaultSecgroupRules(podPort, l.coreProtocolToSecgroupProtocol(port.Protocol))
 				}
 			}
 		} else {
@@ -163,14 +165,14 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 
 		// if healthcheckPort is set, add to secgroup
 		if l.healthcheckPort != 0 {
-			l.addDefaultSecgroupRules(l.healthcheckPort, coreProtocolToSecgroupProtocol(port.Protocol))
+			l.addDefaultSecgroupRules(l.healthcheckPort, l.coreProtocolToSecgroupProtocol(port.Protocol))
 		}
 
 		// build pool members
 		poolMembers := make([]*loadbalancerv2.Member, 0)
 		for _, member := range membersAddr {
 			// L4 support TCP (TCP, HTTP, HTTPS), UDP (PING-UDP), PROXY (TCP, HTTP, HTTPS)
-			l.addDefaultSecgroupRules(member.Port, coreProtocolToSecgroupProtocol(port.Protocol))
+			l.addDefaultSecgroupRules(member.Port, l.coreProtocolToSecgroupProtocol(port.Protocol))
 
 			monitorPort := member.Port
 			if l.healthcheckPort != 0 {
@@ -215,7 +217,7 @@ func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name stri
 			DefaultPoolId: PointerOf(""), // will be set later
 
 			ListenerName:                name,
-			ListenerProtocol:            VNGHelper.ParseListenerProtocol(pPort),
+			ListenerProtocol:            l.parseListenerProtocol(pPort),
 			ListenerProtocolPort:        int(pPort.Port),
 			CertificateAuthorities:      nil,
 			ClientCertificate:           nil,
@@ -237,7 +239,7 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 		UnhealthyThreshold:  l.unhealthyThresholdCount,
 		Interval:            l.healthcheckIntervalSeconds,
 		Timeout:             l.healthcheckTimeoutSeconds,
-		HealthCheckProtocol: VNGHelper.ParseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
+		HealthCheckProtocol: l.parseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
 	}
 	if l.healthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP ||
 		l.healthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTPs {
@@ -246,7 +248,7 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 			UnhealthyThreshold:  l.unhealthyThresholdCount,
 			Interval:            l.healthcheckIntervalSeconds,
 			Timeout:             l.healthcheckTimeoutSeconds,
-			HealthCheckProtocol: VNGHelper.ParseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
+			HealthCheckProtocol: l.parseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
 			HealthCheckMethod:   PointerOf(l.healthcheckHttpMethod),
 			HealthCheckPath:     PointerOf(l.healthcheckPath),
 			SuccessCode:         PointerOf(l.successCodes),
@@ -260,7 +262,7 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 			name: name,
 		},
 		isDeleted:     false,
-		PoolProtocol:  VNGHelper.ParsePoolProtocol(l.mappingProtocol(pPort)),
+		PoolProtocol:  l.parsePoolProtocol(l.mappingProtocol(pPort)),
 		Stickiness:    false,
 		TLSEncryption: false,
 		HealthMonitor: &healthMonitor,
@@ -314,4 +316,59 @@ func (l *modelBuilder) mappingProtocol(pPort corev1.ServicePort) string {
 		}
 	}
 	return string(pPort.Protocol)
+}
+
+// ParseListenerProtocol parse listener protocol to listener protocol
+func (l *modelBuilder) parseListenerProtocol(pPort corev1.ServicePort) loadbalancerv2.ListenerProtocol {
+	opt := strings.TrimSpace(strings.ToUpper(string(pPort.Protocol)))
+	switch opt {
+	case string(loadbalancerv2.ListenerProtocolUDP):
+		return loadbalancerv2.ListenerProtocolUDP
+	}
+
+	return loadbalancerv2.ListenerProtocolTCP
+}
+
+// ParseMonitorProtocol parse monitor protocol to health check protocol
+func (l *modelBuilder) parseHealthCheckProtocol(pPoolProtocol corev1.Protocol, pMonitorProtocol string) loadbalancerv2.HealthCheckProtocol {
+	switch pPoolProtocol {
+	case corev1.ProtocolUDP:
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	switch strings.TrimSpace(strings.ToUpper(pMonitorProtocol)) {
+	case string(loadbalancerv2.HealthCheckProtocolHTTP):
+		return loadbalancerv2.HealthCheckProtocolHTTP
+	case string(loadbalancerv2.HealthCheckProtocolHTTPs):
+		return loadbalancerv2.HealthCheckProtocolHTTPs
+	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	return loadbalancerv2.HealthCheckProtocolTCP
+}
+
+// ParsePoolProtocol parse string to pool protocol
+func (l *modelBuilder) parsePoolProtocol(pPoolProtocol string) loadbalancerv2.PoolProtocol {
+	opt := strings.TrimSpace(strings.ToUpper(pPoolProtocol))
+	switch opt {
+	case string(loadbalancerv2.PoolProtocolProxy):
+		return loadbalancerv2.PoolProtocolProxy
+	case string(loadbalancerv2.PoolProtocolHTTP):
+		return loadbalancerv2.PoolProtocolHTTP
+	case string(loadbalancerv2.PoolProtocolUDP):
+		return loadbalancerv2.PoolProtocolUDP
+	}
+	return loadbalancerv2.PoolProtocolTCP
+}
+
+func (l *modelBuilder) coreProtocolToSecgroupProtocol(protocol corev1.Protocol) networkv2.SecgroupRuleProtocol {
+	switch protocol {
+	case corev1.ProtocolTCP:
+		return networkv2.SecgroupRuleProtocolTCP
+	case corev1.ProtocolUDP:
+		return networkv2.SecgroupRuleProtocolUDP
+	default:
+		return networkv2.SecgroupRuleProtocolTCP
+	}
 }
