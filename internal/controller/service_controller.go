@@ -753,7 +753,7 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 	if err != nil {
 		return err
 	}
-	providerIDs := builder.VNGHelper.GetListProviderID(r.knownNodes)
+	providerIDs := builder.GetListProviderID(r.knownNodes)
 	if len(r.knownNodes) == 0 || len(providerIDs) == 0 {
 		return errors.New("require at least 1 node to get network information")
 	}

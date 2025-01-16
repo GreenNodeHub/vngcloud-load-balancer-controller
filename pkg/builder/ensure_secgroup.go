@@ -127,7 +127,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 
 	// ensure secgroup rules
 	newBuilder.EnsureSecgroupPING_UDP()
-	needDelete, needCreate, err := VNGHelper.CompareSecgroupRule(defaultSecgroupRules.Items, newBuilder.GetListDefaultSecgroupRules())
+	needDelete, needCreate, err := r.compareSecgroupRule(defaultSecgroupRules.Items, newBuilder.GetListDefaultSecgroupRules())
 	if err != nil {
 		r.logger.Error("Fail to compare secgroup rules", err)
 		return err
@@ -277,7 +277,7 @@ func (r *vngcloudLBBuilder) ensureDeleteAddNodesSG(oldSecgroups, newSecgroups []
 	}
 
 	// get instance id of all servers
-	instanceIDs := VNGHelper.GetListProviderID(nodes)
+	instanceIDs := GetListProviderID(nodes)
 	for _, instanceID := range instanceIDs {
 		err := r.ensureSecgroupForInstance(instanceID, oldSecgroups, newSecgroups)
 		if err != nil {
@@ -314,7 +314,7 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 		currentSecgroups = append(currentSecgroups, secgroup.Uuid)
 	}
 
-	newSecgroups, isNeedUpdate := VNGHelper.MergeStringArray(m.context, currentSecgroups, oldSecgroups, newSecgroups)
+	newSecgroups, isNeedUpdate := mergeStringArray(m.context, currentSecgroups, oldSecgroups, newSecgroups)
 	if !isNeedUpdate {
 		m.logger.Infof("No need to update security groups for instance: %v", instanceID)
 		return nil
@@ -346,4 +346,55 @@ func (m *vngcloudLBBuilder) getServerUseSecgroup(secgroupID string) (bool, error
 	}
 
 	return len(listServer.Items) > 0, nil
+}
+
+func (m *vngcloudLBBuilder) compareSecgroupRule(current []*entityv2.SecgroupRule, new []*secGroupRuleBuilderType) ([]*entityv2.SecgroupRule, []*secGroupRuleBuilderType, error) {
+	// get only ingress rules
+	currentIngressRules := make([]*entityv2.SecgroupRule, 0)
+	for _, rule := range current {
+		if strings.EqualFold(rule.Direction, string(networkv2.SecgroupRuleDirectionIngress)) {
+			currentIngressRules = append(currentIngressRules, rule)
+		}
+	}
+
+	needDelete := make([]*entityv2.SecgroupRule, 0)
+	needCreate := make([]*secGroupRuleBuilderType, 0)
+
+	// mark all rule not in use
+	ruleInUse := make(map[string]bool)
+	for _, rule := range currentIngressRules {
+		ruleInUse[rule.Id] = false
+	}
+
+	// check if the rule is in new
+	for _, rule := range new {
+		found := false
+		for _, currentRule := range currentIngressRules {
+			if rule.Description == currentRule.Description &&
+				strings.EqualFold(string(rule.Direction), currentRule.Direction) &&
+				strings.EqualFold(string(rule.EtherType), currentRule.EtherType) &&
+				strings.EqualFold(string(rule.Protocol), currentRule.Protocol) &&
+				rule.PortRangeMax == currentRule.PortRangeMax &&
+				rule.PortRangeMin == currentRule.PortRangeMin &&
+				rule.RemoteIPPrefix == currentRule.RemoteIPPrefix {
+
+				ruleInUse[currentRule.Id] = true
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			needCreate = append(needCreate, rule)
+		}
+	}
+
+	// check if the rule is not in use
+	for _, rule := range currentIngressRules {
+		if !ruleInUse[rule.Id] {
+			needDelete = append(needDelete, rule)
+		}
+	}
+
+	return needDelete, needCreate, nil
 }
