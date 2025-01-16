@@ -71,7 +71,7 @@ type ServiceReconciler struct {
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 
-	netwotkID  string
+	networkID  string
 	subnetID   string
 	subnetCIDR string
 
@@ -374,7 +374,7 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 	}
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByService(ctx, obj, r.annotationParser, r.Client,
-		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.networkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
@@ -641,7 +641,7 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 
 	// build loadbalancer model, pass nil to object to create a model with default values
 	newBuilder, err := builder.NewModelBuilderByService(ctx, nil, r.annotationParser, r.Client,
-		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.networkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
@@ -764,10 +764,10 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 		logrus.Error("Failed to init provider: ", err)
 		return err
 	}
-	r.netwotkID = r.Provider.GetNetworkID()
+	r.networkID = r.Provider.GetNetworkID()
 	r.subnetID = r.Provider.GetSubnetID()
 	r.subnetCIDR = r.Provider.GetSubnetCIDR()
-	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
+	if r.networkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
 		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
 	}
 
