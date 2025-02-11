@@ -27,6 +27,7 @@ import (
 
 	"github.com/huandu/go-clone"
 	"github.com/sirupsen/logrus"
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -374,6 +375,37 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		return nil
 	}
 
+	// ensure certs
+	currentCerts, err := r.Provider.ListCertificates(ctx)
+	if err != nil {
+		logger.Error("Failed to list certificates: ", err)
+		return err
+	}
+	certBuilders := loadBalancerBuilder.GetCertBuilders()
+	for _, certBuilder := range certBuilders {
+		found := false
+		var certObject *entityv2.Certificate
+		for _, cert := range currentCerts.Certificates {
+			if cert.Name == certBuilder.GetName() {
+				found = true
+				certObject = &cert
+				break
+			}
+		}
+		if !found {
+			certObject, err = r.Provider.ImportCertificate(ctx, certBuilder.GetICreateCertificateRequest())
+			if err != nil {
+				logger.Error("Failed to create certificate: ", err, certBuilder.GetName())
+				return err
+			}
+		}
+		if certObject == nil || certObject.UUID == "" {
+			return errors.New("certificate not have UUID after create, need to retry")
+		}
+		certBuilder.SetID(certObject.UUID)
+		loadBalancerBuilder.AddCertificateID(certObject.UUID)
+	}
+
 	// create loadbalancer, update annotation and reconcile later
 	if loadBalancerBuilder.GetLoadBalancerID() == "" {
 		// check if loadbalancer with the generate name exists, if exists, update annotation and return
@@ -501,6 +533,9 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			listenerBuilder.SetPoolID(defaultPoolBuilder.GetID())
 		}
 
+		// set certificate for listener
+		listenerBuilder.SetCertificateAuthority(loadBalancerBuilder.GetCertificateIDs()...)
+
 		err := currentBuilder.EnsureListener(listenerBuilder, oldBuilder)
 		if err != nil {
 			logger.Error("Failed to ensure listener: ", err)
@@ -519,6 +554,13 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	err = currentBuilder.DeleteRedundantPools(oldBuilder, loadBalancerBuilder)
 	if err != nil {
 		logger.Error("Failed to delete redundant pool: ", err)
+		return err
+	}
+
+	// delete redundant certificates
+	err = currentBuilder.DeleteRedundantCertificates(loadBalancerBuilder.GetCertificateIDs())
+	if err != nil {
+		logger.Error("Failed to delete redundant certificates: ", err)
 		return err
 	}
 
@@ -679,6 +721,13 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		}
 	}
 
+	// delete redundant certificates
+	err = currentBuilder.DeleteRedundantCertificates([]string{})
+	if err != nil {
+		logger.Error("Failed to delete redundant certificates: ", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -810,15 +859,22 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&networkingv1.Ingress{}).
 		Watches(
 			&corev1.Endpoints{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
-				return r.resourceDependant.GetResourceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return r.resourceDependant.GetResourceNeedReconcile("endpoint", obj.GetNamespace(), obj.GetName())
 			}),
 			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Watches(
 			&corev1.Service{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, service client.Object) []reconcile.Request {
-				return r.resourceDependant.GetResourceNeedReconcile("service", service.GetNamespace(), service.GetName())
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return r.resourceDependant.GetResourceNeedReconcile("service", obj.GetNamespace(), obj.GetName())
+			}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return r.resourceDependant.GetResourceNeedReconcile("secret", obj.GetNamespace(), obj.GetName())
 			}),
 			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
@@ -865,6 +921,8 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					return false
 				case *corev1.Endpoints:
 					return false
+				case *corev1.Secret:
+					return true
 				case *corev1.Node:
 					newNodes, err := r.getNodes(r.Client)
 					if err != nil {
@@ -920,9 +978,11 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				case *corev1.Service:
 					logrus.Info("Detect update Service event.")
 					return true
-
 				case *corev1.Endpoints:
 					logrus.Info("Detect update Endpoints event.")
+					return true
+				case *corev1.Secret:
+					logrus.Info("Detect update Secret event.")
 					return true
 				case *corev1.Node:
 					logrus.Info("Detect update Node event.")
@@ -951,6 +1011,9 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				case *corev1.Endpoints:
 					logrus.Info("Detect delete Endpoints event.")
 					return true
+				case *corev1.Secret:
+					// logrus.Info("Detect delete Secret event.")
+					return false
 				case *corev1.Node:
 					newNodes, err := r.getNodes(r.Client)
 					if err != nil {

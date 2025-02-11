@@ -98,6 +98,7 @@ func NewModelBuilderByIngress(
 			Http:  []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
 			Https: []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}},
 		clientCertificateID: "",
+		certBuilders:        make([]*certificateBuilderType, 0),
 	}
 	if ingress == nil {
 		return model, nil
@@ -151,8 +152,25 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	}
 
 	// build listener https
+	isValidToBuildHTTPSListener := func() (bool, error) {
+		if len(ingress.Spec.TLS) == 0 {
+			return false, nil
+		}
+		if len(l.certificateIDs) > 0 {
+			return true, nil
+		}
+		for _, tls := range ingress.Spec.TLS {
+			if tls.SecretName == "" {
+				return true, errs.NewNoNeedRequeue("to use TLS, specific certIDs through annotation or secretName must be set")
+			}
+		}
+		return true, nil
+	}
 	var httpsListener *ListenerBuilderType
-	if len(l.certificateIDs) > 0 {
+	if isValid, err := isValidToBuildHTTPSListener(); isValid {
+		if err != nil {
+			return err
+		}
 		httpsListener, err = l.buildL7Listener(true)
 		if err != nil {
 			return err
@@ -161,8 +179,14 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 			httpsListener.ReferPoolName = defaultPoolBuilder.GetName()
 		}
 		l.AddListenerBuilder(httpsListener)
-	} else if len(ingress.Spec.TLS) > 0 {
-		return errs.NewNoNeedRequeue("missing certificates, need to specific through annotation")
+
+		if len(l.certificateIDs) == 0 {
+			// build certificate
+			err = l.buildCertificate(ingress.Spec.TLS)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// which host using tls
@@ -275,12 +299,6 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 		opt.CreateListenerRequest.CertificateAuthorities = PointerOf([]string{})
 		opt.CreateListenerRequest.Headers = &l.headers.Https
 
-		if len(l.certificateIDs) > 0 {
-			opt.DefaultCertificateAuthority = &l.certificateIDs[0]
-		}
-		if len(l.certificateIDs) > 1 {
-			opt.CertificateAuthorities = PointerOf(l.certificateIDs[1:])
-		}
 		if l.clientCertificateID != "" {
 			opt.CreateListenerRequest.ClientCertificate = &l.clientCertificateID
 		}
@@ -444,7 +462,13 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 	case networkingv1.PathTypePrefix:
 		compareType = loadbalancerv2.PolicyCompareTypeSTARTSWITH
 	case networkingv1.PathTypeImplementationSpecific:
-		return l.buildPolicyByRegex(host, policyName, path)
+		// incase not specify annotation to config, use as path type Exact
+		compareType = loadbalancerv2.PolicyCompareTypeEQUALS
+		res, err := l.buildPolicyByRegex(host, policyName, host, path)
+		if err == nil || err != errs.ErrorNoImplementationSpecificConfigFound {
+			return res, err
+		}
+
 	default:
 		compareType = loadbalancerv2.PolicyCompareTypeEQUALS
 	}
@@ -479,9 +503,9 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 	}, nil
 }
 
-func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {
+func (l *modelBuilder) buildPolicyByRegex(_, policyName, host string, path *networkingv1.HTTPIngressPath) (*policyBuilderType, error) {
 	for _, config := range l.implementationSpecificConfigs {
-		if config.Path == path.Path {
+		if config.Path == path.Path && config.Host == host {
 			l.logger.Debugf("Found implementation specific config for path %s: %v", path.Path, config)
 			// validate rules
 			for _, rule := range config.Rules {
@@ -564,5 +588,68 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName string, path *networking
 		}
 	}
 
-	return nil, errs.NewNoNeedRequeue("no implementation specific config found for path " + path.Path)
+	l.logger.Warnf("No implementation specific config found for host '%s' and path '%s'.", host, path.Path)
+
+	return nil, errs.ErrorNoImplementationSpecificConfigFound
+}
+
+func (l *modelBuilder) buildCertificate(tlss []networkingv1.IngressTLS) error {
+	secretNames := make([]string, 0)
+	for _, tls := range tlss {
+		if !slices.Contains(secretNames, tls.SecretName) {
+			secretNames = append(secretNames, tls.SecretName)
+		}
+	}
+
+	for _, secretName := range secretNames {
+		err := l.buildCertificateBySecretName(secretName)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *modelBuilder) buildCertificateBySecretName(secretName string) error {
+	secret := &corev1.Secret{}
+	err := l.client.Get(l.context, types.NamespacedName{Namespace: l.resourceNamespace, Name: secretName}, secret)
+	if err != nil {
+		return err
+	}
+	if secret.Type != corev1.SecretTypeTLS {
+		return errs.NewNoNeedRequeue("secret type must be tls")
+	}
+
+	if len(secret.Data[corev1.TLSCertKey]) == 0 || len(secret.Data[corev1.TLSPrivateKeyKey]) == 0 {
+		return errs.NewNoNeedRequeue("secret must have tls.crt and tls.key")
+	}
+
+	certificateData := string(secret.Data[corev1.TLSCertKey])
+	privateKeyData := string(secret.Data[corev1.TLSPrivateKeyKey])
+
+	certBuilder := &certificateBuilderType{
+		ID: "",
+		CreateCertificateRequest: loadbalancerv2.CreateCertificateRequest{
+			Name:             l.genCertName(secretName, secret.ResourceVersion),
+			Type:             loadbalancerv2.ImportOptsTypeOptTLS,
+			Certificate:      certificateData,
+			PrivateKey:       &privateKeyData,
+			CertificateChain: nil,
+			Passphrase:       nil,
+		},
+	}
+	l.certBuilders = append(l.certBuilders, certBuilder)
+	return nil
+}
+
+func (l *modelBuilder) genCertName(secretName, resourceVersion string) string {
+	hash := l.GenerateHash()
+	hashSecret := TrimString(HashString(secretName), consts.DEFAULT_HASH_NAME_LENGTH)
+
+	name := fmt.Sprintf("%s-%s-%s-%s",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		hash,
+		hashSecret,
+		resourceVersion)
+	return l.validateName(name)
 }

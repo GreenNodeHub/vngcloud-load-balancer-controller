@@ -43,8 +43,8 @@ github.com/coreos/go-systemd/v22 v22.5.0 h1:RrqgGjYQKalulkV8NGVIfkXQf6YYmOyiJKk8
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/cuongpiger/joat v1.0.14 h1:s/gN89kBN91cIFXWeLSJyY+0Q70H26KNDLKlaeMnSDU=
-github.com/cuongpiger/joat v1.0.14/go.mod h1:Oi1GvzXKHc0nlEnh9pGCFK13h8+EhDnWmfv2TiNH35g=
+github.com/cuongpiger/joat v1.0.17 h1:P6VZZhZplLjKRnfbHRal8jkgXNBp69Sj9lQ7aST6Hmo=
+github.com/cuongpiger/joat v1.0.17/go.mod h1:Oi1GvzXKHc0nlEnh9pGCFK13h8+EhDnWmfv2TiNH35g=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
@@ -239,8 +239,10 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXVQ=
 github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.2 h1:hYzrYHIxSImIGRzPUBgFOGcsJBut72FfsokeO/GWSz0=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.2/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.0 h1:+W3rrDyFWfaU7jIvcoy00yO52ZGS6pb7VU10Edz4SyY=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.0/go.mod h1:FetWUe2fEuqySEkYgkuDgt/WOAlI/YC02reGqjdJRMU=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384 h1:2rt+SgFfiLvtbO03ObQZo6hJTp5x7xClBvHbuHbcZSU=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384/go.mod h1:FetWUe2fEuqySEkYgkuDgt/WOAlI/YC02reGqjdJRMU=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

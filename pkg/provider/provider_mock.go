@@ -71,6 +71,10 @@ type wrapSecgroupRule struct {
 	*entityv2.SecgroupRule
 }
 
+type wrapCertificate struct {
+	*entityv2.Certificate
+}
+
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
 	projectID  string
@@ -86,7 +90,7 @@ type MockProvider struct {
 	servers       []*wrapServer
 	secgroups     []*wrapSecgroup
 	secgroupRules []*wrapSecgroupRule
-	lbcert        []string
+	certs         []*wrapCertificate
 
 	mu            sync.Mutex
 	WaitAfterTime time.Duration
@@ -109,7 +113,7 @@ func NewMockProvider() *MockProvider {
 		servers:       make([]*wrapServer, 0),
 		secgroups:     make([]*wrapSecgroup, 0),
 		secgroupRules: make([]*wrapSecgroupRule, 0),
-		lbcert:        MockCerts,
+		certs:         make([]*wrapCertificate, 0),
 
 		WaitAfterTime: 0,
 	}
@@ -149,6 +153,17 @@ func (m *MockProvider) Init(_ []string) error {
 					SecGroups:          []entityv2.ServerSecgroup{},
 					ExternalInterfaces: []entityv2.NetworkInterface{},
 					InternalInterfaces: []entityv2.NetworkInterface{},
+				},
+			})
+		}
+
+		for _, id := range MockCerts {
+			m.certs = append(m.certs, &wrapCertificate{
+				Certificate: &entityv2.Certificate{
+					UUID:            id,
+					Name:            id,
+					InUse:           false,
+					CertificateType: "TLS/SSL",
 				},
 			})
 		}
@@ -1273,19 +1288,60 @@ func (m *MockProvider) GetPoolHealthMonitorById(ctx context.Context, lbID, poolI
 
 // // --------------------------- Certificate ---------------------------
 
-// func (m *MockProvider) ImportCertificate(ctx context.Context, opt *certificates.ImportOpts) (*objects.Certificate, error) {
-// 	logger.Error("not implemented yet", "ImportCertificate")
-// 	return nil, ErrorNotImplemented
-// }
-// func (m *MockProvider) ListCertificates(ctx context.Context, ) ([]*objects.Certificate, error) {
-// 	logger.Error("not implemented yet", "ListCertificates")
-// 	return nil, ErrorNotImplemented
-// }
-// func (m *MockProvider) GetCertificateByID(ctx context.Context, certID string) (*objects.Certificate, error) {
-// 	logger.Error("not implemented yet", "GetCertificateByID")
-// 	return nil, ErrorNotImplemented
-// }
-// func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) error {
-// 	logger.Error("not implemented yet", "DeleteCertificate")
-// 	return ErrorNotImplemented
-// }
+func (m *MockProvider) ListCertificates(ctx context.Context) (*entityv2.ListCertificates, error) {
+	certs := make([]entityv2.Certificate, 0)
+	for _, c := range m.certs {
+		certs = append(certs, clone.Clone(*c.Certificate).(entityv2.Certificate))
+	}
+	return &entityv2.ListCertificates{
+		Certificates: certs,
+	}, nil
+}
+
+func (m *MockProvider) GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error) {
+	for _, c := range m.certs {
+		if c.Certificate.UUID == certID {
+			return clone.Clone(*c.Certificate).(*entityv2.Certificate), nil
+		}
+	}
+	return nil, ErrorNotFound
+}
+
+func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request import certificate", icon)
+	cert := opt.ToRequestBody().(*loadbalancerv2.CreateCertificateRequest)
+	newCert := &wrapCertificate{
+		Certificate: &entityv2.Certificate{
+			UUID:            "cert-" + randID(),
+			Name:            cert.Name,
+			CertificateType: string(cert.Type),
+			InUse:           false,
+		},
+	}
+	m.mu.Lock()
+	m.certs = append(m.certs, newCert)
+	m.mu.Unlock()
+	return &entityv2.Certificate{
+		UUID: newCert.Certificate.UUID,
+	}, nil
+}
+
+func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request delete certificate %s", icon, certID)
+	isFound := false
+	newCerts := make([]*wrapCertificate, 0)
+	for i, c := range m.certs {
+		if c.Certificate.UUID != certID {
+			newCerts = append(newCerts, m.certs[i])
+		} else {
+			isFound = true
+		}
+	}
+	if !isFound {
+		return ErrorNotFound
+	}
+	m.certs = newCerts
+	return nil
+}

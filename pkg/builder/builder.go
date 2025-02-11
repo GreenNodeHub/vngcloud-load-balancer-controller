@@ -60,6 +60,10 @@ type ModelBuilder interface {
 	GetManageAnnotation() map[string]string
 
 	// GetNodeBySelector(selector map[string]string) ([]*corev1.Node, error)
+
+	GetCertBuilders() []CertificateBuilder
+	AddCertificateID(id string)
+	GetCertificateIDs() []string
 }
 
 var _ ModelBuilder = &modelBuilder{}
@@ -78,6 +82,7 @@ type action struct {
 }
 
 type implementationSpecificConfig struct {
+	Host   string `json:"host"`
 	Path   string `json:"path"`
 	Rules  []rule `json:"rules"`
 	Action action `json:"action"`
@@ -122,6 +127,7 @@ type modelBuilder struct {
 	implementationSpecificConfigs []implementationSpecificConfig
 	headers                       headerConfig
 	clientCertificateID           string
+	certBuilders                  []*certificateBuilderType
 
 	// helper components
 	annotationParser annotations.Parser
@@ -182,6 +188,10 @@ func (l *modelBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBal
 			// if have listener, create first listener
 			if len(l.GetListenerBuilders()) > 0 {
 				listenerBuilder := l.GetListenerBuilders()[0]
+
+				// set certificate for listener
+				listenerBuilder.SetCertificateAuthority(l.GetCertificateIDs()...)
+
 				opts.WithListener(
 					listenerBuilder.GetICreateListenerRequest(),
 				)
@@ -335,8 +345,22 @@ func (l *modelBuilder) EnsureSecgroupPING_UDP() {
 	}
 }
 
-// func (l *modelBuilder)
-// func (l *modelBuilder)
+func (l *modelBuilder) GetCertBuilders() []CertificateBuilder {
+	res := make([]CertificateBuilder, 0)
+	for _, cert := range l.certBuilders {
+		res = append(res, cert)
+	}
+	return res
+}
+
+func (l *modelBuilder) AddCertificateID(id string) {
+	l.certificateIDs = append(l.certificateIDs, id)
+}
+
+func (l *modelBuilder) GetCertificateIDs() []string {
+	return l.certificateIDs
+}
+
 // func (l *modelBuilder)
 // func (l *modelBuilder)
 // func (l *modelBuilder)

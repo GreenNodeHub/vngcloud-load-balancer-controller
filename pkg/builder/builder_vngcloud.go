@@ -3,6 +3,8 @@ package builder
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -38,6 +40,8 @@ type LoadBalancerBuilder interface {
 	CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilder) bool
 
 	CanDeleteWholeListener(oldListener OldListener) bool
+
+	DeleteRedundantCertificates([]string) error
 }
 
 // depend on loadBalancerID, get loadBalancer information by using provider, then build the ModelBuilder
@@ -771,6 +775,27 @@ func (r *vngcloudLBBuilder) DeleteListener(id string) error {
 		return err
 	}
 	currentListener.SetIsDeleted(true)
+	return nil
+}
+
+// delete all cert with prefix "vks-(hash)" and not in use
+func (r *vngcloudLBBuilder) DeleteRedundantCertificates(inUseCert []string) error {
+	certs, err := r.provider.ListCertificates(r.context)
+	if err != nil {
+		r.logger.Error("Failed to list certificates: ", err)
+	}
+
+	prefix := fmt.Sprintf("%s-%s", consts.DEFAULT_LB_PREFIX_NAME, r.GenerateHash())
+	for _, cert := range certs.Certificates {
+		if strings.HasPrefix(cert.Name, prefix) &&
+			!slices.Contains(inUseCert, cert.UUID) &&
+			!cert.InUse {
+			if err := r.provider.DeleteCertificate(r.context, cert.UUID); err != nil {
+				r.logger.Error("Failed to delete certificate: ", err)
+				return err
+			}
+		}
+	}
 	return nil
 }
 

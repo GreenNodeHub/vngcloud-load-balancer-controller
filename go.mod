@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	github.com/anngdinh/operator-helper v0.0.2
-	github.com/cuongpiger/joat v1.0.14
+	github.com/cuongpiger/joat v1.0.17
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
 	github.com/huandu/go-clone v1.7.2
@@ -14,7 +14,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.2
+	github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.3
