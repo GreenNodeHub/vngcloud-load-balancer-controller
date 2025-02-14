@@ -12,6 +12,7 @@ type Config struct {
 	Cluster      struct {
 		ClusterName string `mapstructure:"clusterName"`
 		ClusterID   string `mapstructure:"clusterID"`
+		Region      string `mapstructure:"region"`
 	} `mapstructure:"cluster"`
 
 	Global   AuthOpts `mapstructure:"global"`

@@ -63,6 +63,7 @@ var (
 		Cluster: struct {
 			ClusterName string "mapstructure:\"clusterName\""
 			ClusterID   string "mapstructure:\"clusterID\""
+			Region      string "mapstructure:\"region\""
 		}{ClusterName: "test-cluster", ClusterID: "k8s-00000000-0000-0000-0000-000000000000"},
 	}
 

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/anngdinh/operator-helper/contexts"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -26,9 +27,10 @@ func NewModelBuilderByService(
 	client client.Client,
 	networkID, subnetID, subnetCIDR string,
 	clusterID string,
+	region string,
+	fleetID string,
 	nodes []*corev1.Node,
 	cnitype utils.CNIType,
-	packageID string,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -38,16 +40,15 @@ func NewModelBuilderByService(
 		basicInfoHelper: basicInfoHelper{
 			loadBalancerID:   "",
 			loadBalancerName: "",
-			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer4,
-			packageID:        packageID,
-			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
+			loadBalancerType: global.GlobalLoadBalancerTypeLayer4,
 			tags:             map[string]string{},
 		},
 		nameHelper: nameHelper{
-			resourceType:      "service",
+			resourceType:      "vglb",
 			resourceName:      "",
 			resourceNamespace: "",
 			clusterID:         clusterID,
+			fleetID:           fleetID,
 		},
 
 		secGroupRuleBuilders: make([]*secGroupRuleBuilderType, 0),
@@ -61,20 +62,22 @@ func NewModelBuilderByService(
 		networkID:  networkID,
 		subnetID:   subnetID,
 		subnetCIDR: subnetCIDR,
+		region:     region,
 
 		isIgnored: false,
 
+		configClusterID:            "",
 		idleTimeoutClient:          50,
 		idleTimeoutMember:          50,
 		idleTimeoutConnection:      5,
 		inboundCIDRs:               []string{"0.0.0.0/0"},
-		healthcheckProtocol:        loadbalancerv2.HealthCheckProtocolTCP,
-		healthcheckHttpMethod:      loadbalancerv2.HealthCheckMethodGET,
+		healthcheckProtocol:        global.GlobalPoolHealthCheckProtocolTCP,
+		healthcheckHttpMethod:      global.GlobalPoolHealthCheckMethodGET,
 		healthcheckPath:            "/",
 		successCodes:               "200",
-		healthcheckHttpVersion:     loadbalancerv2.HealthCheckHttpVersionHttp1,
+		healthcheckHttpVersion:     global.GlobalPoolHealthCheckHttpVersionHttp1,
 		healthcheckHttpDomainName:  "",
-		poolAlgorithm:              loadbalancerv2.PoolAlgorithmRoundRobin,
+		poolAlgorithm:              global.GlobalPoolAlgorithmRoundRobin,
 		healthyThresholdCount:      3,
 		unhealthyThresholdCount:    3,
 		healthcheckTimeoutSeconds:  5,
@@ -87,13 +90,10 @@ func NewModelBuilderByService(
 		targetType:                 TargetTypeInstance,
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
-		certificateIDs:             []string{},
 
-		isAutoCreateSecurityGroup:     true,
-		isPOC:                         false,
-		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
-		headers:                       headerConfig{},
-		clientCertificateID:           "",
+		isAutoCreateSecurityGroup: true,
+		isPOC:                     false,
+		headers:                   headerConfig{},
 	}
 	if service == nil {
 		return model, nil
@@ -169,7 +169,7 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 		}
 
 		// build pool members
-		poolMembers := make([]*loadbalancerv2.Member, 0)
+		poolMembers := make([]global.IGlobalMemberRequest, 0)
 		for _, member := range membersAddr {
 			// L4 support TCP (TCP, HTTP, HTTPS), UDP (PING-UDP), PROXY (TCP, HTTP, HTTPS)
 			l.addDefaultSecgroupRules(member.Port, l.coreProtocolToSecgroupProtocol(port.Protocol))
@@ -179,18 +179,32 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 				monitorPort = l.healthcheckPort
 			}
 
-			poolMembers = append(poolMembers, &loadbalancerv2.Member{
-				IpAddress:   member.IP,
+			poolMembers = append(poolMembers, &global.GlobalMemberRequest{
+				// IpAddress:   member.IP,
+				// Backup:      false,
+				Address:     member.IP,
+				BackupRole:  false,
+				Description: member.Name,
+				SubnetID:    l.subnetID,
 				Port:        member.Port,
-				Backup:      false,
 				Weight:      1,
 				MonitorPort: monitorPort,
-				Name:        member.Name,
+				Name:        l.clusterID,
 			})
 		}
 
 		poolBuilder := l.createPoolBuilder(port, poolName)
-		poolBuilder.Members = poolMembers
+		poolBuilder.GlobalPoolMembers = []*global.GlobalPoolMemberRequest{
+			{
+				Name:        fmt.Sprintf("%s-%s", l.region, l.networkID),
+				Description: "",
+				Region:      l.region,
+				TrafficDial: 100,
+				VPCID:       l.networkID,
+				Members:     poolMembers,
+				Type:        global.GlobalPoolMemberTypePrivate,
+			},
+		}
 
 		listenerBuilder := l.createListenerBuilder(port, listenerName)
 		listenerBuilder.ReferPoolName = poolName
@@ -206,27 +220,23 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 // createListenerBuilder creates the listener options.
 func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name string) *ListenerBuilderType {
 	opt := &ListenerBuilderType{
-		IsL4: true,
 		commonBuilder: commonBuilder{
 			name: name,
 		},
 		isDeleted:      false,
 		policyBuilders: []*policyBuilderType{},
 		ReferPoolName:  "", // will be set later
-		CreateListenerRequest: loadbalancerv2.CreateListenerRequest{
-			DefaultPoolId: PointerOf(""), // will be set later
-
-			ListenerName:                name,
-			ListenerProtocol:            l.parseListenerProtocol(pPort),
-			ListenerProtocolPort:        int(pPort.Port),
-			CertificateAuthorities:      nil,
-			ClientCertificate:           nil,
-			DefaultCertificateAuthority: nil,
-			TimeoutClient:               l.idleTimeoutClient,
-			TimeoutMember:               l.idleTimeoutMember,
-			TimeoutConnection:           l.idleTimeoutConnection,
-			AllowedCidrs:                StringListToString(l.inboundCIDRs),
-			Headers:                     nil,
+		CreateGlobalListenerRequest: global.CreateGlobalListenerRequest{
+			Description:       "",
+			Name:              name,
+			Port:              int(pPort.Port),
+			Protocol:          global.GlobalListenerProtocolTCP,
+			GlobalPoolId:      "",
+			TimeoutClient:     l.idleTimeoutClient,
+			TimeoutMember:     l.idleTimeoutMember,
+			TimeoutConnection: l.idleTimeoutConnection,
+			AllowedCidrs:      StringListToString(l.inboundCIDRs),
+			Headers:           nil,
 		},
 	}
 	return opt
@@ -234,44 +244,50 @@ func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name stri
 
 // createPoolBuilder creates the pool options.
 func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) *poolBuilderType {
-	healthMonitor := loadbalancerv2.HealthMonitor{
+	healthMonitor := global.GlobalHealthMonitorRequest{
 		HealthyThreshold:    l.healthyThresholdCount,
 		UnhealthyThreshold:  l.unhealthyThresholdCount,
 		Interval:            l.healthcheckIntervalSeconds,
 		Timeout:             l.healthcheckTimeoutSeconds,
 		HealthCheckProtocol: l.parseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
+		HttpMethod:          nil,
+		HttpVersion:         nil,
+		Path:                nil,
+		DomainName:          nil,
+		SuccessCode:         nil,
 	}
-	if l.healthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP ||
-		l.healthcheckProtocol == loadbalancerv2.HealthCheckProtocolHTTPs {
-		healthMonitor = loadbalancerv2.HealthMonitor{
+	if l.healthcheckProtocol == global.GlobalPoolHealthCheckProtocolHTTP ||
+		l.healthcheckProtocol == global.GlobalPoolHealthCheckProtocolHTTPs {
+		healthMonitor = global.GlobalHealthMonitorRequest{
 			HealthyThreshold:    l.healthyThresholdCount,
 			UnhealthyThreshold:  l.unhealthyThresholdCount,
 			Interval:            l.healthcheckIntervalSeconds,
 			Timeout:             l.healthcheckTimeoutSeconds,
 			HealthCheckProtocol: l.parseHealthCheckProtocol(pPort.Protocol, string(l.healthcheckProtocol)),
-			HealthCheckMethod:   PointerOf(l.healthcheckHttpMethod),
-			HealthCheckPath:     PointerOf(l.healthcheckPath),
+			HttpMethod:          PointerOf(l.healthcheckHttpMethod),
+			Path:                PointerOf(l.healthcheckPath),
 			SuccessCode:         PointerOf(l.successCodes),
 			HttpVersion:         PointerOf(l.healthcheckHttpVersion),
 			DomainName:          PointerOf(l.healthcheckHttpDomainName),
 		}
 	}
 	opt := &poolBuilderType{
-		IsL4: true,
 		commonBuilder: commonBuilder{
 			name: name,
 		},
-		isDeleted:     false,
-		PoolProtocol:  l.parsePoolProtocol(l.mappingProtocol(pPort)),
-		Stickiness:    false,
-		TLSEncryption: false,
-		HealthMonitor: &healthMonitor,
-		Algorithm:     l.poolAlgorithm,
-		Members:       nil, // will be set later
+		Algorithm:         global.GlobalPoolAlgorithmRoundRobin,
+		isDeleted:         false,
+		Description:       "",
+		Name:              name,
+		Protocol:          global.GlobalPoolProtocolTCP,
+		Stickiness:        nil,
+		TLSEncryption:     nil,
+		HealthMonitor:     &healthMonitor,
+		GlobalPoolMembers: nil, // will be set later
 	}
 	for _, name := range l.enableProxyProtocol {
 		if (name == "*" || name == pPort.Name) && pPort.Protocol == corev1.ProtocolTCP {
-			opt.PoolProtocol = loadbalancerv2.PoolProtocolProxy
+			opt.Protocol = global.GlobalPoolProtocolProxy
 			break
 		}
 	}
@@ -283,7 +299,7 @@ func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
+		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 9),
 		TrimString(l.resourceName, 9),
 		hash,
@@ -299,7 +315,7 @@ func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
 		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
+		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 9),
 		TrimString(l.resourceName, 9),
 		hash,
@@ -312,7 +328,7 @@ func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 func (l *modelBuilder) mappingProtocol(pPort corev1.ServicePort) string {
 	for _, name := range l.enableProxyProtocol {
 		if (name == "*" || name == pPort.Name) && pPort.Protocol == corev1.ProtocolTCP {
-			return string(loadbalancerv2.PoolProtocolProxy)
+			return string(global.GlobalPoolProtocolProxy)
 		}
 	}
 	return string(pPort.Protocol)
@@ -330,22 +346,22 @@ func (l *modelBuilder) parseListenerProtocol(pPort corev1.ServicePort) loadbalan
 }
 
 // ParseMonitorProtocol parse monitor protocol to health check protocol
-func (l *modelBuilder) parseHealthCheckProtocol(pPoolProtocol corev1.Protocol, pMonitorProtocol string) loadbalancerv2.HealthCheckProtocol {
-	switch pPoolProtocol {
-	case corev1.ProtocolUDP:
-		return loadbalancerv2.HealthCheckProtocolPINGUDP
-	}
+func (l *modelBuilder) parseHealthCheckProtocol(pPoolProtocol corev1.Protocol, pMonitorProtocol string) global.GlobalPoolHealthCheckProtocol {
+	// switch pPoolProtocol {
+	// case corev1.ProtocolUDP:
+	// 	return global.GlobalPoolHealthCheckProtocolPINGUDP
+	// }
 
 	switch strings.TrimSpace(strings.ToUpper(pMonitorProtocol)) {
-	case string(loadbalancerv2.HealthCheckProtocolHTTP):
-		return loadbalancerv2.HealthCheckProtocolHTTP
-	case string(loadbalancerv2.HealthCheckProtocolHTTPs):
-		return loadbalancerv2.HealthCheckProtocolHTTPs
-	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
-		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	case string(global.GlobalPoolHealthCheckProtocolHTTP):
+		return global.GlobalPoolHealthCheckProtocolHTTP
+	case string(global.GlobalPoolHealthCheckProtocolHTTPs):
+		return global.GlobalPoolHealthCheckProtocolHTTPs
+		// case string(global.GlobalPoolHealthCheckProtocolPINGUDP):
+		// 	return global.GlobalPoolHealthCheckProtocolPINGUDP
 	}
 
-	return loadbalancerv2.HealthCheckProtocolTCP
+	return global.GlobalPoolHealthCheckProtocolTCP
 }
 
 // ParsePoolProtocol parse string to pool protocol

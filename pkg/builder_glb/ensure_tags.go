@@ -27,9 +27,9 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 
 	// ensure have cluster ids tag
 	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
-	if !strings.Contains(vksClusterTags, r.clusterID) {
+	if !strings.Contains(vksClusterTags, r.fleetID) {
 		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
-		vksClusterTags = r.joinVKSTag(vksClusterTags, r.clusterID)
+		vksClusterTags = r.joinVKSTag(vksClusterTags, r.fleetID)
 		newTags[consts.VKS_TAG_KEY] = vksClusterTags
 	}
 
@@ -157,9 +157,9 @@ func (r *vngcloudLBBuilder) EnsureDeleteTags(oldBuilder OldModelBuilder) error {
 
 	// ensure have cluster ids tag
 	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
-	if strings.Contains(vksClusterTags, r.clusterID) {
+	if strings.Contains(vksClusterTags, r.fleetID) {
 		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
-		vksClusterTags = r.removeVKSTag(vksClusterTags, r.clusterID)
+		vksClusterTags = r.removeVKSTag(vksClusterTags, r.fleetID)
 		if vksClusterTags == "" {
 			// remove tag
 			oldTags[consts.VKS_TAG_KEY] = currentTags[consts.VKS_TAG_KEY]

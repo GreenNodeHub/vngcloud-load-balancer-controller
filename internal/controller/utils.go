@@ -10,6 +10,7 @@ import (
 const (
 	successIcon = "✅"
 	errorIcon   = "❌"
+	actionIcon  = "🌐"
 )
 
 func genKey(namespace, name string) string {

@@ -19,23 +19,38 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/event_classification"
 	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/huandu/go-clone"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	k8sBuilder "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	builder "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder_glb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // VngcloudGlobalLoadBalancerReconciler reconciles a VngcloudGlobalLoadBalancer object
@@ -48,12 +63,124 @@ type VngcloudGlobalLoadBalancerReconciler struct {
 
 	eventClassification *event_classification.EventClassification
 	Provider            provider.Provider
-	// annotationParser    annotations.Parser
+	annotationParser    annotations.Parser
+	resourceDependant   ResourceDependant[*v1alpha1.VngcloudGlobalLoadBalancer]
+
+	netwotkID  string
+	subnetID   string
+	subnetCIDR string
+
+	knownNodes []*corev1.Node
+	cniMode    utils.CNIType
+
+	//  flag to check if the reconciler is initialized
+	initialized bool
+	initLock    sync.Mutex
+
+	numCurrentReconcile int
+	numCurrentLock      sync.Mutex
 }
 
 func (r *VngcloudGlobalLoadBalancerReconciler) init() error {
 	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
+	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+	r.resourceDependant = NewVGLBDependant(r.Client)
 	return nil
+}
+
+// this function is called by the InitRunnable after cache is started, run after init() function
+func (r *VngcloudGlobalLoadBalancerReconciler) Init(client client.Client) error {
+	r.initLock.Lock()
+	defer r.initLock.Unlock()
+	// should have at least 1 node to get network information (networkID, subnetID, subnetCIDR)
+	var err error
+	r.knownNodes, err = r.getNodes(client)
+	if err != nil {
+		return err
+	}
+	providerIDs := builder.GetListProviderID(r.knownNodes)
+	if len(r.knownNodes) == 0 || len(providerIDs) == 0 {
+		return errors.New("require at least 1 node to get network information")
+	}
+
+	// init provider
+	err = r.Provider.Init(providerIDs)
+	if err != nil {
+		logrus.Error("Failed to init provider: ", err)
+		return err
+	}
+	r.netwotkID = r.Provider.GetNetworkID()
+	r.subnetID = r.Provider.GetSubnetID()
+	r.subnetCIDR = r.Provider.GetSubnetCIDR()
+	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
+		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
+	}
+
+	// if clusterID is empty, get from node label
+	if r.Config.Cluster.ClusterID == "" {
+		clusterID := ""
+		for _, node := range r.knownNodes {
+			if node.Labels != nil && node.Labels["vks.vngcloud.vn/cluster-id"] != "" {
+				clusterID = node.Labels["vks.vngcloud.vn/cluster-id"]
+				break
+			}
+		}
+		if clusterID == "" {
+			return errors.New("no clusterID found, should exist in node label or specify in config")
+		}
+		r.Config.Cluster.ClusterID = clusterID
+		logrus.Infof("ClusterID is empty, get from node label: %s.", r.Config.Cluster.ClusterID)
+	}
+
+	// if region is empty, get from node label
+	if r.Config.Cluster.Region == "" {
+		region := ""
+		for _, node := range r.knownNodes {
+			if node.Labels != nil && node.Labels["vks.vngcloud.vn/mgmt-zone"] != "" {
+				region = node.Labels["vks.vngcloud.vn/mgmt-zone"]
+				break
+			}
+		}
+		if region == "" {
+			return errors.New("no region found, should exist in node label or specify in config")
+		}
+		if strings.HasPrefix(region, "han") {
+			region = "han"
+		} else {
+			region = "hcm"
+		}
+		r.Config.Cluster.Region = region
+		logrus.Infof("Region is empty, get from node label: %s.", r.Config.Cluster.Region)
+	}
+
+	// init cni mode
+	r.cniMode, err = utils.NewDetector(client).DetectCNIType()
+	if err != nil {
+		logrus.Error("Failed to detect CNI type: ", err)
+		return err
+	}
+	logrus.Infof("Detected CNI type: %s", r.cniMode)
+
+	// r.UpdateTracker.Start(context.Background(), r.Config.Cluster.ClusterID)
+
+	r.initialized = true
+	return nil
+}
+
+func (r *VngcloudGlobalLoadBalancerReconciler) getNodes(client client.Client) ([]*corev1.Node, error) {
+	nodes := &corev1.NodeList{}
+	err := client.List(context.Background(), nodes)
+	if err != nil {
+		return nil, err
+	}
+	// filter nodes with annotation
+	filteredNodes := make([]*corev1.Node, 0)
+	for i := range nodes.Items {
+		if nodes.Items[i].Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != "true" {
+			filteredNodes = append(filteredNodes, &nodes.Items[i])
+		}
+	}
+	return filteredNodes, nil
 }
 
 func (r *VngcloudGlobalLoadBalancerReconciler) isValid(obj client.Object) bool {
@@ -85,6 +212,20 @@ func (r *VngcloudGlobalLoadBalancerReconciler) getObjectByKey(key string) (clien
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *VngcloudGlobalLoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if !r.initialized {
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// add one more reconcile to the counter
+	r.numCurrentLock.Lock()
+	r.numCurrentReconcile++
+	r.numCurrentLock.Unlock()
+	defer func() {
+		r.numCurrentLock.Lock()
+		r.numCurrentReconcile--
+		r.numCurrentLock.Unlock()
+	}()
+
 	ctx = contexts.NewContext(ctx).SetLogName(fmt.Sprint("glb/" + genKey(req.Namespace, req.Name))).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	logger.Info("------------------ START ------------------")
@@ -157,7 +298,239 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 		return err
 	}
 
-	logger.Info("Ensuring object...")
+	// check if service with the same name exists and is valid
+	svcObj := &corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: obj.Name, Namespace: obj.Namespace}, svcObj)
+	if err != nil {
+		logger.Errorf("Failed to get service %s/%s: %v", obj.Namespace, obj.Name, err)
+		return err
+	}
+	if svcObj.Spec.Type != corev1.ServiceTypeLoadBalancer && svcObj.Spec.Type != corev1.ServiceTypeNodePort {
+		logger.Warnf("Service %s/%s is not LoadBalancer or NodePort type, return.", obj.Namespace, obj.Name)
+		return nil
+	}
+
+	// check if obj have config cluster annotation
+	if obj.Annotations == nil || obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] == "" {
+		logger.Warnf("Annotation `%s` is empty, return.", v1alpha1.ConfigClusterIdAnnotation)
+		return nil
+	}
+
+	// get fleet id from label
+	fleetID := obj.Labels[v1alpha1.FleetIDLabel]
+	if fleetID == "" {
+		logger.Errorf("Label `%s` is empty, return.", v1alpha1.FleetIDLabel)
+		return nil
+	}
+
+	// set service annotation to glb object
+	svcObj.Annotations = obj.Annotations
+	loadBalancerBuilder, err := builder.NewModelBuilderByService(ctx, svcObj, r.annotationParser, r.Client,
+		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.Config.Cluster.ClusterID,
+		r.Config.Cluster.Region,
+		fleetID,
+		r.knownNodes,
+		r.cniMode,
+	)
+	if err != nil {
+		logger.Error("Failed to create loadbalancer builder: ", err)
+		return err
+	}
+
+	// ignore reconcile
+	if loadBalancerBuilder.IsIgnored() {
+		logger.Info("Object is ignored")
+		return nil
+	}
+
+	// create loadbalancer, update annotation and reconcile later
+	if loadBalancerBuilder.GetLoadBalancerID() == "" {
+		// ignore if this cluster isn't config cluster
+		if loadBalancerBuilder.GetConfigClusterID() != r.Config.Cluster.ClusterID {
+			logger.Infof("Wait config cluster create loadbalancer.")
+			return nil
+		}
+
+		// check if loadbalancer with the generate name exists, if exists, update annotation and return
+		// check the name that user specified in the annotation first
+		lbName := loadBalancerBuilder.GetLoadBalancerName()
+		if lbName == "" {
+			lbName = loadBalancerBuilder.GetLoadBalancerDefaultName()
+		}
+		lb, err := r.Provider.GetGlobalLoadBalancerByName(ctx, lbName)
+		if err != nil {
+			return err
+		}
+		if lb == nil {
+			// create loadbalancer. It `must` create lb, listener, pool at the same time
+			lb, err = r.Provider.CreateGlobalLoadBalancer(ctx, loadBalancerBuilder.CreateLoadBalancerOptions())
+			if err != nil {
+				return err
+			}
+		}
+		if lb == nil || lb.ID == "" {
+			return errors.New("load balancer not have ID after find by name or create, need to retry")
+		}
+
+		// wait for loadbalancer active, if lb is error, delete it and return error
+		if _, err := r.Provider.WaitGlobalLoadBalancerActive(ctx, lb.ID); err != nil {
+			if err == provider.ErrorLoadBalancerStatusError {
+				if err := r.Provider.DeleteGlobalLoadBalancer(ctx, lb.ID); err != nil {
+					logger.Error("Failed to delete loadbalancer: ", err)
+					return err
+				}
+				logger.Infof("Delete loadbalancer \"%s\" because of status error, recreate now.", lb.ID)
+				return errs.NewRequeueNeeded("loadbalancer status is error, delete and recreate")
+			}
+			logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
+		}
+
+		// update object annotation, also trigger reconcile immediately
+		updateObjectAnnotation(ctx, r.Client, obj, map[string]string{
+			fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.ID,
+		})
+		return nil
+	} else {
+		if _, err := r.Provider.WaitGlobalLoadBalancerActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
+			logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
+		}
+	}
+
+	// inspect current loadbalancer in portal to compare with the new one
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetLoadBalancerID(),
+		r.Provider, r.annotationParser,
+		r.Config.Cluster.ClusterID,
+		fleetID,
+		r.knownNodes, obj)
+	if err != nil {
+		logger.Error("Failed to get current loadbalancer: ", err)
+		return err
+	}
+
+	// // get old object annotations
+	// oldAnnotations := make(map[string]string)
+	// if oldObj, ok := oldObjInterface.(*corev1.Service); ok {
+	// 	oldAnnotations = oldObj.Annotations
+	// }
+
+	// build oldBuilder
+	var oldBuilder builder.OldModelBuilder
+	oldBuilder = nil
+	// oldBuilder = builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
+	// if oldBuilder.GetLoadBalancerID() != loadBalancerBuilder.GetLoadBalancerID() && oldBuilder.GetLoadBalancerID() != "" {
+	// 	oldBuilder = builder.NewOldModelBuilder(obj.Annotations, obj.Annotations, r.annotationParser)
+
+	// 	// clean up old loadbalancer if exists
+	// 	go func() {
+	// 		oldObj, ok := oldObjInterface.(*corev1.Service)
+	// 		if !ok {
+	// 			return
+	// 		}
+	// 		err := r.subDeleteObject(ctx, oldObj, true, false, false)
+	// 		if err != nil {
+	// 			logger.Error("Failed to delete old loadbalancer: ", err)
+	// 			return
+	// 		}
+	// 		logger.Infof("Successfully ensure delete tags for old loadbalancer %s.", oldBuilder.GetLoadBalancerID())
+	// 	}()
+	// }
+
+	// // ensure tags
+	// err = r.ensureTags(loadBalancerBuilder, currentBuilder, oldBuilder)
+	// if err != nil {
+	// 	logger.Error("Failed to ensure tags: ", err)
+	// 	return err
+	// }
+
+	// // ensure package
+	// if currentBuilder.GetPackageID() != loadBalancerBuilder.GetPackageID() &&
+	// 	currentBuilder.GetPackageID() != "" &&
+	// 	loadBalancerBuilder.GetPackageID() != "" {
+	// 	logger.Infof("Need resize loadbalancer from package %s -> %s", currentBuilder.GetPackageID(), loadBalancerBuilder.GetPackageID())
+	// 	if err := r.Provider.ResizeLoadBalancer(ctx, loadBalancerBuilder.GetLoadBalancerID(), loadBalancerBuilder.GetPackageID()); err != nil {
+	// 		logger.Error("Failed to resize loadbalancer: ", err)
+	// 		return err
+	// 	}
+	// 	if _, err := r.Provider.WaitForLBActive(ctx, loadBalancerBuilder.GetLoadBalancerID()); err != nil {
+	// 		logger.Error("Failed to wait for loadbalancer active: ", err)
+	// 		return err
+	// 	}
+	// }
+
+	// ensure pools
+	for _, poolBuilder := range loadBalancerBuilder.GetPoolBuilders() {
+		err := currentBuilder.EnsurePool(poolBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure pool: ", err)
+			return err
+		}
+	}
+
+	// ensure listeners
+	for _, listenerBuilder := range loadBalancerBuilder.GetListenerBuilders() {
+		// set default pool id created above
+		referPool := loadBalancerBuilder.GetPoolBuilderByName(listenerBuilder.GetPoolName())
+		if referPool == nil {
+			logger.Error("Failed to get refer pool: ", listenerBuilder.GetPoolName())
+			return nil
+		}
+		listenerBuilder.SetPoolID(referPool.GetID())
+
+		err := currentBuilder.EnsureListener(listenerBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure listener: ", err)
+			return err
+		}
+	}
+
+	// // delete redundant listeners
+	// err = currentBuilder.DeleteRedundantListeners(oldBuilder, loadBalancerBuilder)
+	// if err != nil {
+	// 	logger.Error("Failed to delete redundant listener: ", err)
+	// 	return err
+	// }
+
+	// // delete redundant pools, should check if pool is used by other listeners then ignore
+	// err = currentBuilder.DeleteRedundantPools(oldBuilder, loadBalancerBuilder)
+	// if err != nil {
+	// 	logger.Error("Failed to delete redundant pool: ", err)
+	// 	return err
+	// }
+
+	// // update management annotations
+	// if err := r.updateObjectAnnotation(ctx, obj, loadBalancerBuilder.GetManageAnnotation()); err != nil {
+	// 	logger.Error("Failed to update management annotations: ", err)
+	// 	return err
+	// }
+
+	// watch endpoint if target type is ip or cni mode is cilium native routing
+	r.resourceDependant.Set(obj, loadBalancerBuilder.GetTargetType() == builder.TargetTypeIP ||
+		r.cniMode == utils.CiliumNativeRouting)
+
+	// // get lb updated time and add to update tracker
+	// lb, err := r.Provider.GetLoadBalancerByID(ctx, loadBalancerBuilder.GetLoadBalancerID())
+	// if err != nil {
+	// 	logger.Error("Failed to get loadbalancer: ", err)
+	// 	return err
+	// }
+	// r.UpdateTracker.AddService(loadBalancerBuilder.GetLoadBalancerID(), lb.UpdatedAt, obj)
+
+	// // update status
+	// err = r.updateObjectStatus(ctx, obj, lb.Address)
+	// if err != nil {
+	// 	logger.Error("Failed to update status: ", err)
+	// 	return err
+	// }
+
+	// // ensure security group with mutex
+	// err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
+	// if err != nil {
+	// 	logger.Error("Failed to ensure security group: ", err)
+	// 	return err
+	// }
 
 	return nil
 }
@@ -184,9 +557,31 @@ func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context,
 func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	logger.Info("Deleting object...")
+	// check if obj have config cluster annotation
+	if obj.Annotations == nil || obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] == "" {
+		logger.Warnf("Annotation `%s` is empty, return.", v1alpha1.ConfigClusterIdAnnotation)
+		return nil
+	}
 
-	return nil
+	if obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] != r.Config.Cluster.ClusterID {
+		return nil
+	}
+
+	if obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIgnore)] == "true" {
+		logger.Info("Object is ignored, return.")
+		return nil
+	}
+
+	// get glb id
+	glbID := obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+	if glbID == "" {
+		logger.Warn("LoadBalancerID is empty, return.")
+		return nil
+	}
+
+	// delete loadbalancer
+	return errs.IgnoreErrors(r.Provider.DeleteGlobalLoadBalancer(ctx, glbID),
+		errs.IsGlobalLoadBalancerNotFound)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -196,8 +591,162 @@ func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager
 		return err
 	}
 
+	// Add the initialization logic after cache is started
+	if err := mgr.Add(&InitRunnable{
+		Client:     mgr.GetClient(),
+		Reconciler: r, // Pass the reconciler to store nodes
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&v1alpha1.VngcloudGlobalLoadBalancer{}).
+		Watches(
+			&corev1.Endpoints{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, endpoint client.Object) []reconcile.Request {
+				return r.resourceDependant.GetResourceNeedReconcile("endpoint", endpoint.GetNamespace(), endpoint.GetName())
+			}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&corev1.Service{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, service client.Object) []reconcile.Request {
+				return r.resourceDependant.GetResourceNeedReconcile("service", service.GetNamespace(), service.GetName())
+			}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Watches(
+			&corev1.Node{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+				// list all
+				objList := &v1alpha1.VngcloudGlobalLoadBalancerList{}
+				err := r.List(ctx, objList)
+				if err != nil {
+					return []reconcile.Request{}
+				}
+
+				// filter
+				requests := make([]reconcile.Request, 0)
+				for _, obj := range objList.Items {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      obj.GetName(),
+							Namespace: obj.GetNamespace(),
+						},
+					})
+				}
+				return requests
+			}),
+			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 5, // ..................
+		}).
+		WithEventFilter(predicate.Funcs{
+			CreateFunc: func(e event.CreateEvent) bool {
+				switch e.Object.(type) {
+				case *v1alpha1.VngcloudGlobalLoadBalancer:
+					logrus.Info("Detect create VGLB event.")
+					return true
+				case *corev1.Service:
+					return false
+				case *corev1.Endpoints:
+					return false
+				case *corev1.Node:
+					newNodes, err := r.getNodes(r.Client)
+					if err != nil {
+						logrus.Warn("Detect create Node event but failed to get nodes: ", err)
+						return true
+					}
+					if !k8s.NodeSlicesEqual(r.knownNodes, newNodes) {
+						logrus.Info("Detect create Node event, update knownNodes.")
+						r.knownNodes = newNodes
+						return true
+					}
+					return false
+				default:
+					logrus.Warn("Detect create object is of an unknown type: ", e.Object)
+					return false
+				}
+			},
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				switch e.ObjectNew.(type) {
+				case *v1alpha1.VngcloudGlobalLoadBalancer:
+					oldObj := e.ObjectOld.(*v1alpha1.VngcloudGlobalLoadBalancer)
+					newObj := e.ObjectNew.(*v1alpha1.VngcloudGlobalLoadBalancer)
+
+					if !reflect.DeepEqual(oldObj.Spec, newObj.Spec) {
+						logrus.Info("Detect update VGLB Spec event.")
+						return true
+					}
+
+					oldAnnotations := clone.Clone(oldObj.Annotations).(map[string]string)
+					newAnnotations := clone.Clone(newObj.Annotations).(map[string]string)
+
+					// remove whitelisted annotations in the comparison
+					for k := range consts.WhitelistedAnnotations {
+						delete(oldAnnotations, k)
+						delete(newAnnotations, k)
+					}
+					if !reflect.DeepEqual(oldAnnotations, newAnnotations) {
+						logrus.Info("Detect update VGLB Annotations event.")
+						debugCompareMapString(oldAnnotations, newAnnotations)
+						return true
+					}
+					if !reflect.DeepEqual(oldObj.DeletionTimestamp.IsZero(), newObj.DeletionTimestamp.IsZero()) {
+						logrus.Info("Detect update VGLB DeletionTimestamp event.")
+						return true
+					}
+					return false
+
+				case *corev1.Service:
+					logrus.Info("Detect update Service event.")
+					return true
+
+				case *corev1.Endpoints:
+					logrus.Info("Detect update Endpoints event.")
+					return true
+				case *corev1.Node:
+					logrus.Info("Detect update Node event.")
+					r.knownNodes, _ = r.getNodes(r.Client)
+					return true
+				default:
+					logrus.Warn("Detect update object is of an unknown type: ", e.ObjectNew)
+					return false
+				}
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				switch e.Object.(type) {
+				// We attach a finalizer during reconcile, and handle the user triggered delete action during the update event.
+				// In case of delete, there will first be an update event with nonzero deletionTimestamp set on the object. Since
+				// deletion is already taken care of during update event, we will ignore this event.
+				case *v1alpha1.VngcloudGlobalLoadBalancer:
+					logrus.Info("Detect delete VGLB event.")
+					return true
+				case *corev1.Service:
+					logrus.Info("Detect delete Service event.")
+					return true
+				case *corev1.Endpoints:
+					logrus.Info("Detect delete Endpoints event.")
+					return true
+				case *corev1.Node:
+					newNodes, err := r.getNodes(r.Client)
+					if err != nil {
+						logrus.Warn("Detect delete Node event but failed to get nodes: ", err)
+						return true
+					}
+					if !k8s.NodeSlicesEqual(r.knownNodes, newNodes) {
+						logrus.Info("Detect delete Node event, update knownNodes.")
+						r.knownNodes = newNodes
+						return true
+					}
+					return false
+				default:
+					logrus.Warn("Detect delete object is of an unknown type: ", e.Object)
+					return false
+				}
+			},
+		}).
 		Complete(r)
 }

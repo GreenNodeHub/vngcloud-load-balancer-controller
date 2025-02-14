@@ -243,6 +243,14 @@ github.com/vngcloud/vngcloud-fleet-controller v0.0.1 h1:sIGd3ZzOgXb9FZarUs/y5gRw
 github.com/vngcloud/vngcloud-fleet-controller v0.0.1/go.mod h1:HC0Ad8nYhiRj77mY4rmahMHJYzjBYpcPKdkotUKv4yQ=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20241225081929-6831108b3b19 h1:j1B1/aG0C/1MjfzHWrGtxrA05ymy3TvA9azsguScJrY=
 github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20241225081929-6831108b3b19/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20241227034018-d7b1cb31c966 h1:f5mX8Njd8Rr23IrZyUEm0FDRyx5GfkdVlM7YF8MdBxs=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20241227034018-d7b1cb31c966/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250213095752-db06b5053465 h1:bayXNe5/dpBtaQzYgJ0biI++rQJ2uiQINCU3ZAUMGow=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250213095752-db06b5053465/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250213155812-cb5d230cceac h1:zlsdI8cwhEbNsGXZIwjK6PJqqYX6OZXQdgBennifaqc=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250213155812-cb5d230cceac/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250214093538-54498483a2f0 h1:FREE+0PE9YalYoihJtD+XNypDuskZ6GaPVFXJWyNnJI=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250214093538-54498483a2f0/go.mod h1:rI8kDZMcgxTgoaL19YbfAkqeRJuIqWFjyWt4UpsqzuI=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

@@ -53,8 +53,6 @@ func serviceBackendToIntOrString(port nwv1.ServiceBackendPort) intstr.IntOrStrin
 	return intstr.FromInt(int(port.Number))
 }
 
-
-
 func mergeStringArray(ctx context.Context, current, remove, add []string) ([]string, bool) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("  - current: %v", current)

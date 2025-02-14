@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/sirupsen/logrus"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
@@ -87,7 +87,7 @@ func (l *poolListenerHelper) GetListenerBuilderByName(name string) *ListenerBuil
 
 func (l *poolListenerHelper) GetListenerBuilderByPort(port int) *ListenerBuilderType {
 	for _, listener := range l.listenerBuilders {
-		if listener.ListenerProtocolPort == port {
+		if listener.Port == port {
 			return listener
 		}
 	}
@@ -106,7 +106,7 @@ func (l *poolListenerHelper) GetListenerBuilderByID(id string) *ListenerBuilderT
 func (l *poolListenerHelper) IsPoolInUseByOtherListener(poolID string) bool {
 	// check if the pool is used by other listener
 	for _, listener := range l.listenerBuilders {
-		if !listener.IsDeleted() && *listener.DefaultPoolId == poolID {
+		if !listener.IsDeleted() && listener.GlobalPoolId == poolID {
 			logrus.Debugf("Pool %s is used by listener %s.", poolID, listener.GetName())
 			return true
 		}
@@ -132,9 +132,8 @@ type BasicInfoHelper interface {
 	GetLoadBalancerID() string
 	// return the real name in portal or the name that user specified in the annotation
 	GetLoadBalancerName() string
-	GetPackageID() string
-	GetScheme() loadbalancerv2.LoadBalancerScheme
-	GetLoadBalancerType() loadbalancerv2.LoadBalancerType
+	// GetScheme() loadbalancerv2.LoadBalancerScheme
+	GetLoadBalancerType() global.GlobalLoadBalancerType
 	GetTags() map[string]string
 }
 
@@ -143,10 +142,9 @@ var _ BasicInfoHelper = &basicInfoHelper{}
 type basicInfoHelper struct {
 	loadBalancerID   string
 	loadBalancerName string
-	loadBalancerType loadbalancerv2.LoadBalancerType
-	packageID        string
-	scheme           loadbalancerv2.LoadBalancerScheme
-	tags             map[string]string
+	loadBalancerType global.GlobalLoadBalancerType
+	// scheme           loadbalancerv2.LoadBalancerScheme
+	tags map[string]string
 }
 
 func (l *basicInfoHelper) GetLoadBalancerID() string {
@@ -158,15 +156,11 @@ func (l *basicInfoHelper) GetLoadBalancerName() string {
 	return l.loadBalancerName
 }
 
-func (l *basicInfoHelper) GetPackageID() string {
-	return l.packageID
-}
+// func (l *basicInfoHelper) GetScheme() loadbalancerv2.LoadBalancerScheme {
+// 	return l.scheme
+// }
 
-func (l *basicInfoHelper) GetScheme() loadbalancerv2.LoadBalancerScheme {
-	return l.scheme
-}
-
-func (l *basicInfoHelper) GetLoadBalancerType() loadbalancerv2.LoadBalancerType {
+func (l *basicInfoHelper) GetLoadBalancerType() global.GlobalLoadBalancerType {
 	return l.loadBalancerType
 }
 
@@ -186,6 +180,7 @@ var _ NameHelper = &nameHelper{}
 
 type nameHelper struct {
 	// resource info
+	fleetID           string
 	clusterID         string
 	resourceType      string // service, ingress
 	resourceName      string
@@ -196,7 +191,7 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s",
 		consts.DEFAULT_LB_PREFIX_NAME,
-		TrimString(l.clusterID, 10),
+		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 10),
 		TrimString(l.resourceName, 10),
 		hash)
@@ -204,7 +199,7 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 }
 
 func (l *nameHelper) GenerateHash() string {
-	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
+	fullName := fmt.Sprintf("%s_%s_%s_%s", l.fleetID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
 	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
 }

@@ -1,7 +1,8 @@
 package builder
 
 import (
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
@@ -12,8 +13,6 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	}
 
 	l.loadBalancerName = l.parseAnnotationLoadBalancerName(annos)
-	l.packageID = l.parseAnnotationPackageID(annos)
-	l.scheme = l.parseAnnotationScheme(annos)
 	l.targetType = l.parseAnnotationTargetType(annos)
 	l.loadBalancerID = l.parseAnnotationLoadBalancerID(annos)
 	l.isIgnored = l.parseAnnotationIgnore(annos)
@@ -37,15 +36,13 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.enableProxyProtocol = l.parseAnnotationEnableProxyProtocol(annos)
 	l.enableStickySession = l.parseAnnotationEnableStickySession(annos)
 	l.enableTLSEncryption = l.parseAnnotationEnableTLSEncryption(annos)
-	l.certificateIDs = l.parseAnnotationCertificateIDs(annos)
 	l.healthcheckHttpMethod = l.parseAnnotationHealthcheckHttpMethod(annos)
 	l.healthcheckTimeoutSeconds = l.parseAnnotationHealthcheckTimeoutSeconds(annos)
 	l.healthcheckIntervalSeconds = l.parseAnnotationHealthcheckIntervalSeconds(annos)
 	l.isPOC = l.parseAnnotationIsPOC_old(annos) // isPOC2 is deprecated
 	l.isPOC = l.parseAnnotationIsPOC(annos)
-	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
 	l.headers = l.parseAnnotationHeader(annos)
-	l.clientCertificateID = l.parseAnnotationClientCertificateID(annos)
+	l.configClusterID = l.parseAnnotationConfigClusterID(annos)
 }
 
 func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
@@ -69,29 +66,6 @@ func (l *modelBuilder) parseAnnotationLoadBalancerName(annos map[string]string) 
 	option := l.GetLoadBalancerName()
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, annos)
 	return option
-}
-
-func (l *modelBuilder) parseAnnotationPackageID(annos map[string]string) string {
-	option := l.packageID
-	l.annotationParser.ParseStringAnnotation(annotations.SuffixPackageID, &option, annos)
-	return option
-}
-
-func (l *modelBuilder) parseAnnotationScheme(annos map[string]string) loadbalancerv2.LoadBalancerScheme {
-	option := ""
-	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixScheme, &option, annos)
-	switch option {
-	case "internet-facing":
-		return loadbalancerv2.InternetLoadBalancerScheme
-	case "internal":
-		return loadbalancerv2.InternalLoadBalancerScheme
-	default:
-		if exist {
-			l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
-				annotations.SuffixScheme, "internet-facing", "internal")
-		}
-	}
-	return loadbalancerv2.InternetLoadBalancerScheme
 }
 
 func (l *modelBuilder) parseAnnotationLoadBalancerID(annos map[string]string) string {
@@ -157,24 +131,23 @@ func (l *modelBuilder) parseAnnotationInboundCIDRs(annos map[string]string) []st
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationHealthcheckProtocol(annos map[string]string) loadbalancerv2.HealthCheckProtocol {
+func (l *modelBuilder) parseAnnotationHealthcheckProtocol(annos map[string]string) global.GlobalPoolHealthCheckProtocol {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckProtocol, &option, annos)
 	switch option {
 	case
-		string(loadbalancerv2.HealthCheckProtocolHTTP),
-		string(loadbalancerv2.HealthCheckProtocolHTTPs),
-		string(loadbalancerv2.HealthCheckProtocolTCP),
-		string(loadbalancerv2.HealthCheckProtocolPINGUDP):
-		return loadbalancerv2.HealthCheckProtocol(option)
+		string(global.GlobalPoolHealthCheckProtocolHTTP),
+		string(global.GlobalPoolHealthCheckProtocolHTTPs),
+		string(global.GlobalPoolHealthCheckProtocolTCP):
+		return global.GlobalPoolHealthCheckProtocol(option)
 	default:
 		if exist {
-			l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\", \"%s\" or \"%s\"",
+			l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
 				annotations.SuffixHealthcheckProtocol,
-				loadbalancerv2.HealthCheckProtocolHTTP,
-				loadbalancerv2.HealthCheckProtocolHTTPs,
-				loadbalancerv2.HealthCheckProtocolTCP,
-				loadbalancerv2.HealthCheckProtocolPINGUDP)
+				global.GlobalPoolHealthCheckProtocolHTTP,
+				global.GlobalPoolHealthCheckProtocolHTTPs,
+				global.GlobalPoolHealthCheckProtocolTCP,
+			)
 		}
 	}
 	return l.healthcheckProtocol
@@ -198,21 +171,21 @@ func (l *modelBuilder) parseAnnotationSuccessCodes(annos map[string]string) stri
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationHealthcheckHttpVersion(annos map[string]string) loadbalancerv2.HealthCheckHttpVersion {
+func (l *modelBuilder) parseAnnotationHealthcheckHttpVersion(annos map[string]string) global.GlobalPoolHealthCheckHttpVersion {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpVersion, &option, annos)
 	if !exist {
 		return l.healthcheckHttpVersion
 	}
 	switch option {
-	case string(loadbalancerv2.HealthCheckHttpVersionHttp1),
-		string(loadbalancerv2.HealthCheckHttpVersionHttp1Minor1):
-		return loadbalancerv2.HealthCheckHttpVersion(option)
+	case string(global.GlobalPoolHealthCheckHttpVersionHttp1),
+		string(global.GlobalPoolHealthCheckHttpVersionHttp1Minor1):
+		return global.GlobalPoolHealthCheckHttpVersion(option)
 	default:
 		l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpVersion,
-			loadbalancerv2.HealthCheckHttpVersionHttp1,
-			loadbalancerv2.HealthCheckHttpVersionHttp1Minor1)
+			global.GlobalPoolHealthCheckHttpVersionHttp1,
+			global.GlobalPoolHealthCheckHttpVersionHttp1Minor1)
 	}
 	return l.healthcheckHttpVersion
 }
@@ -254,23 +227,23 @@ func (l *modelBuilder) parseAnnotationUnhealthyThresholdCount(annos map[string]s
 	return int(optionsInt64)
 }
 
-func (l *modelBuilder) parseAnnotationPoolAlgorithm(annos map[string]string) loadbalancerv2.PoolAlgorithm {
+func (l *modelBuilder) parseAnnotationPoolAlgorithm(annos map[string]string) global.GlobalPoolAlgorithm {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixPoolAlgorithm, &option, annos)
 	if !exist {
 		return l.poolAlgorithm
 	}
 	switch option {
-	case string(loadbalancerv2.PoolAlgorithmLeastConn),
-		string(loadbalancerv2.PoolAlgorithmRoundRobin),
-		string(loadbalancerv2.PoolAlgorithmSourceIP):
-		return loadbalancerv2.PoolAlgorithm(option)
+	case string(global.GlobalPoolAlgorithmLeastConn),
+		string(global.GlobalPoolAlgorithmRoundRobin),
+		string(global.GlobalPoolAlgorithmSourceIP):
+		return global.GlobalPoolAlgorithm(option)
 	default:
 		l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixPoolAlgorithm,
-			loadbalancerv2.PoolAlgorithmLeastConn,
-			loadbalancerv2.PoolAlgorithmRoundRobin,
-			loadbalancerv2.PoolAlgorithmSourceIP)
+			global.GlobalPoolAlgorithmLeastConn,
+			global.GlobalPoolAlgorithmRoundRobin,
+			global.GlobalPoolAlgorithmSourceIP)
 	}
 	return l.poolAlgorithm
 }
@@ -378,16 +351,7 @@ func (l *modelBuilder) parseAnnotationEnableTLSEncryption(annos map[string]strin
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationCertificateIDs(annos map[string]string) []string {
-	option := l.certificateIDs
-	exist := l.annotationParser.ParseStringSliceAnnotation(annotations.SuffixCertificateIDs, &option, annos)
-	if !exist {
-		return l.certificateIDs
-	}
-	return option
-}
-
-func (l *modelBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]string) loadbalancerv2.HealthCheckMethod {
+func (l *modelBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]string) global.GlobalPoolHealthCheckMethod {
 	option := ""
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpMethod, &option, annos)
 	if !exist {
@@ -395,16 +359,16 @@ func (l *modelBuilder) parseAnnotationHealthcheckHttpMethod(annos map[string]str
 	}
 	switch option {
 	case
-		string(loadbalancerv2.HealthCheckMethodGET),
-		string(loadbalancerv2.HealthCheckMethodPUT),
-		string(loadbalancerv2.HealthCheckMethodPOST):
-		return loadbalancerv2.HealthCheckMethod(option)
+		string(global.GlobalPoolHealthCheckMethodGET),
+		string(global.GlobalPoolHealthCheckMethodPUT),
+		string(global.GlobalPoolHealthCheckMethodPOST):
+		return global.GlobalPoolHealthCheckMethod(option)
 	default:
 		l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpMethod,
-			loadbalancerv2.HealthCheckMethodGET,
-			loadbalancerv2.HealthCheckMethodPUT,
-			loadbalancerv2.HealthCheckMethodPOST)
+			global.GlobalPoolHealthCheckMethodGET,
+			global.GlobalPoolHealthCheckMethodPUT,
+			global.GlobalPoolHealthCheckMethodPOST)
 		return l.healthcheckHttpMethod
 	}
 }
@@ -464,20 +428,6 @@ func (l *modelBuilder) parseAnnotationIsPOC_old(annos map[string]string) bool {
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationImplementationSpecificConfigs(annos map[string]string) []implementationSpecificConfig {
-	option := make([]implementationSpecificConfig, 0)
-	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixImplementationSpecificParams, &option, annos)
-	if !exist {
-		return l.implementationSpecificConfigs
-	}
-	if err != nil {
-		l.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
-			annotations.SuffixImplementationSpecificParams, l.implementationSpecificConfigs)
-		return l.implementationSpecificConfigs
-	}
-	return option
-}
-
 func (l *modelBuilder) parseAnnotationHeader(annos map[string]string) headerConfig {
 	option := headerConfig{}
 	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixHeader, &option, annos)
@@ -492,13 +442,8 @@ func (l *modelBuilder) parseAnnotationHeader(annos map[string]string) headerConf
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationClientCertificateID(annos map[string]string) string {
-	option := ""
-	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixClientCertificateID, &option, annos)
-	if !exist {
-		return l.clientCertificateID
-	}
-	return option
+func (l *modelBuilder) parseAnnotationConfigClusterID(annos map[string]string) string {
+	return annos[v1alpha1.ConfigClusterIdAnnotation]
 }
 
 // func (l *modelBuilder) parseAnnotation
