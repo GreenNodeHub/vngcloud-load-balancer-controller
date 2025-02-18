@@ -154,7 +154,7 @@ func (l *modelBuilder) CreateLoadBalancerOptions() global.ICreateGlobalLoadBalan
 	}
 	opts := global.NewCreateGlobalLoadBalancerRequest(lbName).
 		WithGlobalListener(l.GetListenerBuilders()[0].GetICreateListenerRequest()).
-		WithGlobalPool(l.GetPoolBuilders()[0].GetICreatePoolRequest(""))
+		WithGlobalPool(l.GetPoolBuilders()[0].GetICreatePoolRequest("")).WithPackage(l.packageID)
 
 	// if have tags, add tags
 	// ............................

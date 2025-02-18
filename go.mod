@@ -15,7 +15,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vngcloud/vngcloud-fleet-controller v0.0.1
-	github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250214093538-54498483a2f0
+	github.com/vngcloud/vngcloud-go-sdk/v2 v2.10.3-0.20250218063009-8ecb96ee656f
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.3

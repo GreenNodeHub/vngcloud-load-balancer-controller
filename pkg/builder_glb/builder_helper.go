@@ -144,7 +144,8 @@ type basicInfoHelper struct {
 	loadBalancerName string
 	loadBalancerType global.GlobalLoadBalancerType
 	// scheme           loadbalancerv2.LoadBalancerScheme
-	tags map[string]string
+	tags      map[string]string
+	packageID string
 }
 
 func (l *basicInfoHelper) GetLoadBalancerID() string {

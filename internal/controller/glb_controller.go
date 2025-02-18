@@ -70,8 +70,9 @@ type VngcloudGlobalLoadBalancerReconciler struct {
 	subnetID   string
 	subnetCIDR string
 
-	knownNodes []*corev1.Node
-	cniMode    utils.CNIType
+	knownNodes       []*corev1.Node
+	cniMode          utils.CNIType
+	defaultPackageID string
 
 	//  flag to check if the reconciler is initialized
 	initialized bool
@@ -85,6 +86,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) init() error {
 	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
 	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 	r.resourceDependant = NewVGLBDependant(r.Client)
+	r.defaultPackageID = "pkg-b02e62ab-a282-4faf-8732-a172ef497a7b"
 	return nil
 }
 
@@ -332,6 +334,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 		fleetID,
 		r.knownNodes,
 		r.cniMode,
+		r.defaultPackageID,
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)

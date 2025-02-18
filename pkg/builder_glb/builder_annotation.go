@@ -13,6 +13,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	}
 
 	l.loadBalancerName = l.parseAnnotationLoadBalancerName(annos)
+	l.packageID = l.parseAnnotationPackageID(annos)
 	l.targetType = l.parseAnnotationTargetType(annos)
 	l.loadBalancerID = l.parseAnnotationLoadBalancerID(annos)
 	l.isIgnored = l.parseAnnotationIgnore(annos)
@@ -65,6 +66,12 @@ func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) Target
 func (l *modelBuilder) parseAnnotationLoadBalancerName(annos map[string]string) string {
 	option := l.GetLoadBalancerName()
 	l.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, annos)
+	return option
+}
+
+func (l *modelBuilder) parseAnnotationPackageID(annos map[string]string) string {
+	option := l.packageID
+	l.annotationParser.ParseStringAnnotation(annotations.SuffixPackageID, &option, annos)
 	return option
 }
 

@@ -31,6 +31,7 @@ func NewModelBuilderByService(
 	fleetID string,
 	nodes []*corev1.Node,
 	cnitype utils.CNIType,
+	packageID string,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
 		poolListenerHelper: poolListenerHelper{
@@ -42,6 +43,7 @@ func NewModelBuilderByService(
 			loadBalancerName: "",
 			loadBalancerType: global.GlobalLoadBalancerTypeLayer4,
 			tags:             map[string]string{},
+			packageID:        packageID,
 		},
 		nameHelper: nameHelper{
 			resourceType:      "vglb",
