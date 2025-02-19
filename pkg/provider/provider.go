@@ -32,6 +32,7 @@ type Provider interface {
 	Init(providerIDs []string) error
 	GetProjectID() string
 	GetNetworkID() string
+	GetNetworkCIDR() string
 	GetSubnetID() string
 	GetSubnetCIDR() string
 	GetDefaultPackage() (string, string, error)

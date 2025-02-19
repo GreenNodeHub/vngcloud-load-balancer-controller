@@ -261,6 +261,8 @@ func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilde
 				r.logger.Error("Fail to delete default secgroup", err)
 				return err
 			}
+		} else {
+			r.logger.Warnf("Default secgroup %s is still in use, which should not be", defaultSecgroup.Id)
 		}
 	}
 
@@ -390,7 +392,12 @@ func (m *vngcloudLBBuilder) compareSecgroupRule(current []*entityv2.SecgroupRule
 	}
 
 	// check if the rule is not in use
+	// - description is not empty and contains clusterID of other cluster, then ignore it
+	// - not exist in ruleInUse
 	for _, rule := range currentIngressRules {
+		if rule.Description != "" && rule.Description != m.clusterID {
+			continue
+		}
 		if !ruleInUse[rule.Id] {
 			needDelete = append(needDelete, rule)
 		}

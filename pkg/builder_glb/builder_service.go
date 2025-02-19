@@ -25,7 +25,7 @@ func NewModelBuilderByService(
 	service *corev1.Service,
 	annotationParser annotations.Parser,
 	client client.Client,
-	networkID, subnetID, subnetCIDR string,
+	networkID, subnetID, networkCIDR string,
 	clusterID string,
 	region string,
 	fleetID string,
@@ -63,7 +63,7 @@ func NewModelBuilderByService(
 
 		networkID:  networkID,
 		subnetID:   subnetID,
-		subnetCIDR: subnetCIDR,
+		subnetCIDR: networkCIDR,
 		region:     region,
 
 		isIgnored: false,

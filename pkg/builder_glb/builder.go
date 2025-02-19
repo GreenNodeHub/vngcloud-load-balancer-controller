@@ -232,7 +232,7 @@ func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.Secg
 			name: "",
 			id:   "",
 		},
-		Description:    "",
+		Description:    l.clusterID,
 		Direction:      networkv2.SecgroupRuleDirectionIngress,
 		EtherType:      networkv2.SecgroupRuleEtherTypeIPv4,
 		PortRangeMax:   port,

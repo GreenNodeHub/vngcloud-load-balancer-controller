@@ -24,6 +24,7 @@ import (
 const (
 	MockProjectID   = "projectID"
 	MockNetID       = "netID"
+	MockNetCIDR     = "199.0.0.0/16"
 	MockSubnetID    = "subnetID"
 	MockSubnetCIDR  = "199.0.0.0/24"
 	MockLBNameError = "error-lb" // create lb with this name will be error
@@ -76,6 +77,7 @@ type MockProvider struct {
 	// securityGroups []*objects.Secgroup
 	projectID  string
 	netID      string
+	netCIDR    string
 	subnetID   string
 	subnetCIDR string
 
@@ -99,6 +101,7 @@ func NewMockProvider() *MockProvider {
 	return &MockProvider{
 		projectID:  MockProjectID,
 		netID:      MockNetID,
+		netCIDR:    MockNetCIDR,
 		subnetID:   MockSubnetID,
 		subnetCIDR: MockSubnetCIDR,
 
@@ -163,6 +166,10 @@ func (m *MockProvider) GetProjectID() string {
 
 func (m *MockProvider) GetNetworkID() string {
 	return m.netID
+}
+
+func (m *MockProvider) GetNetworkCIDR() string {
+	return m.netCIDR
 }
 
 func (m *MockProvider) GetSubnetID() string {

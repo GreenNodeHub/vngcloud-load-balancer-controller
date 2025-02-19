@@ -66,9 +66,9 @@ type VngcloudGlobalLoadBalancerReconciler struct {
 	annotationParser    annotations.Parser
 	resourceDependant   ResourceDependant[*v1alpha1.VngcloudGlobalLoadBalancer]
 
-	netwotkID  string
-	subnetID   string
-	subnetCIDR string
+	netwotkID   string
+	subnetID    string
+	networkCIDR string
 
 	knownNodes       []*corev1.Node
 	cniMode          utils.CNIType
@@ -94,7 +94,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) init() error {
 func (r *VngcloudGlobalLoadBalancerReconciler) Init(client client.Client) error {
 	r.initLock.Lock()
 	defer r.initLock.Unlock()
-	// should have at least 1 node to get network information (networkID, subnetID, subnetCIDR)
+	// should have at least 1 node to get network information (networkID, subnetID, networkCIDR)
 	var err error
 	r.knownNodes, err = r.getNodes(client)
 	if err != nil {
@@ -113,9 +113,9 @@ func (r *VngcloudGlobalLoadBalancerReconciler) Init(client client.Client) error 
 	}
 	r.netwotkID = r.Provider.GetNetworkID()
 	r.subnetID = r.Provider.GetSubnetID()
-	r.subnetCIDR = r.Provider.GetSubnetCIDR()
-	if r.netwotkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
-		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
+	r.networkCIDR = r.Provider.GetNetworkCIDR()
+	if r.netwotkID == "" || r.subnetID == "" || r.networkCIDR == "" {
+		return errors.New("no network info, lack of networkID or subnetID or networkCIDR")
 	}
 
 	// if clusterID is empty, get from node label
@@ -328,7 +328,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	// set service annotation to glb object
 	svcObj.Annotations = obj.Annotations
 	loadBalancerBuilder, err := builder.NewModelBuilderByService(ctx, svcObj, r.annotationParser, r.Client,
-		r.netwotkID, r.subnetID, r.subnetCIDR,
+		r.netwotkID, r.subnetID, r.networkCIDR,
 		r.Config.Cluster.ClusterID,
 		r.Config.Cluster.Region,
 		fleetID,
@@ -420,9 +420,8 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	// }
 
 	// build oldBuilder
-	var oldBuilder builder.OldModelBuilder
-	oldBuilder = nil
-	// oldBuilder = builder.NewOldModelBuilder(obj.Annotations, oldAnnotations, r.annotationParser)
+	// var oldBuilder builder.OldModelBuilder
+	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, map[string]string{}, r.annotationParser)
 	// if oldBuilder.GetLoadBalancerID() != loadBalancerBuilder.GetLoadBalancerID() && oldBuilder.GetLoadBalancerID() != "" {
 	// 	oldBuilder = builder.NewOldModelBuilder(obj.Annotations, obj.Annotations, r.annotationParser)
 
@@ -528,13 +527,23 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	// 	return err
 	// }
 
-	// // ensure security group with mutex
-	// err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
-	// if err != nil {
-	// 	logger.Error("Failed to ensure security group: ", err)
-	// 	return err
-	// }
+	// ensure security group with mutex
+	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
+	if err != nil {
+		logger.Error("Failed to ensure security group: ", err)
+		return err
+	}
 
+	return nil
+}
+
+func (r *VngcloudGlobalLoadBalancerReconciler) ensureSecurityGroup(currentBuilder builder.LoadBalancerBuilder, loadBalancerBuilder builder.ModelBuilder, oldBuilder builder.OldModelBuilder) error {
+	secGroupMutex.Lock()
+	defer secGroupMutex.Unlock()
+	err := currentBuilder.EnsureSecurityGroups(loadBalancerBuilder, oldBuilder)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -546,7 +555,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context,
 		return nil
 	}
 
-	err := r.subDeleteObject(ctx, obj)
+	err := r.subDeleteObject(ctx, obj, true, true, true)
 	if err != nil {
 		return err
 	}
@@ -557,34 +566,99 @@ func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context,
 	return nil
 }
 
-func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) error {
+func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer,
+	deletetag, deleteResource, deleteSegroup bool) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	// check if obj have config cluster annotation
-	if obj.Annotations == nil || obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] == "" {
-		logger.Warnf("Annotation `%s` is empty, return.", v1alpha1.ConfigClusterIdAnnotation)
+	// build oldBuilder
+	oldBuilder := builder.NewOldModelBuilder(obj.Annotations, obj.Annotations, r.annotationParser)
+
+	// ignore reconcile
+	if oldBuilder.IsIgnored() {
+		logger.Info("Ingress is ignored")
 		return nil
 	}
 
-	if obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] != r.Config.Cluster.ClusterID {
+	if oldBuilder.GetLoadBalancerID() == "" {
+		logger.Info("LoadBalancer ID is empty, return.")
 		return nil
 	}
 
-	if obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIgnore)] == "true" {
-		logger.Info("Object is ignored, return.")
+	// // remove from update tracker
+	// r.UpdateTracker.RemoveIngress(oldBuilder.GetLoadBalancerID(), obj)
+
+	// get fleet id from label
+	fleetID := obj.Labels[v1alpha1.FleetIDLabel]
+	if fleetID == "" {
+		logger.Errorf("Label `%s` is empty, return.", v1alpha1.FleetIDLabel)
 		return nil
 	}
 
-	// get glb id
-	glbID := obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-	if glbID == "" {
-		logger.Warn("LoadBalancerID is empty, return.")
-		return nil
+	// inspect current loadbalancer in portal to compare with
+	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
+		r.Provider, r.annotationParser,
+		r.Config.Cluster.ClusterID,
+		fleetID,
+		r.knownNodes, obj)
+
+	if err != nil {
+		if !errs.IsGlobalLoadBalancerNotFound(err) {
+			logger.Error("Failed to get current loadbalancer: ", err)
+			return err
+		}
 	}
 
-	// delete loadbalancer
-	return errs.IgnoreErrors(r.Provider.DeleteGlobalLoadBalancer(ctx, glbID),
-		errs.IsGlobalLoadBalancerNotFound)
+	// // build loadbalancer model, pass nil to object to create a model with default values
+	// newBuilder, err := builder.NewModelBuilderByIngress(ctx, nil, r.annotationParser, r.Client,
+	// 	r.networkID, r.subnetID, r.subnetCIDR,
+	// 	r.Config.Cluster.ClusterID,
+	// 	r.knownNodes,
+	// 	r.cniMode,
+	// 	r.defaultPackageID,
+	// )
+	// if err != nil {
+	// 	logger.Error("Failed to create new model builder: ", err)
+	// 	return err
+	// }
+
+	// if deletetag {
+	// 	// ensure delete tags
+	// 	err = r.ensureDeleteTags(currentBuilder, oldBuilder)
+	// 	if err != nil {
+	// 		logger.Error("Failed to ensure delete tags: ", err)
+	// 		return err
+	// 	}
+	// }
+
+	if deleteResource {
+		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
+			if !errs.IsGlobalLoadBalancerNotFound(err) {
+				logger.Error("Failed to delete loadbalancer: ", err)
+				return err
+			}
+		}
+	}
+
+	if deleteSegroup {
+		// ensure delete security group with mutex
+		err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
+		if err != nil {
+			logger.Error("Failed to ensure delete security group: ", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *VngcloudGlobalLoadBalancerReconciler) ensureDeleteSecurityGroup(currentBuilder builder.LoadBalancerBuilder, oldBuilder builder.OldModelBuilder) error {
+	secGroupMutex.Lock()
+	defer secGroupMutex.Unlock()
+	err := currentBuilder.EnsureDeleteSecurityGroups(oldBuilder)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

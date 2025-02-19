@@ -32,7 +32,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.enableAutoscale = l.parseAnnotationEnableAutoscale(annos)
 	l.tags = l.parseAnnotationTags(annos)
 	l.targetNodeLabels = l.parseAnnotationTargetNodeLabels(annos)
-	l.securityGroups = l.parseAnnotationSecurityGroups(annos)
+	// l.securityGroups = l.parseAnnotationSecurityGroups(annos)
 	l.healthcheckPort = l.parseAnnotationHealthcheckPort(annos)
 	l.enableProxyProtocol = l.parseAnnotationEnableProxyProtocol(annos)
 	l.enableStickySession = l.parseAnnotationEnableStickySession(annos)

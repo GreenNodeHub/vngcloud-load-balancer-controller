@@ -50,6 +50,7 @@ type VNGCLOUD_Provider struct {
 	userAgent string
 
 	netID      string
+	netCIDR    string
 	subnetID   string
 	subnetCIDR string
 
@@ -151,6 +152,16 @@ func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
 		return ErrorNotFound
 	}
 	m.subnetCIDR = subnet.Cidr
+
+	vpc, err := m.GetNetworkByID(context.Background(), m.netID)
+	if err != nil {
+		return err
+	}
+	if vpc == nil {
+		return ErrorNotFound
+	}
+	m.netCIDR = vpc.Cidr
+
 	return nil
 }
 
@@ -160,6 +171,10 @@ func (m *VNGCLOUD_Provider) GetProjectID() string {
 
 func (m *VNGCLOUD_Provider) GetNetworkID() string {
 	return m.netID
+}
+
+func (m *VNGCLOUD_Provider) GetNetworkCIDR() string {
+	return m.netCIDR
 }
 
 func (m *VNGCLOUD_Provider) GetSubnetID() string {
@@ -381,6 +396,16 @@ func (m *VNGCLOUD_Provider) GetSubnetByID(ctx context.Context, networkID, subnet
 		return nil, sdkErr.GetError()
 	}
 	return subnet, nil
+}
+
+func (m *VNGCLOUD_Provider) GetNetworkByID(ctx context.Context, networkID string) (*entityv2.Network, error) {
+	logger := contexts.NewContext(ctx).Log()
+	vpc, sdkErr := m.client.VServerGateway().V2().NetworkService().GetNetworkById(networkv2.NewGetNetworkByIdRequest(networkID))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetNetworkByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return vpc, nil
 }
 
 // // --------------------------- Server ---------------------------
