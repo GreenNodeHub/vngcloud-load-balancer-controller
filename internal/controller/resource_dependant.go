@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 go mod download
 # Copy the go source
 COPY Makefile ./
 COPY cmd/main.go cmd/main.go
+COPY api/ api/
 COPY pkg/ pkg/
 COPY internal/controller/ internal/controller/
 

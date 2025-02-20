@@ -32,7 +32,6 @@ import (
 	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/anngdinh/operator-helper/version"
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +42,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
@@ -56,8 +56,8 @@ var (
 )
 
 func init() {
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vksvngcloudvnv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

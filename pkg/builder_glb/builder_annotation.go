@@ -1,9 +1,9 @@
 package builder
 
 import (
-	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
 func (l *modelBuilder) parseAnnotation(annos map[string]string) {
@@ -450,7 +450,7 @@ func (l *modelBuilder) parseAnnotationHeader(annos map[string]string) headerConf
 }
 
 func (l *modelBuilder) parseAnnotationConfigClusterID(annos map[string]string) string {
-	return annos[v1alpha1.ConfigClusterIdAnnotation]
+	return annos[consts.ConfigClusterIdAnnotation]
 }
 
 // func (l *modelBuilder) parseAnnotation

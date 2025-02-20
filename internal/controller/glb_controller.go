@@ -30,7 +30,6 @@ import (
 	"github.com/huandu/go-clone"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-fleet-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	builder "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder_glb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -313,15 +313,15 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	}
 
 	// check if obj have config cluster annotation
-	if obj.Annotations == nil || obj.Annotations[v1alpha1.ConfigClusterIdAnnotation] == "" {
-		logger.Warnf("Annotation `%s` is empty, return.", v1alpha1.ConfigClusterIdAnnotation)
+	if obj.Annotations == nil || obj.Annotations[consts.ConfigClusterIdAnnotation] == "" {
+		logger.Warnf("Annotation `%s` is empty, return.", consts.ConfigClusterIdAnnotation)
 		return nil
 	}
 
 	// get fleet id from label
-	fleetID := obj.Labels[v1alpha1.FleetIDLabel]
+	fleetID := obj.Labels[consts.FleetIDLabel]
 	if fleetID == "" {
-		logger.Errorf("Label `%s` is empty, return.", v1alpha1.FleetIDLabel)
+		logger.Errorf("Label `%s` is empty, return.", consts.FleetIDLabel)
 		return nil
 	}
 
@@ -588,9 +588,9 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 	// r.UpdateTracker.RemoveIngress(oldBuilder.GetLoadBalancerID(), obj)
 
 	// get fleet id from label
-	fleetID := obj.Labels[v1alpha1.FleetIDLabel]
+	fleetID := obj.Labels[consts.FleetIDLabel]
 	if fleetID == "" {
-		logger.Errorf("Label `%s` is empty, return.", v1alpha1.FleetIDLabel)
+		logger.Errorf("Label `%s` is empty, return.", consts.FleetIDLabel)
 		return nil
 	}
 
