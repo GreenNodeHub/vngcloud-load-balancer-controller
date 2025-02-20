@@ -602,10 +602,11 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 		r.knownNodes, obj)
 
 	if err != nil {
-		if !errs.IsGlobalLoadBalancerNotFound(err) {
-			logger.Error("Failed to get current loadbalancer: ", err)
-			return err
+		if errs.IsGlobalLoadBalancerNotFound(err) {
+			return nil
 		}
+		logger.Error("Failed to get current loadbalancer: ", err)
+		return err
 	}
 
 	// // build loadbalancer model, pass nil to object to create a model with default values
@@ -631,7 +632,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 	// }
 
 	if deleteResource {
-		if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
+		if err := r.Provider.DeleteGlobalLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
 			if !errs.IsGlobalLoadBalancerNotFound(err) {
 				logger.Error("Failed to delete loadbalancer: ", err)
 				return err
