@@ -34,8 +34,7 @@ type VngcloudGlobalLoadBalancerSpec struct {
 
 // VngcloudGlobalLoadBalancerStatus defines the observed state of VngcloudGlobalLoadBalancer.
 type VngcloudGlobalLoadBalancerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Address string `json:"address,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -56,6 +55,7 @@ type VngcloudGlobalLoadBalancer struct {
 // VngcloudGlobalLoadBalancerList contains a list of VngcloudGlobalLoadBalancer.
 // +kubebuilder:printcolumn:name="FLEET ID",type=string,JSONPath=`.metadata.labels.fleet\.vngcloud\.vn\/fleet-id`
 // +kubebuilder:printcolumn:name="GLB ID",type=string,JSONPath=`.metadata.annotations.vks\.vngcloud\.vn\/load-balancer-id`
+// +kubebuilder:printcolumn:name="ADDRESS",type=string,JSONPath=`.status.address`
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type VngcloudGlobalLoadBalancerList struct {
 	metav1.TypeMeta `json:",inline"`

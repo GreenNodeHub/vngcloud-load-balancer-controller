@@ -512,20 +512,24 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	r.resourceDependant.Set(obj, loadBalancerBuilder.GetTargetType() == builder.TargetTypeIP ||
 		r.cniMode == utils.CiliumNativeRouting)
 
-	// // get lb updated time and add to update tracker
-	// lb, err := r.Provider.GetLoadBalancerByID(ctx, loadBalancerBuilder.GetLoadBalancerID())
-	// if err != nil {
-	// 	logger.Error("Failed to get loadbalancer: ", err)
-	// 	return err
-	// }
+	// get lb updated time and add to update tracker
+	lb, err := r.Provider.GetGlobalLoadBalancerByID(ctx, loadBalancerBuilder.GetLoadBalancerID())
+	if err != nil {
+		logger.Error("Failed to get loadbalancer: ", err)
+		return err
+	}
 	// r.UpdateTracker.AddService(loadBalancerBuilder.GetLoadBalancerID(), lb.UpdatedAt, obj)
 
-	// // update status
-	// err = r.updateObjectStatus(ctx, obj, lb.Address)
-	// if err != nil {
-	// 	logger.Error("Failed to update status: ", err)
-	// 	return err
-	// }
+	// update status
+	if len(lb.Domains) > 0 {
+		err = r.updateObjectStatus(ctx, obj, lb.Domains[0].Hostname)
+		if err != nil {
+			logger.Error("Failed to update status: ", err)
+			return err
+		}
+	} else {
+		logger.Warn("Why this loadbalancer has no domain???????????")
+	}
 
 	// ensure security group with mutex
 	err = r.ensureSecurityGroup(currentBuilder, loadBalancerBuilder, oldBuilder)
@@ -827,4 +831,28 @@ func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager
 			},
 		}).
 		Complete(r)
+}
+
+func (r *VngcloudGlobalLoadBalancerReconciler) updateObjectStatus(ctx context.Context, obj client.Object, address string) error {
+	if obj == nil {
+		return nil
+	}
+	if address == "" {
+		return errors.New("address is empty")
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("Update status for object %s/%s = %s", obj.GetNamespace(), obj.GetName(), address)
+
+	// get object again to avoid conflict
+	object := &v1alpha1.VngcloudGlobalLoadBalancer{}
+	err := r.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, object)
+	if err != nil {
+		logger.Error("Failed to get object: ", err)
+		return err
+	}
+	objectOld := object.DeepCopy()
+	object.Status.Address = address
+
+	return r.Status().Patch(ctx, object, client.MergeFrom(objectOld))
 }

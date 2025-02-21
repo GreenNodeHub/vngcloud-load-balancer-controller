@@ -46,6 +46,9 @@ spec:
           status:
             description: VngcloudGlobalLoadBalancerStatus defines the observed state
               of VngcloudGlobalLoadBalancer.
+            properties:
+              address:
+                type: string
             type: object
         type: object
     served: true
