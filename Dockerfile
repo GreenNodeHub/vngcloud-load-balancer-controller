@@ -32,6 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod make build-pro CGO_ENABLED=0 GOOS=${TA
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY ./config/crd/bases ./config/crd/bases
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
