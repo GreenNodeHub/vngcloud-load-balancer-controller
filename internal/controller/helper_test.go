@@ -136,3 +136,12 @@ func getLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *en
 	Expect(err).ShouldNot(HaveOccurred())
 	return loadbalancer
 }
+
+func getGLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.GlobalLoadBalancer {
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
+	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+	Expect(loadbalancerID).ShouldNot(BeEmpty())
+	loadbalancer, err := mockProvider.GetGlobalLoadBalancerByID(ctx, loadbalancerID)
+	Expect(err).ShouldNot(HaveOccurred())
+	return loadbalancer
+}

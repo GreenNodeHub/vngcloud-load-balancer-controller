@@ -12,7 +12,6 @@ import (
 	clone "github.com/huandu/go-clone"
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -90,6 +89,11 @@ type MockProvider struct {
 	secgroups     []*wrapSecgroup
 	secgroupRules []*wrapSecgroupRule
 	lbcert        []string
+
+	// glb
+	glbs            []*entityv2.GlobalLoadBalancer
+	globalListeners []*wrapGlobalListener
+	globalPools     []*wrapGlobalPool
 
 	mu            sync.Mutex
 	WaitAfterTime time.Duration
@@ -1297,101 +1301,3 @@ func (m *MockProvider) GetPoolHealthMonitorById(ctx context.Context, lbID, poolI
 // 	logger.Error("not implemented yet", "DeleteCertificate")
 // 	return ErrorNotImplemented
 // }
-
-// --------------------------- Global Load Balancer ---------------------------
-
-func (m *MockProvider) ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}
-
-func (m *MockProvider) WaitGlobalLoadBalancerActive(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) ListGlobalPools(ctx context.Context, glbID string) (*entityv2.ListGlobalPools, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID string) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}
-
-func (m *MockProvider) UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}
-
-func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}
-
-func (m *MockProvider) ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return nil, ErrorNotImplemented
-}
-
-func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}
-
-func (m *MockProvider) UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
-}

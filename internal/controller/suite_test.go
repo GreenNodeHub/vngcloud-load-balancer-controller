@@ -30,6 +30,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 
@@ -57,6 +58,7 @@ var (
 	cancel                context.CancelFunc
 	mockIngressReconciler *IngressReconciler
 	mockServiceReconciler *ServiceReconciler
+	mockVGLBReconciler    *VngcloudGlobalLoadBalancerReconciler
 	mockProvider          *provider.MockProvider
 
 	mockConfig = &config.Config{
@@ -64,7 +66,7 @@ var (
 			ClusterName string "mapstructure:\"clusterName\""
 			ClusterID   string "mapstructure:\"clusterID\""
 			Region      string "mapstructure:\"region\""
-		}{ClusterName: "test-cluster", ClusterID: "k8s-00000000-0000-0000-0000-000000000000"},
+		}{ClusterName: "test-cluster", ClusterID: mockClusterID},
 	}
 
 	mockNode1 = &corev1.Node{
@@ -75,8 +77,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-1",
 			Labels: map[string]string{
-				"nodeName":  "mock-node-1",
-				"nodeGroup": "mock-node-group-a",
+				"nodeName":                  "mock-node-1",
+				"nodeGroup":                 "mock-node-group-a",
+				"vks.vngcloud.vn/mgmt-zone": "mock-mgmt-zone",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -173,9 +176,10 @@ var (
 )
 
 const (
-	timeout  = time.Second * 5
-	duration = time.Second * 10
-	interval = time.Millisecond * 250
+	timeout       = time.Second * 5
+	duration      = time.Second * 10
+	interval      = time.Millisecond * 250
+	mockClusterID = "k8s-00000000-0000-0000-0000-000000000000"
 )
 
 var (
@@ -229,6 +233,9 @@ var _ = BeforeSuite(func() {
 	err = networkingv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = v1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -272,6 +279,21 @@ var _ = BeforeSuite(func() {
 		UpdateTracker:       updateTracker,
 	}
 	err = mockServiceReconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	mockVGLBReconciler = &VngcloudGlobalLoadBalancerReconciler{
+		// modeTest: true,
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+
+		Config:           mockConfig,
+		Provider:         mockProvider,
+		FinalizerManager: finalizerManager,
+		// timeReconcilePeriod: 2 * time.Second,
+		// UpdateTracker:       updateTracker,
+	}
+	err = mockVGLBReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
