@@ -588,6 +588,12 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 		return nil
 	}
 
+	// check if obj have config cluster annotation, if this cluster is not config cluster, not delete glb
+	if obj.Annotations == nil || obj.Annotations[consts.ConfigClusterIdAnnotation] == "" ||
+		obj.Annotations[consts.ConfigClusterIdAnnotation] != r.Config.Cluster.ClusterID {
+		deleteResource = false
+	}
+
 	// // remove from update tracker
 	// r.UpdateTracker.RemoveIngress(oldBuilder.GetLoadBalancerID(), obj)
 
