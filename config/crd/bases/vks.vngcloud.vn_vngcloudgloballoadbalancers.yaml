@@ -16,7 +16,20 @@ spec:
     singular: vngcloudgloballoadbalancer
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.labels.fleet\.vngcloud\.vn\/fleet-id
+      name: FLEET ID
+      type: string
+    - jsonPath: .metadata.annotations.vks\.vngcloud\.vn\/load-balancer-id
+      name: GLB ID
+      type: string
+    - jsonPath: .status.address
+      name: ADDRESS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: VngcloudGlobalLoadBalancer is the Schema for the vngcloudgloballoadbalancers

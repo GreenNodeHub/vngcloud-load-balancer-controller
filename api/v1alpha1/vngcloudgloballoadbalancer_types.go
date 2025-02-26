@@ -42,6 +42,10 @@ type VngcloudGlobalLoadBalancerStatus struct {
 // +kubebuilder:resource:shortName=vglb
 
 // VngcloudGlobalLoadBalancer is the Schema for the vngcloudgloballoadbalancers API.
+// +kubebuilder:printcolumn:name="FLEET ID",type=string,JSONPath=`.metadata.labels.fleet\.vngcloud\.vn\/fleet-id`
+// +kubebuilder:printcolumn:name="GLB ID",type=string,JSONPath=`.metadata.annotations.vks\.vngcloud\.vn\/load-balancer-id`
+// +kubebuilder:printcolumn:name="ADDRESS",type=string,JSONPath=`.status.address`
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type VngcloudGlobalLoadBalancer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -53,10 +57,6 @@ type VngcloudGlobalLoadBalancer struct {
 // +kubebuilder:object:root=true
 
 // VngcloudGlobalLoadBalancerList contains a list of VngcloudGlobalLoadBalancer.
-// +kubebuilder:printcolumn:name="FLEET ID",type=string,JSONPath=`.metadata.labels.fleet\.vngcloud\.vn\/fleet-id`
-// +kubebuilder:printcolumn:name="GLB ID",type=string,JSONPath=`.metadata.annotations.vks\.vngcloud\.vn\/load-balancer-id`
-// +kubebuilder:printcolumn:name="ADDRESS",type=string,JSONPath=`.status.address`
-// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type VngcloudGlobalLoadBalancerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
