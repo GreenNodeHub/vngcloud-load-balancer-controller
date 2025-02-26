@@ -151,8 +151,8 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	for _, rule := range needCreate {
 		_, err := r.provider.CreateSecurityGroupRule(context.Background(), defaultSecgroup.Id,
 			rule.GetICreateSecgroupRuleRequest(defaultSecgroup.Id))
-		if err != nil {
-			r.logger.Error("Fail to create secgroup rule", err)
+		if errs.IgnoreErrors(err, errs.IsSecurityGroupRuleExists) != nil {
+			r.logger.Errorf("Fail to create secgroup rule: `%s`", err.Error())
 			return err
 		}
 	}
@@ -262,7 +262,28 @@ func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilde
 				return err
 			}
 		} else {
-			r.logger.Warnf("Default secgroup %s is still in use, which should not be", defaultSecgroup.Id)
+			r.logger.Warnf("Default secgroup %s is still in use, should delete rule of this cluster", defaultSecgroup.Id)
+
+			// get all secgroup rules of default secgroup
+			defaultSecgroupRules, err := r.provider.ListSecurityGroupRules(context.Background(), defaultSecgroup.Id)
+			if err != nil {
+				r.logger.Error("Fail to list secgroup rules", err)
+				return err
+			}
+
+			if defaultSecgroupRules == nil || defaultSecgroupRules.Items == nil {
+				return nil
+			}
+
+			for _, rule := range defaultSecgroupRules.Items {
+				if rule.Description == r.clusterID {
+					err := r.provider.DeleteSecurityGroupRule(context.Background(), defaultSecgroup.Id, rule.Id)
+					if err != nil {
+						r.logger.Error("Fail to delete secgroup rule", err)
+						return err
+					}
+				}
+			}
 		}
 	}
 

@@ -20,6 +20,11 @@ func IsGlobalLoadBalancerNotFound(err error) bool {
 	return strings.EqualFold(err.Error(), "global_load_balancer_not_found")
 }
 
+// `create rule fail. SecurityGroupRuleExists`
+func IsSecurityGroupRuleExists(err error) bool {
+	return strings.Contains(err.Error(), "SecurityGroupRuleExists")
+}
+
 func IgnoreErrors(err error, funcs ...func(error) bool) error {
 	if err == nil {
 		return nil
