@@ -50,10 +50,15 @@ type poolBuilderType struct {
 	Stickiness        *bool                              `json:"stickiness,omitempty"`    // only for l7, l4 doesn't have this field => nil
 	TLSEncryption     *bool                              `json:"tlsEncryption,omitempty"` // only for l7, l4 doesn't have this field => nil
 	HealthMonitor     *global.GlobalHealthMonitorRequest `json:"health"`
-	GlobalPoolMembers []*global.GlobalPoolMemberRequest  `json:"globalPoolMembers"`
+	GlobalPoolMembers []*poolMemberBuilderType           `json:"globalPoolMembers"`
 
 	commonBuilder
 	isDeleted bool
+}
+
+type poolMemberBuilderType struct {
+	global.GlobalPoolMemberRequest
+	id string
 }
 
 func (p *poolBuilderType) GetICreatePoolRequest(lbID string) global.ICreateGlobalPoolRequest {

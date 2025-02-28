@@ -38,6 +38,12 @@ type LoadBalancerBuilder interface {
 	// CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilder) bool
 
 	// CanDeleteWholeListener(oldListener OldListener) bool
+
+	PatchRedudantPoolMember(ModelBuilder) error
+
+	// delete redundant pool (all empty poolmember), poolMember(no member), member(name not in whitelist)
+	// delete redundant listener (point to redundant pool or no pool)
+	CleanUp(context.Context, []string) error
 }
 
 // depend on loadBalancerID, get loadBalancer information by using provider, then build the ModelBuilder
@@ -165,7 +171,7 @@ func (r *vngcloudLBBuilder) buildPool(pool *entityv2.GlobalPool) (*poolBuilderTy
 			HttpVersion:         (*global.GlobalPoolHealthCheckHttpVersion)(pool.Health.HTTPVersion),
 			DomainName:          pool.Health.DomainName,
 		},
-		GlobalPoolMembers: make([]*global.GlobalPoolMemberRequest, 0),
+		GlobalPoolMembers: make([]*poolMemberBuilderType, 0),
 	}
 
 	members, err := r.provider.ListGlobalPoolMembers(r.context, r.loadBalancerID, pool.ID)
@@ -196,17 +202,20 @@ func (r *vngcloudLBBuilder) buildPool(pool *entityv2.GlobalPool) (*poolBuilderTy
 			}
 		}
 
-		poolBuilder.GlobalPoolMembers = append(poolBuilder.GlobalPoolMembers, &global.GlobalPoolMemberRequest{
-			Name:        poolMember.Name,
-			Description: poolMember.Description,
-			Region:      poolMember.Region,
-			TrafficDial: poolMember.TrafficDial,
-			Type:        global.GlobalPoolMemberTypePrivate,
-			VPCID:       poolMember.VpcID,
-			Members:     members,
-			PoolCommon: common.PoolCommon{
-				PoolId: poolMember.ID,
+		poolBuilder.GlobalPoolMembers = append(poolBuilder.GlobalPoolMembers, &poolMemberBuilderType{
+			GlobalPoolMemberRequest: global.GlobalPoolMemberRequest{
+				Name:        poolMember.Name,
+				Description: poolMember.Description,
+				Region:      poolMember.Region,
+				TrafficDial: poolMember.TrafficDial,
+				Type:        global.GlobalPoolMemberTypePrivate,
+				VPCID:       poolMember.VpcID,
+				Members:     members,
+				PoolCommon: common.PoolCommon{
+					PoolId: poolMember.ID,
+				},
 			},
+			id: poolMember.ID,
 		})
 	}
 	return poolBuilder, nil
@@ -576,6 +585,82 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 // 	return nil
 // }
 
+// use for member cluster in fleet, remove their pool member with name=clusterID but not in use
+func (r *vngcloudLBBuilder) PatchRedudantPoolMember(newBuilder ModelBuilder) error {
+
+	for _, currentPoolBuilder := range r.GetPoolBuilders() {
+		wantGlobalPoolMembers := make([]*poolMemberBuilderType, 0)
+		wantPoolBuilder := newBuilder.GetPoolBuilderByName(currentPoolBuilder.GetName())
+		if wantPoolBuilder != nil {
+			wantGlobalPoolMembers = wantPoolBuilder.GlobalPoolMembers
+		}
+		if patchPoolMemberOptions := r.removeRedundantMemberWithClusterID(currentPoolBuilder.GlobalPoolMembers, wantGlobalPoolMembers); patchPoolMemberOptions != nil {
+			err := r.provider.PatchGlobalPoolMember(r.context, r.GetLoadBalancerID(), currentPoolBuilder.GetID(),
+				patchPoolMemberOptions)
+			if err != nil {
+				r.logger.Error("Failed to patch pool members: ", err)
+				return err
+			}
+			if _, err := r.provider.WaitGlobalLoadBalancerActive(r.context, r.GetLoadBalancerID()); err != nil {
+				r.logger.Error("Failed to wait for loadbalancer active: ", err)
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// removeRedundantMemberWithClusterID compares two pool members.
+// delete all members in parentSet but not in childSet and have name=clusterID
+func (l *vngcloudLBBuilder) removeRedundantMemberWithClusterID(parentSet, childSet []*poolMemberBuilderType) global.IPatchGlobalPoolMemberRequest {
+	getPoolMemberByName := func(mems []*poolMemberBuilderType, name string) *poolMemberBuilderType {
+		for _, mem := range mems {
+			if mem.Name == name {
+				return mem
+			}
+		}
+		return nil
+	}
+
+	bulkRequests := make([]global.IBulkActionRequest, 0)
+
+	for _, parentPM := range parentSet {
+		childPM := getPoolMemberByName(childSet, parentPM.Name)
+		if bulkAction := l.getIBulkActionRequest(l.clusterID, parentPM, childPM); bulkAction != nil {
+			bulkRequests = append(bulkRequests, bulkAction)
+		}
+	}
+
+	if len(bulkRequests) == 0 {
+		return nil
+	}
+
+	return global.NewPatchGlobalPoolMemberRequest(l.GetLoadBalancerID(), ""). // set empty poolID ...
+											WithBulkAction(bulkRequests...)
+}
+
+func (r *vngcloudLBBuilder) getIBulkActionRequest(clusterID string, current, want *poolMemberBuilderType) global.IBulkActionRequest {
+	_want := want
+	if want == nil {
+		_want = &poolMemberBuilderType{
+			GlobalPoolMemberRequest: global.GlobalPoolMemberRequest{
+				Members: make([]global.IGlobalMemberRequest, 0),
+			},
+		}
+	}
+
+	if updatePoolMembersOption := r.compareGlobalPoolMembers(clusterID, current.Members, _want.Members); updatePoolMembersOption != nil {
+		if len(updatePoolMembersOption) > 0 {
+			return global.NewPatchGlobalPoolUpdateBulkActionRequest(current.PoolId,
+				global.NewUpdateGlobalPoolMemberRequest(current.TrafficDial).WithMembers(updatePoolMembersOption...),
+			)
+		} else {
+			return global.NewPatchGlobalPoolDeleteBulkActionRequest(current.PoolId)
+		}
+	}
+	return nil
+}
+
 // func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilder) bool {
 // 	if len(oldBuilder.GetOldListeners()) < len(r.GetListenerBuilders()) {
 // 		r.logger.Debugf("Can't delete whole loadbalancer, len(oldListeners) < len(currentListeners) (%d < %d)",
@@ -682,7 +767,7 @@ func (l *vngcloudLBBuilder) AddClonePoolBuilder(pool *poolBuilderType) {
 		Stickiness:        pool.Stickiness,
 		TLSEncryption:     pool.TLSEncryption,
 		HealthMonitor:     pool.HealthMonitor,
-		GlobalPoolMembers: make([]*global.GlobalPoolMemberRequest, 0),
+		GlobalPoolMembers: make([]*poolMemberBuilderType, 0),
 		isDeleted:         false,
 	}
 	l.AddPoolBuilder(clone)
@@ -716,8 +801,8 @@ func (l *vngcloudLBBuilder) AddCloneListenerBuilder(listener *ListenerBuilderTyp
 
 // ComparePoolMembers compares two pool members.
 // mustBeEqual is true if the two pool members must be equal, otherwise, just check if the pool members exist in the other pool members.
-func (l *vngcloudLBBuilder) comparePoolMembers(parentSet, childSet []*global.GlobalPoolMemberRequest, mustBeEqual bool) global.IPatchGlobalPoolMemberRequest {
-	getPoolMemberByName := func(mems []*global.GlobalPoolMemberRequest, name string) *global.GlobalPoolMemberRequest {
+func (l *vngcloudLBBuilder) comparePoolMembers(parentSet, childSet []*poolMemberBuilderType, mustBeEqual bool) global.IPatchGlobalPoolMemberRequest {
+	getPoolMemberByName := func(mems []*poolMemberBuilderType, name string) *poolMemberBuilderType {
 		for _, mem := range mems {
 			if mem.Name == name {
 				return mem
@@ -732,7 +817,7 @@ func (l *vngcloudLBBuilder) comparePoolMembers(parentSet, childSet []*global.Glo
 		if parentPM := getPoolMemberByName(parentSet, childPM.Name); parentPM == nil {
 			bulkRequests = append(bulkRequests,
 				global.NewPatchGlobalPoolCreateBulkActionRequest(childPM))
-		} else if updateRequest, _ := l.compareGlobalPoolMember(l.clusterID, parentPM, childPM); updateRequest != nil {
+		} else if updateRequest, _ := l.compareGlobalPoolMember(l.clusterID, &parentPM.GlobalPoolMemberRequest, &childPM.GlobalPoolMemberRequest); updateRequest != nil {
 			bulkRequests = append(bulkRequests,
 				global.NewPatchGlobalPoolUpdateBulkActionRequest(parentPM.PoolId, updateRequest))
 		}
@@ -770,39 +855,12 @@ func (l *vngcloudLBBuilder) compareGlobalPoolMember(clusterID string, current, w
 
 // compare all member with name=clusterID in current vs want
 func (l *vngcloudLBBuilder) compareGlobalPoolMembers(clusterID string, current, want []global.IGlobalMemberRequest) []global.IGlobalMemberRequest {
-	clusterMembers := make([]*global.GlobalMemberRequest, 0)
+	currentMembersOfCluster := make([]*global.GlobalMemberRequest, 0)
 	for _, member := range current {
 		_member := member.(*global.GlobalMemberRequest)
 		if _member.Name == clusterID {
-			clusterMembers = append(clusterMembers, _member)
+			currentMembersOfCluster = append(currentMembersOfCluster, _member)
 		}
-	}
-
-	checkIfMemberExist := func(mems []*global.GlobalMemberRequest, mem *global.GlobalMemberRequest) bool {
-		for _, r := range mems {
-			if r.Address == mem.Address &&
-				r.Port == mem.Port &&
-				r.Weight == mem.Weight &&
-				r.BackupRole == mem.BackupRole &&
-				r.SubnetID == mem.SubnetID &&
-				r.MonitorPort == mem.MonitorPort {
-				return true
-			}
-		}
-		return false
-	}
-
-	// check if the pool members are equal
-	checkIfMembersEqual := func(mems1, mems2 []*global.GlobalMemberRequest) bool {
-		if len(mems1) != len(mems2) {
-			return false
-		}
-		for _, mem := range mems1 {
-			if !checkIfMemberExist(mems2, mem) {
-				return false
-			}
-		}
-		return true
 	}
 
 	_want := make([]*global.GlobalMemberRequest, 0)
@@ -810,7 +868,8 @@ func (l *vngcloudLBBuilder) compareGlobalPoolMembers(clusterID string, current, 
 		_member := member.(*global.GlobalMemberRequest)
 		_want = append(_want, _member)
 	}
-	if checkIfMembersEqual(clusterMembers, _want) {
+
+	if checkGlobalMemberRequestsEqual(currentMembersOfCluster, _want) {
 		return nil
 	}
 
@@ -824,4 +883,31 @@ func (l *vngcloudLBBuilder) compareGlobalPoolMembers(clusterID string, current, 
 	}
 	result = append(result, want...)
 	return result
+}
+
+// check if the pool members are equal
+func checkGlobalMemberRequestsEqual(mems1, mems2 []*global.GlobalMemberRequest) bool {
+	if len(mems1) != len(mems2) {
+		return false
+	}
+	for _, mem := range mems1 {
+		if !checkGlobalMemberRequestExist(mems2, mem) {
+			return false
+		}
+	}
+	return true
+}
+
+func checkGlobalMemberRequestExist(mems []*global.GlobalMemberRequest, mem *global.GlobalMemberRequest) bool {
+	for _, r := range mems {
+		if r.Address == mem.Address &&
+			r.Port == mem.Port &&
+			r.Weight == mem.Weight &&
+			r.BackupRole == mem.BackupRole &&
+			r.SubnetID == mem.SubnetID &&
+			r.MonitorPort == mem.MonitorPort {
+			return true
+		}
+	}
+	return false
 }

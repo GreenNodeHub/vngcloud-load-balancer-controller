@@ -196,15 +196,18 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 		}
 
 		poolBuilder := l.createPoolBuilder(port, poolName)
-		poolBuilder.GlobalPoolMembers = []*global.GlobalPoolMemberRequest{
+		poolBuilder.GlobalPoolMembers = []*poolMemberBuilderType{
 			{
-				Name:        fmt.Sprintf("%s-%s", l.region, l.networkID),
-				Description: "",
-				Region:      l.region,
-				TrafficDial: 100,
-				VPCID:       l.networkID,
-				Members:     poolMembers,
-				Type:        global.GlobalPoolMemberTypePrivate,
+				GlobalPoolMemberRequest: global.GlobalPoolMemberRequest{
+					Name:        fmt.Sprintf("%s-%s", l.region, l.networkID),
+					Description: "",
+					Region:      l.region,
+					TrafficDial: 100,
+					VPCID:       l.networkID,
+					Members:     poolMembers,
+					Type:        global.GlobalPoolMemberTypePrivate,
+				},
+				id: "",
 			},
 		}
 

@@ -360,8 +360,151 @@ func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID 
 
 func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return ErrorNotImplemented
+	logger.Infof("%s Request patch global pool member of load balancer %s", icon, glbID)
+
+	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMemberRequest)
+	for _, action := range patch.BulkActions {
+		// action can be PatchGlobalPoolCreateBulkActionRequest or PatchGlobalPoolDeleteBulkActionRequest
+		if rawAction, ok := action.(*global.PatchGlobalPoolCreateBulkActionRequest); ok {
+			createPoolMemberOptions := rawAction.CreatePoolMember.ToRequestBody().(*global.GlobalPoolMemberRequest)
+			poolMemberID := "gpoolmem-" + randID()
+			members := &entityv2.ListGlobalMembers{
+				Items: make([]*entityv2.GlobalPoolMemberDetail, 0),
+			}
+			for _, mem := range createPoolMemberOptions.Members {
+				member := mem.ToRequestBody().(*global.GlobalMemberRequest)
+				members.Items = append(members.Items, &entityv2.GlobalPoolMemberDetail{
+					ID:                   "gmem-" + randID(),
+					CreatedAt:            time.Now().Format(time.RFC3339),
+					UpdatedAt:            time.Now().Format(time.RFC3339),
+					Name:                 member.Name,
+					Description:          "????????",
+					GlobalLoadBalancerID: glbID,
+					Status:               consts.ACTIVE_LOADBALANCER_STATUS,
+					GlobalPoolMemberID:   poolMemberID,
+					SubnetID:             member.SubnetID,
+					Address:              member.Address,
+					Weight:               member.Weight,
+					Port:                 member.Port,
+					MonitorPort:          member.MonitorPort,
+					BackupRole:           member.BackupRole,
+				})
+			}
+			newPoolMember := &entityv2.GlobalPoolMember{
+				ID:                   poolMemberID,
+				CreatedAt:            time.Now().Format(time.RFC3339),
+				UpdatedAt:            time.Now().Format(time.RFC3339),
+				Name:                 createPoolMemberOptions.Name,
+				Description:          "????????",
+				Region:               createPoolMemberOptions.Region,
+				GlobalPoolID:         createPoolMemberOptions.PoolId,
+				GlobalLoadBalancerID: glbID,
+				TrafficDial:          createPoolMemberOptions.TrafficDial,
+				VpcID:                createPoolMemberOptions.VPCID,
+				Status:               consts.ACTIVE_LOADBALANCER_STATUS,
+				Members:              members,
+			}
+
+			m.mu.Lock()
+			for _, p := range m.globalPools {
+				if p.lbID == glbID && p.ID == poolID {
+					p.globalPoolMembers = append(p.globalPoolMembers, newPoolMember)
+					break
+				}
+			}
+			m.mu.Unlock()
+
+			m.updatingGlobalStatus(glbID)
+			go m.readyGlobalAfterTime(glbID)
+		} else if rawAction, ok := action.(*global.PatchGlobalPoolDeleteBulkActionRequest); ok {
+			poolMemberID := rawAction.ID
+			isFound := false
+			newPoolMembers := make([]*entityv2.GlobalPoolMember, 0)
+			for _, p := range m.globalPools {
+				if p.lbID == glbID && p.ID == poolID {
+					for i, m := range p.globalPoolMembers {
+						if m.ID != poolMemberID {
+							newPoolMembers = append(newPoolMembers, p.globalPoolMembers[i])
+						} else {
+							isFound = true
+						}
+					}
+					break
+				}
+			}
+			if !isFound {
+				logger.Error("Pool member not found")
+				return ErrorNotFound
+			}
+			m.mu.Lock()
+			for _, p := range m.globalPools {
+				if p.lbID == glbID && p.ID == poolID {
+					p.globalPoolMembers = newPoolMembers
+					break
+				}
+			}
+			m.mu.Unlock()
+
+			m.updatingGlobalStatus(glbID)
+			go m.readyGlobalAfterTime(glbID)
+
+		} else if rawAction, ok := action.(*global.PatchGlobalPoolUpdateBulkActionRequest); ok {
+			updatePoolMemberOptions := rawAction.UpdatePoolMember.ToRequestBody().(*global.UpdateGlobalPoolMemberRequest)
+			poolMemberID := rawAction.ID
+
+			members := &entityv2.ListGlobalMembers{
+				Items: make([]*entityv2.GlobalPoolMemberDetail, 0),
+			}
+			for _, mem := range updatePoolMemberOptions.Members {
+				member := mem.ToRequestBody().(*global.GlobalMemberRequest)
+				members.Items = append(members.Items, &entityv2.GlobalPoolMemberDetail{
+					ID:                   "gmem-" + randID(),
+					CreatedAt:            time.Now().Format(time.RFC3339),
+					UpdatedAt:            time.Now().Format(time.RFC3339),
+					Name:                 member.Name,
+					Description:          "????????",
+					GlobalLoadBalancerID: glbID,
+					Status:               consts.ACTIVE_LOADBALANCER_STATUS,
+					GlobalPoolMemberID:   poolMemberID,
+					SubnetID:             member.SubnetID,
+					Address:              member.Address,
+					Weight:               member.Weight,
+					Port:                 member.Port,
+					MonitorPort:          member.MonitorPort,
+					BackupRole:           member.BackupRole,
+				})
+			}
+
+			isFound := false
+			for _, p := range m.globalPools {
+				if p.lbID == glbID && p.ID == poolID {
+					for _, m := range p.globalPoolMembers {
+						if m.ID == poolMemberID {
+							m.TrafficDial = updatePoolMemberOptions.TrafficDial
+							m.Members = members
+							m.UpdatedAt = time.Now().Format(time.RFC3339)
+							isFound = true
+							break
+						}
+					}
+					break
+				}
+
+			}
+			if !isFound {
+				logger.Error("Pool member not found")
+				return ErrorNotFound
+			}
+			m.updatingGlobalStatus(glbID)
+			go m.readyGlobalAfterTime(glbID)
+
+		} else {
+			logger.Error("Invalid bulk action")
+			return ErrorInvalidInput
+		}
+	}
+
+	return nil
 }
 
 func (m *MockProvider) ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error) {

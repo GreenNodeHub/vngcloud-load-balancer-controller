@@ -495,12 +495,26 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 	// 	return err
 	// }
 
-	// // delete redundant pools, should check if pool is used by other listeners then ignore
-	// err = currentBuilder.DeleteRedundantPools(oldBuilder, loadBalancerBuilder)
-	// if err != nil {
-	// 	logger.Error("Failed to delete redundant pool: ", err)
-	// 	return err
-	// }
+	// delete redundant pools, should check if pool is used by other listeners then ignore
+	err = currentBuilder.PatchRedudantPoolMember(loadBalancerBuilder)
+	if err != nil {
+		logger.Error("Failed to delete redundant pool: ", err)
+		return err
+	}
+
+	// clean up, only for managed cluster
+	if obj.Annotations != nil && obj.Annotations[consts.ConfigClusterIdAnnotation] == r.Config.Cluster.ClusterID {
+
+		activeClusterIDs := strings.Split(obj.Annotations["fleet.vngcloud.vn/active-clusters"], ",")
+		if len(activeClusterIDs) == 0 {
+			return errs.NewRequeueNeededAfter("active cluster ids is empty", 5*time.Second)
+		} else {
+			if err := currentBuilder.CleanUp(ctx, activeClusterIDs); err != nil {
+				logger.Error("Failed to clean up: ", err)
+				return err
+			}
+		}
+	}
 
 	// // update management annotations
 	// if err := r.updateObjectAnnotation(ctx, obj, loadBalancerBuilder.GetManageAnnotation()); err != nil {
