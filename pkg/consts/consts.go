@@ -28,6 +28,7 @@ const (
 	ServiceFinalizer = "service.kubernetes.io/load-balancer-cleanup"
 
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
+	GLBFinalizer     = "glb.vngcloud.vn/resources"
 
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
@@ -98,4 +99,15 @@ const (
 
 	RESOURCE_TYPE_SERVICE = "service"
 	RESOURCE_TYPE_INGRESS = "ingress"
+)
+
+const (
+	FleetServiceNameLabel      = "fleet.vngcloud.vn/service-name"
+	FleetServiceNamespaceLabel = "fleet.vngcloud.vn/service-namespace"
+	FleetIDLabel               = "fleet.vngcloud.vn/fleet-id"
+	FleetServiceIDLabel        = "fleet.vngcloud.vn/fleet-service-id"
+	FleetClusterIDLabel        = "fleet.vngcloud.vn/cluster-id"
+
+	ConfigClusterIdAnnotation = "fleet.vngcloud.vn/config-cluster-id"
+	TriggerAnnotation         = "fleet.vngcloud.vn/trigger"
 )

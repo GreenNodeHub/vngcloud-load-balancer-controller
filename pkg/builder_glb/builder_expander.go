@@ -3,9 +3,9 @@ package builder
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
@@ -36,61 +36,56 @@ type PoolBuilder interface {
 	SetName(name string)
 	SetID(id string)
 
-	GetICreatePoolRequest() loadbalancerv2.ICreatePoolRequest
-	loadbalancerv2.ICreatePoolRequest
+	GetICreatePoolRequest(string) global.ICreateGlobalPoolRequest
+	// global.ICreateGlobalPoolRequest
 }
 
-// var _ PoolBuilder = &poolBuilderType{}
+var _ PoolBuilder = &poolBuilderType{}
 
 type poolBuilderType struct {
-	Algorithm     loadbalancerv2.PoolAlgorithm  `json:"algorithm"`
-	PoolProtocol  loadbalancerv2.PoolProtocol   `json:"poolProtocol"`
-	Stickiness    bool                          `json:"stickiness,omitempty"`    // only for l7, l4 doesn't have this field => nil
-	TLSEncryption bool                          `json:"tlsEncryption,omitempty"` // only for l7, l4 doesn't have this field => nil
-	HealthMonitor *loadbalancerv2.HealthMonitor `json:"healthMonitor"`
-	Members       []*loadbalancerv2.Member      `json:"members"`
+	Algorithm         global.GlobalPoolAlgorithm         `json:"algorithm"`
+	Description       string                             `json:"description,omitempty"`
+	Name              string                             `json:"name"`
+	Protocol          global.GlobalPoolProtocol          `json:"protocol"`
+	Stickiness        *bool                              `json:"stickiness,omitempty"`    // only for l7, l4 doesn't have this field => nil
+	TLSEncryption     *bool                              `json:"tlsEncryption,omitempty"` // only for l7, l4 doesn't have this field => nil
+	HealthMonitor     *global.GlobalHealthMonitorRequest `json:"health"`
+	GlobalPoolMembers []*poolMemberBuilderType           `json:"globalPoolMembers"`
 
 	commonBuilder
-	IsL4      bool // check then stickness can be nil
 	isDeleted bool
 }
 
-func (p *poolBuilderType) GetICreatePoolRequest(lbID string) loadbalancerv2.ICreatePoolRequest {
-	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-	for _, member := range p.Members {
-		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
+type poolMemberBuilderType struct {
+	global.GlobalPoolMemberRequest
+	id string
+}
+
+func (p *poolBuilderType) GetICreatePoolRequest(lbID string) global.ICreateGlobalPoolRequest {
+	convertMembers := make([]global.ICreateGlobalPoolMemberRequest, 0)
+	for _, member := range p.GlobalPoolMembers {
+		convertMembers = append(convertMembers, &global.GlobalPoolMemberRequest{
+			Name:        member.Name,
+			Description: member.Description,
+			Region:      member.Region,
+			TrafficDial: member.TrafficDial,
+			VPCID:       member.VPCID,
+			Members:     member.Members,
+			Type:        global.GlobalPoolMemberTypePrivate,
+		})
 	}
-	r := &loadbalancerv2.CreatePoolRequest{
+	r := &global.CreateGlobalPoolRequest{
 		LoadBalancerCommon: common.LoadBalancerCommon{LoadBalancerId: lbID},
 		Algorithm:          p.Algorithm,
-		PoolName:           p.GetName(),
-		PoolProtocol:       p.PoolProtocol,
 		Stickiness:         nil,
 		TLSEncryption:      nil,
 		HealthMonitor:      p.HealthMonitor,
-		Members:            convertMembers,
-	}
-	if !p.IsL4 {
-		r.Stickiness = &p.Stickiness
-		r.TLSEncryption = &p.TLSEncryption
+		Description:        p.Description,
+		Name:               p.Name,
+		Protocol:           p.Protocol,
+		GlobalPoolMembers:  convertMembers,
 	}
 	return r
-}
-
-func (p *poolBuilderType) GetIUpdatePoolMembersRequest(lbID string) loadbalancerv2.IUpdatePoolMembersRequest {
-	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-	for _, member := range p.Members {
-		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
-	}
-	return loadbalancerv2.NewUpdatePoolMembersRequest(lbID, p.GetID()).WithMembers(convertMembers...)
-}
-
-func (p *poolBuilderType) GetIMembersRequest() []loadbalancerv2.IMemberRequest {
-	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-	for _, member := range p.Members {
-		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IpAddress, member.Port, member.MonitorPort))
-	}
-	return convertMembers
 }
 
 func (p *poolBuilderType) String() string {
@@ -110,22 +105,22 @@ func (p *poolBuilderType) IsDeleted() bool {
 }
 
 // ComparePoolBuilder compares two pools.
-func (current *poolBuilderType) ComparePoolBuilder(lbID string, new *poolBuilderType) (*loadbalancerv2.UpdatePoolRequest, []string) {
+func (current *poolBuilderType) ComparePoolBuilder(lbID string, new *poolBuilderType) (*global.UpdateGlobalPoolRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
-	healthMonitor := &loadbalancerv2.HealthMonitor{
+	healthMonitor := &global.GlobalHealthMonitorRequest{
 		HealthyThreshold:    new.HealthMonitor.HealthyThreshold,
 		UnhealthyThreshold:  new.HealthMonitor.UnhealthyThreshold,
 		Interval:            new.HealthMonitor.Interval,
 		Timeout:             new.HealthMonitor.Timeout,
 		HealthCheckProtocol: new.HealthMonitor.HealthCheckProtocol,
-		HealthCheckMethod:   new.HealthMonitor.HealthCheckMethod,
+		HttpMethod:          new.HealthMonitor.HttpMethod,
 		HttpVersion:         new.HealthMonitor.HttpVersion,
-		HealthCheckPath:     new.HealthMonitor.HealthCheckPath,
+		Path:                new.HealthMonitor.Path,
 		DomainName:          new.HealthMonitor.DomainName,
 		SuccessCode:         new.HealthMonitor.SuccessCode,
 	}
-	updateOptions := &loadbalancerv2.UpdatePoolRequest{
+	updateOptions := &global.UpdateGlobalPoolRequest{
 		PoolCommon: common.PoolCommon{
 			PoolId: current.GetID(),
 		},
@@ -133,24 +128,11 @@ func (current *poolBuilderType) ComparePoolBuilder(lbID string, new *poolBuilder
 			LoadBalancerId: lbID,
 		},
 		Algorithm:     new.Algorithm,
-		Stickiness:    nil,
-		TLSEncryption: nil,
 		HealthMonitor: healthMonitor,
 	}
-	if !new.IsL4 {
-		updateOptions.Stickiness = &new.Stickiness
-		updateOptions.TLSEncryption = &new.TLSEncryption
-	}
+
 	if current.Algorithm != new.Algorithm {
 		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.Algorithm, new.Algorithm))
-		isNeedUpdate = true
-	}
-	if !new.IsL4 && current.Stickiness != new.Stickiness {
-		message = append(message, fmt.Sprintf("stickiness (%t -> %t)", current.Stickiness, new.Stickiness))
-		isNeedUpdate = true
-	}
-	if !new.IsL4 && current.TLSEncryption != new.TLSEncryption {
-		message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", current.TLSEncryption, new.TLSEncryption))
 		isNeedUpdate = true
 	}
 
@@ -171,32 +153,32 @@ func (current *poolBuilderType) ComparePoolBuilder(lbID string, new *poolBuilder
 		isNeedUpdate = true
 	}
 
-	if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
-		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+	if current.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolHTTP &&
+		new.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolHTTP {
 		// domain may return nil
-		if current.HealthMonitor.HealthCheckPath == nil || *current.HealthMonitor.HealthCheckPath != *new.HealthMonitor.HealthCheckPath ||
+		if current.HealthMonitor.Path == nil || *current.HealthMonitor.Path != *new.HealthMonitor.Path ||
 			current.HealthMonitor.DomainName == nil || *current.HealthMonitor.DomainName != *new.HealthMonitor.DomainName ||
 			current.HealthMonitor.HttpVersion == nil || *current.HealthMonitor.HttpVersion != *new.HealthMonitor.HttpVersion ||
-			current.HealthMonitor.HealthCheckMethod == nil || *current.HealthMonitor.HealthCheckMethod != *new.HealthMonitor.HealthCheckMethod ||
+			current.HealthMonitor.HttpMethod == nil || *current.HealthMonitor.HttpMethod != *new.HealthMonitor.HttpMethod ||
 			current.HealthMonitor.SuccessCode == nil || *current.HealthMonitor.SuccessCode != *new.HealthMonitor.SuccessCode {
 			isNeedUpdate = true
 		}
-	} else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
-		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP {
+	} else if current.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolHTTP &&
+		new.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolTCP {
 
-		healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolHTTP
-		healthMonitor.HealthCheckPath = current.HealthMonitor.HealthCheckPath
+		healthMonitor.HealthCheckProtocol = global.GlobalPoolHealthCheckProtocolHTTP
+		healthMonitor.Path = current.HealthMonitor.Path
 		healthMonitor.DomainName = current.HealthMonitor.DomainName
 		healthMonitor.HttpVersion = current.HealthMonitor.HttpVersion
-		healthMonitor.HealthCheckMethod = current.HealthMonitor.HealthCheckMethod
-	} else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP &&
-		new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+		healthMonitor.HttpMethod = current.HealthMonitor.HttpMethod
+	} else if current.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolTCP &&
+		new.HealthMonitor.HealthCheckProtocol == global.GlobalPoolHealthCheckProtocolHTTP {
 
-		healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolTCP
-		healthMonitor.HealthCheckPath = nil
+		healthMonitor.HealthCheckProtocol = global.GlobalPoolHealthCheckProtocolTCP
+		healthMonitor.Path = nil
 		healthMonitor.DomainName = nil
 		healthMonitor.HttpVersion = nil
-		healthMonitor.HealthCheckMethod = nil
+		healthMonitor.HttpMethod = nil
 	}
 
 	if !isNeedUpdate {
@@ -336,31 +318,30 @@ type ListenerBuilder interface {
 
 	SetPoolID(poolID string)
 	GetPoolName() string
-	loadbalancerv2.ICreateListenerRequest
+	global.ICreateGlobalListenerRequest
 }
 
 var _ ListenerBuilder = &ListenerBuilderType{}
 
 type ListenerBuilderType struct {
 	commonBuilder
-	loadbalancerv2.CreateListenerRequest
+	global.CreateGlobalListenerRequest
 	ReferPoolName string
-	IsL4          bool
 
 	isDeleted      bool
 	policyBuilders []*policyBuilderType
 }
 
 func (l *ListenerBuilderType) SetPoolID(poolID string) {
-	l.CreateListenerRequest.DefaultPoolId = &poolID
+	l.CreateGlobalListenerRequest.GlobalPoolId = poolID
 }
 
 func (l *ListenerBuilderType) GetPoolName() string {
 	return l.ReferPoolName
 }
 
-func (l *ListenerBuilderType) GetICreateListenerRequest() *loadbalancerv2.CreateListenerRequest {
-	return &l.CreateListenerRequest
+func (l *ListenerBuilderType) GetICreateListenerRequest() *global.CreateGlobalListenerRequest {
+	return &l.CreateGlobalListenerRequest
 	// return loadbalancerv2.NewCreateListenerRequest(l.Name, l.ListenerProtocol, l.ListenerProtocolPort).
 	// 	WithDefaultPoolId(*l.DefaultPoolId).
 	// 	WithAllowedCidrs(l.AllowedCidrs).
@@ -399,35 +380,22 @@ func (l *ListenerBuilderType) GetPolicyBuilderByName(name string) *policyBuilder
 }
 
 // CompareListenerBuilder compares two listener options.
-func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *ListenerBuilderType) (*loadbalancerv2.UpdateListenerRequest, []string) {
+func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *ListenerBuilderType) (*global.UpdateGlobalListenerRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
-	updateOptions := &loadbalancerv2.UpdateListenerRequest{
+	updateOptions := &global.UpdateGlobalListenerRequest{
 		LoadBalancerCommon: common.LoadBalancerCommon{
 			LoadBalancerId: lbID,
 		},
 		ListenerCommon: common.ListenerCommon{
 			ListenerId: current.GetID(),
 		},
-		AllowedCidrs:                new.AllowedCidrs,
-		TimeoutClient:               new.TimeoutClient,
-		TimeoutMember:               new.TimeoutMember,
-		TimeoutConnection:           new.TimeoutConnection,
-		DefaultPoolId:               *new.DefaultPoolId,
-		DefaultCertificateAuthority: nil,
-		CertificateAuthorities:      nil,
-		Headers:                     nil,
-		ClientCertificate:           nil,
-	}
-
-	// set current value
-	if !new.IsL4 {
-		updateOptions.Headers = new.Headers
-		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
-			updateOptions.ClientCertificate = new.ClientCertificate
-			updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
-			updateOptions.CertificateAuthorities = new.CertificateAuthorities
-		}
+		AllowedCidrs:      new.AllowedCidrs,
+		TimeoutClient:     new.TimeoutClient,
+		TimeoutMember:     new.TimeoutMember,
+		TimeoutConnection: new.TimeoutConnection,
+		Headers:           nil,
+		GlobalPoolId:      new.GlobalPoolId,
 	}
 
 	if current.AllowedCidrs != new.AllowedCidrs {
@@ -450,58 +418,9 @@ func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *Lis
 		isNeedUpdate = true
 	}
 
-	if *current.DefaultPoolId != *new.DefaultPoolId {
-		message = append(message, fmt.Sprintf("default pool id (%s -> %s)", *current.DefaultPoolId, *new.DefaultPoolId))
+	if current.GlobalPoolId != new.GlobalPoolId {
+		message = append(message, fmt.Sprintf("default pool id (%s -> %s)", current.GlobalPoolId, new.GlobalPoolId))
 		isNeedUpdate = true
-	}
-
-	if !new.IsL4 {
-
-		// headers
-		slices.Sort(*current.Headers)
-		slices.Sort(*new.Headers)
-		if !slices.Equal(*current.Headers, *new.Headers) {
-			message = append(message, fmt.Sprintf("headers (%v -> %v)", *current.Headers, *new.Headers))
-			isNeedUpdate = true
-		}
-
-		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
-
-			// client certificate
-			if !comparePointer(current.ClientCertificate, new.ClientCertificate) {
-				message = append(message, fmt.Sprintf("client certificate (%v -> %v)",
-					pointerToString(current.ClientCertificate), pointerToString(new.ClientCertificate)))
-				isNeedUpdate = true
-			}
-
-			// default certificate authority
-			if !comparePointer(current.DefaultCertificateAuthority, new.DefaultCertificateAuthority) {
-				message = append(message, fmt.Sprintf("default certificate authority (%s -> %s)",
-					pointerToString(current.DefaultCertificateAuthority), pointerToString(new.DefaultCertificateAuthority)))
-				isNeedUpdate = true
-			}
-
-			// certificate authorities
-			if (current.CertificateAuthorities == nil || new.CertificateAuthorities == nil) &&
-				current.CertificateAuthorities != new.CertificateAuthorities {
-				message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
-				isNeedUpdate = true
-			} else {
-				// CertificateAuthorities is not nil
-				if len(*current.CertificateAuthorities) != len(*new.CertificateAuthorities) {
-					message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
-					isNeedUpdate = true
-				} else {
-					for _, ca := range *new.CertificateAuthorities {
-						if !slices.Contains(*current.CertificateAuthorities, ca) {
-							message = append(message, fmt.Sprintf("certificate authorities (%v -> %v)", current.CertificateAuthorities, new.CertificateAuthorities))
-							isNeedUpdate = true
-							break
-						}
-					}
-				}
-			}
-		}
 	}
 
 	if !isNeedUpdate {

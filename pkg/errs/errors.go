@@ -14,3 +14,25 @@ func IsLoadBalancerNotFound(err error) bool {
 func IsExceededSecurityGroupPerServerQuota(err error) bool {
 	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
 }
+
+// if the error is due to load balancer not found
+func IsGlobalLoadBalancerNotFound(err error) bool {
+	return strings.EqualFold(err.Error(), "global_load_balancer_not_found")
+}
+
+// `create rule fail. SecurityGroupRuleExists`
+func IsSecurityGroupRuleExists(err error) bool {
+	return strings.Contains(err.Error(), "SecurityGroupRuleExists")
+}
+
+func IgnoreErrors(err error, funcs ...func(error) bool) error {
+	if err == nil {
+		return nil
+	}
+	for _, f := range funcs {
+		if f(err) {
+			return nil
+		}
+	}
+	return err
+}

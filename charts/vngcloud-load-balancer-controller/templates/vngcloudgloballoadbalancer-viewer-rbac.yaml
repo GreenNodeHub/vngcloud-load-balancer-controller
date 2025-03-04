@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-vngcloudgloballoadbalancer-viewer-role
+  labels:
+  {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - vks.vngcloud.vn
+  resources:
+  - vngcloudgloballoadbalancers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - vks.vngcloud.vn
+  resources:
+  - vngcloudgloballoadbalancers/status
+  verbs:
+  - get
