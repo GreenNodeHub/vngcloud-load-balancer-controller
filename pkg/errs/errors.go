@@ -1,6 +1,7 @@
 package errs
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -14,6 +15,10 @@ func IsLoadBalancerNotFound(err error) bool {
 func IsExceededSecurityGroupPerServerQuota(err error) bool {
 	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
 }
+
+var (
+	ErrorNoImplementationSpecificConfigFound = fmt.Errorf("no implementation specific config found")
+)
 
 // if the error is due to load balancer not found
 func IsGlobalLoadBalancerNotFound(err error) bool {

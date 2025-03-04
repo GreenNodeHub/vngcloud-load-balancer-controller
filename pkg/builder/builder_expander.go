@@ -398,6 +398,19 @@ func (l *ListenerBuilderType) GetPolicyBuilderByName(name string) *policyBuilder
 	return nil
 }
 
+func (l *ListenerBuilderType) SetCertificateAuthority(certs ...string) {
+	if l.IsL4 {
+		return
+	}
+
+	if len(certs) > 0 {
+		l.DefaultCertificateAuthority = &certs[0]
+	}
+	if len(certs) > 1 {
+		l.CertificateAuthorities = PointerOf(certs[1:])
+	}
+}
+
 // CompareListenerBuilder compares two listener options.
 func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *ListenerBuilderType) (*loadbalancerv2.UpdateListenerRequest, []string) {
 	isNeedUpdate := false
@@ -517,12 +530,35 @@ type CertificateBuilder interface {
 	GetID() string
 	SetName(name string)
 	SetID(id string)
+
+	GetICreateCertificateRequest() loadbalancerv2.ICreateCertificateRequest
 }
 
 var _ CertificateBuilder = &certificateBuilderType{}
 
 type certificateBuilderType struct {
-	commonBuilder
+	ID string
+	loadbalancerv2.CreateCertificateRequest
+}
+
+func (c *certificateBuilderType) GetName() string {
+	return c.Name
+}
+
+func (c *certificateBuilderType) GetID() string {
+	return c.ID
+}
+
+func (c *certificateBuilderType) SetName(name string) {
+	c.Name = name
+}
+
+func (c *certificateBuilderType) SetID(id string) {
+	c.ID = id
+}
+
+func (c *certificateBuilderType) GetICreateCertificateRequest() loadbalancerv2.ICreateCertificateRequest {
+	return &c.CreateCertificateRequest
 }
 
 // ------------------------------------------------------------

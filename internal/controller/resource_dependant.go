@@ -117,11 +117,19 @@ func (r *ingressDependant) Set(ingress *networkv1.Ingress, isAddEndpoint bool) {
 			}
 		}
 	}
+
+	// get all secret name in ingress
+	for _, tls := range ingress.Spec.TLS {
+		if tls.SecretName != "" {
+			secretKey := "secret/" + namespace + "/" + tls.SecretName
+			r.ingressDependResources[key] = append(r.ingressDependResources[key], secretKey)
+		}
+	}
 	// logrus.Infof("SetIngress: %v", r.ingressDependResources)
 }
 
 func (r *ingressDependant) GetResourceNeedReconcile(kind, namespace, resource string) []reconcile.Request {
-	if kind != "endpoint" && kind != "service" {
+	if kind != "endpoint" && kind != "service" && kind != "secret" {
 		return nil
 	}
 	result := []reconcile.Request{}

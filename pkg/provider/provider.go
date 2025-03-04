@@ -95,10 +95,10 @@ type Provider interface {
 	UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error
 	GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error)
 
-	// ImportCertificate(opt *certificates.ImportOpts) (*objects.Certificate, error)
-	// ListCertificates() ([]*objects.Certificate, error)
-	// GetCertificateByID(certID string) (*objects.Certificate, error)
-	// DeleteCertificate(certID string) error
+	ListCertificates(ctx context.Context) (*entityv2.ListCertificates, error)
+	GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error)
+	ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error)
+	DeleteCertificate(ctx context.Context, certID string) error
 
 	ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error)
 	GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
