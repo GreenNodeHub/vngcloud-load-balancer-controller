@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
@@ -31,6 +32,7 @@ type Provider interface {
 	Init(providerIDs []string) error
 	GetProjectID() string
 	GetNetworkID() string
+	GetNetworkCIDR() string
 	GetSubnetID() string
 	GetSubnetCIDR() string
 	GetDefaultPackage() (string, string, error)
@@ -97,4 +99,23 @@ type Provider interface {
 	GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error)
 	ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error)
 	DeleteCertificate(ctx context.Context, certID string) error
+
+	ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error)
+	GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+	GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+	CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error)
+	DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error
+	WaitGlobalLoadBalancerActive(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+
+	ListGlobalPools(ctx context.Context, glbID string) (*entityv2.ListGlobalPools, error)
+	CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error)
+	DeleteGlobalPool(ctx context.Context, glbID, poolID string) error
+	UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error
+	ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error)
+	PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error
+
+	ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error)
+	CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error)
+	DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error
+	UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error
 }

@@ -125,10 +125,12 @@ To install dev version through helm:
 ```sh
 helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/60108-annd2-ingress/vks-helm-charts/vngcloud-load-balancer-controller \
   --namespace kube-system \
-  --set manager.manager.image.tag=v0.0.1 \
+  --set manager.manager.image.repository=vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller \
+  --set manager.manager.image.tag=v0.0.0 \
   --version 0.0.1 \
   --set mysecret.global.clientID="____________________" \
-  --set mysecret.global.clientSecret="____________________"
+  --set mysecret.global.clientSecret="____________________" \
+  --set mysecret.global.vserverURL="https://han-1.api.vngcloud.vn/vserver"
 ```
 
 To run locally, make sure you have this file `/etc/vngcloud-load-balancer-controller/config.yaml` with the following content:

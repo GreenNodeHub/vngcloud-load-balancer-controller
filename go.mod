@@ -14,8 +14,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384
+	github.com/vngcloud/vngcloud-go-sdk/v2 v2.13.0
 	k8s.io/api v0.31.3
+	k8s.io/apiextensions-apiserver v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.3
 	k8s.io/klog/v2 v2.130.1
@@ -137,7 +138,6 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.31.3 // indirect
 	k8s.io/apiserver v0.31.3 // indirect
 	k8s.io/cluster-bootstrap v0.31.3 // indirect
 	k8s.io/component-base v0.31.3 // indirect

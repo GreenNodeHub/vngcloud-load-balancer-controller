@@ -1,7 +1,7 @@
 package controller
 
 import (
-	// "github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	networkv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,6 +151,63 @@ func (r *ingressDependant) GetResourceNeedReconcile(kind, namespace, resource st
 }
 
 func (r *ingressDependant) Clear(service *networkv1.Ingress) {
+	key := service.Namespace + "/" + service.Name
+	delete(r.ingressDependResources, key)
+}
+
+// --------------------------------------------------------------------------------------------
+
+var _ ResourceDependant[*v1alpha1.VngcloudGlobalLoadBalancer] = &vglbDependant{}
+
+func NewVGLBDependant(k8sClient client.Client) ResourceDependant[*v1alpha1.VngcloudGlobalLoadBalancer] {
+	return &vglbDependant{
+		k8sClient:              k8sClient,
+		ingressDependResources: make(map[string][]string),
+	}
+}
+
+type vglbDependant struct {
+	k8sClient              client.Client
+	ingressDependResources map[string][]string
+}
+
+func (r *vglbDependant) Set(ingress *v1alpha1.VngcloudGlobalLoadBalancer, isAddEndpoint bool) {
+	r.Clear(ingress)
+	namespace := ingress.Namespace
+	name := ingress.Name
+	key := namespace + "/" + name
+
+	serviceKey := "service/" + key
+	r.ingressDependResources[key] = append(r.ingressDependResources[key], serviceKey)
+	if isAddEndpoint {
+		endpointKey := "endpoint/" + key
+		r.ingressDependResources[key] = append(r.ingressDependResources[key], endpointKey)
+	}
+}
+
+func (r *vglbDependant) GetResourceNeedReconcile(kind, namespace, resource string) []reconcile.Request {
+	if kind != "endpoint" && kind != "service" {
+		return nil
+	}
+	result := []reconcile.Request{}
+	key := kind + "/" + namespace + "/" + resource
+	for k, v := range r.ingressDependResources {
+		for _, d := range v {
+			if d == key {
+				namespace, name := revertKey(k)
+				result = append(result, reconcile.Request{
+					NamespacedName: client.ObjectKey{
+						Namespace: namespace,
+						Name:      name,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (r *vglbDependant) Clear(service *v1alpha1.VngcloudGlobalLoadBalancer) {
 	key := service.Namespace + "/" + service.Name
 	delete(r.ingressDependResources, key)
 }

@@ -239,10 +239,8 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/valyala/fastjson v1.6.4 h1:uAUNq9Z6ymTgGhcm0UynUAB6tlbakBrz6CQFax3BXVQ=
 github.com/valyala/fastjson v1.6.4/go.mod h1:CLCAqky6SMuOcxStkYQvblddUtoRxhYMGLrsQns1aXY=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.0 h1:+W3rrDyFWfaU7jIvcoy00yO52ZGS6pb7VU10Edz4SyY=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.0/go.mod h1:FetWUe2fEuqySEkYgkuDgt/WOAlI/YC02reGqjdJRMU=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384 h1:2rt+SgFfiLvtbO03ObQZo6hJTp5x7xClBvHbuHbcZSU=
-github.com/vngcloud/vngcloud-go-sdk/v2 v2.11.1-0.20250121073437-4685debe2384/go.mod h1:FetWUe2fEuqySEkYgkuDgt/WOAlI/YC02reGqjdJRMU=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.13.0 h1:iD+iIpCt8qTDElFKLAO9EaK6JII2SfsRzkn2L63Qhlg=
+github.com/vngcloud/vngcloud-go-sdk/v2 v2.13.0/go.mod h1:FetWUe2fEuqySEkYgkuDgt/WOAlI/YC02reGqjdJRMU=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
