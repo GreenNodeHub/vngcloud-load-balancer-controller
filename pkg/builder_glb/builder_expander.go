@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )
@@ -487,7 +487,7 @@ func (s *secGroupRuleBuilderType) GetPortRangeMax() int {
 func (s *secGroupRuleBuilderType) GetICreateSecgroupRuleRequest(secgroupID string) *networkv2.CreateSecgroupRuleRequest {
 	return &networkv2.CreateSecgroupRuleRequest{
 		SecurityGroupID: secgroupID,
-		SecgroupCommon: networkv2.SecgroupCommon{
+		SecgroupCommon: common.SecgroupCommon{
 			SecgroupId: secgroupID,
 		},
 		Description:    s.Description,

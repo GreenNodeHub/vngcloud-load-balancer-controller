@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 )

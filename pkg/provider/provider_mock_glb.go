@@ -8,7 +8,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	clone "github.com/huandu/go-clone"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"

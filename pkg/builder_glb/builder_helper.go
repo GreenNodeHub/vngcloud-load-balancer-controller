@@ -6,7 +6,7 @@ import (
 	"unicode"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 

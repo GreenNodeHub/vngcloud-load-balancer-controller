@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

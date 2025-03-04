@@ -568,7 +568,7 @@ func (s *secGroupRuleBuilderType) GetPortRangeMax() int {
 func (s *secGroupRuleBuilderType) GetICreateSecgroupRuleRequest(secgroupID string) *networkv2.CreateSecgroupRuleRequest {
 	return &networkv2.CreateSecgroupRuleRequest{
 		SecurityGroupID: secgroupID,
-		SecgroupCommon: networkv2.SecgroupCommon{
+		SecgroupCommon: common.SecgroupCommon{
 			SecgroupId: secgroupID,
 		},
 		Description:    s.Description,

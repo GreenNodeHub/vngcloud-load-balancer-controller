@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"

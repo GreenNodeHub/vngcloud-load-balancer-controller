@@ -5,7 +5,7 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/global"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 )
 
 type modelMember struct {
