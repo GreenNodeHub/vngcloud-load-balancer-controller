@@ -38,6 +38,7 @@ rules:
   - endpoints
   - events
   - nodes
+  - secrets
   - services
   verbs:
   - create
