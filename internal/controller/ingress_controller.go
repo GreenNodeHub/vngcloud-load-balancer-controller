@@ -45,6 +45,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/event_classification"
 	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/anngdinh/operator-helper/string_locker"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -90,6 +91,9 @@ type IngressReconciler struct {
 	timeReconcilePeriod time.Duration
 	numCurrentReconcile int
 	numCurrentLock      sync.Mutex
+
+	// mutex to avoid update, delete conflicts
+	lbIDMutex string_locker.StringKeyLocker
 }
 
 func (r *IngressReconciler) isValid(obj client.Object) bool {
@@ -651,6 +655,10 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 	// remove from update tracker
 	r.UpdateTracker.RemoveIngress(oldBuilder.GetLoadBalancerID(), obj)
 
+	// lock the current loadbalancer id
+	r.lbIDMutex.Lock(oldBuilder.GetLoadBalancerID())
+	defer r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
 		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
@@ -712,6 +720,9 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 		}
 	}
 
+	// unlock the current loadbalancer id
+	r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+
 	if deleteSegroup {
 		// ensure delete security group with mutex
 		err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
@@ -767,6 +778,7 @@ func (r *IngressReconciler) init() error {
 	if r.timeReconcilePeriod == 0 {
 		r.timeReconcilePeriod = 60 * time.Second
 	}
+	r.lbIDMutex = string_locker.StringKeyLocker{}
 
 	ctx := context.Background()
 	r.startBackgroundGoroutine(ctx)

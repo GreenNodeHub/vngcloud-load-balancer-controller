@@ -76,16 +76,31 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	// get selector node
-	var nodes []*corev1.Node
+	var selectedNodes []*corev1.Node
+	var unselectedNodes []*corev1.Node
 	if newBuilder.GetTargetType() == TargetTypeIP {
-		nodes = k8s.FilterNodeWithLabel(r.knownNodes, map[string]string{})
+		selectedNodes = k8s.FilterNodeWithLabel(r.knownNodes, map[string]string{})
+		unselectedNodes = k8s.FilterNodeWithoutLabel(r.knownNodes, map[string]string{})
 	} else {
-		nodes = k8s.FilterNodeWithLabel(r.knownNodes, newBuilder.GetTargetNodeLabels())
+		selectedNodes = k8s.FilterNodeWithLabel(r.knownNodes, newBuilder.GetTargetNodeLabels())
+		unselectedNodes = k8s.FilterNodeWithoutLabel(r.knownNodes, newBuilder.GetTargetNodeLabels())
 	}
 
 	// ensure all server using the secgroups, which are in the annotation
 	if !newBuilder.IsCreateDefaultSecgroup() {
-		r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), newBuilder.GetSecurityGroupIDs(), nodes)
+		err := r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), newBuilder.GetSecurityGroupIDs(), selectedNodes)
+		if err != nil {
+			r.logger.Error("Fail to ensure server have secgroup", err)
+			return err
+		}
+
+		// remove secgroups from all server in unselected node
+		r.logger.Debug("🎃 Remove secgroup from unselected node")
+		err = r.ensureDeleteAddNodesSG(append(oldBuilder.GetOldSecGroups(), newBuilder.GetSecurityGroupIDs()...), []string{}, unselectedNodes)
+		if err != nil {
+			r.logger.Error("Fail to remove secgroup from unselected node", err)
+			return err
+		}
 		return nil
 	}
 
@@ -158,9 +173,17 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	// ensure secgroup in server
-	err = r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), []string{defaultSecgroup.Id}, nodes)
+	err = r.ensureDeleteAddNodesSG(oldBuilder.GetOldSecGroups(), []string{defaultSecgroup.Id}, selectedNodes)
 	if err != nil {
 		r.logger.Error("Fail to ensure server have secgroup", err)
+		return err
+	}
+
+	// remove secgroups from all server in unselected node
+	r.logger.Debug("🎃 Remove secgroup from unselected node")
+	err = r.ensureDeleteAddNodesSG(append(oldBuilder.GetOldSecGroups(), defaultSecgroup.Id), []string{}, unselectedNodes)
+	if err != nil {
+		r.logger.Error("Fail to remove secgroup from unselected node", err)
 		return err
 	}
 

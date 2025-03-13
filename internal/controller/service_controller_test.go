@@ -1806,6 +1806,175 @@ var _ = Describe("Service Controller", func() {
 		})
 	})
 
+	Context("When update target node label", func() {
+		It("it should update default secgroup in server opt out", func() {
+			// if skipIngressTest {
+			// 	Skip("Skip test")
+			// }
+			mockServiceReconciler.modeTest = false
+
+			test := TestType[*corev1.Service]{
+				preTest:         func() {},
+				postTest:        func() {},
+				name:            "create service with target node label",
+				generateDepends: func() []client.Object { return []client.Object{} },
+				generateObj: func() []ObjectAndExpect[*corev1.Service] {
+					service := newServiceResource("test-service-target-node-label", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					if service.Annotations == nil {
+						service.Annotations = map[string]string{}
+					}
+					service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels)] = "nodeGroup=mock-node-group-a"
+					return []ObjectAndExpect[*corev1.Service]{{obj: service, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-target-node-label", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+					for _, pool := range pools.Items {
+						Expect(pool.Members).ShouldNot(BeNil())
+						Expect((pool.Members.Items)).Should(HaveLen(2)) // number of member in pool = number of node or number of endpoint
+						expectAddress := []string{
+							mockNode1.Status.Addresses[0].Address,
+							mockNode2.Status.Addresses[0].Address}
+						for _, member := range pool.Members.Items {
+							Expect(member.MonitorPort).Should(Equal(member.ProtocolPort))
+							Expect(member.Address).Should(BeElementOf(expectAddress))
+							expectAddress = removeFisrt(expectAddress, member.Address)
+						}
+					}
+
+					// check secgroups
+					secgroups, err := mockProvider.ListSecurityGroups(ctx)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(secgroups).ShouldNot(BeNil())
+					Expect((secgroups.Items)).Should(HaveLen(1))
+					secgroupID := ""
+					for _, secgroup := range secgroups.Items {
+						if secgroup.Name == loadbalancer.Name {
+							secgroupID = secgroup.Id
+						}
+					}
+					Expect(secgroupID).ShouldNot(BeEmpty())
+
+					// check server have secgroup
+					server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(server).ShouldNot(BeNil())
+					Expect((server.Items)).Should(HaveLen(2))
+					expectServerID := []string{"ins-00000000-0000-0000-0000-000000000001", "ins-00000000-0000-0000-0000-000000000002"}
+					for _, item := range server.Items {
+						Expect(item.Uuid).Should(BeElementOf(expectServerID))
+						expectServerID = removeFisrt(expectServerID, item.Name)
+
+						serverSecgroups := make([]string, 0)
+						for _, secgroup := range item.SecGroups {
+							serverSecgroups = append(serverSecgroups, secgroup.Uuid)
+						}
+						Expect(serverSecgroups).Should(ContainElement(secgroupID))
+					}
+
+					// check server opt out
+					unexpectedServerID := []string{"ins-00000000-0000-0000-0000-000000000003", "ins-00000000-0000-0000-0000-000000000004"}
+					for _, item := range server.Items {
+						Expect(item.Uuid).ShouldNot(BeElementOf(unexpectedServerID))
+					}
+				},
+				steps: []StepType{
+					{
+						kindStep: updateStep,
+						name:     "update target node label",
+						getObject: func() client.Object {
+							obj := &corev1.Service{}
+							Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "test-service-target-node-label", Namespace: "default"}, obj)).Should(Succeed())
+							obj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels)] = "nodeGroup=mock-node-group-b"
+							return obj
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-target-node-label", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+							for _, pool := range pools.Items {
+								Expect(pool.Members).ShouldNot(BeNil())
+								Expect((pool.Members.Items)).Should(HaveLen(2)) // number of member in pool = number of node or number of endpoint
+								expectAddress := []string{
+									mockNode3.Status.Addresses[0].Address,
+									mockNode4.Status.Addresses[0].Address}
+								for _, member := range pool.Members.Items {
+									Expect(member.MonitorPort).Should(Equal(member.ProtocolPort))
+									Expect(member.Address).Should(BeElementOf(expectAddress))
+									expectAddress = removeFisrt(expectAddress, member.Address)
+								}
+							}
+
+							// check secgroups
+							secgroups, err := mockProvider.ListSecurityGroups(ctx)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(secgroups).ShouldNot(BeNil())
+							Expect((secgroups.Items)).Should(HaveLen(1))
+							secgroupID := ""
+							for _, secgroup := range secgroups.Items {
+								if secgroup.Name == loadbalancer.Name {
+									secgroupID = secgroup.Id
+								}
+							}
+							Expect(secgroupID).ShouldNot(BeEmpty())
+
+							// check server have secgroup
+							server, err := mockProvider.ListServerBySecgroupID(ctx, secgroupID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(server).ShouldNot(BeNil())
+							Expect((server.Items)).Should(HaveLen(2))
+							expectServerID := []string{"ins-00000000-0000-0000-0000-000000000003", "ins-00000000-0000-0000-0000-000000000004"}
+							for _, item := range server.Items {
+								Expect(item.Uuid).Should(BeElementOf(expectServerID))
+								expectServerID = removeFisrt(expectServerID, item.Name)
+
+								serverSecgroups := make([]string, 0)
+								for _, secgroup := range item.SecGroups {
+									serverSecgroups = append(serverSecgroups, secgroup.Uuid)
+								}
+								Expect(serverSecgroups).Should(ContainElement(secgroupID))
+							}
+
+							// check server opt out
+							unexpectedServerID := []string{"ins-00000000-0000-0000-0000-000000000001", "ins-00000000-0000-0000-0000-000000000002"}
+							for _, item := range server.Items {
+								Expect(item.Uuid).ShouldNot(BeElementOf(unexpectedServerID))
+							}
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*corev1.Service](test)
+		})
+	})
+
 	// Context("aaaaaaaaaaaaaaaa", func() {
 	// 	It("aaaaaaaaaaaaaaaaaaaaaa", func() {
 	// 	})

@@ -43,6 +43,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/event_classification"
 	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/anngdinh/operator-helper/string_locker"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -88,6 +89,9 @@ type ServiceReconciler struct {
 	timeReconcilePeriod time.Duration
 	numCurrentReconcile int
 	numCurrentLock      sync.Mutex
+
+	// mutex to avoid update, delete conflicts
+	lbIDMutex string_locker.StringKeyLocker
 }
 
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;create;update;patch;delete
@@ -631,6 +635,10 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	// remove from update tracker
 	r.UpdateTracker.RemoveService(oldBuilder.GetLoadBalancerID(), obj)
 
+	// lock the current loadbalancer id
+	r.lbIDMutex.Lock(oldBuilder.GetLoadBalancerID())
+	defer r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+
 	// inspect current loadbalancer in portal to compare with
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
 		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
@@ -692,6 +700,9 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		}
 	}
 
+	// unlock the current loadbalancer id
+	r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+
 	if deleteSegroup {
 		// ensure delete security group with mutex
 		err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
@@ -740,6 +751,7 @@ func (r *ServiceReconciler) init() error {
 	if r.timeReconcilePeriod == 0 {
 		r.timeReconcilePeriod = 60 * time.Second
 	}
+	r.lbIDMutex = string_locker.StringKeyLocker{}
 
 	ctx := context.Background()
 	r.startBackgroundGoroutine(ctx)
