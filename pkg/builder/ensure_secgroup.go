@@ -206,6 +206,9 @@ func (r *vngcloudLBBuilder) findSecgroupByName(name string) (*entityv2.Secgroup,
 }
 
 func (m *vngcloudLBBuilder) validateSecurityGroup(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
 
 	listSecgroups, sdkErr := m.provider.ListSecurityGroups(m.context)
 	if sdkErr != nil {
@@ -294,6 +297,11 @@ func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilde
 
 // ensure delete old secgroups and add new secgroups to nodes
 func (r *vngcloudLBBuilder) ensureDeleteAddNodesSG(oldSecgroups, newSecgroups []string, nodes []*corev1.Node) error {
+	if len(oldSecgroups) == 0 && len(newSecgroups) == 0 {
+		return nil
+	}
+
+	// validate secgroups
 	err := r.validateSecurityGroup(newSecgroups)
 	if err != nil {
 		return err
