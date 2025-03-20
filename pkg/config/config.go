@@ -8,8 +8,10 @@ import (
 
 // Config struct contains ingress controller configuration
 type Config struct {
-	ChartVersion string `mapstructure:"chartVersion"`
-	Cluster      struct {
+	ChartVersion            string `mapstructure:"chartVersion"`
+	MaxConcurrentReconciles int    `mapstructure:"maxConcurrentReconciles"`
+
+	Cluster struct {
 		ClusterName string `mapstructure:"clusterName"`
 		ClusterID   string `mapstructure:"clusterID"`
 		Region      string `mapstructure:"region"`

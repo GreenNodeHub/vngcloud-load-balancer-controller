@@ -743,7 +743,12 @@ func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager
 			k8sBuilder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 5, // ..................
+			MaxConcurrentReconciles: func() int {
+				if r.Config.MaxConcurrentReconciles > 0 {
+					return r.Config.MaxConcurrentReconciles
+				}
+				return 5
+			}(),
 		}).
 		WithEventFilter(predicate.Funcs{
 			CreateFunc: func(e event.CreateEvent) bool {
