@@ -1,7 +1,6 @@
 package builder
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -106,13 +105,13 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 
 	// if default secgroup not exists, create it
 	if !isExists {
-		_secG, err := r.provider.CreateSecurityGroup(context.Background(), r.GetLoadBalancerDefaultName(),
+		_secG, err := r.provider.CreateSecurityGroup(r.context, r.GetLoadBalancerDefaultName(),
 			"Automatically created using VNGCLOUD LoadBalancer Controller")
 		if err != nil {
 			r.logger.Error("Fail to create default secgroup", err)
 			return err
 		}
-		defaultSecgroup, err = r.provider.GetSecurityGroup(context.Background(), _secG.Id)
+		defaultSecgroup, err = r.provider.GetSecurityGroup(r.context, _secG.Id)
 		if err != nil {
 			r.logger.Error("Fail to get default secgroup", err)
 			return err
@@ -120,7 +119,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	// get all secgroup rules of default secgroup
-	defaultSecgroupRules, err := r.provider.ListSecurityGroupRules(context.Background(), defaultSecgroup.Id)
+	defaultSecgroupRules, err := r.provider.ListSecurityGroupRules(r.context, defaultSecgroup.Id)
 	if err != nil {
 		r.logger.Error("Fail to list secgroup rules", err)
 		return err
@@ -156,7 +155,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	for _, rule := range needDelete {
-		err := r.provider.DeleteSecurityGroupRule(context.Background(), defaultSecgroup.Id, rule.Id)
+		err := r.provider.DeleteSecurityGroupRule(r.context, defaultSecgroup.Id, rule.Id)
 		if err != nil {
 			r.logger.Error("Fail to delete secgroup rule", err)
 			return err
@@ -164,7 +163,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	}
 
 	for _, rule := range needCreate {
-		_, err := r.provider.CreateSecurityGroupRule(context.Background(), defaultSecgroup.Id,
+		_, err := r.provider.CreateSecurityGroupRule(r.context, defaultSecgroup.Id,
 			rule.GetICreateSecgroupRuleRequest(defaultSecgroup.Id))
 		if err != nil {
 			r.logger.Error("Fail to create secgroup rule", err)
@@ -191,7 +190,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 }
 
 func (r *vngcloudLBBuilder) findSecgroupByName(name string) (*entityv2.Secgroup, bool, error) {
-	secgroups, err := r.provider.ListSecurityGroups(context.Background())
+	secgroups, err := r.provider.ListSecurityGroups(r.context)
 	if err != nil {
 		return nil, false, err
 	}
@@ -282,7 +281,7 @@ func (r *vngcloudLBBuilder) EnsureDeleteSecurityGroups(oldBuilder OldModelBuilde
 			return err
 		}
 		if !isInUse {
-			err = r.provider.DeleteSecurityGroup(context.Background(), defaultSecgroup.Id)
+			err = r.provider.DeleteSecurityGroup(r.context, defaultSecgroup.Id)
 			if err != nil {
 				r.logger.Error("Fail to delete default secgroup", err)
 				return err
@@ -332,7 +331,7 @@ func (r *vngcloudLBBuilder) ensureDeleteAddNodesSG(oldSecgroups, newSecgroups []
 // ensure secgroup for instance, remove old secgroups and add new secgroups
 func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecgroups, newSecgroups []string) error {
 	// get security groups of instance
-	instance, err := m.provider.GetServerByID(context.Background(), instanceID)
+	instance, err := m.provider.GetServerByID(m.context, instanceID)
 	if err != nil {
 		m.logger.Error("Fail to get instance", err)
 		return err
@@ -353,7 +352,7 @@ func (m *vngcloudLBBuilder) ensureSecgroupForInstance(instanceID string, oldSecg
 
 	// update security groups of instance
 	m.logger.Infof("Update security groups of instance %s: %v -> %v", instanceID, currentSecgroups, newSecgroups)
-	_, err = m.provider.UpdateSecGroupsOfServer(context.Background(), instanceID, newSecgroups)
+	_, err = m.provider.UpdateSecGroupsOfServer(m.context, instanceID, newSecgroups)
 	if err != nil {
 		m.logger.Error("Fail to update security groups of instance", err)
 		return err
