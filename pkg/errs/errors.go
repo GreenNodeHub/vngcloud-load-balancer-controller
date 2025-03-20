@@ -16,6 +16,11 @@ func IsExceededSecurityGroupPerServerQuota(err error) bool {
 	return strings.Contains(err.Error(), "Exceeded SEC_GROUP_PER_SERVER quota.")
 }
 
+// The load balancer id lb-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx is not ready
+func IsLoadBalancerNotReady(err error) bool {
+	return strings.HasPrefix(err.Error(), "The load balancer id") && strings.HasSuffix(err.Error(), "is not ready")
+}
+
 var (
 	ErrorNoImplementationSpecificConfigFound = fmt.Errorf("no implementation specific config found")
 )

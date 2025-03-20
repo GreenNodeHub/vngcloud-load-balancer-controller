@@ -43,7 +43,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/event_classification"
 	"github.com/anngdinh/operator-helper/k8s"
-	"github.com/anngdinh/operator-helper/string_locker"
+	"github.com/anngdinh/operator-helper/multilock"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -91,7 +91,7 @@ type ServiceReconciler struct {
 	numCurrentLock      sync.Mutex
 
 	// mutex to avoid update, delete conflicts
-	lbIDMutex string_locker.StringKeyLocker
+	lbIDMutex *multilock.MultiLock
 }
 
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;create;update;patch;delete
@@ -635,77 +635,86 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 	// remove from update tracker
 	r.UpdateTracker.RemoveService(oldBuilder.GetLoadBalancerID(), obj)
 
-	// lock the current loadbalancer id
-	r.lbIDMutex.Lock(oldBuilder.GetLoadBalancerID())
-	defer r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+	var currentBuilder builder.LoadBalancerBuilder
+	var newBuilder builder.ModelBuilder
 
-	// inspect current loadbalancer in portal to compare with
-	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
-		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
-	if err != nil {
-		if errs.IsLoadBalancerNotFound(err) {
-			logger.Info("LoadBalancer not found, return.")
-			return nil
-		}
-		logger.Error("Failed to get current loadbalancer: ", err)
-		return err
-	}
+	// wrap with mutex to lock the loadbalancer id
+	err := func() error {
+		// lock the current loadbalancer id
+		r.lbIDMutex.Lock(oldBuilder.GetLoadBalancerID())
+		defer r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
 
-	// build loadbalancer model, pass nil to object to create a model with default values
-	newBuilder, err := builder.NewModelBuilderByService(ctx, nil, r.annotationParser, r.Client,
-		r.networkID, r.subnetID, r.subnetCIDR,
-		r.Config.Cluster.ClusterID,
-		r.knownNodes,
-		r.cniMode,
-		r.defaultPackageID,
-	)
-	if err != nil {
-		logger.Error("Failed to create new model builder: ", err)
-		return err
-	}
-
-	if deletetag {
-		// ensure delete tags
-		err = r.ensureDeleteTags(currentBuilder, oldBuilder)
+		// inspect current loadbalancer in portal to compare with
+		var err error
+		currentBuilder, err = builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
+			r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 		if err != nil {
-			logger.Error("Failed to ensure delete tags: ", err)
+			if errs.IsLoadBalancerNotFound(err) {
+				logger.Info("LoadBalancer not found, return.")
+				return nil
+			}
+			logger.Error("Failed to get current loadbalancer: ", err)
 			return err
 		}
-	}
 
-	if deleteResource {
-		// check if can delete whole loadbalancer
-		// oldBuilder and currentBuilder should be the same listeners' name, pool's name
-		// if can delete whole loadbalancer, delete loadbalancer and return
-		if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
-			if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
-				logger.Error("Failed to delete loadbalancer: ", err)
-				return err
-			}
-			logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
-		} else {
-			// delete redundant listeners
-			err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
-			if err != nil {
-				logger.Error("Failed to delete redundant listeners: ", err)
-				return err
-			}
+		// build loadbalancer model, pass nil to object to create a model with default values
+		newBuilder, err = builder.NewModelBuilderByService(ctx, nil, r.annotationParser, r.Client,
+			r.networkID, r.subnetID, r.subnetCIDR,
+			r.Config.Cluster.ClusterID,
+			r.knownNodes,
+			r.cniMode,
+			r.defaultPackageID,
+		)
+		if err != nil {
+			logger.Error("Failed to create new model builder: ", err)
+			return err
+		}
 
-			// delete redundant pools, should check if pool is used by other listeners or policy then ignore
-			err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
+		if deletetag {
+			// ensure delete tags
+			err = r.ensureDeleteTags(currentBuilder, oldBuilder)
 			if err != nil {
-				logger.Error("Failed to delete redundant pools: ", err)
+				logger.Error("Failed to ensure delete tags: ", err)
 				return err
 			}
 		}
-	}
 
-	// unlock the current loadbalancer id
-	r.lbIDMutex.Unlock(oldBuilder.GetLoadBalancerID())
+		if deleteResource {
+			// check if can delete whole loadbalancer
+			// oldBuilder and currentBuilder should be the same listeners' name, pool's name
+			// if can delete whole loadbalancer, delete loadbalancer and return
+			if currentBuilder.CanDeleteWholeLoadBalancer(oldBuilder) {
+				if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
+					logger.Error("Failed to delete loadbalancer: ", err)
+					return err
+				}
+				logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
+			} else {
+				// delete redundant listeners
+				err = currentBuilder.DeleteRedundantListeners(oldBuilder, newBuilder)
+				if err != nil {
+					logger.Error("Failed to delete redundant listeners: ", err)
+					return err
+				}
+
+				// delete redundant pools, should check if pool is used by other listeners or policy then ignore
+				err = currentBuilder.DeleteRedundantPools(oldBuilder, newBuilder)
+				if err != nil {
+					logger.Error("Failed to delete redundant pools: ", err)
+					return err
+				}
+			}
+		}
+
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
 
 	if deleteSegroup {
 		// ensure delete security group with mutex
-		err = r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
+		err := r.ensureDeleteSecurityGroup(currentBuilder, oldBuilder)
 		if err != nil {
 			logger.Error("Failed to ensure delete security group: ", err)
 			return err
@@ -751,7 +760,7 @@ func (r *ServiceReconciler) init() error {
 	if r.timeReconcilePeriod == 0 {
 		r.timeReconcilePeriod = 60 * time.Second
 	}
-	r.lbIDMutex = string_locker.StringKeyLocker{}
+	r.lbIDMutex = multilock.NewMultipleLock()
 
 	ctx := context.Background()
 	r.startBackgroundGoroutine(ctx)

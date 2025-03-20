@@ -1808,9 +1808,9 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When update target node label", func() {
 		It("it should update default secgroup in server opt out", func() {
-			// if skipIngressTest {
-			// 	Skip("Skip test")
-			// }
+			if skipIngressTest {
+				Skip("Skip test")
+			}
 			mockServiceReconciler.modeTest = false
 
 			test := TestType[*corev1.Service]{
@@ -1964,6 +1964,169 @@ var _ = Describe("Service Controller", func() {
 							for _, item := range server.Items {
 								Expect(item.Uuid).ShouldNot(BeElementOf(unexpectedServerID))
 							}
+						},
+					},
+				},
+				expectAfterDelete: func() {},
+			}
+
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*corev1.Service](test)
+		})
+	})
+
+	Context("When create 3 service using same LB", func() {
+		It("it should work well, delete should delete all", func() {
+			if skipIngressTest {
+				Skip("Skip test")
+			}
+			mockServiceReconciler.modeTest = false
+
+			lbID := ""
+			test := TestType[*corev1.Service]{
+				preTest:         func() {},
+				postTest:        func() {},
+				name:            "create service normal",
+				generateDepends: func() []client.Object { return []client.Object{} },
+				generateObj: func() []ObjectAndExpect[*corev1.Service] {
+					service := newServiceResource("test-service-port-80", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []ObjectAndExpect[*corev1.Service]{{obj: service, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+					lbID = loadbalancer.UUID
+					Expect(loadbalancer).ShouldNot(BeNil())
+
+					// check pool
+					pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(pools).ShouldNot(BeNil())
+					Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+
+					// check listener
+					listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+					Expect(err).ShouldNot(HaveOccurred())
+					Expect(listeners).ShouldNot(BeNil())
+					Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+				},
+				steps: []StepType{
+					{
+						kindStep: createStep,
+						name:     "create new service with same LB ID annotation",
+						getObject: func() client.Object {
+							service := newServiceResource("test-service-port-81", "default")
+							service.Spec.Ports = []corev1.ServicePort{
+								{Name: "http", Port: 81, TargetPort: intstr.FromInt(81), Protocol: corev1.ProtocolTCP, NodePort: 30001},
+							}
+							if service.Annotations == nil {
+								service.Annotations = map[string]string{}
+							}
+							service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
+							return service
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							lbID = loadbalancer.UUID
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(2)) // number of pool
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(2)) // number of listener
+						},
+					},
+					{
+						kindStep: createStep,
+						name:     "create new service with same LB ID annotation",
+						getObject: func() client.Object {
+							service := newServiceResource("test-service-port-82", "default")
+							service.Spec.Ports = []corev1.ServicePort{
+								{Name: "http", Port: 82, TargetPort: intstr.FromInt(82), Protocol: corev1.ProtocolTCP, NodePort: 30002},
+							}
+							if service.Annotations == nil {
+								service.Annotations = map[string]string{}
+							}
+							service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
+							return service
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// get load balancer by id in resource annotation
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
+							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							lbID = loadbalancer.UUID
+							Expect(loadbalancer).ShouldNot(BeNil())
+
+							// check pool
+							pools, err := mockProvider.ListPool(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(pools).ShouldNot(BeNil())
+							Expect((pools.Items)).Should(HaveLen(3)) // number of pool
+
+							// check listener
+							listeners, err := mockProvider.ListListenerOfLB(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(listeners).ShouldNot(BeNil())
+							Expect((listeners.Items)).Should(HaveLen(3)) // number of listener
+						},
+					},
+					{
+						kindStep: deleteStep,
+						name:     "delete service",
+						getObject: func() client.Object {
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
+							return obj
+						},
+						expect: func() {},
+					},
+					{
+						kindStep: deleteStep,
+						name:     "delete service",
+						getObject: func() client.Object {
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-81", Namespace: "default"}}
+							return obj
+						},
+						expect: func() {},
+					},
+					{
+						kindStep: deleteStep,
+						name:     "delete service",
+						getObject: func() client.Object {
+							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-82", Namespace: "default"}}
+							return obj
+						},
+						expect: func() {
+							// wait until reconcile done
+							time.Sleep(timeWaitRecocile)
+
+							// it will delete load balancer
+							Eventually(func() int {
+								listLB, err := mockProvider.ListLoadBalancers(ctx, nil)
+								Expect(err).ShouldNot(HaveOccurred())
+								return len(listLB.Items)
+							}, timeout, interval).Should(Equal(0))
 						},
 					},
 				},
