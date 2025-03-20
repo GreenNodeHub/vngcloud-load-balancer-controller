@@ -2,9 +2,12 @@ package controller
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/anngdinh/operator-helper/contexts"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,4 +80,81 @@ func updateObjectAnnotation(ctx context.Context, cl client.Client, _obj client.O
 		logger.Infof("%s Updating object annotations: %s/%s/%s", actionIcon, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
 		return cl.Patch(ctx, obj, client.MergeFromWithOptions(objGet, client.MergeFromWithOptimisticLock{}))
 	})
+}
+
+// check if the node update condition, ignore LastTransitionTime, HeartbeatTime
+func isNodeUpdateCondition(old, new *corev1.Node) bool {
+	if old == nil && new == nil {
+		return false
+	}
+
+	if old == nil || new == nil {
+		return true
+	}
+
+	if old.Status.Conditions == nil && new.Status.Conditions == nil {
+		return false
+	}
+
+	if old.Status.Conditions == nil || new.Status.Conditions == nil {
+		return true
+	}
+
+	if len(old.Status.Conditions) != len(new.Status.Conditions) {
+		return true
+	}
+
+	// compare each condition by type
+	for i := range old.Status.Conditions {
+		newCondition := func() *corev1.NodeCondition {
+			for j := range new.Status.Conditions {
+				if old.Status.Conditions[i].Type == new.Status.Conditions[j].Type {
+					return &new.Status.Conditions[j]
+				}
+			}
+			return nil
+		}()
+
+		if newCondition == nil {
+			return true
+		}
+
+		if old.Status.Conditions[i].Status != newCondition.Status {
+			return true
+		}
+
+		if old.Status.Conditions[i].Reason != newCondition.Reason {
+			return true
+		}
+
+		if old.Status.Conditions[i].Message != newCondition.Message {
+			return true
+		}
+	}
+
+	return false
+}
+
+// check if the node update object meta, ignore ResourceVersion, Generation, ManagedFields
+func isNodeUpdateObjectMeta(old, new *metav1.ObjectMeta) bool {
+	if old == nil && new == nil {
+		return false
+	}
+
+	if old == nil || new == nil {
+		return true
+	}
+
+	oldClone := old.DeepCopy()
+	newClone := new.DeepCopy()
+	newClone.ResourceVersion = oldClone.ResourceVersion
+	newClone.Generation = oldClone.Generation
+	oldClone.ManagedFields = nil
+	newClone.ManagedFields = nil
+
+	if reflect.DeepEqual(oldClone, newClone) {
+		return false
+	}
+
+	return true
 }

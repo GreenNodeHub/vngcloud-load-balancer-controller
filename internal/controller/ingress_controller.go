@@ -1011,6 +1011,14 @@ func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					logrus.Info("Detect update Secret event.")
 					return true
 				case *corev1.Node:
+					oldObj := e.ObjectOld.(*corev1.Node)
+					newObj := e.ObjectNew.(*corev1.Node)
+					if reflect.DeepEqual(oldObj.Spec, newObj.Spec) &&
+						reflect.DeepEqual(oldObj.TypeMeta, newObj.TypeMeta) &&
+						!isNodeUpdateObjectMeta(&oldObj.ObjectMeta, &newObj.ObjectMeta) &&
+						!isNodeUpdateCondition(oldObj, newObj) {
+						return false
+					}
 					logrus.Info("Detect update Node event.")
 					r.knownNodes, _ = r.getNodes(r.Client)
 					return true
