@@ -63,10 +63,11 @@ var (
 
 	mockConfig = &config.Config{
 		Cluster: struct {
-			ClusterName string "mapstructure:\"clusterName\""
-			ClusterID   string "mapstructure:\"clusterID\""
-			Region      string "mapstructure:\"region\""
-		}{ClusterName: "test-cluster", ClusterID: mockClusterID},
+			IsRunRemote bool   `mapstructure:"isRunRemote"` // run from another cluster, watch through clusterAPI
+			Namespace   string `mapstructure:"namespace"`   // if run remote, the namespace of cluster
+			ClusterID   string `mapstructure:"clusterID"`   // clusterID of cluster
+			Region      string `mapstructure:"region"`      // region of cluster
+		}{IsRunRemote: false, ClusterID: mockClusterID},
 	}
 
 	mockNode1 = &corev1.Node{

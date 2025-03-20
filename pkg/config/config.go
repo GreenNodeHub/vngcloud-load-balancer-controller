@@ -12,9 +12,10 @@ type Config struct {
 	MaxConcurrentReconciles int    `mapstructure:"maxConcurrentReconciles"`
 
 	Cluster struct {
-		ClusterName string `mapstructure:"clusterName"`
-		ClusterID   string `mapstructure:"clusterID"`
-		Region      string `mapstructure:"region"`
+		IsRunRemote bool   `mapstructure:"isRunRemote"` // run from another cluster, watch through clusterAPI
+		Namespace   string `mapstructure:"namespace"`   // if run remote, the namespace of cluster
+		ClusterID   string `mapstructure:"clusterID"`   // clusterID of cluster
+		Region      string `mapstructure:"region"`      // region of cluster
 	} `mapstructure:"cluster"`
 
 	Global   AuthOpts `mapstructure:"global"`

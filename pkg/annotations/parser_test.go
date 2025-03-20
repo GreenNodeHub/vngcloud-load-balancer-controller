@@ -204,7 +204,7 @@ func Test_serviceAnnotationParser_ParseStringSliceAnnotation(t *testing.T) {
 				"b.co/val": "\t,  ,,,,,",
 			},
 			wantExist: true,
-			wantValue: nil,
+			wantValue: []string{},
 		},
 		{
 			name:   "single value",

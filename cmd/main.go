@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -124,6 +125,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	kubeRestConfig := ctrl.GetConfigOrDie()
+	if conf.Cluster.IsRunRemote {
+		if conf.Cluster.ClusterID == "" || conf.Cluster.Namespace == "" {
+			setupLog.Error(fmt.Errorf("clusterID or namespace is empty"), "clusterID or namespace is empty")
+			os.Exit(1)
+		}
+
+		clientManager := controller.GetClientManager()
+		kubeRestConfig, err = clientManager.GetRestConfig(client.ObjectKey{Namespace: conf.Cluster.Namespace, Name: conf.Cluster.ClusterID})
+		if err != nil {
+			setupLog.Error(err, "unable to get client")
+			os.Exit(1)
+		}
+	}
+
 	setupLog.Info(fmt.Sprintf("The commit is [%s], version is [%s], chartVersion is [%s]", version.Commit, version.Version, conf.ChartVersion))
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -168,13 +184,13 @@ func main() {
 		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(kubeRestConfig, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "f98f6a02.vks.vngcloud.vn",
+		LeaderElectionID:       fmt.Sprintf("%s.%s.lbc.vks.vngcloud.vn", conf.Cluster.ClusterID, conf.Cluster.Namespace),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -192,10 +208,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// install crd
-	kubeConfigWorkload := ctrl.GetConfigOrDie()
-	// Apply the CRD for CiliumNode
-	crdClient, err := apiextensionsclient.NewForConfig(kubeConfigWorkload)
+	// Apply the CRD
+	crdClient, err := apiextensionsclient.NewForConfig(kubeRestConfig)
 	if err != nil {
 		setupLog.Error(err, "unable to create CRD client")
 		os.Exit(1)

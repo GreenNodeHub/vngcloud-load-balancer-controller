@@ -32,9 +32,12 @@ metricsService:
     targetPort: 8443
   type: ClusterIP
 mysecret:
+  maxConcurrentReconciles: 5
   cluster:
+    isRunRemote: false
     clusterID: ""
-    clusterName: ""
+    namespace: ""
+    region: ""
   global:
     clientID: ""
     clientSecret: ""

@@ -42,7 +42,8 @@ func TestConfig_Init(t *testing.T) {
 	configContent := `
 chartVersion: "1.0.0"
 cluster:
-  clusterName: "test-cluster"
+  namespace: "test-namespace"
+  region: "hcm"
   clusterID: "test-cluster-id"
 global:
   identityURL: "https://identity.url"
@@ -62,8 +63,10 @@ global:
 
 	// Verify that the configuration was loaded correctly
 	assert.Equal(t, "1.0.0", config.ChartVersion)
-	assert.Equal(t, "test-cluster", config.Cluster.ClusterName)
+	assert.Equal(t, "test-namespace", config.Cluster.Namespace)
 	assert.Equal(t, "test-cluster-id", config.Cluster.ClusterID)
+	assert.Equal(t, "hcm", config.Cluster.Region)
+	assert.Equal(t, false, config.Cluster.IsRunRemote)
 	assert.Equal(t, "https://identity.url", config.Global.IdentityURL)
 	assert.Equal(t, "https://vserver.url", config.Global.VServerURL)
 	assert.Equal(t, "test-client-id", config.Global.ClientID)
@@ -89,7 +92,7 @@ func TestConfig_Init_Success(t *testing.T) {
 	configContent := `
 chartVersion: "1.0.0"
 cluster:
-  clusterName: "test-cluster"
+  namespace: "test-cluster"
   clusterID: "test-cluster-id"
 global:
   identityURL: "https://identity.url"
@@ -109,7 +112,7 @@ global:
 
 	// Check if the values were loaded correctly
 	assert.Equal(t, "1.0.0", config.ChartVersion)
-	assert.Equal(t, "test-cluster", config.Cluster.ClusterName)
+	assert.Equal(t, "test-cluster", config.Cluster.Namespace)
 	assert.Equal(t, "test-cluster-id", config.Cluster.ClusterID)
 	assert.Equal(t, "https://identity.url", config.Global.IdentityURL)
 	assert.Equal(t, "https://vserver.url", config.Global.VServerURL)
