@@ -189,7 +189,7 @@ func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
 	logger := contexts.NewContext(context.TODO()).Log()
 
 	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
-	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt)
+	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetDefaultPackage: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return "", "", sdkErr.GetError()
@@ -229,7 +229,7 @@ func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
 func (m *VNGCLOUD_Provider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error) {
 	logger := contexts.NewContext(ctx).Log()
 
-	secgroups, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroup(networkv2.NewListSecgroupRequest())
+	secgroups, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroup(networkv2.NewListSecgroupRequest().AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListSecurityGroups: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -249,7 +249,7 @@ func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(ctx context.Context, instanc
 	var sdkErr sdk_error.IError
 	var server *entityv2.Server
 	for i := 0; i < 3; i++ {
-		server, sdkErr = m.client.VServerGateway().V2().ComputeService().UpdateServerSecgroupsByServerId(opt)
+		server, sdkErr = m.client.VServerGateway().V2().ComputeService().UpdateServerSecgroupsByServerId(opt.AddUserAgent(m.userAgent))
 		if sdkErr != nil {
 			if IsServerNotReady(sdkErr.GetError()) {
 				logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, instanceID)
@@ -269,7 +269,7 @@ func (m *VNGCLOUD_Provider) UpdateSecGroupsOfServer(ctx context.Context, instanc
 func (m *VNGCLOUD_Provider) GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
 
-	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSecgroupById(networkv2.NewGetSecgroupByIdRequest(secgroupID))
+	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSecgroupById(networkv2.NewGetSecgroupByIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -281,7 +281,7 @@ func (m *VNGCLOUD_Provider) DeleteSecurityGroup(ctx context.Context, secgroupID 
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete security group %s", icon, secgroupID)
 
-	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupById(networkv2.NewDeleteSecgroupByIdRequest(secgroupID))
+	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupById(networkv2.NewDeleteSecgroupByIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -294,7 +294,7 @@ func (m *VNGCLOUD_Provider) CreateSecurityGroup(ctx context.Context, name string
 	logger.Infof("%s Request create security group %s", icon, name)
 
 	opt := networkv2.NewCreateSecgroupRequest(name, description)
-	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroup(opt)
+	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroup(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -306,7 +306,7 @@ func (m *VNGCLOUD_Provider) CreateSecurityGroupRule(ctx context.Context, secgrou
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create security group rule of security group %s", icon, secgroupID)
 
-	rule, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroupRule(opts)
+	rule, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroupRule(opts.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -318,7 +318,7 @@ func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(ctx context.Context, secgrou
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete security group rule %s of security group %s", icon, ruleID, secgroupID)
 
-	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupRuleById(networkv2.NewDeleteSecgroupRuleByIdRequest(ruleID))
+	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupRuleById(networkv2.NewDeleteSecgroupRuleByIdRequest(ruleID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -329,7 +329,7 @@ func (m *VNGCLOUD_Provider) DeleteSecurityGroupRule(ctx context.Context, secgrou
 func (m *VNGCLOUD_Provider) ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error) {
 	logger := contexts.NewContext(ctx).Log()
 
-	rules, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroupRulesBySecgroupId(networkv2.NewListSecgroupRulesBySecgroupIdRequest(secgroupID))
+	rules, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroupRulesBySecgroupId(networkv2.NewListSecgroupRulesBySecgroupIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListSecurityGroupRules: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -342,7 +342,7 @@ func (m *VNGCLOUD_Provider) ListSecurityGroupRules(ctx context.Context, secgroup
 func (m *VNGCLOUD_Provider) ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListTagsRequest(resourceID)
-	tags, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListTags(opt)
+	tags, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -361,7 +361,7 @@ func (m *VNGCLOUD_Provider) CreateTags(ctx context.Context, resourceID string, t
 	}
 	opt.WithTags(arr...)
 
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateTags(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -380,7 +380,7 @@ func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, t
 	}
 	opt.WithTags(arr...)
 
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateTags(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -390,7 +390,7 @@ func (m *VNGCLOUD_Provider) UpdateTags(ctx context.Context, resourceID string, t
 
 func (m *VNGCLOUD_Provider) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
 	logger := contexts.NewContext(ctx).Log()
-	subnet, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID))
+	subnet, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -400,7 +400,7 @@ func (m *VNGCLOUD_Provider) GetSubnetByID(ctx context.Context, networkID, subnet
 
 func (m *VNGCLOUD_Provider) GetNetworkByID(ctx context.Context, networkID string) (*entityv2.Network, error) {
 	logger := contexts.NewContext(ctx).Log()
-	vpc, sdkErr := m.client.VServerGateway().V2().NetworkService().GetNetworkById(networkv2.NewGetNetworkByIdRequest(networkID))
+	vpc, sdkErr := m.client.VServerGateway().V2().NetworkService().GetNetworkById(networkv2.NewGetNetworkByIdRequest(networkID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetNetworkByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -414,7 +414,7 @@ func (m *VNGCLOUD_Provider) GetServerByID(ctx context.Context, serverID string) 
 	logger := contexts.NewContext(ctx).Log()
 
 	opt := computev2.NewGetServerByIdRequest(serverID)
-	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt)
+	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -462,7 +462,7 @@ func (m *VNGCLOUD_Provider) ListServerBySecgroupID(ctx context.Context, secgroup
 	logger := contexts.NewContext(ctx).Log()
 
 	opt := networkv2.NewListAllServersBySecgroupIdRequest(secgroupID)
-	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt)
+	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -474,8 +474,7 @@ func (m *VNGCLOUD_Provider) ListServerBySecgroupID(ctx context.Context, secgroup
 
 func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error) {
 	logger := contexts.NewContext(ctx).Log()
-	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
-		ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...))
+	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListLoadBalancers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -484,8 +483,7 @@ func (m *VNGCLOUD_Provider) ListLoadBalancers(ctx context.Context, tags []string
 }
 func (m *VNGCLOUD_Provider) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	lb, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
-		GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID))
+	lb, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetLoadBalancerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -509,8 +507,7 @@ func (m *VNGCLOUD_Provider) GetLoadBalancerByName(ctx context.Context, name stri
 func (m *VNGCLOUD_Provider) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create load balancer.", icon)
-	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
-		CreateLoadBalancer(lbOptions)
+	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -520,8 +517,7 @@ func (m *VNGCLOUD_Provider) CreateLoadBalancer(ctx context.Context, lbOptions lo
 func (m *VNGCLOUD_Provider) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete load balancer %s", icon, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().
-		DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID))
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -533,7 +529,7 @@ func (m *VNGCLOUD_Provider) ResizeLoadBalancer(ctx context.Context, lbID, packag
 	logger.Infof("%s Request resize load balancer %s to package %s", icon, lbID, packageID)
 
 	opt := loadbalancerv2.NewResizeLoadBalancerRequest(lbID, packageID)
-	_, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ResizeLoadBalancer(opt)
+	_, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ResizeLoadBalancer(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ResizeLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -592,7 +588,7 @@ func (m *VNGCLOUD_Provider) WaitForLBActive(ctx context.Context, lbID string) (*
 func (m *VNGCLOUD_Provider) CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create listener of load balancer %s", icon, lbID)
-	listener, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateListener(opt)
+	listener, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateListener(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -602,7 +598,7 @@ func (m *VNGCLOUD_Provider) CreateListener(ctx context.Context, lbID string, opt
 func (m *VNGCLOUD_Provider) ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListListenersByLoadBalancerIdRequest(lbID)
-	listeners, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListListenersByLoadBalancerId(opt)
+	listeners, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListListenersByLoadBalancerId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListListenerOfLB: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -613,7 +609,7 @@ func (m *VNGCLOUD_Provider) DeleteListener(ctx context.Context, lbID, listenerID
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete listener %s of load balancer %s", icon, listenerID, lbID)
 	opt := loadbalancerv2.NewDeleteListenerByIdRequest(lbID, listenerID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteListenerById(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteListenerById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -623,7 +619,7 @@ func (m *VNGCLOUD_Provider) DeleteListener(ctx context.Context, lbID, listenerID
 func (m *VNGCLOUD_Provider) UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update listener %s of load balancer %s", icon, listenerID, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateListener(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateListener(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdateListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -640,7 +636,7 @@ func (m *VNGCLOUD_Provider) UpdateListener(ctx context.Context, lbID, listenerID
 func (m *VNGCLOUD_Provider) CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create policy of listener %s of load balancer %s", icon, listenerID, lbID)
-	policy, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePolicy(opt)
+	policy, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePolicy(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreatePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -649,7 +645,7 @@ func (m *VNGCLOUD_Provider) CreatePolicy(ctx context.Context, lbID, listenerID s
 }
 func (m *VNGCLOUD_Provider) ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error) {
 	logger := contexts.NewContext(ctx).Log()
-	listPolicies, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPolicies(loadbalancerv2.NewListPoliciesRequest(lbID, listenerID))
+	listPolicies, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPolicies(loadbalancerv2.NewListPoliciesRequest(lbID, listenerID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListPolicyOfListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -664,7 +660,7 @@ func (m *VNGCLOUD_Provider) ListPolicyOfListener(ctx context.Context, lbID, list
 func (m *VNGCLOUD_Provider) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePolicy(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePolicy(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -674,7 +670,7 @@ func (m *VNGCLOUD_Provider) UpdatePolicy(ctx context.Context, lbID, listenerID, 
 func (m *VNGCLOUD_Provider) DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete policy %s of listener %s of load balancer %s", icon, policyID, listenerID, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePolicyById(loadbalancerv2.NewDeletePolicyByIdRequest(lbID, listenerID, policyID))
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePolicyById(loadbalancerv2.NewDeletePolicyByIdRequest(lbID, listenerID, policyID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeletePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -691,7 +687,7 @@ func (m *VNGCLOUD_Provider) DeletePolicy(ctx context.Context, lbID, listenerID, 
 func (m *VNGCLOUD_Provider) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create pool of load balancer %s", icon, lbID)
-	pool, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePool(opt)
+	pool, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePool(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreatePool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -701,7 +697,7 @@ func (m *VNGCLOUD_Provider) CreatePool(ctx context.Context, lbID string, opt loa
 func (m *VNGCLOUD_Provider) ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListPoolsByLoadBalancerIdRequest(lbID)
-	pools, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolsByLoadBalancerId(opt)
+	pools, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolsByLoadBalancerId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListPool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -711,7 +707,7 @@ func (m *VNGCLOUD_Provider) ListPool(ctx context.Context, lbID string) (*entityv
 func (m *VNGCLOUD_Provider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update pool members of pool %s of load balancer %s", icon, poolID, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePoolMembers(members)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePoolMembers(members.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePoolMembers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -728,7 +724,7 @@ func (m *VNGCLOUD_Provider) GetPoolByID(ctx context.Context, lbID, poolID string
 func (m *VNGCLOUD_Provider) GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListPoolMembersRequest(lbID, poolID)
-	members, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolMembers(opt)
+	members, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolMembers(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetPoolMembers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -740,7 +736,7 @@ func (m *VNGCLOUD_Provider) DeletePool(ctx context.Context, lbID, poolID string)
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete pool %s of load balancer %s", icon, poolID, lbID)
 	opt := loadbalancerv2.NewDeletePoolByIdRequest(lbID, poolID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePoolById(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePoolById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeletePool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -751,7 +747,7 @@ func (m *VNGCLOUD_Provider) DeletePool(ctx context.Context, lbID, poolID string)
 func (m *VNGCLOUD_Provider) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update pool %s of load balancer %s", icon, poolID, lbID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePool(opt)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePool(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -762,7 +758,7 @@ func (m *VNGCLOUD_Provider) UpdatePool(ctx context.Context, lbID, poolID string,
 func (m *VNGCLOUD_Provider) GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewGetPoolHealthMonitorByIdRequest(lbID, poolID)
-	monitor, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetPoolHealthMonitorById(opt)
+	monitor, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetPoolHealthMonitorById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetPoolHealthMonitorById: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -774,7 +770,7 @@ func (m *VNGCLOUD_Provider) GetPoolHealthMonitorById(ctx context.Context, lbID, 
 
 func (m *VNGCLOUD_Provider) ListCertificates(ctx context.Context) (*entityv2.ListCertificates, error) {
 	logger := contexts.NewContext(ctx).Log()
-	certs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListCertificates(loadbalancerv2.NewListCertificatesRequest())
+	certs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListCertificates(loadbalancerv2.NewListCertificatesRequest().AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListCertificates: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -784,7 +780,7 @@ func (m *VNGCLOUD_Provider) ListCertificates(ctx context.Context) (*entityv2.Lis
 
 func (m *VNGCLOUD_Provider) GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
-	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetCertificateById(loadbalancerv2.NewGetCertificateByIdRequest(certID))
+	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetCertificateById(loadbalancerv2.NewGetCertificateByIdRequest(certID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetCertificateByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -795,7 +791,7 @@ func (m *VNGCLOUD_Provider) GetCertificateByID(ctx context.Context, certID strin
 func (m *VNGCLOUD_Provider) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request import certificate", icon)
-	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateCertificate(opt)
+	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateCertificate(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ImportCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -806,7 +802,7 @@ func (m *VNGCLOUD_Provider) ImportCertificate(ctx context.Context, opt loadbalan
 func (m *VNGCLOUD_Provider) DeleteCertificate(ctx context.Context, certID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete certificate %s", icon, certID)
-	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteCertificateById(loadbalancerv2.NewDeleteCertificateByIdRequest(certID))
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteCertificateById(loadbalancerv2.NewDeleteCertificateByIdRequest(certID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return sdkErr.GetError()
@@ -818,8 +814,7 @@ func (m *VNGCLOUD_Provider) DeleteCertificate(ctx context.Context, certID string
 
 func (m *VNGCLOUD_Provider) ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error) {
 	logger := contexts.NewContext(ctx).Log()
-	lbs, sdkErr := m.client.GLBGateway().V1().GLBService().
-		ListGlobalLoadBalancers(global.NewListGlobalLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...))
+	lbs, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalLoadBalancers(global.NewListGlobalLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListGlobalLoadBalancers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -829,7 +824,7 @@ func (m *VNGCLOUD_Provider) ListGlobalLoadBalancers(ctx context.Context, tags []
 
 func (m *VNGCLOUD_Provider) GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	lb, sdkErr := m.client.GLBGateway().V1().GLBService().GetGlobalLoadBalancerById(global.NewGetGlobalLoadBalancerByIdRequest(glbID))
+	lb, sdkErr := m.client.GLBGateway().V1().GLBService().GetGlobalLoadBalancerById(global.NewGetGlobalLoadBalancerByIdRequest(glbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetGlobalLoadBalancerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -853,7 +848,7 @@ func (m *VNGCLOUD_Provider) GetGlobalLoadBalancerByName(ctx context.Context, nam
 func (m *VNGCLOUD_Provider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create global load balancer.", icon)
-	lb, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalLoadBalancer(glbOptions)
+	lb, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalLoadBalancer(glbOptions.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateGlobalLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -864,7 +859,7 @@ func (m *VNGCLOUD_Provider) CreateGlobalLoadBalancer(ctx context.Context, glbOpt
 func (m *VNGCLOUD_Provider) DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete global load balancer %s", icon, glbID)
-	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalLoadBalancer(global.NewDeleteGlobalLoadBalancerRequest(glbID))
+	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalLoadBalancer(global.NewDeleteGlobalLoadBalancerRequest(glbID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalLoadBalancer: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
@@ -911,7 +906,7 @@ func (m *VNGCLOUD_Provider) WaitGlobalLoadBalancerActive(ctx context.Context, gl
 
 func (m *VNGCLOUD_Provider) ListGlobalPools(ctx context.Context, glbID string) (*entityv2.ListGlobalPools, error) {
 	logger := contexts.NewContext(ctx).Log()
-	pools, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPools(global.NewListGlobalPoolsRequest(glbID))
+	pools, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPools(global.NewListGlobalPoolsRequest(glbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListGlobalPools: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -922,7 +917,7 @@ func (m *VNGCLOUD_Provider) ListGlobalPools(ctx context.Context, glbID string) (
 func (m *VNGCLOUD_Provider) CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create global pool of global load balancer %s", icon, glbID)
-	pool, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalPool(opt)
+	pool, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalPool(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateGlobalPool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -933,7 +928,7 @@ func (m *VNGCLOUD_Provider) CreateGlobalPool(ctx context.Context, glbID string, 
 func (m *VNGCLOUD_Provider) DeleteGlobalPool(ctx context.Context, glbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete global pool %s of global load balancer %s", icon, poolID, glbID)
-	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalPool(global.NewDeleteGlobalPoolRequest(glbID, poolID))
+	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalPool(global.NewDeleteGlobalPoolRequest(glbID, poolID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalPool: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
@@ -944,7 +939,7 @@ func (m *VNGCLOUD_Provider) DeleteGlobalPool(ctx context.Context, glbID, poolID 
 func (m *VNGCLOUD_Provider) UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update global pool %s of global load balancer %s", icon, poolID, glbID)
-	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalPool(opt)
+	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalPool(opt.AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - UpdateGlobalPool: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
@@ -954,7 +949,7 @@ func (m *VNGCLOUD_Provider) UpdateGlobalPool(ctx context.Context, glbID, poolID 
 
 func (m *VNGCLOUD_Provider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error) {
 	logger := contexts.NewContext(ctx).Log()
-	poolMembers, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPoolMembers(global.NewListGlobalPoolMembersRequest(glbID, poolID))
+	poolMembers, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPoolMembers(global.NewListGlobalPoolMembersRequest(glbID, poolID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListGlobalPoolMembers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -965,7 +960,7 @@ func (m *VNGCLOUD_Provider) ListGlobalPoolMembers(ctx context.Context, glbID, po
 func (m *VNGCLOUD_Provider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request patch global pool member of global load balancer %s", icon, glbID)
-	err := m.client.GLBGateway().V1().GLBService().PatchGlobalPoolMember(opt.WithPoolId(poolID).WithLoadBalancerId(glbID))
+	err := m.client.GLBGateway().V1().GLBService().PatchGlobalPoolMember(opt.WithPoolId(poolID).WithLoadBalancerId(glbID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - PatchGlobalPoolMember: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
@@ -975,7 +970,7 @@ func (m *VNGCLOUD_Provider) PatchGlobalPoolMember(ctx context.Context, glbID, po
 
 func (m *VNGCLOUD_Provider) ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error) {
 	logger := contexts.NewContext(ctx).Log()
-	listeners, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalListeners(global.NewListGlobalListenersRequest(glbID))
+	listeners, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalListeners(global.NewListGlobalListenersRequest(glbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListGlobalListeners: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -986,7 +981,7 @@ func (m *VNGCLOUD_Provider) ListGlobalListeners(ctx context.Context, glbID strin
 func (m *VNGCLOUD_Provider) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create global listener of global load balancer %s", icon, glbID)
-	listener, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalListener(opt)
+	listener, sdkErr := m.client.GLBGateway().V1().GLBService().CreateGlobalListener(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateGlobalListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, sdkErr.GetError()
@@ -997,7 +992,7 @@ func (m *VNGCLOUD_Provider) CreateGlobalListener(ctx context.Context, glbID stri
 func (m *VNGCLOUD_Provider) DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete global listener %s of global load balancer %s", icon, listenerID, glbID)
-	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalListener(global.NewDeleteGlobalListenerRequest(glbID, listenerID))
+	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalListener(global.NewDeleteGlobalListenerRequest(glbID, listenerID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalListener: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
@@ -1008,7 +1003,7 @@ func (m *VNGCLOUD_Provider) DeleteGlobalListener(ctx context.Context, glbID, lis
 func (m *VNGCLOUD_Provider) UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update global listener %s of global load balancer %s", icon, listenerID, glbID)
-	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalListener(opt)
+	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalListener(opt.AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - UpdateGlobalListener: ", err, ", params: ", err.GetListParameters())
 		return err.GetError()
