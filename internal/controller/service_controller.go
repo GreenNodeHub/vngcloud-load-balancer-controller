@@ -649,10 +649,6 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		currentBuilder, err = builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, oldBuilder.GetLoadBalancerID(),
 			r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 		if err != nil {
-			if errs.IsLoadBalancerNotFound(err) {
-				logger.Info("LoadBalancer not found, return.")
-				return nil
-			}
 			logger.Error("Failed to get current loadbalancer: ", err)
 			return err
 		}
@@ -709,6 +705,10 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 		return nil
 	}()
 	if err != nil {
+		if errs.IsLoadBalancerNotFound(err) {
+			logger.Info("LoadBalancer not found, return.")
+			return nil
+		}
 		return err
 	}
 
