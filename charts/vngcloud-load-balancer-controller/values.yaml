@@ -12,7 +12,7 @@ manager:
         - ALL
     image:
       repository: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller
-      tag: "v0.2.3" # release
+      tag: "v0.2.4" # release
     imagePullPolicy: Always
     resources:
       limits:
@@ -32,14 +32,4 @@ metricsService:
     targetPort: 8443
   type: ClusterIP
 mysecret:
-  maxConcurrentReconciles: 5
-  cluster:
-    isRunRemote: false
-    clusterID: ""
-    namespace: ""
-    region: ""
-  global:
-    clientID: ""
-    clientSecret: ""
-    identityURL: https://iamapis.vngcloud.vn/accounts-api
-    vserverURL: https://hcm-3.api.vngcloud.vn/vserver
+  configYaml: ""
