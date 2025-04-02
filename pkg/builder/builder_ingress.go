@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -624,8 +625,14 @@ func (l *modelBuilder) buildCertificateBySecretName(secretName string) error {
 		return errs.NewNoNeedRequeue("secret must have tls.crt and tls.key")
 	}
 
-	certificateData := string(secret.Data[corev1.TLSCertKey])
-	privateKeyData := string(secret.Data[corev1.TLSPrivateKeyKey])
+	formatString := func(s string) string {
+		return strings.ReplaceAll(s, "\r", "")
+	}
+	certificateData := formatString(string(secret.Data[corev1.TLSCertKey]))
+	privateKeyData := formatString(string(secret.Data[corev1.TLSPrivateKeyKey]))
+
+	l.logger.Debugf(" #################### Certificate data: %q #################### ", certificateData)
+	l.logger.Debugf(" #################### Private key data: %q #################### ", privateKeyData)
 
 	certBuilder := &certificateBuilderType{
 		ID: "",
