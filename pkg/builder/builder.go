@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -88,9 +89,31 @@ type implementationSpecificConfig struct {
 	Action action `json:"action"`
 }
 
-type headerConfig struct {
-	Http  []string `json:"http"`
-	Https []string `json:"https"`
+type insertHeadersConfig struct {
+	Http  map[string]string `json:"http"`
+	Https map[string]string `json:"https"`
+}
+
+func (i *insertHeadersConfig) GetHTTP() *[]entity.ListenerInsertHeader {
+	headers := make([]entity.ListenerInsertHeader, 0)
+	for k, v := range i.Http {
+		headers = append(headers, entity.ListenerInsertHeader{
+			HeaderName:  k,
+			HeaderValue: v,
+		})
+	}
+	return &headers
+}
+
+func (i *insertHeadersConfig) GetHTTPS() *[]entity.ListenerInsertHeader {
+	headers := make([]entity.ListenerInsertHeader, 0)
+	for k, v := range i.Https {
+		headers = append(headers, entity.ListenerInsertHeader{
+			HeaderName:  k,
+			HeaderValue: v,
+		})
+	}
+	return &headers
 }
 
 type modelBuilder struct {
@@ -125,7 +148,7 @@ type modelBuilder struct {
 	enableTLSEncryption           bool
 	certificateIDs                []string
 	implementationSpecificConfigs []implementationSpecificConfig
-	headers                       headerConfig
+	insertHeaders                 insertHeadersConfig
 	clientCertificateID           string
 	certBuilders                  []*certificateBuilderType
 

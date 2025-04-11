@@ -767,7 +767,7 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			CreatedAt:                       time.Now().Format(time.RFC3339),
 			UpdatedAt:                       time.Now().Format(time.RFC3339),
 			ProgressStatus:                  consts.ACTIVE_LOADBALANCER_STATUS,
-			Headers:                         nil,
+			InsertHeaders:                   nil,
 			CertificateAuthorities:          nil,
 			DefaultCertificateAuthority:     nil,
 			ClientCertificateAuthentication: nil,
@@ -775,10 +775,10 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 	}
 	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS ||
 		listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTP {
-		if listener.Headers == nil {
+		if listener.InsertHeaders == nil {
 			return nil, errors.New("Missing Headers For HTTP/HTTPS Listener")
 		}
-		newListener.Listener.Headers = *listener.Headers
+		newListener.Listener.InsertHeaders = *listener.InsertHeaders
 	}
 	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
 		if listener.DefaultCertificateAuthority == nil || *listener.DefaultCertificateAuthority == "" {
@@ -865,10 +865,10 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 
 	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
 		listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
-		if updateOpt.Headers == nil {
+		if updateOpt.InsertHeaders == nil {
 			return errors.New("Missing Headers For HTTP/HTTPS Listener")
 		}
-		listener.Listener.Headers = *updateOpt.Headers
+		listener.Listener.InsertHeaders = *updateOpt.InsertHeaders
 	}
 	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) {
 		if updateOpt.DefaultCertificateAuthority == nil || *updateOpt.DefaultCertificateAuthority == "" {

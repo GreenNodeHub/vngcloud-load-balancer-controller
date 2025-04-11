@@ -95,9 +95,18 @@ func NewModelBuilderByIngress(
 		isAutoCreateSecurityGroup:     true,
 		isPOC:                         false,
 		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
-		headers: headerConfig{
-			Http:  []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"},
-			Https: []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}},
+		insertHeaders: insertHeadersConfig{
+			Http: map[string]string{
+				"X-Forwarded-For":   "true",
+				"X-Forwarded-Proto": "true",
+				"X-Forwarded-Port":  "true",
+			},
+			Https: map[string]string{
+				"X-Forwarded-For":   "true",
+				"X-Forwarded-Proto": "true",
+				"X-Forwarded-Port":  "true",
+			},
+		},
 		clientCertificateID: "",
 		certBuilders:        make([]*certificateBuilderType, 0),
 	}
@@ -288,7 +297,7 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 			CertificateAuthorities:      PointerOf([]string{}),
 			ClientCertificate:           nil,
 			DefaultCertificateAuthority: nil,
-			Headers:                     &l.headers.Http,
+			InsertHeaders:               l.insertHeaders.GetHTTP(),
 		},
 	}
 	if isHTTPS {
@@ -298,7 +307,7 @@ func (l *modelBuilder) buildL7Listener(isHTTPS bool) (*ListenerBuilderType, erro
 		opt.CreateListenerRequest.ListenerProtocolPort = 443
 		opt.CreateListenerRequest.DefaultCertificateAuthority = nil
 		opt.CreateListenerRequest.CertificateAuthorities = PointerOf([]string{})
-		opt.CreateListenerRequest.Headers = &l.headers.Https
+		opt.CreateListenerRequest.InsertHeaders = l.insertHeaders.GetHTTPS()
 
 		if l.clientCertificateID != "" {
 			opt.CreateListenerRequest.ClientCertificate = &l.clientCertificateID

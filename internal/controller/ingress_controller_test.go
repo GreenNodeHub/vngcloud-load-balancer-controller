@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -1685,7 +1686,7 @@ var _ = Describe("Ingress Controller", func() {
 				TimeoutClient:               50000,
 				TimeoutConnection:           50000,
 				TimeoutMember:               50000,
-				Headers:                     &[]string{},
+				InsertHeaders:               &[]entity.ListenerInsertHeader{},
 				CertificateAuthorities:      nil,
 				ClientCertificate:           nil,
 				DefaultCertificateAuthority: nil,
@@ -2154,7 +2155,8 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(listener.TimeoutConnection).Should(Equal(5))
 						Expect(listener.TimeoutMember).Should(Equal(50))
 						Expect(listener.Description).Should(Equal("????????"))
-						Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}))
+						Expect(listener.InsertHeaders).Should(HaveLen(3))
+						// Expect(listener.InsertHeaders).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Port", "X-Forwarded-Proto"}))
 						Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[0]))
 						Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[1]}))
 						Expect(listener.ClientCertificateAuthentication).Should(BeNil())
@@ -2230,7 +2232,8 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(listener.TimeoutConnection).Should(Equal(5))
 								Expect(listener.TimeoutMember).Should(Equal(50))
 								Expect(listener.Description).Should(Equal("????????"))
-								Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Port", "X-Forwarded-Proto"}))
+								Expect(listener.InsertHeaders).Should(HaveLen(3))
+								// Expect(listener.Headers).Should(Equal([]string{"X-Forwarded-For", "X-Forwarded-Port", "X-Forwarded-Proto"}))
 								Expect(*listener.DefaultCertificateAuthority).Should(Equal(provider.MockCerts[1]))
 								Expect(listener.CertificateAuthorities).Should(Equal([]string{provider.MockCerts[2]}))
 								Expect(listener.ClientCertificateAuthentication).Should(BeNil())

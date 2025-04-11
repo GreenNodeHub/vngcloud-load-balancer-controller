@@ -429,13 +429,13 @@ func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *Lis
 		DefaultPoolId:               *new.DefaultPoolId,
 		DefaultCertificateAuthority: nil,
 		CertificateAuthorities:      nil,
-		Headers:                     nil,
+		InsertHeaders:               nil,
 		ClientCertificate:           nil,
 	}
 
 	// set current value
 	if !new.IsL4 {
-		updateOptions.Headers = new.Headers
+		updateOptions.InsertHeaders = new.InsertHeaders
 		if new.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
 			updateOptions.ClientCertificate = new.ClientCertificate
 			updateOptions.DefaultCertificateAuthority = new.DefaultCertificateAuthority
@@ -471,10 +471,8 @@ func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *Lis
 	if !new.IsL4 {
 
 		// headers
-		slices.Sort(*current.Headers)
-		slices.Sort(*new.Headers)
-		if !slices.Equal(*current.Headers, *new.Headers) {
-			message = append(message, fmt.Sprintf("headers (%v -> %v)", *current.Headers, *new.Headers))
+		if !current.CompareHeader(new) {
+			message = append(message, fmt.Sprintf("headers (%v -> %v)", *current.InsertHeaders, *new.InsertHeaders))
 			isNeedUpdate = true
 		}
 
@@ -521,6 +519,32 @@ func (current *ListenerBuilderType) CompareListenerBuilder(lbID string, new *Lis
 		return nil, nil
 	}
 	return updateOptions, message
+}
+
+// compare listener headers, if they are the same then return true
+func (current *ListenerBuilderType) CompareHeader(new *ListenerBuilderType) bool {
+	if current.InsertHeaders == nil && new.InsertHeaders == nil {
+		return true
+	}
+	if current.InsertHeaders == nil || new.InsertHeaders == nil {
+		return false
+	}
+	if len(*current.InsertHeaders) != len(*new.InsertHeaders) {
+		return false
+	}
+	mapHeader := make(map[string]string)
+	for _, header := range *new.InsertHeaders {
+		mapHeader[header.HeaderName] = header.HeaderValue
+	}
+	for _, header := range *current.InsertHeaders {
+		if _, ok := mapHeader[header.HeaderName]; !ok {
+			return false
+		}
+		if header.HeaderValue != mapHeader[header.HeaderName] {
+			return false
+		}
+	}
+	return true
 }
 
 // ------------------------------------------------------------

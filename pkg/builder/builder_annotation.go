@@ -44,7 +44,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.isPOC = l.parseAnnotationIsPOC_old(annos) // isPOC2 is deprecated
 	l.isPOC = l.parseAnnotationIsPOC(annos)
 	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
-	l.headers = l.parseAnnotationHeader(annos)
+	l.insertHeaders = l.parseAnnotationInsertHeaders(annos)
 	l.clientCertificateID = l.parseAnnotationClientCertificateID(annos)
 }
 
@@ -478,16 +478,22 @@ func (l *modelBuilder) parseAnnotationImplementationSpecificConfigs(annos map[st
 	return option
 }
 
-func (l *modelBuilder) parseAnnotationHeader(annos map[string]string) headerConfig {
-	option := headerConfig{}
-	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixHeader, &option, annos)
+func (l *modelBuilder) parseAnnotationInsertHeaders(annos map[string]string) insertHeadersConfig {
+	option := insertHeadersConfig{}
+	exist, err := l.annotationParser.ParseJSONAnnotation(annotations.SuffixInsertHeaders, &option, annos)
 	if !exist {
-		return l.headers
+		return l.insertHeaders
 	}
 	if err != nil {
 		l.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
-			annotations.SuffixHeader, l.headers)
-		return l.headers
+			annotations.SuffixInsertHeaders, l.insertHeaders)
+		return l.insertHeaders
+	}
+	if option.Http == nil {
+		option.Http = make(map[string]string)
+	}
+	if option.Https == nil {
+		option.Https = make(map[string]string)
 	}
 	return option
 }

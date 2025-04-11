@@ -92,7 +92,7 @@ func NewModelBuilderByService(
 		isAutoCreateSecurityGroup:     true,
 		isPOC:                         false,
 		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
-		headers:                       headerConfig{},
+		insertHeaders:                 insertHeadersConfig{}, // this field supports response header
 		clientCertificateID:           "",
 	}
 	if service == nil {
@@ -226,7 +226,7 @@ func (l *modelBuilder) createListenerBuilder(pPort corev1.ServicePort, name stri
 			TimeoutMember:               l.idleTimeoutMember,
 			TimeoutConnection:           l.idleTimeoutConnection,
 			AllowedCidrs:                StringListToString(l.inboundCIDRs),
-			Headers:                     nil,
+			InsertHeaders:               nil,
 		},
 	}
 	return opt

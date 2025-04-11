@@ -37,6 +37,7 @@ const (
 	SuffixCertificateIDs               = "certificate-ids"
 	SuffixImplementationSpecificParams = "implementation-specific-params"
 	SuffixHeader                       = "header"
+	SuffixInsertHeaders                = "insert-headers"
 	SuffixClientCertificateID          = "client-certificate-id"
 
 	// for management
