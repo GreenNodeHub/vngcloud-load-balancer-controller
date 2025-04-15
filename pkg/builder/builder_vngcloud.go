@@ -262,10 +262,11 @@ func (r *vngcloudLBBuilder) buildPolicy(policy *entityv2.Policy) (*policyBuilder
 		RedirectHTTPCode: policy.RedirectHTTPCode,
 		KeepQueryString:  policy.KeepQueryString,
 		ReferPoolName:    policy.RedirectPoolName,
+		Position:         policy.Position,
 	}
-	rules := make([]loadbalancerv2.L7RuleRequest, 0)
+	rules := make([]l7RuleWrapper, 0)
 	for _, rule := range policy.L7Rules {
-		rules = append(rules, loadbalancerv2.L7RuleRequest{
+		rules = append(rules, l7RuleWrapper{
 			CompareType: loadbalancerv2.PolicyCompareType(rule.CompareType),
 			RuleType:    loadbalancerv2.PolicyRuleType(rule.RuleType),
 			RuleValue:   rule.RuleValue,
@@ -528,6 +529,24 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 		// delete redundant policy
 		if err := r.deleteRedundantPolicies(oldListener, currentListener, newListener); err != nil {
 			return err
+		}
+	}
+
+	// reorder policies if needed
+	if newBuilder.AutoReorderPolicies() {
+		for _, listener := range r.GetListenerBuilders() {
+			isNeeded, policyIDs := listener.NeedReorder()
+			if !isNeeded {
+				continue
+			}
+			if err := r.provider.ReorderPolicies(r.context, r.GetLoadBalancerID(), listener.GetID(), policyIDs); err != nil {
+				r.logger.Error("Failed to reorder policies: ", err)
+				return err
+			}
+			if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
+				r.logger.Error("Failed to wait for loadbalancer active: ", err)
+				return err
+			}
 		}
 	}
 	return nil

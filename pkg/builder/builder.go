@@ -65,6 +65,7 @@ type ModelBuilder interface {
 	GetCertBuilders() []CertificateBuilder
 	AddCertificateID(id string)
 	GetCertificateIDs() []string
+	AutoReorderPolicies() bool
 }
 
 var _ ModelBuilder = &modelBuilder{}
@@ -151,6 +152,7 @@ type modelBuilder struct {
 	insertHeaders                 insertHeadersConfig
 	clientCertificateID           string
 	certBuilders                  []*certificateBuilderType
+	autoReorderPolicies           bool
 
 	// helper components
 	annotationParser annotations.Parser
@@ -382,6 +384,10 @@ func (l *modelBuilder) AddCertificateID(id string) {
 
 func (l *modelBuilder) GetCertificateIDs() []string {
 	return l.certificateIDs
+}
+
+func (l *modelBuilder) AutoReorderPolicies() bool {
+	return l.autoReorderPolicies
 }
 
 // func (l *modelBuilder)

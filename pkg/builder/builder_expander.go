@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -212,26 +213,72 @@ type PolicyBuilder interface {
 	GetID() string
 	SetName(name string)
 	SetID(id string)
+	GetPriority() int
 }
 
 var _ PolicyBuilder = &policyBuilderType{}
 
+type l7RuleWrapper loadbalancerv2.L7RuleRequest
+
+func (s *l7RuleWrapper) GetPriority() int {
+	compareTypeValue := 1
+	switch s.CompareType {
+	case loadbalancerv2.PolicyCompareTypeREGEX:
+		compareTypeValue = 10
+	case loadbalancerv2.PolicyCompareTypeCONTAINS:
+		compareTypeValue = 100
+	case loadbalancerv2.PolicyCompareTypeENDSWITH:
+		compareTypeValue = 1000
+	case loadbalancerv2.PolicyCompareTypeSTARTSWITH:
+		compareTypeValue = 10000
+	case loadbalancerv2.PolicyCompareTypeEQUALS:
+		compareTypeValue = 100000
+	}
+
+	ruleTypeValue := 1
+	switch s.RuleType {
+	case loadbalancerv2.PolicyRuleTypeHOSTNAME:
+		ruleTypeValue = 100
+	case loadbalancerv2.PolicyRuleTypePATH:
+		ruleTypeValue = 1
+	}
+
+	return compareTypeValue * ruleTypeValue * len(s.RuleValue)
+}
+
 type policyBuilderType struct {
 	commonBuilder
-	Action           loadbalancerv2.PolicyAction    `json:"action"`
-	Rules            []loadbalancerv2.L7RuleRequest `json:"rules"`
-	RedirectPoolID   string                         `json:"redirectPoolId"`
-	RedirectURL      string                         `json:"redirectUrl"`
-	RedirectHTTPCode int                            `json:"redirectHttpCode"`
-	KeepQueryString  bool                           `json:"keepQueryString"`
+	Action           loadbalancerv2.PolicyAction `json:"action"`
+	Rules            []l7RuleWrapper             `json:"rules"`
+	RedirectPoolID   string                      `json:"redirectPoolId"`
+	RedirectURL      string                      `json:"redirectUrl"`
+	RedirectHTTPCode int                         `json:"redirectHttpCode"`
+	KeepQueryString  bool                        `json:"keepQueryString"`
+	Position         int
 
 	ReferPoolName string
 	isDeleted     bool
 }
 
+func (p *policyBuilderType) GetL7RuleRequests() []loadbalancerv2.L7RuleRequest {
+	rules := make([]loadbalancerv2.L7RuleRequest, 0)
+	for _, rule := range p.Rules {
+		rules = append(rules, loadbalancerv2.L7RuleRequest(rule))
+	}
+	return rules
+}
+
+func (p *policyBuilderType) GetPriority() int {
+	sum := 0
+	for _, rule := range p.Rules {
+		sum += rule.GetPriority()
+	}
+	return sum
+}
+
 func (p *policyBuilderType) GetICreatePolicyRequest(lbID, lisID string) loadbalancerv2.ICreatePolicyRequest {
 	return loadbalancerv2.NewCreatePolicyRequest(lbID, lisID).
-		WithRules(p.Rules...).
+		WithRules(p.GetL7RuleRequests()...).
 		WithRedirectPoolId(p.RedirectPoolID).
 		WithAction(p.Action).
 		WithName(p.GetName()).
@@ -263,7 +310,7 @@ func (current *policyBuilderType) ComparePolicyBuilder(lbID, lisID string, new *
 			PolicyId: current.GetID(),
 		},
 		Action:           new.Action,
-		Rules:            new.Rules,
+		Rules:            new.GetL7RuleRequests(),
 		KeepQueryString:  new.KeepQueryString,
 		RedirectPoolID:   new.RedirectPoolID,
 		RedirectURL:      new.RedirectURL,
@@ -300,8 +347,8 @@ func (current *policyBuilderType) ComparePolicyBuilder(lbID, lisID string, new *
 		message = append(message, fmt.Sprintf("len(rules) (%d -> %d)", len(current.Rules), len(new.Rules)))
 		isNeedUpdate = true
 	} else {
-		for _, rule := range new.Rules {
-			if !current.checkIfL7RuleExist(current.Rules, rule) {
+		for _, rule := range new.GetL7RuleRequests() {
+			if !current.checkIfL7RuleExist(current.GetL7RuleRequests(), rule) {
 				message = append(message, fmt.Sprintf("rules (%v -> %v)", current.Rules, new.Rules))
 				isNeedUpdate = true
 				break
@@ -367,6 +414,46 @@ func (l *ListenerBuilderType) GetICreateListenerRequest() *loadbalancerv2.Create
 	// 	WithTimeoutClient(l.TimeoutClient).
 	// 	WithTimeoutConnection(l.TimeoutConnection).
 	// 	WithTimeoutMember(l.TimeoutMember)
+}
+
+func (l *ListenerBuilderType) NeedReorder() (bool, []string) {
+	if l.IsDeleted() || len(l.GetPolicyBuilders()) == 0 {
+		return false, nil
+	}
+
+	type kv struct {
+		key      string
+		current  int
+		priority int
+	}
+	var ss []kv
+	for _, policy := range l.GetPolicyBuilders() {
+		if policy.IsDeleted() {
+			continue
+		}
+		ss = append(ss, kv{key: policy.GetID(), current: -policy.Position, priority: policy.GetPriority()})
+	}
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].priority > ss[j].priority
+	})
+
+	// check if need to reorder
+	isNeedReorder := false
+	for i := 1; i < len(ss); i++ {
+		if ss[i-1].priority > ss[i].priority && ss[i-1].current < ss[i].current {
+			isNeedReorder = true
+			break
+		}
+	}
+	if !isNeedReorder {
+		return false, nil
+	}
+	// reorder policies
+	policyIDs := make([]string, len(ss))
+	for i, policy := range ss {
+		policyIDs[i] = policy.key
+	}
+	return true, policyIDs
 }
 
 func (l *ListenerBuilderType) String() string {

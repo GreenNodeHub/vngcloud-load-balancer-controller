@@ -678,6 +678,18 @@ func (m *VNGCLOUD_Provider) DeletePolicy(ctx context.Context, lbID, listenerID, 
 	return nil
 }
 
+func (m *VNGCLOUD_Provider) ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request reorder policies policyIDs=[%s]", icon, strings.Join(policyIDs, ","))
+	opt := loadbalancerv2.NewReorderPoliciesRequest(lbID, listenerID).WithPoliciesOrder(policyIDs)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ReorderPolicies(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ReorderPolicies: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
+
 // --------------------------- Pool ---------------------------
 
 //	func (m *VNGCLOUD_Provider) GetPoolByName(ctx context.Context,lbID, name string) (*objects.Pool, error) {

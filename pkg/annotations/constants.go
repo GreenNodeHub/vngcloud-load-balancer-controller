@@ -39,6 +39,7 @@ const (
 	SuffixHeader                       = "header"
 	SuffixInsertHeaders                = "insert-headers"
 	SuffixClientCertificateID          = "client-certificate-id"
+	SuffixAutoReorderPolicies          = "auto-reorder-policies"
 
 	// for management
 	SuffixManagePools      = "manage-pools"

@@ -46,6 +46,7 @@ func (l *modelBuilder) parseAnnotation(annos map[string]string) {
 	l.implementationSpecificConfigs = l.parseAnnotationImplementationSpecificConfigs(annos)
 	l.insertHeaders = l.parseAnnotationInsertHeaders(annos)
 	l.clientCertificateID = l.parseAnnotationClientCertificateID(annos)
+	l.autoReorderPolicies = l.parseAnnotationAutoReorderPolicies(annos)
 }
 
 func (l *modelBuilder) parseAnnotationTargetType(annos map[string]string) TargetType {
@@ -503,6 +504,20 @@ func (l *modelBuilder) parseAnnotationClientCertificateID(annos map[string]strin
 	exist := l.annotationParser.ParseStringAnnotation(annotations.SuffixClientCertificateID, &option, annos)
 	if !exist {
 		return l.clientCertificateID
+	}
+	return option
+}
+
+func (l *modelBuilder) parseAnnotationAutoReorderPolicies(annos map[string]string) bool {
+	option := false
+	exists, err := l.annotationParser.ParseBoolAnnotation(annotations.SuffixAutoReorderPolicies, &option, annos)
+	if !exists {
+		return l.autoReorderPolicies
+	}
+	if err != nil {
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean, using default value %t",
+			annotations.SuffixAutoReorderPolicies, l.autoReorderPolicies)
+		return l.autoReorderPolicies
 	}
 	return option
 }
