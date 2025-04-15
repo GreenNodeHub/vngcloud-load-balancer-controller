@@ -535,6 +535,24 @@ func (r *vngcloudLBBuilder) DeleteRedundantListeners(oldBuilder OldModelBuilder,
 	// reorder policies if needed
 	if newBuilder.AutoReorderPolicies() {
 		for _, listener := range r.GetListenerBuilders() {
+			if listener.IsDeleted() {
+				continue
+			}
+			// get policies to update
+			policies, err := r.provider.ListPolicyOfListener(r.context, r.loadBalancerID, listener.GetID())
+			if err != nil {
+				return err
+			}
+			listener.policyBuilders = make([]*policyBuilderType, 0)
+			for _, policy := range policies.Items {
+				policyBuilder, err := r.buildPolicy(policy)
+				if err != nil {
+					return err
+				}
+				listener.policyBuilders = append(listener.policyBuilders, policyBuilder)
+			}
+
+			// check if need reorder policies
 			isNeeded, policyIDs := listener.NeedReorder()
 			if !isNeeded {
 				continue
