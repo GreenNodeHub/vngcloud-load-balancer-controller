@@ -88,6 +88,7 @@ func NewModelBuilderByService(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+		autoReorderPolicies:        false,
 
 		isAutoCreateSecurityGroup:     true,
 		isPOC:                         false,

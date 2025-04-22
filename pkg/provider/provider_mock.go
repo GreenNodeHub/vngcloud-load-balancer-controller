@@ -1048,6 +1048,51 @@ func (m *MockProvider) DeletePolicy(ctx context.Context, lbID, listenerID, polic
 	return nil
 }
 
+func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request reorder policies of listener %s of load balancer %s", icon, listenerID, lbID)
+	var listener *wrapListener
+	for _, l := range m.listeners {
+		if l.lbID == lbID && l.GetId() == listenerID {
+			listener = l
+			break
+		}
+	}
+	if listener == nil {
+		return ErrorNotFound
+	}
+	newPolicies := make([]*wrapPolicy, 0)
+	for _, p := range m.policies {
+		if p.lbID == lbID && p.listenerID == listenerID {
+			newPolicies = append(newPolicies, p)
+		}
+	}
+	for _, p := range policyIDs {
+		isFound := false
+		for _, np := range newPolicies {
+			if np.UUID == p {
+				isFound = true
+				break
+			}
+		}
+		if !isFound {
+			return ErrorNotFound
+		}
+	}
+	m.policies = append(m.policies, newPolicies...)
+	m.policies = m.policies[len(newPolicies):]
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, p := range m.policies {
+		if p.lbID == lbID && p.listenerID == listenerID {
+			p.Policy.Position = i
+		}
+	}
+	m.updatingStatus(lbID)
+	go m.readyAfterTime(lbID)
+	return nil
+}
+
 // --------------------------- Pool ---------------------------
 
 //	func (m *MockProvider) GetPoolByName(ctx context.Context, lbID, name string) (*objects.Pool, error) {

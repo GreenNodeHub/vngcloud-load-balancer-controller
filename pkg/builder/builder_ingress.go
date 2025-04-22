@@ -91,6 +91,7 @@ func NewModelBuilderByIngress(
 		enableStickySession:        false,
 		enableTLSEncryption:        false,
 		certificateIDs:             []string{},
+		autoReorderPolicies:        false,
 
 		isAutoCreateSecurityGroup:     true,
 		isPOC:                         false,
@@ -484,7 +485,7 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 	}
 
 	// path rule
-	l7Rules := []loadbalancerv2.L7RuleRequest{
+	l7Rules := []l7RuleWrapper{
 		{
 			CompareType: compareType,
 			RuleType:    loadbalancerv2.PolicyRuleTypePATH,
@@ -493,7 +494,7 @@ func (l *modelBuilder) buildPolicyByPath(host, policyName string, path *networki
 	}
 
 	if host != "" {
-		l7Rules = append(l7Rules, loadbalancerv2.L7RuleRequest{
+		l7Rules = append(l7Rules, l7RuleWrapper{
 			CompareType: loadbalancerv2.PolicyCompareTypeEQUALS,
 			RuleType:    loadbalancerv2.PolicyRuleTypeHOSTNAME,
 			RuleValue:   host,
@@ -566,7 +567,7 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName, host string, path *netw
 				config.Action.RedirectHTTPCode = 301
 			}
 
-			l7Rule := make([]loadbalancerv2.L7RuleRequest, 0)
+			l7Rule := make([]l7RuleWrapper, 0)
 			for _, rule := range config.Rules {
 				// check if rule is duplicated
 				for _, r := range l7Rule {
@@ -576,7 +577,7 @@ func (l *modelBuilder) buildPolicyByRegex(_, policyName, host string, path *netw
 						return nil, errs.NewNoNeedRequeue(fmt.Sprintf("duplicated rule: %v", rule))
 					}
 				}
-				l7Rule = append(l7Rule, loadbalancerv2.L7RuleRequest{
+				l7Rule = append(l7Rule, l7RuleWrapper{
 					CompareType: loadbalancerv2.PolicyCompareType(rule.Compare),
 					RuleType:    loadbalancerv2.PolicyRuleType(rule.RuleType),
 					RuleValue:   rule.Value,

@@ -84,6 +84,7 @@ type Provider interface {
 	ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error)
 	UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error
 	DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error
+	ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error
 
 	// GetPoolByName(lbID, name string) (*objects.Pool, error)
 	// GetPoolByID(lbID, poolID string) (*entityv2.Pool, error)
