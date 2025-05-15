@@ -8,7 +8,8 @@ on:
       - "*" # Triggers on version tags, e.g., 1.0.0
 
 env:
-  REPO: vcr.vngcloud.vn/81-vks-public
+  REPO_HCM: vcr.vngcloud.vn/81-vks-public
+  REPO_HAN: vcr-han.vngcloud.vn/81-vks-public
 
 jobs:
   build_package:
@@ -28,12 +29,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to the vCR
+      - name: Log in to the vCR HCM
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: vcr.vngcloud.vn
           username: ${{ secrets.VCR_USER_PRO }}
           password: ${{ secrets.VCR_PASSWORD_PRO }}
+      
+      - name: Log in to the vCR HAN
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: vcr-han.vngcloud.vn
+          username: ${{ secrets.VCR_USER_HAN_PRO }}
+          password: ${{ secrets.VCR_PASSWORD_HAN_PRO }}
       
       - name: Set short git commit SHA
         id: vars
@@ -57,8 +65,10 @@ jobs:
           tags: |
             ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.sha }}
             ghcr.io/vngcloud/vngcloud-load-balancer-controller:v${{ github.ref_name }}
-            ${{ env.REPO }}/vngcloud-load-balancer-controller:${{ github.sha }}
-            ${{ env.REPO }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
+            ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:${{ github.sha }}
+            ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:${{ github.sha }}
+            ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
+            ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
           # target: vngcloud-load-balancer-controller
       
       - name: Push charts
@@ -67,7 +77,8 @@ jobs:
         run: |
           echo "$CHANGED_CHARTS"
           echo ${{ github.workspace }}
-          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS ${{ github.ref_name }}
+          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO_HCM }}/vks-helm-charts $CHANGED_CHARTS ${{ github.ref_name }}
+          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO_HAN }}/vks-helm-charts $CHANGED_CHARTS ${{ github.ref_name }}
 
   create_release:
     runs-on: ubuntu-latest
