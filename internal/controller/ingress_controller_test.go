@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -287,7 +288,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -405,7 +406,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -504,7 +505,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -671,7 +672,7 @@ var _ = Describe("Ingress Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -772,7 +773,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -875,7 +876,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -974,7 +975,7 @@ var _ = Describe("Ingress Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L7_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 7"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -2659,6 +2660,110 @@ var _ = Describe("Ingress Controller", func() {
 				expectAfterDelete: func() {},
 			}
 
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
+	Context("Test annotation prefer subnet id", func() {
+		It("LB should create exact in it", func() {
+			if skipIngressTest {
+				Skip("Skip test")
+			}
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest:  func() {},
+				postTest: func() {},
+				name:     "specify subnet id in annotation",
+				generateDepends: func() []client.Object {
+					// create service node port
+					service := newServiceNodePortResource("service-foo", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{service}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-service-gogsf", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: "service-foo",
+							Port: networkingv1.ServiceBackendPort{
+								Number: 80,
+							},
+						},
+					}
+					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPreferSubnetID)] = provider.MockSubnetID_1b_2
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+					Expect(loadbalancer.SubnetID).Should(Equal(provider.MockSubnetID_1b_2))
+					Expect(loadbalancer.ZoneID).Should(Equal(common.HCM_03_1B_ZONE))
+				},
+				steps:             []StepType{},
+				expectAfterDelete: func() {},
+			}
+			logrus.Info("Running test: ", test.name)
+			RunMultiStepTest[*networkingv1.Ingress](test)
+		})
+	})
+
+	Context("Test annotation prefer Zone id", func() {
+		It("LB should create exact in it", func() {
+			if skipIngressTest {
+				Skip("Skip test")
+			}
+			mockIngressReconciler.modeTest = false
+
+			test := TestType[*networkingv1.Ingress]{
+				preTest:  func() {},
+				postTest: func() {},
+				name:     "specify subnet id in annotation",
+				generateDepends: func() []client.Object {
+					// create service node port
+					service := newServiceNodePortResource("service-foo", "default")
+					service.Spec.Ports = []corev1.ServicePort{
+						{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+					}
+					return []client.Object{service}
+				},
+				generateObj: func() []ObjectAndExpect[*networkingv1.Ingress] {
+					ingress := newIngressResource("test-service-gogsf", "default")
+					Expect(ingress).NotTo(BeNil())
+					ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{
+						Service: &networkingv1.IngressServiceBackend{
+							Name: "service-foo",
+							Port: networkingv1.ServiceBackendPort{
+								Number: 80,
+							},
+						},
+					}
+					ingress.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPreferZoneID)] = common.HCM_03_1B_ZONE
+					return []ObjectAndExpect[*networkingv1.Ingress]{{obj: ingress, expect: func() {}}}
+				},
+				expect: func() {
+					// wait until reconcile done
+					time.Sleep(timeWaitRecocile)
+
+					// get load balancer by id in resource annotation
+					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
+					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					Expect(loadbalancer).ShouldNot(BeNil())
+					Expect(loadbalancer.SubnetID).Should(Equal(provider.MockSubnetID_1b_1)) // MockSubnetID_1b_1 or MockSubnetID_1b_2
+					Expect(loadbalancer.ZoneID).Should(Equal(common.HCM_03_1B_ZONE))
+				},
+				steps:             []StepType{},
+				expectAfterDelete: func() {},
+			}
 			logrus.Info("Running test: ", test.name)
 			RunMultiStepTest[*networkingv1.Ingress](test)
 		})

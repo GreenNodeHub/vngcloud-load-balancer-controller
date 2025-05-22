@@ -12,6 +12,7 @@ import (
 	clone "github.com/huandu/go-clone"
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -21,12 +22,16 @@ import (
 )
 
 const (
-	MockProjectID   = "projectID"
-	MockNetID       = "netID"
-	MockNetCIDR     = "199.0.0.0/16"
-	MockSubnetID    = "subnetID"
-	MockSubnetCIDR  = "199.0.0.0/24"
-	MockLBNameError = "error-lb" // create lb with this name will be error
+	MockProjectID       = "projectID"
+	MockNetID           = "netID"
+	MockNetCIDR         = "199.0.0.0/16"
+	MockSubnetID        = "subnetID-hcm-1a"
+	MockSubnetID_1b_1   = "subnetID-hcm-1b-1"
+	MockSubnetID_1b_2   = "subnetID-hcm-1b-2"
+	MockSubnetCIDR      = "199.0.0.0/24"
+	MockSubnetCIDR_1b_1 = "299.0.0.0/24"
+	MockSubnetCIDR_1b_2 = "399.0.0.0/24"
+	MockLBNameError     = "error-lb" // create lb with this name will be error
 )
 
 var (
@@ -76,13 +81,17 @@ type wrapCertificate struct {
 	*entityv2.Certificate
 }
 
+type wrapSubnet struct {
+	*entityv2.Subnet
+}
+
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
-	projectID  string
-	netID      string
-	netCIDR    string
-	subnetID   string
-	subnetCIDR string
+	projectID string
+	netID     string
+	netCIDR   string
+
+	subnet []*wrapSubnet
 
 	loadBalancers []*entityv2.LoadBalancer
 	listeners     []*wrapListener
@@ -106,13 +115,41 @@ type MockProvider struct {
 }
 
 func NewMockProvider() *MockProvider {
-	return &MockProvider{
-		projectID:  MockProjectID,
-		netID:      MockNetID,
-		netCIDR:    MockNetCIDR,
-		subnetID:   MockSubnetID,
-		subnetCIDR: MockSubnetCIDR,
 
+	return &MockProvider{
+		projectID: MockProjectID,
+		netID:     MockNetID,
+		netCIDR:   MockNetCIDR,
+
+		subnet: [](*wrapSubnet){
+			&wrapSubnet{
+				Subnet: &entityv2.Subnet{
+					Id:        MockSubnetID,
+					NetworkId: MockNetID,
+					Name:      "mock-subnet",
+					Cidr:      MockSubnetCIDR,
+					ZoneID:    common.HCM_03_1A_ZONE,
+				},
+			},
+			&wrapSubnet{
+				Subnet: &entityv2.Subnet{
+					Id:        MockSubnetID_1b_1,
+					NetworkId: MockNetID,
+					Name:      "mock-subnet-2a",
+					Cidr:      MockSubnetCIDR_1b_1,
+					ZoneID:    common.HCM_03_1B_ZONE,
+				},
+			},
+			&wrapSubnet{
+				Subnet: &entityv2.Subnet{
+					Id:        MockSubnetID_1b_2,
+					NetworkId: MockNetID,
+					Name:      "mock-subnet-2b",
+					Cidr:      MockSubnetCIDR_1b_2,
+					ZoneID:    common.HCM_03_1B_ZONE,
+				},
+			},
+		},
 		loadBalancers: make([]*entityv2.LoadBalancer, 0),
 		listeners:     make([]*wrapListener, 0),
 		pools:         make([]*wrapPool, 0),
@@ -137,6 +174,18 @@ func (m *MockProvider) Init(_ []string) error {
 			"ins-00000000-0000-0000-0000-000000000003",
 			"ins-00000000-0000-0000-0000-000000000004",
 		}
+		mapServerSubnet := map[string]string{
+			serverIDs[0]: MockSubnetID,
+			serverIDs[1]: MockSubnetID,
+			serverIDs[2]: MockSubnetID_1b_1,
+			serverIDs[3]: MockSubnetID_1b_2,
+		}
+		mapServerZone := map[string]string{
+			serverIDs[0]: common.HCM_03_1A_ZONE,
+			serverIDs[1]: common.HCM_03_1A_ZONE,
+			serverIDs[2]: common.HCM_03_1B_ZONE,
+			serverIDs[3]: common.HCM_03_1B_ZONE,
+		}
 		for _, id := range serverIDs {
 			m.servers = append(m.servers, &wrapServer{
 				Server: &entityv2.Server{
@@ -160,7 +209,13 @@ func (m *MockProvider) Init(_ []string) error {
 					Flavor:             entityv2.Flavor{},
 					SecGroups:          []entityv2.ServerSecgroup{},
 					ExternalInterfaces: []entityv2.NetworkInterface{},
-					InternalInterfaces: []entityv2.NetworkInterface{},
+					InternalInterfaces: []entityv2.NetworkInterface{
+						{
+							NetworkUuid: MockNetID,
+							SubnetUuid:  mapServerSubnet[id],
+						},
+					},
+					ZoneId: mapServerZone[id],
 				},
 			})
 		}
@@ -191,16 +246,77 @@ func (m *MockProvider) GetNetworkCIDR() string {
 	return m.netCIDR
 }
 
-func (m *MockProvider) GetSubnetID() string {
-	return m.subnetID
+func (m *MockProvider) GetDefaultSubnetID() string {
+	return m.subnet[0].Id
 }
 
-func (m *MockProvider) GetSubnetCIDR() string {
-	return m.subnetCIDR
+func (m *MockProvider) GetDefaultSubnetCIDR() string {
+	return m.subnet[0].Cidr
 }
 
-func (m *MockProvider) GetDefaultPackage() (string, string, error) {
+func (m *MockProvider) GetDefaultZone() common.Zone {
+	return common.Zone(m.subnet[0].ZoneID)
+}
+
+func (m *MockProvider) subnetToCIDR(subnetID string) string {
+	for _, s := range m.subnet {
+		if s.Id == subnetID {
+			return s.Cidr
+		}
+	}
+	return ""
+}
+func (m *MockProvider) subnetToZone(subnetID string) string {
+	for _, s := range m.subnet {
+		if s.Id == subnetID {
+			return s.ZoneID
+		}
+	}
+	return ""
+}
+
+func (m *MockProvider) getDefaultPackage() (string, string, error) {
 	return DEFAULT_L4_PACKAGE_ID, DEFAULT_L7_PACKAGE_ID, nil
+}
+
+func (m *MockProvider) GetDefaultPackageNetworkLB(zone string) string {
+	return DEFAULT_L4_PACKAGE_ID
+}
+
+func (m *MockProvider) GetDefaultPackageApplicationLB(zone string) string {
+	return DEFAULT_L7_PACKAGE_ID
+}
+
+func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	server, sdkErr := m.GetServerByID(ctx, serverID)
+	if sdkErr != nil {
+		return "", "", "", sdkErr
+	}
+	if server == nil {
+		return "", "", "", ErrorNotFound
+	}
+
+	networkID := server.InternalInterfaces[0].NetworkUuid
+	subnetID = server.InternalInterfaces[0].SubnetUuid
+	zoneID = server.ZoneId
+
+	if networkID == "" || subnetID == "" {
+		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, netID: %s, subnetID: %s", networkID, subnetID)
+		return "", "", "", ErrorNotFound
+	}
+
+	subnet, err := m.GetSubnetByID(ctx, networkID, subnetID)
+	if err != nil {
+		return "", "", "", err
+	}
+	if subnet == nil {
+		return "", "", "", ErrorNotFound
+	}
+	subnetCIDR = subnet.Cidr
+
+	return zoneID, subnetID, subnetCIDR, nil
 }
 
 // // --------------------------- Security Group ---------------------------
@@ -430,8 +546,18 @@ func (m *MockProvider) UpdateTags(ctx context.Context, resourceID string, tags m
 
 func (m *MockProvider) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet", "GetSubnetByID")
-	return nil, ErrorNotImplemented
+
+	if networkID != m.netID {
+		logger.Errorf("networkID %s not found", networkID)
+		return nil, ErrorNotFound
+	}
+
+	for _, s := range m.subnet {
+		if s.Id == subnetID {
+			return clone.Clone(s.Subnet).(*entityv2.Subnet), nil
+		}
+	}
+	return nil, ErrorNotFound
 }
 
 // // --------------------------- Server ---------------------------
@@ -561,8 +687,9 @@ func (m *MockProvider) CreateLoadBalancer(ctx context.Context, lbOptions loadbal
 		PackageID:          lbOpt.PackageID,
 		SubnetID:           lbOpt.SubnetID,
 		DisplayStatus:      consts.CREATED_LOADBALANCER_STATUS,
-		PrivateSubnetID:    "????????",
-		PrivateSubnetCidr:  "????????",
+		PrivateSubnetID:    lbOpt.SubnetID,
+		PrivateSubnetCidr:  m.subnetToCIDR(lbOpt.SubnetID),
+		ZoneID:             m.subnetToZone(lbOpt.SubnetID),
 		DisplayType:        consts.CREATED_LOADBALANCER_STATUS,
 		Description:        "????????",
 		Location:           "????????",

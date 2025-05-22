@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,6 +25,8 @@ type LoadBalancerBuilder interface {
 	BasicInfoHelper
 	PoolListenerHelper
 	NameHelper
+
+	GetMetaInfo() (zoneID common.Zone, subnetID string, subnetCIDR string)
 
 	EnsurePool(pool *poolBuilderType, oldBuilder OldModelBuilder) error
 	EnsureListener(listener *ListenerBuilderType, oldBuilder OldModelBuilder) error
@@ -95,11 +98,19 @@ type vngcloudLBBuilder struct {
 	poolListenerHelper
 	nameHelper
 
+	zoneID     common.Zone
+	subnetID   string
+	subnetCIDR string
+
 	logger           *logrus.Entry
 	context          context.Context
 	provider         provider.Provider
 	annotationParser annotations.Parser
 	knownNodes       []*corev1.Node
+}
+
+func (v *vngcloudLBBuilder) GetMetaInfo() (common.Zone, string, string) {
+	return v.zoneID, v.subnetID, v.subnetCIDR
 }
 
 func (r *vngcloudLBBuilder) build() error {
@@ -116,6 +127,9 @@ func (r *vngcloudLBBuilder) build() error {
 	r.loadBalancerType = loadbalancerv2.LoadBalancerType(lb.Type)
 	r.packageID = lb.PackageID
 	r.scheme = loadbalancerv2.LoadBalancerScheme(lb.LoadBalancerSchema)
+	r.zoneID = common.Zone(lb.ZoneID)
+	r.subnetID = lb.PrivateSubnetID
+	r.subnetCIDR = lb.PrivateSubnetCidr
 
 	// Get pools
 	pools, err := r.provider.ListPool(r.context, r.loadBalancerID)

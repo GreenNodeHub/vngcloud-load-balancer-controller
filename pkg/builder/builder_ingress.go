@@ -27,24 +27,17 @@ func NewModelBuilderByIngress(
 	ingress *networkingv1.Ingress,
 	annotationParser annotations.Parser,
 	client client.Client,
-	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
 	cniType utils.CNIType,
-	packageID string,
+	annotationConfig *AnnotationConfig,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
+		AnnotationConfig: annotationConfig,
+
 		poolListenerHelper: poolListenerHelper{
 			poolBuilders:     make([]*poolBuilderType, 0),
 			listenerBuilders: make([]*ListenerBuilderType, 0),
-		},
-		basicInfoHelper: basicInfoHelper{
-			loadBalancerID:   "",
-			loadBalancerName: "",
-			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer7,
-			packageID:        packageID,
-			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
-			tags:             map[string]string{},
 		},
 		nameHelper: nameHelper{
 			resourceType:      "ingress",
@@ -60,56 +53,8 @@ func NewModelBuilderByIngress(
 		client:           client,
 		logger:           contexts.NewContext(ctx).Log(),
 		cniType:          cniType,
-
-		networkID:  networkID,
-		subnetID:   subnetID,
-		subnetCIDR: subnetCIDR,
-
-		isIgnored: false,
-
-		idleTimeoutClient:          50,
-		idleTimeoutMember:          50,
-		idleTimeoutConnection:      5,
-		inboundCIDRs:               []string{"0.0.0.0/0"},
-		healthcheckProtocol:        loadbalancerv2.HealthCheckProtocolTCP,
-		healthcheckHttpMethod:      loadbalancerv2.HealthCheckMethodGET,
-		healthcheckPath:            "/",
-		successCodes:               "200",
-		healthcheckHttpVersion:     loadbalancerv2.HealthCheckHttpVersionHttp1,
-		healthcheckHttpDomainName:  "",
-		poolAlgorithm:              loadbalancerv2.PoolAlgorithmRoundRobin,
-		healthyThresholdCount:      3,
-		unhealthyThresholdCount:    3,
-		healthcheckTimeoutSeconds:  5,
-		healthcheckIntervalSeconds: 30,
-		healthcheckPort:            0,
-		targetNodeLabels:           map[string]string{},
-		securityGroups:             []string{},
-		enableProxyProtocol:        []string{},
-		enableAutoscale:            false,
-		targetType:                 TargetTypeInstance,
-		enableStickySession:        false,
-		enableTLSEncryption:        false,
-		certificateIDs:             []string{},
-		autoReorderPolicies:        false,
-
-		isAutoCreateSecurityGroup:     true,
-		isPOC:                         false,
-		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
-		insertHeaders: insertHeadersConfig{
-			Http: map[string]string{
-				"X-Forwarded-For":   "true",
-				"X-Forwarded-Proto": "true",
-				"X-Forwarded-Port":  "true",
-			},
-			Https: map[string]string{
-				"X-Forwarded-For":   "true",
-				"X-Forwarded-Proto": "true",
-				"X-Forwarded-Port":  "true",
-			},
-		},
-		clientCertificateID: "",
-		certBuilders:        make([]*certificateBuilderType, 0),
+		resource:         ingress,
+		nodes:            nodes,
 	}
 	if ingress == nil {
 		return model, nil
@@ -120,12 +65,35 @@ func NewModelBuilderByIngress(
 
 	model.parseAnnotation(ingress.Annotations)
 
-	err := model.buildIngress(ingress, nodes)
+	err := model.buildCertificates(ingress)
 	if err != nil {
 		return nil, err
 	}
 
 	return model, nil
+}
+
+func (l *modelBuilder) buildCertificates(ingress *networkingv1.Ingress) error {
+	if isValid, err := l.isValidToBuildHTTPSListener(ingress); isValid {
+		if len(l.certificateIDs) == 0 {
+			// build certificate
+			err = l.buildCertificate(ingress.Spec.TLS)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (l *modelBuilder) Build() error {
+	if l.builderType == BuilderTypeLoadIngress {
+		return l.buildIngress(l.resource.(*networkingv1.Ingress), l.nodes)
+	}
+	if l.builderType == BuilderTypeLoadService {
+		return l.buildService(l.resource.(*corev1.Service), l.nodes)
+	}
+	return nil
 }
 
 func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*corev1.Node) error {
@@ -163,22 +131,8 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	}
 
 	// build listener https
-	isValidToBuildHTTPSListener := func() (bool, error) {
-		if len(ingress.Spec.TLS) == 0 {
-			return false, nil
-		}
-		if len(l.certificateIDs) > 0 {
-			return true, nil
-		}
-		for _, tls := range ingress.Spec.TLS {
-			if tls.SecretName == "" {
-				return true, errs.NewNoNeedRequeue("to use TLS, specific certIDs through annotation or secretName must be set")
-			}
-		}
-		return true, nil
-	}
 	var httpsListener *ListenerBuilderType
-	if isValid, err := isValidToBuildHTTPSListener(); isValid {
+	if isValid, err := l.isValidToBuildHTTPSListener(ingress); isValid {
 		if err != nil {
 			return err
 		}
@@ -190,14 +144,6 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 			httpsListener.ReferPoolName = defaultPoolBuilder.GetName()
 		}
 		l.AddListenerBuilder(httpsListener)
-
-		if len(l.certificateIDs) == 0 {
-			// build certificate
-			err = l.buildCertificate(ingress.Spec.TLS)
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	// which host using tls
@@ -245,6 +191,21 @@ func (l *modelBuilder) buildIngress(ingress *networkingv1.Ingress, nodes []*core
 	}
 
 	return nil
+}
+
+func (l *modelBuilder) isValidToBuildHTTPSListener(ingress *networkingv1.Ingress) (bool, error) {
+	if len(ingress.Spec.TLS) == 0 {
+		return false, nil
+	}
+	if len(l.certificateIDs) > 0 {
+		return true, nil
+	}
+	for _, tls := range ingress.Spec.TLS {
+		if tls.SecretName == "" {
+			return true, errs.NewNoNeedRequeue("to use TLS, specific certIDs through annotation or secretName must be set")
+		}
+	}
+	return true, nil
 }
 
 // if have default backend,

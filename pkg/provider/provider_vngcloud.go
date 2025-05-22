@@ -13,6 +13,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/client"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/sdk_error"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	computev2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/compute/v2"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -53,6 +54,10 @@ type VNGCLOUD_Provider struct {
 	netCIDR    string
 	subnetID   string
 	subnetCIDR string
+	zoneID     common.Zone
+
+	nlbDefaultPackageID map[common.Zone]string
+	albDefaultPackageID map[common.Zone]string
 
 	once sync.Once
 }
@@ -87,6 +92,27 @@ func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
 		err = m.getNetworkInformation(providerIDs)
 		if err != nil {
 			return
+		}
+
+		// get the default package id
+		m.nlbDefaultPackageID = make(map[common.Zone]string)
+		m.albDefaultPackageID = make(map[common.Zone]string)
+
+		allZones := []common.Zone{
+			common.HCM_03_1A_ZONE,
+			common.HCM_03_1B_ZONE,
+			common.HCM_03_1C_ZONE,
+			common.HCM_03_BKK_01_ZONE,
+		}
+
+		for _, zone := range allZones {
+			l4PackageID, l7PackageID, err := m.getDefaultPackage(zone)
+			if err != nil {
+				logrus.Errorf("[ERROR] - Init: failed to get default package for zone %s: %v", zone, err)
+				return
+			}
+			m.nlbDefaultPackageID[zone] = l4PackageID
+			m.albDefaultPackageID[zone] = l7PackageID
 		}
 	})
 	return err
@@ -138,6 +164,7 @@ func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
 	}
 	m.netID = server.InternalInterfaces[0].NetworkUuid
 	m.subnetID = server.InternalInterfaces[0].SubnetUuid
+	m.zoneID = common.Zone(server.ZoneId)
 
 	if m.netID == "" || m.subnetID == "" {
 		logrus.Errorf("[ERROR] - getNetworkInformation: failed to get network information, netID: %s, subnetID: %s", m.netID, m.subnetID)
@@ -165,6 +192,38 @@ func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
 	return nil
 }
 
+func (m *VNGCLOUD_Provider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	server, sdkErr := m.GetServerByID(ctx, serverID)
+	if sdkErr != nil {
+		return "", "", "", sdkErr
+	}
+	if server == nil {
+		return "", "", "", ErrorNotFound
+	}
+
+	networkID := server.InternalInterfaces[0].NetworkUuid
+	subnetID = server.InternalInterfaces[0].SubnetUuid
+	zoneID = server.ZoneId
+
+	if networkID == "" || subnetID == "" {
+		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, netID: %s, subnetID: %s", networkID, subnetID)
+		return "", "", "", ErrorNotFound
+	}
+
+	subnet, err := m.GetSubnetByID(ctx, networkID, subnetID)
+	if err != nil {
+		return "", "", "", err
+	}
+	if subnet == nil {
+		return "", "", "", ErrorNotFound
+	}
+	subnetCIDR = subnet.Cidr
+
+	return zoneID, subnetID, subnetCIDR, nil
+}
+
 func (m *VNGCLOUD_Provider) GetProjectID() string {
 	return m.projectID
 }
@@ -177,19 +236,23 @@ func (m *VNGCLOUD_Provider) GetNetworkCIDR() string {
 	return m.netCIDR
 }
 
-func (m *VNGCLOUD_Provider) GetSubnetID() string {
+func (m *VNGCLOUD_Provider) GetDefaultSubnetID() string {
 	return m.subnetID
 }
 
-func (m *VNGCLOUD_Provider) GetSubnetCIDR() string {
+func (m *VNGCLOUD_Provider) GetDefaultSubnetCIDR() string {
 	return m.subnetCIDR
 }
 
-func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
+func (m *VNGCLOUD_Provider) GetDefaultZone() common.Zone {
+	return m.zoneID
+}
+
+func (m *VNGCLOUD_Provider) getDefaultPackage(zone common.Zone) (string, string, error) {
 	logger := contexts.NewContext(context.TODO()).Log()
 
 	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
-	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent))
+	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent).WithZoneId(zone))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetDefaultPackage: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return "", "", sdkErr.GetError()
@@ -222,6 +285,20 @@ func (m *VNGCLOUD_Provider) GetDefaultPackage() (string, string, error) {
 	}
 
 	return l4PackageID, l7PackageID, nil
+}
+
+func (m *VNGCLOUD_Provider) GetDefaultPackageNetworkLB(zone string) string {
+	if packageID, ok := m.nlbDefaultPackageID[common.Zone(zone)]; ok {
+		return packageID
+	}
+	return ""
+}
+
+func (m *VNGCLOUD_Provider) GetDefaultPackageApplicationLB(zone string) string {
+	if packageID, ok := m.albDefaultPackageID[common.Zone(zone)]; ok {
+		return packageID
+	}
+	return ""
 }
 
 // // --------------------------- Security Group ---------------------------

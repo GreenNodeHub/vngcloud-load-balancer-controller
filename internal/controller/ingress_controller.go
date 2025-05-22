@@ -28,6 +28,7 @@ import (
 	"github.com/huandu/go-clone"
 	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -74,9 +75,10 @@ type IngressReconciler struct {
 	ensureTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 	deleteTest func(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
 
-	networkID  string
-	subnetID   string
-	subnetCIDR string
+	networkID         string
+	defaultZone       common.Zone
+	defaultSubnetID   string
+	defaultSubnetCIDR string
 
 	knownNodes []*corev1.Node
 
@@ -84,8 +86,7 @@ type IngressReconciler struct {
 	initialized bool
 	initLock    sync.Mutex
 
-	cniMode          utils.CNIType
-	defaultPackageID string
+	cniMode utils.CNIType
 
 	UpdateTracker       UpdateTrackerInterface
 	timeReconcilePeriod time.Duration
@@ -358,12 +359,17 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		return err
 	}
 
+	annotationConfig, err := builder.NewAnnotationConfig(ctx, r.annotationParser, obj.Annotations, builder.BuilderTypeLoadIngress)
+	if err != nil {
+		logger.Error("Failed to parse annotation: ", err)
+		return errs.NewNoNeedRequeue(err.Error())
+	}
+
 	loadBalancerBuilder, err := builder.NewModelBuilderByIngress(ctx, obj, r.annotationParser, r.Client,
-		r.networkID, r.subnetID, r.subnetCIDR,
 		r.Config.Cluster.ClusterID,
 		r.knownNodes,
 		r.cniMode,
-		r.defaultPackageID,
+		annotationConfig,
 	)
 	if err != nil {
 		logger.Error("Failed to create loadbalancer builder: ", err)
@@ -374,7 +380,7 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 	// loadBalancerBuilder.Print()
 
 	// ignore reconcile
-	if loadBalancerBuilder.IsIgnored() {
+	if annotationConfig.IsIgnored() {
 		logger.Info("Object is ignored")
 		return nil
 	}
@@ -423,6 +429,44 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			return err
 		}
 		if lb == nil {
+			// try to get zone, subnet from prefer subnet id annotation
+			if !annotationConfig.IsMetadataValid() && annotationConfig.GetPreferSubnetID() != "" {
+				subnet, err := r.Provider.GetSubnetByID(ctx, r.networkID, annotationConfig.GetPreferSubnetID())
+				if err != nil || subnet == nil {
+					logger.Warnf("Failed to get subnet: %s. Fall to prefer zone, then use default zone.", err)
+				} else {
+					annotationConfig.ZoneID = common.Zone(subnet.ZoneID)
+					annotationConfig.SubnetID = subnet.Id
+					annotationConfig.SubnetCIDR = subnet.Cidr
+				}
+			}
+			// try to get zone, subnet from prefer zone id annotation
+			if !annotationConfig.IsMetadataValid() && annotationConfig.GetPreferZoneID() != "" {
+				providerIDs := builder.GetListProviderID(r.knownNodes)
+				for _, providerID := range providerIDs {
+					_zone, _subnetID, _subnetCIDR, err := r.Provider.GetServerNetworkInfo(ctx, providerID)
+					if err != nil {
+						continue
+					}
+					if annotationConfig.GetPreferZoneID() == common.Zone(_zone) {
+						annotationConfig.ZoneID = common.Zone(_zone)
+						annotationConfig.SubnetID = _subnetID
+						annotationConfig.SubnetCIDR = _subnetCIDR
+						break
+					}
+				}
+			}
+			// use default zone and subnet if not specified
+			if !annotationConfig.IsMetadataValid() {
+				annotationConfig.ZoneID = r.defaultZone
+				annotationConfig.SubnetID = r.defaultSubnetID
+				annotationConfig.SubnetCIDR = r.defaultSubnetCIDR
+			}
+
+			if annotationConfig.GetPackageID() == "" {
+				annotationConfig.SetPackageID(r.Provider.GetDefaultPackageApplicationLB(string(annotationConfig.ZoneID)))
+			}
+
 			// create loadbalancer. It mays create lb, listener, pool at the same time
 			lb, err = r.Provider.CreateLoadBalancer(ctx, loadBalancerBuilder.CreateLoadBalancerOptions())
 			if err != nil {
@@ -459,11 +503,22 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		}
 	}
 
+	r.lbIDMutex.Lock(loadBalancerBuilder.GetLoadBalancerID())
+	defer r.lbIDMutex.Unlock(loadBalancerBuilder.GetLoadBalancerID())
+
 	// inspect current loadbalancer in portal to compare with the new one
 	currentBuilder, err := builder.NewLoadBalancerBuilderByLoadBalancerID(ctx, loadBalancerBuilder.GetLoadBalancerID(),
 		r.Provider, r.annotationParser, r.Config.Cluster.ClusterID, r.knownNodes, obj)
 	if err != nil {
 		logger.Error("Failed to get current loadbalancer: ", err)
+		return err
+	}
+
+	// update meta info
+	annotationConfig.ZoneID, annotationConfig.SubnetID, annotationConfig.SubnetCIDR = currentBuilder.GetMetaInfo()
+	err = loadBalancerBuilder.Build()
+	if err != nil {
+		logger.Error("Failed to build model loadbalancer: ", err)
 		return err
 	}
 
@@ -673,13 +728,18 @@ func (r *IngressReconciler) subDeleteObject(ctx context.Context, obj *networking
 			return err
 		}
 
+		annotationConfig, err := builder.NewAnnotationConfig(ctx, r.annotationParser, obj.Annotations, builder.BuilderTypeLoadIngress)
+		if err != nil {
+			logger.Error("Failed to parse annotation: ", err)
+			return errs.NewNoNeedRequeue(err.Error())
+		}
+
 		// build loadbalancer model, pass nil to object to create a model with default values
 		newBuilder, err = builder.NewModelBuilderByIngress(ctx, nil, r.annotationParser, r.Client,
-			r.networkID, r.subnetID, r.subnetCIDR,
 			r.Config.Cluster.ClusterID,
 			r.knownNodes,
 			r.cniMode,
-			r.defaultPackageID,
+			annotationConfig,
 		)
 		if err != nil {
 			logger.Error("Failed to create new model builder: ", err)
@@ -817,10 +877,11 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		return err
 	}
 	r.networkID = r.Provider.GetNetworkID()
-	r.subnetID = r.Provider.GetSubnetID()
-	r.subnetCIDR = r.Provider.GetSubnetCIDR()
-	if r.networkID == "" || r.subnetID == "" || r.subnetCIDR == "" {
-		return errors.New("no network info, lack of networkID or subnetID or subnetCIDR")
+	r.defaultSubnetID = r.Provider.GetDefaultSubnetID()
+	r.defaultSubnetCIDR = r.Provider.GetDefaultSubnetCIDR()
+	r.defaultZone = r.Provider.GetDefaultZone()
+	if r.networkID == "" || r.defaultZone == "" || r.defaultSubnetID == "" || r.defaultSubnetCIDR == "" {
+		return errors.New("no network info, lack of networkID or zone or subnetID or subnetCIDR")
 	}
 
 	// if clusterID is empty, get from node label
@@ -846,14 +907,6 @@ func (r *IngressReconciler) Init(client client.Client) error {
 		return err
 	}
 	logrus.Infof("Detected CNI type: %s", r.cniMode)
-
-	// get default package id
-	_, r.defaultPackageID, err = r.Provider.GetDefaultPackage()
-	logrus.Infof("Default ALB package ID: %s", r.defaultPackageID)
-	if err != nil {
-		logrus.Error("Failed to get default package: ", err)
-		return err
-	}
 
 	r.UpdateTracker.Start(context.Background(), r.Config.Cluster.ClusterID)
 

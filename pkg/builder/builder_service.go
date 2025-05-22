@@ -24,24 +24,16 @@ func NewModelBuilderByService(
 	service *corev1.Service,
 	annotationParser annotations.Parser,
 	client client.Client,
-	networkID, subnetID, subnetCIDR string,
 	clusterID string,
 	nodes []*corev1.Node,
 	cnitype utils.CNIType,
-	packageID string,
+	annotationConfig *AnnotationConfig,
 ) (ModelBuilder, error) {
 	model := &modelBuilder{
+		AnnotationConfig: annotationConfig,
 		poolListenerHelper: poolListenerHelper{
 			poolBuilders:     make([]*poolBuilderType, 0),
 			listenerBuilders: make([]*ListenerBuilderType, 0),
-		},
-		basicInfoHelper: basicInfoHelper{
-			loadBalancerID:   "",
-			loadBalancerName: "",
-			loadBalancerType: loadbalancerv2.LoadBalancerTypeLayer4,
-			packageID:        packageID,
-			scheme:           loadbalancerv2.InternetLoadBalancerScheme,
-			tags:             map[string]string{},
 		},
 		nameHelper: nameHelper{
 			resourceType:      "service",
@@ -57,44 +49,8 @@ func NewModelBuilderByService(
 		client:           client,
 		logger:           contexts.NewContext(ctx).Log(),
 		cniType:          cnitype,
-
-		networkID:  networkID,
-		subnetID:   subnetID,
-		subnetCIDR: subnetCIDR,
-
-		isIgnored: false,
-
-		idleTimeoutClient:          50,
-		idleTimeoutMember:          50,
-		idleTimeoutConnection:      5,
-		inboundCIDRs:               []string{"0.0.0.0/0"},
-		healthcheckProtocol:        loadbalancerv2.HealthCheckProtocolTCP,
-		healthcheckHttpMethod:      loadbalancerv2.HealthCheckMethodGET,
-		healthcheckPath:            "/",
-		successCodes:               "200",
-		healthcheckHttpVersion:     loadbalancerv2.HealthCheckHttpVersionHttp1,
-		healthcheckHttpDomainName:  "",
-		poolAlgorithm:              loadbalancerv2.PoolAlgorithmRoundRobin,
-		healthyThresholdCount:      3,
-		unhealthyThresholdCount:    3,
-		healthcheckTimeoutSeconds:  5,
-		healthcheckIntervalSeconds: 30,
-		healthcheckPort:            0,
-		targetNodeLabels:           map[string]string{},
-		securityGroups:             []string{},
-		enableProxyProtocol:        []string{},
-		enableAutoscale:            false,
-		targetType:                 TargetTypeInstance,
-		enableStickySession:        false,
-		enableTLSEncryption:        false,
-		certificateIDs:             []string{},
-		autoReorderPolicies:        false,
-
-		isAutoCreateSecurityGroup:     true,
-		isPOC:                         false,
-		implementationSpecificConfigs: make([]implementationSpecificConfig, 0),
-		insertHeaders:                 insertHeadersConfig{}, // this field supports response header
-		clientCertificateID:           "",
+		resource:         service,
+		nodes:            nodes,
 	}
 	if service == nil {
 		return model, nil
@@ -104,11 +60,6 @@ func NewModelBuilderByService(
 	model.resourceNamespace = service.Namespace
 
 	model.parseAnnotation(service.Annotations)
-
-	err := model.buildService(service, nodes)
-	if err != nil {
-		return nil, err
-	}
 
 	return model, nil
 }

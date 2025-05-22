@@ -285,7 +285,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -380,7 +380,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeTrue())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
 						Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -459,7 +459,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -535,7 +535,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -611,7 +611,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -693,7 +693,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -775,7 +775,7 @@ var _ = Describe("Service Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -892,7 +892,7 @@ var _ = Describe("Service Controller", func() {
 						Expect(loadbalancer.Internal).Should(BeFalse())
 						Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 						Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+						Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 						Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 						// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 
@@ -979,7 +979,7 @@ var _ = Describe("Service Controller", func() {
 								Expect(loadbalancer.Internal).Should(BeFalse())
 								Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internet"))
 								Expect(loadbalancer.PackageID).Should(Equal(provider.DEFAULT_L4_PACKAGE_ID))
-								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetSubnetID()))
+								Expect(loadbalancer.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
 								Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 								// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(mockProvider.GetSubnetCIDR()))
 

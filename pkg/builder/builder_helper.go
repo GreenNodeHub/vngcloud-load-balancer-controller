@@ -136,6 +136,8 @@ type BasicInfoHelper interface {
 	GetScheme() loadbalancerv2.LoadBalancerScheme
 	GetLoadBalancerType() loadbalancerv2.LoadBalancerType
 	GetTags() map[string]string
+
+	SetPackageID(id string)
 }
 
 var _ BasicInfoHelper = &basicInfoHelper{}
@@ -172,6 +174,10 @@ func (l *basicInfoHelper) GetLoadBalancerType() loadbalancerv2.LoadBalancerType 
 
 func (l *basicInfoHelper) GetTags() map[string]string {
 	return l.tags
+}
+
+func (l *basicInfoHelper) SetPackageID(id string) {
+	l.packageID = id
 }
 
 // ---------------------------------------------------------- generate name

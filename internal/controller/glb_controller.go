@@ -112,7 +112,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) Init(client client.Client) error 
 		return err
 	}
 	r.netwotkID = r.Provider.GetNetworkID()
-	r.subnetID = r.Provider.GetSubnetID()
+	r.subnetID = r.Provider.GetDefaultSubnetID()
 	r.networkCIDR = r.Provider.GetNetworkCIDR()
 	if r.netwotkID == "" || r.subnetID == "" || r.networkCIDR == "" {
 		return errors.New("no network info, lack of networkID or subnetID or networkCIDR")

@@ -42,14 +42,8 @@ type ModelBuilder interface {
 	GetListDefaultSecgroupRules() []*secGroupRuleBuilderType
 	EnsureSecgroupPING_UDP() // if use UDP protocol, must open ICMP protocol too
 
-	IsIgnored() bool
 	// It mays create lb, listener, pool (not policy) at the same time
 	CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBalancerRequest
-
-	// default subnet id of the network if not specified
-	GetSubnetID() (subnetID string)
-	GetNetworkID() (networkID string)
-	GetSubnetCIDR() string
 
 	GetTargetNodeLabels() map[string]string
 	GetTargetType() TargetType
@@ -66,6 +60,8 @@ type ModelBuilder interface {
 	AddCertificateID(id string)
 	GetCertificateIDs() []string
 	AutoReorderPolicies() bool
+
+	Build() error
 }
 
 var _ ModelBuilder = &modelBuilder{}
@@ -118,41 +114,7 @@ func (i *insertHeadersConfig) GetHTTPS() *[]entity.ListenerInsertHeader {
 }
 
 type modelBuilder struct {
-	// annotation configuration
-	isIgnored                  bool
-	idleTimeoutClient          int
-	idleTimeoutMember          int
-	idleTimeoutConnection      int
-	inboundCIDRs               []string
-	healthcheckProtocol        loadbalancerv2.HealthCheckProtocol
-	healthcheckPath            string
-	successCodes               string
-	healthcheckHttpVersion     loadbalancerv2.HealthCheckHttpVersion
-	healthcheckHttpDomainName  string
-	healthyThresholdCount      int
-	unhealthyThresholdCount    int
-	poolAlgorithm              loadbalancerv2.PoolAlgorithm
-	targetNodeLabels           map[string]string
-	healthcheckPort            int
-	healthcheckHttpMethod      loadbalancerv2.HealthCheckMethod
-	healthcheckTimeoutSeconds  int
-	healthcheckIntervalSeconds int
-	enableAutoscale            bool
-	targetType                 TargetType
-	isPOC                      bool
-
-	// annotation configuration for L4 only
-	enableProxyProtocol []string
-
-	// annotation configuration for L7 only
-	enableStickySession           bool
-	enableTLSEncryption           bool
-	certificateIDs                []string
-	implementationSpecificConfigs []implementationSpecificConfig
-	insertHeaders                 insertHeadersConfig
-	clientCertificateID           string
-	certBuilders                  []*certificateBuilderType
-	autoReorderPolicies           bool
+	*AnnotationConfig
 
 	// helper components
 	annotationParser annotations.Parser
@@ -161,17 +123,13 @@ type modelBuilder struct {
 	logger           *logrus.Entry
 	cniType          utils.CNIType
 
-	networkID  string
-	subnetID   string
-	subnetCIDR string
-
 	// if user pass the security group annotation, don't create any security group, just use the given security group
-	isAutoCreateSecurityGroup bool
-	securityGroups            []string
-	secGroupRuleBuilders      []*secGroupRuleBuilderType
+	secGroupRuleBuilders []*secGroupRuleBuilderType
+
+	resource client.Object
+	nodes    []*corev1.Node
 
 	poolListenerHelper
-	basicInfoHelper
 	nameHelper
 }
 
@@ -190,16 +148,12 @@ func (l *modelBuilder) GetNodeBySelector(selector map[string]string) ([]*corev1.
 	return nodes, nil
 }
 
-func (l *modelBuilder) IsIgnored() bool {
-	return l.isIgnored
-}
-
 func (l *modelBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBalancerRequest {
 	lbName := l.GetLoadBalancerDefaultName()
 	if l.GetLoadBalancerName() != "" {
 		lbName = l.GetLoadBalancerName()
 	}
-	opts := loadbalancerv2.NewCreateLoadBalancerRequest(lbName, l.GetPackageID(), l.GetSubnetID()).
+	opts := loadbalancerv2.NewCreateLoadBalancerRequest(lbName, l.GetPackageID(), l.SubnetID).
 		WithScheme(l.scheme).
 		WithType(l.loadBalancerType).
 		WithPoc(l.isPOC).
@@ -228,18 +182,6 @@ func (l *modelBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBal
 	// if have tags, add tags
 	// ............................
 	return opts
-}
-
-func (l *modelBuilder) GetNetworkID() string {
-	return l.networkID
-}
-
-func (l *modelBuilder) GetSubnetID() string {
-	return l.subnetID
-}
-
-func (l *modelBuilder) GetSubnetCIDR() string {
-	return l.subnetCIDR
 }
 
 func (l *modelBuilder) GetTargetNodeLabels() map[string]string {
@@ -356,7 +298,7 @@ func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.Secg
 		PortRangeMax:   port,
 		PortRangeMin:   port,
 		Protocol:       protocol,
-		RemoteIPPrefix: l.GetSubnetCIDR(),
+		RemoteIPPrefix: l.SubnetCIDR,
 	})
 	return false
 }

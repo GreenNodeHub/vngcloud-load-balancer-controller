@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
@@ -33,9 +34,14 @@ type Provider interface {
 	GetProjectID() string
 	GetNetworkID() string
 	GetNetworkCIDR() string
-	GetSubnetID() string
-	GetSubnetCIDR() string
-	GetDefaultPackage() (string, string, error)
+	GetDefaultSubnetID() string
+	GetDefaultSubnetCIDR() string
+	GetDefaultZone() common.Zone
+	// GetDefaultPackage() (string, string, error)
+	GetDefaultPackageNetworkLB(zone string) string
+	GetDefaultPackageApplicationLB(zone string) string
+
+	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error)
 	// clientServer
 	// clientLoadBalancer
 	// projectID

@@ -50,4 +50,7 @@ const (
 	SuffixIsPOC2 = "is-poc" // is poc but deprecated
 
 	SuffixTrigger = "trigger" // trigger
+
+	SuffixPreferZoneID   = "prefer-zone-id"   // prefer zone id
+	SuffixPreferSubnetID = "prefer-subnet-id" // prefer subnet id
 )
