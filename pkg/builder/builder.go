@@ -157,7 +157,8 @@ func (l *modelBuilder) CreateLoadBalancerOptions() loadbalancerv2.ICreateLoadBal
 		WithScheme(l.scheme).
 		WithType(l.loadBalancerType).
 		WithPoc(l.isPOC).
-		WithAutoScalable(l.enableAutoscale)
+		WithAutoScalable(l.enableAutoscale).
+		WithZoneId(l.ZoneID)
 
 	// if have pool, create first pool, but in L7, only create default pool in this step
 	if len(l.GetPoolBuilders()) > 0 {
