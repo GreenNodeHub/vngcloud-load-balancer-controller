@@ -312,7 +312,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 	logger := contexts.NewContext(ctx).Log()
 	key := genKey(req.Namespace, req.Name)
 
-	event := r.eventClassification.Classify(key)
+	event := r.eventClassification.Classify(ctx, key)
 	if event == nil {
 		logger.Info("Event is nil, return.")
 		return nil
