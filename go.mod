@@ -3,7 +3,7 @@ module github.com/vngcloud/vngcloud-load-balancer-controller
 go 1.22.5
 
 require (
-	github.com/anngdinh/operator-helper v0.0.6
+	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c
 	github.com/cuongpiger/joat v1.0.17
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
