@@ -35,14 +35,14 @@ jobs:
           registry: vcr.vngcloud.vn
           username: ${{ secrets.VCR_USER_PRO }}
           password: ${{ secrets.VCR_PASSWORD_PRO }}
-      
+
       - name: Log in to the vCR HAN
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           registry: vcr-han.vngcloud.vn
           username: ${{ secrets.VCR_USER_HAN_PRO }}
           password: ${{ secrets.VCR_PASSWORD_HAN_PRO }}
-      
+
       - name: Set short git commit SHA
         id: vars
         run: |
@@ -70,15 +70,14 @@ jobs:
             ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
             ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
           # target: vngcloud-load-balancer-controller
-      
+
       - name: Push charts
         env:
           CHANGED_CHARTS: "charts/vngcloud-load-balancer-controller"
         run: |
-          echo "$CHANGED_CHARTS"
-          echo ${{ github.workspace }}
-          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO_HCM }}/vks-helm-charts $CHANGED_CHARTS ${{ github.ref_name }}
-          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO_HAN }}/vks-helm-charts $CHANGED_CHARTS ${{ github.ref_name }}
+          helm package ./charts/vngcloud-load-balancer-controller --version ${{ github.ref_name }} --app-version v${{ github.ref_name }}
+          helm push ./*.tgz oci://${{ env.REPO_HCM }}/vks-helm-charts
+          helm push ./*.tgz oci://${{ env.REPO_HAN }}/vks-helm-charts
 
   create_release:
     runs-on: ubuntu-latest

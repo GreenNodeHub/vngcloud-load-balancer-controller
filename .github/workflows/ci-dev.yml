@@ -31,7 +31,7 @@ jobs:
           registry: vcr.vngcloud.vn
           username: ${{ secrets.VCR_USER }}
           password: ${{ secrets.VCR_PASSWORD }}
-      
+
       - name: Set variables
         id: vars
         run: |
@@ -61,9 +61,6 @@ jobs:
           # target: vngcloud-load-balancer-controller
 
       - name: Push charts
-        env:
-          CHANGED_CHARTS: "charts/vngcloud-load-balancer-controller"
         run: |
-          echo "$CHANGED_CHARTS"
-          echo ${{ github.workspace }}
-          cd ${{ github.workspace }} && ./push_tgz.sh oci://${{ env.REPO }}/vks-helm-charts $CHANGED_CHARTS ${{ env.CHART_VERSION }}
+          helm package ./charts/vngcloud-load-balancer-controller --version ${{ env.CHART_VERSION }} --app-version ${{ env.VERSION }}
+          helm push ./*.tgz oci://${{ env.REPO }}/vks-helm-charts
