@@ -390,6 +390,11 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 		logger.Error("Failed to parse annotation: ", err)
 		return errs.NewNoNeedRequeue(err.Error())
 	}
+	providerIDs := builder.GetListProviderID(r.knownNodes)
+	annotationConfig.AllSubnetCIDRs, err = r.Provider.GetAllSubnetCIRDs(ctx, providerIDs)
+	if err != nil {
+		logger.Error("Failed to get all subnet CIDRs: ", err)
+	}
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByService(ctx, obj, r.annotationParser, r.Client,
 		r.Config.Cluster.ClusterID,
@@ -437,7 +442,6 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 			}
 			// try to get zone, subnet from prefer zone id annotation
 			if !annotationConfig.IsMetadataValid() && annotationConfig.GetPreferZoneID() != "" {
-				providerIDs := builder.GetListProviderID(r.knownNodes)
 				for _, providerID := range providerIDs {
 					_zone, _subnetID, _subnetCIDR, err := r.Provider.GetServerNetworkInfo(ctx, providerID)
 					if err != nil {

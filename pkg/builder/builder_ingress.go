@@ -330,7 +330,7 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 				return nil, err
 			}
 			for _, podPort := range podPorts {
-				l.addDefaultSecgroupRules(podPort, networkv2.SecgroupRuleProtocolTCP)
+				l.addDefaultSecgroupRules(podPort, networkv2.SecgroupRuleProtocolTCP, l.AllSubnetCIDRs...)
 			}
 		}
 	} else {
@@ -344,14 +344,14 @@ func (l *modelBuilder) buildIngressPool(service *networkingv1.IngressServiceBack
 
 	// if healthcheckPort is set, add to secgroup
 	if l.healthcheckPort != 0 {
-		l.addDefaultSecgroupRules(l.healthcheckPort, networkv2.SecgroupRuleProtocolTCP)
+		l.addDefaultSecgroupRules(l.healthcheckPort, networkv2.SecgroupRuleProtocolTCP, l.SubnetCIDR)
 	}
 
 	// build members
 	poolMembers := make([]*loadbalancerv2.Member, 0)
 	for _, member := range membersAddr {
 		// L7 pool only support TCP and HTTP healthcheck
-		l.addDefaultSecgroupRules(member.Port, networkv2.SecgroupRuleProtocolTCP)
+		l.addDefaultSecgroupRules(member.Port, networkv2.SecgroupRuleProtocolTCP, l.SubnetCIDR)
 
 		monitorPort := member.Port
 		if l.healthcheckPort != 0 {

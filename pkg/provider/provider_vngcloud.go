@@ -56,8 +56,13 @@ type VNGCLOUD_Provider struct {
 	subnetCIDR string
 	zoneID     common.Zone
 
-	nlbDefaultPackageID map[common.Zone]string
-	albDefaultPackageID map[common.Zone]string
+	// get default package for each zone
+	nlbDefaultPackageID sync.Map // map[common.Zone]string
+	albDefaultPackageID sync.Map // map[common.Zone]string
+
+	cacheInstanceIDToSubnetID sync.Map // map[string]string
+	cacheSubnetIDToCIDR       sync.Map // map[string]string
+	cacheSubnetIDToZoneID     sync.Map // map[string]common.Zone
 
 	once sync.Once
 }
@@ -89,14 +94,10 @@ func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
 
 		m.client = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
 		m.userAgent = fmt.Sprintf("vngcloud-loadbalancer-controller/%s (ChartVersion/%s)", version.Version, m.Config.ChartVersion)
-		err = m.getNetworkInformation(providerIDs)
+		err = m.initNetworkInformation(providerIDs)
 		if err != nil {
 			return
 		}
-
-		// get the default package id
-		m.nlbDefaultPackageID = make(map[common.Zone]string)
-		m.albDefaultPackageID = make(map[common.Zone]string)
 
 		allZones := []common.Zone{
 			common.HCM_03_1A_ZONE,
@@ -111,8 +112,8 @@ func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
 				logrus.Errorf("[ERROR] - Init: failed to get default package for zone %s: %v", zone, err)
 				return
 			}
-			m.nlbDefaultPackageID[zone] = l4PackageID
-			m.albDefaultPackageID[zone] = l7PackageID
+			m.nlbDefaultPackageID.Store(zone, l4PackageID)
+			m.albDefaultPackageID.Store(zone, l7PackageID)
 		}
 	})
 	return err
@@ -153,7 +154,7 @@ func (m *VNGCLOUD_Provider) setupPortalInfo(pmetadataService metadata.IMetadata)
 }
 
 // depend on the instances ids, get the network information. Must guarantee that at least one instance id is existed
-func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
+func (m *VNGCLOUD_Provider) initNetworkInformation(providerIDs []string) error {
 	instanceID := providerIDs[0]
 	server, err := m.GetServerByID(context.Background(), instanceID)
 	if err != nil {
@@ -167,7 +168,7 @@ func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
 	m.zoneID = common.Zone(server.ZoneId)
 
 	if m.netID == "" || m.subnetID == "" {
-		logrus.Errorf("[ERROR] - getNetworkInformation: failed to get network information, netID: %s, subnetID: %s", m.netID, m.subnetID)
+		logrus.Errorf("[ERROR] - initNetworkInformation: failed to get network information, netID: %s, subnetID: %s", m.netID, m.subnetID)
 		return ErrorNotFound
 	}
 
@@ -192,36 +193,41 @@ func (m *VNGCLOUD_Provider) getNetworkInformation(providerIDs []string) error {
 	return nil
 }
 
-func (m *VNGCLOUD_Provider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error) {
-	logger := contexts.NewContext(ctx).Log()
-
-	server, sdkErr := m.GetServerByID(ctx, serverID)
-	if sdkErr != nil {
-		return "", "", "", sdkErr
-	}
-	if server == nil {
-		return "", "", "", ErrorNotFound
-	}
-
-	networkID := server.InternalInterfaces[0].NetworkUuid
-	subnetID = server.InternalInterfaces[0].SubnetUuid
-	zoneID = server.ZoneId
-
-	if networkID == "" || subnetID == "" {
-		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, netID: %s, subnetID: %s", networkID, subnetID)
-		return "", "", "", ErrorNotFound
-	}
-
-	subnet, err := m.GetSubnetByID(ctx, networkID, subnetID)
+func (m *VNGCLOUD_Provider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, subnetID, subnetCIDR string, err error) {
+	zoneID, subnetID, err = m.getZoneIDAndSubnetID(ctx, serverID)
 	if err != nil {
 		return "", "", "", err
 	}
-	if subnet == nil {
-		return "", "", "", ErrorNotFound
+
+	subnetCIDR, err = m.getSubnetCIDR(ctx, subnetID)
+	if err != nil {
+		return "", "", "", err
 	}
-	subnetCIDR = subnet.Cidr
 
 	return zoneID, subnetID, subnetCIDR, nil
+}
+
+func (m *VNGCLOUD_Provider) GetAllSubnetCIRDs(ctx context.Context, providerIDs []string) ([]string, error) {
+	if len(providerIDs) == 0 {
+		return []string{}, nil
+	}
+
+	subnetCIRDs := make([]string, 0)
+	for _, instanceID := range providerIDs {
+		if subnetID, ok := m.cacheInstanceIDToSubnetID.Load(instanceID); ok {
+			if subnetCIDR, ok := m.cacheSubnetIDToCIDR.Load(subnetID); ok {
+				subnetCIRDs = append(subnetCIRDs, subnetCIDR.(string))
+				continue
+			}
+		}
+
+		_, _, subnetCIDR, err := m.GetServerNetworkInfo(ctx, instanceID)
+		if err != nil {
+			return nil, err
+		}
+		subnetCIRDs = append(subnetCIRDs, subnetCIDR)
+	}
+	return subnetCIRDs, nil
 }
 
 func (m *VNGCLOUD_Provider) GetProjectID() string {
@@ -288,17 +294,75 @@ func (m *VNGCLOUD_Provider) getDefaultPackage(zone common.Zone) (string, string,
 }
 
 func (m *VNGCLOUD_Provider) GetDefaultPackageNetworkLB(zone string) string {
-	if packageID, ok := m.nlbDefaultPackageID[common.Zone(zone)]; ok {
-		return packageID
+	if packageID, ok := m.nlbDefaultPackageID.Load(common.Zone(zone)); ok {
+		return packageID.(string)
 	}
 	return ""
 }
 
 func (m *VNGCLOUD_Provider) GetDefaultPackageApplicationLB(zone string) string {
-	if packageID, ok := m.albDefaultPackageID[common.Zone(zone)]; ok {
-		return packageID
+	if packageID, ok := m.albDefaultPackageID.Load(common.Zone(zone)); ok {
+		return packageID.(string)
 	}
 	return ""
+}
+
+// // --------------------------- Helper cache ---------------------------
+
+func (m *VNGCLOUD_Provider) getZoneIDAndSubnetID(ctx context.Context, instanceID string) (common.Zone, string, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	if instanceID == "" {
+		logger.Error("[ERROR] - GetServerNetworkInfo: serverID is empty")
+		return "", "", ErrorInvalidInput
+	}
+
+	if subnetID, ok := m.cacheInstanceIDToSubnetID.Load(instanceID); ok {
+		if zoneID, ok := m.cacheSubnetIDToZoneID.Load(subnetID); ok {
+			return zoneID.(common.Zone), subnetID.(string), nil
+		}
+	}
+
+	server, sdkErr := m.GetServerByID(ctx, instanceID)
+	if sdkErr != nil {
+		return "", "", sdkErr
+	}
+	if server == nil {
+		return "", "", ErrorNotFound
+	}
+
+	networkID := server.InternalInterfaces[0].NetworkUuid
+	subnetID := server.InternalInterfaces[0].SubnetUuid
+	zoneID := server.ZoneId
+
+	if networkID != m.netID {
+		logger.Warnf("[ERROR] - GetServerNetworkInfo: server %s is in different network %s, expected network %s", instanceID, networkID, m.netID)
+		return "", "", errors.New("server is in different network")
+	}
+
+	if subnetID == "" {
+		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, subnetID: %s", subnetID)
+		return "", "", ErrorNotFound
+	}
+
+	m.cacheInstanceIDToSubnetID.Store(instanceID, subnetID)
+	m.cacheSubnetIDToZoneID.Store(subnetID, common.Zone(zoneID))
+	return common.Zone(zoneID), subnetID, nil
+}
+
+func (m *VNGCLOUD_Provider) getSubnetCIDR(ctx context.Context, subnetID string) (string, error) {
+	if subnetCIDR, ok := m.cacheSubnetIDToCIDR.Load(subnetID); ok {
+		return subnetCIDR.(string), nil
+	}
+	subnet, err := m.GetSubnetByID(ctx, m.netID, subnetID)
+	if err != nil {
+		return "", err
+	}
+	if subnet == nil {
+		return "", ErrorNotFound
+	}
+	m.cacheSubnetIDToCIDR.Store(subnetID, subnet.Cidr)
+	return subnet.Cidr, nil
 }
 
 // // --------------------------- Security Group ---------------------------

@@ -41,7 +41,10 @@ type Provider interface {
 	GetDefaultPackageNetworkLB(zone string) string
 	GetDefaultPackageApplicationLB(zone string) string
 
-	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error)
+	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, subnetID, subnetCIDR string, err error)
+
+	// GetAllSubnetIDs returns all subnet CIRDs for the given provider IDs.
+	GetAllSubnetCIRDs(ctx context.Context, providerIDs []string) ([]string, error)
 	// clientServer
 	// clientLoadBalancer
 	// projectID

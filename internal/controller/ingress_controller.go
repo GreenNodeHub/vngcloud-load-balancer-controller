@@ -364,6 +364,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 		logger.Error("Failed to parse annotation: ", err)
 		return errs.NewNoNeedRequeue(err.Error())
 	}
+	providerIDs := builder.GetListProviderID(r.knownNodes)
+	annotationConfig.AllSubnetCIDRs, err = r.Provider.GetAllSubnetCIRDs(ctx, providerIDs)
+	if err != nil {
+		logger.Error("Failed to get all subnet CIDRs: ", err)
+	}
 
 	loadBalancerBuilder, err := builder.NewModelBuilderByIngress(ctx, obj, r.annotationParser, r.Client,
 		r.Config.Cluster.ClusterID,
@@ -442,7 +447,6 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			}
 			// try to get zone, subnet from prefer zone id annotation
 			if !annotationConfig.IsMetadataValid() && annotationConfig.GetPreferZoneID() != "" {
-				providerIDs := builder.GetListProviderID(r.knownNodes)
 				for _, providerID := range providerIDs {
 					_zone, _subnetID, _subnetCIDR, err := r.Provider.GetServerNetworkInfo(ctx, providerID)
 					if err != nil {

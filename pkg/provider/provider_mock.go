@@ -287,7 +287,7 @@ func (m *MockProvider) GetDefaultPackageApplicationLB(zone string) string {
 	return DEFAULT_L7_PACKAGE_ID
 }
 
-func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID, subnetID, subnetCIDR string, err error) {
+func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, subnetID, subnetCIDR string, err error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	server, sdkErr := m.GetServerByID(ctx, serverID)
@@ -300,7 +300,7 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 
 	networkID := server.InternalInterfaces[0].NetworkUuid
 	subnetID = server.InternalInterfaces[0].SubnetUuid
-	zoneID = server.ZoneId
+	zoneID = common.Zone(server.ZoneId)
 
 	if networkID == "" || subnetID == "" {
 		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, netID: %s, subnetID: %s", networkID, subnetID)
@@ -317,6 +317,12 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 	subnetCIDR = subnet.Cidr
 
 	return zoneID, subnetID, subnetCIDR, nil
+}
+
+func (m *MockProvider) GetAllSubnetCIRDs(ctx context.Context, providerIDs []string) ([]string, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("GetAllSubnetCIRDs is not implemented in MockProvider")
+	return []string{}, ErrorNotFound
 }
 
 // // --------------------------- Security Group ---------------------------

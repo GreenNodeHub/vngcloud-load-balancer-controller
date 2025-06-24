@@ -67,9 +67,10 @@ type AnnotationConfig struct {
 	preferZoneID   common.Zone
 	preferSubnetID string
 
-	ZoneID     common.Zone
-	SubnetID   string
-	SubnetCIDR string
+	ZoneID         common.Zone
+	SubnetID       string
+	SubnetCIDR     string
+	AllSubnetCIDRs []string // all subnet CIDRs of this cluster
 }
 
 func NewAnnotationConfig(

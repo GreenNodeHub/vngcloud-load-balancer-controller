@@ -104,7 +104,7 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 					return err
 				}
 				for _, podPort := range podPorts {
-					l.addDefaultSecgroupRules(podPort, l.coreProtocolToSecgroupProtocol(port.Protocol))
+					l.addDefaultSecgroupRules(podPort, l.coreProtocolToSecgroupProtocol(port.Protocol), l.AllSubnetCIDRs...)
 				}
 			}
 		} else {
@@ -117,14 +117,14 @@ func (l *modelBuilder) buildService(pService *corev1.Service, _ []*corev1.Node) 
 
 		// if healthcheckPort is set, add to secgroup
 		if l.healthcheckPort != 0 {
-			l.addDefaultSecgroupRules(l.healthcheckPort, l.coreProtocolToSecgroupProtocol(port.Protocol))
+			l.addDefaultSecgroupRules(l.healthcheckPort, l.coreProtocolToSecgroupProtocol(port.Protocol), l.SubnetCIDR)
 		}
 
 		// build pool members
 		poolMembers := make([]*loadbalancerv2.Member, 0)
 		for _, member := range membersAddr {
 			// L4 support TCP (TCP, HTTP, HTTPS), UDP (PING-UDP), PROXY (TCP, HTTP, HTTPS)
-			l.addDefaultSecgroupRules(member.Port, l.coreProtocolToSecgroupProtocol(port.Protocol))
+			l.addDefaultSecgroupRules(member.Port, l.coreProtocolToSecgroupProtocol(port.Protocol), l.SubnetCIDR)
 
 			monitorPort := member.Port
 			if l.healthcheckPort != 0 {

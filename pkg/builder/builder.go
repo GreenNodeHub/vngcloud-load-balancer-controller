@@ -275,40 +275,42 @@ func (l *modelBuilder) GetListDefaultSecgroupRules() []*secGroupRuleBuilderType 
 }
 
 // only support add default secgroup rules for ingress
-func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.SecgroupRuleProtocol) bool {
-	isExist := false
-	for _, rule := range l.secGroupRuleBuilders {
-		if rule.PortRangeMax == port &&
-			rule.PortRangeMin == port &&
-			rule.Protocol == protocol {
-			isExist = true
-			break
+func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.SecgroupRuleProtocol, sourceAddrs ...string) {
+	for _, addr := range sourceAddrs {
+		isExist := false
+		for _, rule := range l.secGroupRuleBuilders {
+			if rule.PortRangeMax == port &&
+				rule.PortRangeMin == port &&
+				rule.RemoteIPPrefix == addr &&
+				rule.Protocol == protocol {
+				isExist = true
+				break
+			}
 		}
+		if isExist {
+			continue
+		}
+		l.secGroupRuleBuilders = append(l.secGroupRuleBuilders, &secGroupRuleBuilderType{
+			commonBuilder: commonBuilder{
+				name: "",
+				id:   "",
+			},
+			Description:    "",
+			Direction:      networkv2.SecgroupRuleDirectionIngress,
+			EtherType:      networkv2.SecgroupRuleEtherTypeIPv4,
+			PortRangeMax:   port,
+			PortRangeMin:   port,
+			Protocol:       protocol,
+			RemoteIPPrefix: addr,
+		})
 	}
-	if isExist {
-		return true
-	}
-	l.secGroupRuleBuilders = append(l.secGroupRuleBuilders, &secGroupRuleBuilderType{
-		commonBuilder: commonBuilder{
-			name: "",
-			id:   "",
-		},
-		Description:    "",
-		Direction:      networkv2.SecgroupRuleDirectionIngress,
-		EtherType:      networkv2.SecgroupRuleEtherTypeIPv4,
-		PortRangeMax:   port,
-		PortRangeMin:   port,
-		Protocol:       protocol,
-		RemoteIPPrefix: l.SubnetCIDR,
-	})
-	return false
 }
 
 // ensurePING_UDP
 func (l *modelBuilder) EnsureSecgroupPING_UDP() {
 	for _, rule := range l.secGroupRuleBuilders {
 		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
-			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP)
+			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP, l.SubnetCIDR)
 		}
 	}
 }
