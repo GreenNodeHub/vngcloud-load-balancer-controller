@@ -1178,8 +1178,13 @@ var _ = Describe("Ingress Controller", func() {
 						rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect((rules.Items)).Should(HaveLen(3))
-						expectPortRangeMax := []int{80, 8080, 30000} // cilium should only have nodeport + podport
+						Expect((rules.Items)).Should(HaveLen(7)) // 1 nodeport + 3 x 2 (2 pod ports x 3 subnets (4 nodes in 3 subnets))
+						expectPortRangeMax := []int{80, 80, 80, 8080, 8080, 8080, 30000}
+						expectCIDRs := []string{
+							provider.MockSubnetCIDR, provider.MockSubnetCIDR, provider.MockSubnetCIDR,
+							provider.MockSubnetCIDR_1b_1, provider.MockSubnetCIDR_1b_1,
+							provider.MockSubnetCIDR_1b_2, provider.MockSubnetCIDR_1b_2,
+						}
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
 							expectPortRangeMax = removeFisrt(expectPortRangeMax, rule.PortRangeMax)
@@ -1187,7 +1192,8 @@ var _ = Describe("Ingress Controller", func() {
 							Expect(rule.Direction).Should(Equal("ingress"))
 							Expect(rule.EtherType).Should(Equal("IPv4"))
 							Expect(rule.Protocol).Should(Equal("tcp"))
-							Expect(rule.RemoteIPPrefix).Should(Equal(provider.MockSubnetCIDR))
+							Expect(rule.RemoteIPPrefix).Should(BeElementOf(expectCIDRs))
+							expectCIDRs = removeFisrt(expectCIDRs, rule.RemoteIPPrefix)
 						}
 
 						// check server have secgroup
@@ -1267,8 +1273,12 @@ var _ = Describe("Ingress Controller", func() {
 								rules, err := mockProvider.ListSecurityGroupRules(ctx, secgroupID)
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(rules).ShouldNot(BeNil())
-								Expect((rules.Items)).Should(HaveLen(2))
-								expectPortRangeMax := []int{80, 30000} // cilium should only have nodeport + podport
+								Expect((rules.Items)).Should(HaveLen(4)) // 1 nodeport + 3 x 1 (1 pod port x 3 subnets (4 nodes in 3 subnets))
+								expectPortRangeMax := []int{80, 80, 80, 30000}
+								expectCIDRs := []string{
+									provider.MockSubnetCIDR, provider.MockSubnetCIDR,
+									provider.MockSubnetCIDR_1b_1, provider.MockSubnetCIDR_1b_2,
+								}
 								for _, rule := range rules.Items {
 									Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
 									expectPortRangeMax = removeFisrt(expectPortRangeMax, rule.PortRangeMax)
@@ -1276,7 +1286,8 @@ var _ = Describe("Ingress Controller", func() {
 									Expect(rule.Direction).Should(Equal("ingress"))
 									Expect(rule.EtherType).Should(Equal("IPv4"))
 									Expect(rule.Protocol).Should(Equal("tcp"))
-									Expect(rule.RemoteIPPrefix).Should(Equal(provider.MockSubnetCIDR))
+									Expect(rule.RemoteIPPrefix).Should(BeElementOf(expectCIDRs))
+									expectCIDRs = removeFisrt(expectCIDRs, rule.RemoteIPPrefix)
 								}
 
 								// check server have secgroup

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -320,9 +321,42 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 }
 
 func (m *MockProvider) GetAllSubnetCIRDs(ctx context.Context, providerIDs []string) ([]string, error) {
+	// get all subnet CIDRs of all instanceIDs (providerIDs)
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("GetAllSubnetCIRDs is not implemented in MockProvider")
-	return []string{}, ErrorNotFound
+	subnetCIDRs := make([]string, 0)
+	for _, providerID := range providerIDs {
+		server, err := m.GetServerByID(ctx, providerID)
+		if err != nil {
+			logger.Errorf("Error getting server %s: %v", providerID, err)
+			continue
+		}
+		if server == nil {
+			logger.Errorf("Server %s not found", providerID)
+			continue
+		}
+		if len(server.InternalInterfaces) == 0 {
+			logger.Errorf("Server %s has no internal interfaces", providerID)
+			continue
+		}
+		subnetID := server.InternalInterfaces[0].SubnetUuid
+		if subnetID == "" {
+			logger.Errorf("Server %s has no subnet ID", providerID)
+			continue
+		}
+		subnet, err := m.GetSubnetByID(ctx, server.InternalInterfaces[0].NetworkUuid, subnetID)
+		if err != nil {
+			logger.Errorf("Error getting subnet %s: %v", subnetID, err)
+			continue
+		}
+		if subnet == nil {
+			logger.Errorf("Subnet %s not found", subnetID)
+			continue
+		}
+		if !slices.Contains(subnetCIDRs, subnet.Cidr) {
+			subnetCIDRs = append(subnetCIDRs, subnet.Cidr)
+		}
+	}
+	return subnetCIDRs, nil
 }
 
 // // --------------------------- Security Group ---------------------------
