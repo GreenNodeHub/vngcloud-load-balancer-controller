@@ -310,7 +310,7 @@ func (l *modelBuilder) addDefaultSecgroupRules(port int, protocol networkv2.Secg
 func (l *modelBuilder) EnsureSecgroupPING_UDP() {
 	for _, rule := range l.secGroupRuleBuilders {
 		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
-			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP, l.SubnetCIDR)
+			l.addDefaultSecgroupRules(rule.GetPortRangeMax(), networkv2.SecgroupRuleProtocolICMP, rule.RemoteIPPrefix)
 		}
 	}
 }
