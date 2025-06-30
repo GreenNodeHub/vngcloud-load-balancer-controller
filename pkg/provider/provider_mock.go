@@ -276,10 +276,6 @@ func (m *MockProvider) subnetToZone(subnetID string) string {
 	return ""
 }
 
-func (m *MockProvider) getDefaultPackage() (string, string, error) {
-	return DEFAULT_L4_PACKAGE_ID, DEFAULT_L7_PACKAGE_ID, nil
-}
-
 func (m *MockProvider) GetDefaultPackageNetworkLB(zone string) string {
 	return DEFAULT_L4_PACKAGE_ID
 }

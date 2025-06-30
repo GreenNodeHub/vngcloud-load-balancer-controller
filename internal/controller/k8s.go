@@ -6,37 +6,37 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	// "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ensureClientObject(ctx context.Context, cl client.Client, obj client.Object) error {
-	logger := contexts.NewContext(ctx).Log()
+// func ensureClientObject(ctx context.Context, cl client.Client, obj client.Object) error {
+// 	logger := contexts.NewContext(ctx).Log()
 
-	// Check if the object exists
-	objGet := obj.DeepCopyObject().(client.Object)
-	err := cl.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, objGet)
-	if err != nil && errors.IsNotFound(err) {
-		logger.Infof("%s Creating object: %s", actionIcon, obj.GetName())
-		return cl.Create(ctx, obj)
-	} else if err != nil {
-		logger.Errorf("Failed to get object: %v", err)
-		return err
-	}
+// 	// Check if the object exists
+// 	objGet := obj.DeepCopyObject().(client.Object)
+// 	err := cl.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, objGet)
+// 	if err != nil && errors.IsNotFound(err) {
+// 		logger.Infof("%s Creating object: %s", actionIcon, obj.GetName())
+// 		return cl.Create(ctx, obj)
+// 	} else if err != nil {
+// 		logger.Errorf("Failed to get object: %v", err)
+// 		return err
+// 	}
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		objGet := obj.DeepCopyObject().(client.Object)
-		if err := cl.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, objGet); err != nil {
-			return err
-		}
+// 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+// 		objGet := obj.DeepCopyObject().(client.Object)
+// 		if err := cl.Get(ctx, types.NamespacedName{Namespace: obj.GetNamespace(), Name: obj.GetName()}, objGet); err != nil {
+// 			return err
+// 		}
 
-		logger.Infof("%s Patching object: %s/%s/%s", actionIcon, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
-		return cl.Patch(ctx, obj, client.MergeFromWithOptions(objGet, client.MergeFromWithOptimisticLock{}))
-	})
-}
+// 		logger.Infof("%s Patching object: %s/%s/%s", actionIcon, obj.GetObjectKind().GroupVersionKind().Kind, obj.GetNamespace(), obj.GetName())
+// 		return cl.Patch(ctx, obj, client.MergeFromWithOptions(objGet, client.MergeFromWithOptimisticLock{}))
+// 	})
+// }
 
 func updateObjectAnnotation(ctx context.Context, cl client.Client, _obj client.Object, annotations map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
@@ -152,9 +152,5 @@ func isNodeUpdateObjectMeta(old, new *metav1.ObjectMeta) bool {
 	oldClone.ManagedFields = nil
 	newClone.ManagedFields = nil
 
-	if reflect.DeepEqual(oldClone, newClone) {
-		return false
-	}
-
-	return true
+	return !reflect.DeepEqual(oldClone, newClone)
 }

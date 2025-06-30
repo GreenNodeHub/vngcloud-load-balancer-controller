@@ -281,7 +281,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						// get load balancer by id in resource annotation
 						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+						loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -399,7 +399,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						// get load balancer by id in resource annotation
 						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+						loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -498,7 +498,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -665,7 +665,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						// get load balancer by id in resource annotation
 						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+						loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -766,7 +766,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -869,7 +869,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -968,7 +968,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1057,7 +1057,7 @@ var _ = Describe("Ingress Controller", func() {
 
 			for _, tt := range testss {
 				logrus.Info("Running test: ", tt.name)
-				RunMultiStepTest[*networkingv1.Ingress](tt)
+				RunMultiStepTest(tt)
 			}
 		})
 	})
@@ -1146,7 +1146,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						// get load balancer by id in resource annotation
 						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+						loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1241,7 +1241,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1323,7 +1323,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1374,7 +1374,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1478,7 +1478,7 @@ var _ = Describe("Ingress Controller", func() {
 
 						// get load balancer by id in resource annotation
 						obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-						loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+						loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 						Expect(loadbalancer).ShouldNot(BeNil())
 						Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1555,7 +1555,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1606,7 +1606,7 @@ var _ = Describe("Ingress Controller", func() {
 
 								// get load balancer by id in resource annotation
 								obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-								loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+								loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 								Expect(loadbalancer).ShouldNot(BeNil())
 								Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
@@ -1650,7 +1650,7 @@ var _ = Describe("Ingress Controller", func() {
 
 			for _, tt := range tests {
 				logrus.Info("Running test: ", tt.name)
-				RunMultiStepTest[*networkingv1.Ingress](tt)
+				RunMultiStepTest(tt)
 			}
 		})
 	})
@@ -1828,7 +1828,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 					Expect(loadbalancer).ShouldNot(BeNil())
 					Expect(loadbalancer.Name).Should(Equal(LB.Name))
@@ -1879,7 +1879,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			logrus.Info("Running test: ", tests.name)
-			RunMultiStepTest[*networkingv1.Ingress](tests)
+			RunMultiStepTest(tests)
 		})
 	})
 
@@ -1925,7 +1925,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 					Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -1966,7 +1966,7 @@ var _ = Describe("Ingress Controller", func() {
 						getObject: func() client.Object {
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 							ingress2 := newIngressResource("test-service-gogsf-2", "default")
 							Expect(ingress2).NotTo(BeNil())
@@ -1993,7 +1993,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf-2", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 							Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -2046,7 +2046,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 
 							Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -2086,7 +2086,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2148,7 +2148,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-https", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 
 					// check listener
@@ -2225,7 +2225,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-https", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check listener
@@ -2285,7 +2285,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2344,7 +2344,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 
 					// check listener
@@ -2407,7 +2407,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check listener
@@ -2471,7 +2471,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-ingress-implement-specific", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check listener
@@ -2520,7 +2520,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2592,7 +2592,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 
 					// check pool
@@ -2641,7 +2641,7 @@ var _ = Describe("Ingress Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check pool
@@ -2672,7 +2672,7 @@ var _ = Describe("Ingress Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2715,7 +2715,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 					Expect(loadbalancer.SubnetID).Should(Equal(provider.MockSubnetID_1b_2))
 					Expect(loadbalancer.ZoneID).Should(Equal(common.HCM_03_1B_ZONE))
@@ -2724,7 +2724,7 @@ var _ = Describe("Ingress Controller", func() {
 				expectAfterDelete: func() {},
 			}
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2767,7 +2767,7 @@ var _ = Describe("Ingress Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*networkingv1.Ingress](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 					Expect(loadbalancer.SubnetID).Should(Equal(provider.MockSubnetID_1b_1)) // MockSubnetID_1b_1 or MockSubnetID_1b_2
 					Expect(loadbalancer.ZoneID).Should(Equal(common.HCM_03_1B_ZONE))
@@ -2776,7 +2776,7 @@ var _ = Describe("Ingress Controller", func() {
 				expectAfterDelete: func() {},
 			}
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*networkingv1.Ingress](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2803,7 +2803,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 		}
 
 	// 		logrus.Info("Running test: ", test.name)
-	//RunMultiStepTest[*networkingv1.Ingress](test)
+	//RunMultiStepTest(test)
 	// 	})
 	// })
 })

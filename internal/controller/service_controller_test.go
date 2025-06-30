@@ -1803,7 +1803,7 @@ var _ = Describe("Service Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-error", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 							Expect(loadbalancer.Name).Should(Equal("normal-name"))
 						},
@@ -1813,7 +1813,7 @@ var _ = Describe("Service Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*corev1.Service](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -1846,7 +1846,7 @@ var _ = Describe("Service Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-target-node-label", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 
 					// check pool
@@ -1919,7 +1919,7 @@ var _ = Describe("Service Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-target-node-label", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check pool
@@ -1982,7 +1982,7 @@ var _ = Describe("Service Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*corev1.Service](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -2012,7 +2012,7 @@ var _ = Describe("Service Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
-					loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					lbID = loadbalancer.UUID
 					Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -2049,7 +2049,7 @@ var _ = Describe("Service Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							lbID = loadbalancer.UUID
 							Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -2086,7 +2086,7 @@ var _ = Describe("Service Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-service-port-80", Namespace: "default"}}
-							loadbalancer := getLBByAnnotation[*corev1.Service](k8sClient, obj)
+							loadbalancer := getLBByAnnotation(k8sClient, obj)
 							lbID = loadbalancer.UUID
 							Expect(loadbalancer).ShouldNot(BeNil())
 
@@ -2145,7 +2145,7 @@ var _ = Describe("Service Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*corev1.Service](test)
+			RunMultiStepTest(test)
 		})
 	})
 

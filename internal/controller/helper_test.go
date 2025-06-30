@@ -75,15 +75,16 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 			logrus.Infof("###### STEP: %s, kind: %s", step.name, step.kindStep)
 			obj := step.getObject()
 			Expect(obj).NotTo(BeNil())
-			if step.kindStep == createStep {
+			switch step.kindStep {
+			case createStep:
 				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
-			} else if step.kindStep == deleteStep {
+			case deleteStep:
 				Expect(k8sClient.Delete(ctx, obj)).Should(Succeed())
-			} else if step.kindStep == updateStep {
+			case updateStep:
 				Expect(k8sClient.Update(ctx, obj)).Should(Succeed())
-			} else if step.kindStep == updateStatusStep {
+			case updateStatusStep:
 				Expect(k8sClient.Status().Update(ctx, obj)).Should(Succeed())
-			} else {
+			default:
 				logrus.Fatalf("Unknown step kind: %s of STEP %s", step.kindStep, step.name)
 			}
 

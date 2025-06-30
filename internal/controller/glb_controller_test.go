@@ -70,7 +70,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 
 			for _, tt := range testss {
 				logrus.Info("Running test: ", tt.name)
-				RunMultiStepTest[*v1alpha1.VngcloudGlobalLoadBalancer](tt)
+				RunMultiStepTest(tt)
 			}
 		})
 	})
@@ -111,7 +111,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 
 					// get load balancer by id in resource annotation
 					obj := &v1alpha1.VngcloudGlobalLoadBalancer{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-					loadbalancer := getGLBByAnnotation[*v1alpha1.VngcloudGlobalLoadBalancer](k8sClient, obj)
+					loadbalancer := getGLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
 
 					// check pool
@@ -187,7 +187,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &v1alpha1.VngcloudGlobalLoadBalancer{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getGLBByAnnotation[*v1alpha1.VngcloudGlobalLoadBalancer](k8sClient, obj)
+							loadbalancer := getGLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check pool
@@ -264,7 +264,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &v1alpha1.VngcloudGlobalLoadBalancer{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getGLBByAnnotation[*v1alpha1.VngcloudGlobalLoadBalancer](k8sClient, obj)
+							loadbalancer := getGLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check pool
@@ -317,7 +317,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*v1alpha1.VngcloudGlobalLoadBalancer](test)
+			RunMultiStepTest(test)
 		})
 	})
 
@@ -373,7 +373,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 
 							// get load balancer by id in resource annotation
 							obj := &v1alpha1.VngcloudGlobalLoadBalancer{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
-							loadbalancer := getGLBByAnnotation[*v1alpha1.VngcloudGlobalLoadBalancer](k8sClient, obj)
+							loadbalancer := getGLBByAnnotation(k8sClient, obj)
 							Expect(loadbalancer).ShouldNot(BeNil())
 
 							// check pool
@@ -400,7 +400,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 			}
 
 			logrus.Info("Running test: ", test.name)
-			RunMultiStepTest[*v1alpha1.VngcloudGlobalLoadBalancer](test)
+			RunMultiStepTest(test)
 		})
 	})
 })

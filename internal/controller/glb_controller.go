@@ -293,7 +293,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcile(ctx context.Context, re
 	}
 }
 
-func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer, oldObjInterface interface{}) error {
+func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer, _ interface{}) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.GLBFinalizer); err != nil {
@@ -585,7 +585,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context,
 }
 
 func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer,
-	deletetag, deleteResource, deleteSegroup bool) error {
+	_, deleteResource, deleteSegroup bool) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	// build oldBuilder
