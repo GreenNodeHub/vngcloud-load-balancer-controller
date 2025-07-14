@@ -38,8 +38,8 @@ type Provider interface {
 	GetDefaultSubnetCIDR() string
 	GetDefaultZone() common.Zone
 	// GetDefaultPackage() (string, string, error)
-	GetDefaultPackageNetworkLB(zone string) string
-	GetDefaultPackageApplicationLB(zone string) string
+	GetDefaultPackageNetworkLB(common.Zone) (string, error)
+	GetDefaultPackageApplicationLB(common.Zone) (string, error)
 
 	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, subnetID, subnetCIDR string, err error)
 

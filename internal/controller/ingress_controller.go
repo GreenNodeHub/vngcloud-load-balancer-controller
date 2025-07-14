@@ -468,7 +468,11 @@ func (r *IngressReconciler) ensureObject(ctx context.Context, obj *networkingv1.
 			}
 
 			if annotationConfig.GetPackageID() == "" {
-				annotationConfig.SetPackageID(r.Provider.GetDefaultPackageApplicationLB(string(annotationConfig.ZoneID)))
+				defaultPackage, err := r.Provider.GetDefaultPackageApplicationLB(annotationConfig.ZoneID)
+				if err != nil {
+					return err
+				}
+				annotationConfig.SetPackageID(defaultPackage)
 			}
 
 			// create loadbalancer. It mays create lb, listener, pool at the same time

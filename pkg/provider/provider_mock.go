@@ -276,12 +276,12 @@ func (m *MockProvider) subnetToZone(subnetID string) string {
 	return ""
 }
 
-func (m *MockProvider) GetDefaultPackageNetworkLB(zone string) string {
-	return DEFAULT_L4_PACKAGE_ID
+func (m *MockProvider) GetDefaultPackageNetworkLB(zone common.Zone) (string, error) {
+	return DEFAULT_L4_PACKAGE_ID, nil
 }
 
-func (m *MockProvider) GetDefaultPackageApplicationLB(zone string) string {
-	return DEFAULT_L7_PACKAGE_ID
+func (m *MockProvider) GetDefaultPackageApplicationLB(zone common.Zone) (string, error) {
+	return DEFAULT_L7_PACKAGE_ID, nil
 }
 
 func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, subnetID, subnetCIDR string, err error) {

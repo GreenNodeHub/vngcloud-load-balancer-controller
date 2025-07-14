@@ -463,7 +463,11 @@ func (r *ServiceReconciler) ensureObject(ctx context.Context, obj *corev1.Servic
 			}
 
 			if annotationConfig.GetPackageID() == "" {
-				annotationConfig.SetPackageID(r.Provider.GetDefaultPackageNetworkLB(string(annotationConfig.ZoneID)))
+				defaultPackage, err := r.Provider.GetDefaultPackageNetworkLB(annotationConfig.ZoneID)
+				if err != nil {
+					return err
+				}
+				annotationConfig.SetPackageID(defaultPackage)
 			}
 
 			// create loadbalancer. It mays create lb, listener, pool at the same time

@@ -687,14 +687,19 @@ func (l *AnnotationConfig) parseAnnotationPreferZoneID(annos map[string]string) 
 	switch option {
 	case string(common.HCM_03_1A_ZONE),
 		string(common.HCM_03_1B_ZONE),
-		string(common.HCM_03_1C_ZONE):
+		string(common.HCM_03_1C_ZONE),
+		string(common.HCM_03_BKK_01_ZONE),
+		string(common.HAN_01_1A_ZONE):
 		return common.Zone(option)
 	default:
-		l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\".",
+		l.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\", \"%s\", \"%s\" or \"%s\".",
 			annotations.SuffixPreferZoneID,
 			common.HCM_03_1A_ZONE,
 			common.HCM_03_1B_ZONE,
-			common.HCM_03_1C_ZONE)
+			common.HCM_03_1C_ZONE,
+			common.HCM_03_BKK_01_ZONE,
+			common.HAN_01_1A_ZONE,
+		)
 	}
 	return l.preferZoneID
 }

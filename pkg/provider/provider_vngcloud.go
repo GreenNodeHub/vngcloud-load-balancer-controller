@@ -56,10 +56,6 @@ type VNGCLOUD_Provider struct {
 	subnetCIDR string
 	zoneID     common.Zone
 
-	// get default package for each zone
-	nlbDefaultPackageID sync.Map // map[common.Zone]string
-	albDefaultPackageID sync.Map // map[common.Zone]string
-
 	cacheInstanceIDToSubnetID sync.Map // map[string]string
 	cacheSubnetIDToCIDR       sync.Map // map[string]string
 	cacheSubnetIDToZoneID     sync.Map // map[string]common.Zone
@@ -97,23 +93,6 @@ func (m *VNGCLOUD_Provider) Init(providerIDs []string) error {
 		err = m.initNetworkInformation(providerIDs)
 		if err != nil {
 			return
-		}
-
-		allZones := []common.Zone{
-			common.HCM_03_1A_ZONE,
-			common.HCM_03_1B_ZONE,
-			common.HCM_03_1C_ZONE,
-			common.HCM_03_BKK_01_ZONE,
-		}
-
-		for _, zone := range allZones {
-			l4PackageID, l7PackageID, err := m.getDefaultPackage(zone)
-			if err != nil {
-				logrus.Errorf("[ERROR] - Init: failed to get default package for zone %s: %v", zone, err)
-				return
-			}
-			m.nlbDefaultPackageID.Store(zone, l4PackageID)
-			m.albDefaultPackageID.Store(zone, l7PackageID)
 		}
 	})
 	return err
@@ -254,57 +233,62 @@ func (m *VNGCLOUD_Provider) GetDefaultZone() common.Zone {
 	return m.zoneID
 }
 
-func (m *VNGCLOUD_Provider) getDefaultPackage(zone common.Zone) (string, string, error) {
+func (m *VNGCLOUD_Provider) getDefaultPackage(zone common.Zone) (*entityv2.ListLoadBalancerPackages, error) {
 	logger := contexts.NewContext(context.TODO()).Log()
 
 	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
 	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent).WithZoneId(zone))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetDefaultPackage: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return "", "", sdkErr.GetError()
+		return nil, sdkErr.GetError()
 	}
-	if len(packages.Items) == 0 {
-		return "", "", ErrorNotFound
+	return packages, nil
+}
+
+func (m *VNGCLOUD_Provider) GetDefaultPackageNetworkLB(zone common.Zone) (string, error) {
+	logger := contexts.NewContext(context.TODO()).Log()
+
+	all, err := m.getDefaultPackage(zone)
+	if err != nil {
+		return "", err
 	}
 
-	getFirst := func(name, lbType, mode string) string {
-		for _, p := range packages.Items {
-			if p.Name == name && p.LbType == lbType && p.Mode == mode {
-				return p.UUID
-			}
+	if all == nil || len(all.Items) == 0 {
+		logger.Errorf("failed to get default package NLB: %s", ErrorNotFound)
+		return "", ErrorNotFound
+	}
+
+	for _, p := range all.Items {
+		if p.Name == "NLB_Small" && p.LbType == "L4" && p.Mode == "ACTIVE/STANDBY" {
+			return p.UUID, nil
 		}
-		return ""
 	}
 
-	// get the default package for l4
-	l4PackageID := getFirst("NLB_Small", "L4", "ACTIVE/STANDBY")
-	if l4PackageID == "" {
-		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L4, using the default value")
-		l4PackageID = DEFAULT_L4_PACKAGE_ID
-	}
-
-	// get the default package for l7
-	l7PackageID := getFirst("ALB_Small", "L7", "ACTIVE/STANDBY")
-	if l7PackageID == "" {
-		logger.Error("[ERROR] - GetDefaultPackage: failed to get the default package for L7, using the default value")
-		l7PackageID = DEFAULT_L7_PACKAGE_ID
-	}
-
-	return l4PackageID, l7PackageID, nil
+	logger.Warnf("using hard-code package NLB: %s", DEFAULT_L4_PACKAGE_ID)
+	return DEFAULT_L4_PACKAGE_ID, nil
 }
 
-func (m *VNGCLOUD_Provider) GetDefaultPackageNetworkLB(zone string) string {
-	if packageID, ok := m.nlbDefaultPackageID.Load(common.Zone(zone)); ok {
-		return packageID.(string)
-	}
-	return ""
-}
+func (m *VNGCLOUD_Provider) GetDefaultPackageApplicationLB(zone common.Zone) (string, error) {
+	logger := contexts.NewContext(context.TODO()).Log()
 
-func (m *VNGCLOUD_Provider) GetDefaultPackageApplicationLB(zone string) string {
-	if packageID, ok := m.albDefaultPackageID.Load(common.Zone(zone)); ok {
-		return packageID.(string)
+	all, err := m.getDefaultPackage(zone)
+	if err != nil {
+		return "", err
 	}
-	return ""
+
+	if all == nil || len(all.Items) == 0 {
+		logger.Errorf("failed to get default package ALB: %s", ErrorNotFound)
+		return "", ErrorNotFound
+	}
+
+	for _, p := range all.Items {
+		if p.Name == "ALB_Small" && p.LbType == "L7" && p.Mode == "ACTIVE/STANDBY" {
+			return p.UUID, nil
+		}
+	}
+
+	logger.Warnf("using hard-code package ALB: %s", DEFAULT_L7_PACKAGE_ID)
+	return DEFAULT_L7_PACKAGE_ID, nil
 }
 
 // // --------------------------- Helper cache ---------------------------
