@@ -2769,7 +2769,7 @@ var _ = Describe("Ingress Controller", func() {
 					obj := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "test-service-gogsf", Namespace: "default"}}
 					loadbalancer := getLBByAnnotation(k8sClient, obj)
 					Expect(loadbalancer).ShouldNot(BeNil())
-					Expect(loadbalancer.SubnetID).Should(Equal(provider.MockSubnetID_1b_1)) // MockSubnetID_1b_1 or MockSubnetID_1b_2
+					Expect(loadbalancer.SubnetID).Should(BeElementOf(provider.MockSubnetID_1b_1, provider.MockSubnetID_1b_2)) // MockSubnetID_1b_1 or MockSubnetID_1b_2
 					Expect(loadbalancer.ZoneID).Should(Equal(common.HCM_03_1B_ZONE))
 				},
 				steps:             []StepType{},

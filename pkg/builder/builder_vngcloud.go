@@ -39,6 +39,8 @@ type LoadBalancerBuilder interface {
 	DeleteRedundantListeners(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error
 	// delete redundant pools, should check if pool is used by other listeners or policy then ignore
 	DeleteRedundantPools(oldBuilder OldModelBuilder, newBuilder ModelBuilder) error
+	// check if this load balancer is have no listeners and pools, then can delete whole load balancer
+	IsEmpty() bool
 
 	CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilder) bool
 
@@ -737,14 +739,35 @@ func (r *vngcloudLBBuilder) DeleteRedundantPools(oldBuilder OldModelBuilder, new
 	return nil
 }
 
+func (r *vngcloudLBBuilder) IsEmpty() bool {
+	existPools := 0
+	for _, pool := range r.GetPoolBuilders() {
+		if !pool.IsDeleted() {
+			existPools++
+		}
+	}
+	existListeners := 0
+	for _, listener := range r.GetListenerBuilders() {
+		if !listener.IsDeleted() {
+			existListeners++
+		}
+	}
+	if existPools == 0 && existListeners == 0 {
+		r.logger.Infof("Load balancer is empty, no pools and listeners, can delete whole load balancer.")
+		return true
+	}
+	r.logger.Infof("Load balancer is not empty, exist %d pools and %d listeners.", existPools, existListeners)
+	return false
+}
+
 func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilder) bool {
 	if len(oldBuilder.GetOldListeners()) < len(r.GetListenerBuilders()) {
-		r.logger.Debugf("Can't delete whole loadbalancer, len(oldListeners) < len(currentListeners) (%d < %d)",
+		r.logger.Infof("Can't delete whole loadbalancer, len(oldListeners) < len(currentListeners) (%d < %d)",
 			len(oldBuilder.GetOldListeners()), len(r.GetListenerBuilders()))
 		return false
 	}
 	if len(oldBuilder.GetOldPools()) < len(r.GetPoolBuilders()) {
-		r.logger.Debugf("Can't delete whole loadbalancer, len(oldPools) < len(currentPools) (%d < %d)",
+		r.logger.Infof("Can't delete whole loadbalancer, len(oldPools) < len(currentPools) (%d < %d)",
 			len(oldBuilder.GetOldPools()), len(r.GetPoolBuilders()))
 		return false
 	}
@@ -752,20 +775,20 @@ func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilde
 	for _, listener := range oldBuilder.GetOldListeners() {
 		currentListener := r.GetListenerBuilderByName(listener.GetName())
 		if currentListener == nil {
-			r.logger.Debugf("Can't delete whole loadbalancer, listener not exists: %s", listener.GetName())
+			r.logger.Infof("Can't delete whole loadbalancer, listener not exists: %s", listener.GetName())
 			return false
 		}
 		// if policy not exists, return false
 		currentPolicies := currentListener.GetPolicyBuilders()
 		oldPolicies := listener.GetOldPolicies()
 		if len(oldPolicies) < len(currentPolicies) {
-			r.logger.Debugf("Can't delete whole loadbalancer, len(oldPolicies) < len(currentPolicies) (%d < %d)",
+			r.logger.Infof("Can't delete whole loadbalancer, len(oldPolicies) < len(currentPolicies) (%d < %d)",
 				len(oldPolicies), len(currentPolicies))
 			return false
 		}
 		for _, policy := range oldPolicies {
 			if currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName()); currentPolicy == nil {
-				r.logger.Debugf("Can't delete whole loadbalancer, policy not exists: %s", policy.GetName())
+				r.logger.Infof("Can't delete whole loadbalancer, policy not exists: %s", policy.GetName())
 				return false
 			}
 		}
@@ -773,7 +796,7 @@ func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilde
 	// if pool not exists, return false
 	for _, pool := range oldBuilder.GetOldPools() {
 		if currentPool := r.GetPoolBuilderByName(pool.GetName()); currentPool == nil {
-			r.logger.Debugf("Can't delete whole loadbalancer, pool not exists: %s", pool.GetName())
+			r.logger.Infof("Can't delete whole loadbalancer, pool not exists: %s", pool.GetName())
 			return false
 		}
 	}
@@ -783,12 +806,12 @@ func (r *vngcloudLBBuilder) CanDeleteWholeLoadBalancer(oldBuilder OldModelBuilde
 		currentMembers := defaultPool.Members
 		oldMembers := oldBuilder.GetDefaultPoolMembers()
 		if len(oldMembers) < len(currentMembers) {
-			r.logger.Debugf("Can't delete whole loadbalancer, len(oldDFMembers) < len(currentDFMembers) (%d < %d)",
+			r.logger.Infof("Can't delete whole loadbalancer, len(oldDFMembers) < len(currentDFMembers) (%d < %d)",
 				len(oldMembers), len(currentMembers))
 			return false
 		}
 		if !r.comparePoolMembers(oldMembers, currentMembers, true) {
-			r.logger.Debugf("Can't delete whole loadbalancer, default pool members not match")
+			r.logger.Infof("Can't delete whole loadbalancer, default pool members not match")
 			return false
 		}
 	}

@@ -770,6 +770,16 @@ func (r *ServiceReconciler) subDeleteObject(ctx context.Context, obj *corev1.Ser
 					logger.Error("Failed to delete redundant pools: ", err)
 					return err
 				}
+
+				// after deleting lis and pools, check if currentBuilder is empty, if so, delete loadbalancer
+				// this is because CanDeleteWholeLoadBalancer sometimes return false because status is not updated yet but user has deleted svcLB
+				if currentBuilder.IsEmpty() {
+					if err := r.Provider.DeleteLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
+						logger.Error("Failed to delete loadbalancer: ", err)
+						return err
+					}
+					logger.Infof("Delete loadbalancer \"%s\" successfully", oldBuilder.GetLoadBalancerID())
+				}
 			}
 		}
 

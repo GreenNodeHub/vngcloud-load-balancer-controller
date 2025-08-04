@@ -1,6 +1,7 @@
 package annotations
 
 const (
+	// for all
 	SuffixLoadBalancerName           = "load-balancer-name"           // only set via the annotation
 	SuffixPackageID                  = "package-id"                   // size of lb
 	SuffixScheme                     = "scheme"                       // internal or external
@@ -27,6 +28,10 @@ const (
 	SuffixTags                       = "tags"                         // tags
 	SuffixSecurityGroups             = "security-groups"              // security groups
 	SuffixTargetNodeLabels           = "target-node-labels"           // target node labels
+	SuffixIsPOC                      = "isPOC"                        // is poc
+	SuffixIsPOC2                     = "is-poc"                       // is poc but deprecated
+	SuffixPreferZoneID               = "prefer-zone-id"               // prefer zone id
+	SuffixPreferSubnetID             = "prefer-subnet-id"             // prefer subnet id
 
 	// for l4 only
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
@@ -46,11 +51,6 @@ const (
 	SuffixManageListeners  = "manage-listeners"
 	SuffixManageDFPMembers = "manage-dfp-members"
 
-	SuffixIsPOC  = "isPOC"  // is poc
-	SuffixIsPOC2 = "is-poc" // is poc but deprecated
-
 	SuffixTrigger = "trigger" // trigger
 
-	SuffixPreferZoneID   = "prefer-zone-id"   // prefer zone id
-	SuffixPreferSubnetID = "prefer-subnet-id" // prefer subnet id
 )
