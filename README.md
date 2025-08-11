@@ -168,3 +168,13 @@ To deploy the controller with new changes, fill secret in `config/manager/manage
 ```sh
 make docker-build docker-push undeploy deploy
 ```
+
+## Scripts
+
+```bash
+kubebuilder create api --group core --version v1 --kind Service --resource=false --controller=true
+kubebuilder create api --group networking --version v1 --kind Ingress --resource=false --controller=true
+go mod tidy
+make generate
+make manifests kustomize helm
+```
