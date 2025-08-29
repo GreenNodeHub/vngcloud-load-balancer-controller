@@ -55,7 +55,10 @@ import (
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+
 	// "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	vlbv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/vlb/v1alpha1"
+	vlbcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/vlb"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -68,6 +71,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vksvngcloudvnv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(vlbv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -276,6 +280,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
+		os.Exit(1)
+	}
+	if err := (&vlbcontroller.VngcloudLoadBalancerConfigReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VngcloudLoadBalancerConfig")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

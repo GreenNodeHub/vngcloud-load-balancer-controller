@@ -138,3 +138,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - vlb.vks.vngcloud.vn
+  resources:
+  - vngcloudloadbalancerconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - vlb.vks.vngcloud.vn
+  resources:
+  - vngcloudloadbalancerconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - vlb.vks.vngcloud.vn
+  resources:
+  - vngcloudloadbalancerconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
