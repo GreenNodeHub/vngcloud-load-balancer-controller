@@ -31,7 +31,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/anngdinh/operator-helper/k8s"
+	// "github.com/anngdinh/operator-helper/k8s"
 	"github.com/anngdinh/operator-helper/version"
 	"github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -55,7 +55,7 @@ import (
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	// "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -221,51 +221,53 @@ func main() {
 		os.Exit(1)
 	}
 
-	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
-	vngProvider := &provider.VNGCLOUD_Provider{
-		Config: conf,
-	}
-	updateTracker := controller.NewUpdateTracker(vngProvider)
+	ctx := context.Background()
+	// finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
+	// vngProvider := &provider.VNGCLOUD_Provider{
+	// 	Config: conf,
+	// }
+	// updateTracker := controller.NewUpdateTracker(vngProvider)
 
-	if err = (&controller.ServiceReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:           conf,
-		Provider:         vngProvider,
-		FinalizerManager: finalizerManager,
-		UpdateTracker:    updateTracker,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Service")
-		os.Exit(1)
-	}
-	if err = (&controller.IngressReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:           conf,
-		Provider:         vngProvider,
-		FinalizerManager: finalizerManager,
-		UpdateTracker:    updateTracker,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Ingress")
-		os.Exit(1)
-	}
-	if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:           conf,
-		Provider:         vngProvider,
-		FinalizerManager: finalizerManager,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
-		os.Exit(1)
-	}
+	// if err = (&controller.ServiceReconciler{
+	// 	Client:           mgr.GetClient(),
+	// 	Scheme:           mgr.GetScheme(),
+	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+	// 	Config:           conf,
+	// 	Provider:         vngProvider,
+	// 	FinalizerManager: finalizerManager,
+	// 	UpdateTracker:    updateTracker,
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "Service")
+	// 	os.Exit(1)
+	// }
+	// if err = (&controller.IngressReconciler{
+	// 	Client:           mgr.GetClient(),
+	// 	Scheme:           mgr.GetScheme(),
+	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+	// 	Config:           conf,
+	// 	Provider:         vngProvider,
+	// 	FinalizerManager: finalizerManager,
+	// 	UpdateTracker:    updateTracker,
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "Ingress")
+	// 	os.Exit(1)
+	// }
+	// if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
+	// 	Client:           mgr.GetClient(),
+	// 	Scheme:           mgr.GetScheme(),
+	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+	// 	Config:           conf,
+	// 	Provider:         vngProvider,
+	// 	FinalizerManager: finalizerManager,
+	// }).SetupWithManager(mgr); err != nil {
+	// 	setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
+	// 	os.Exit(1)
+	// }
 	if err := (&corecontroller.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		ServiceController: corecontroller.NewServiceController(),
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
