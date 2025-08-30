@@ -17,110 +17,42 @@ limitations under the License.
 package core
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
-	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/shared_constants"
 )
 
-// MockServiceController is a mock implementation of ServiceController
-type MockServiceController struct {
-	mock.Mock
-}
-
-func (m *MockServiceController) Ensure(ctx context.Context, req ctrl.Request) error {
-	args := m.Called(ctx, req)
-	return args.Error(0)
-}
-
-func (m *MockServiceController) Delete(ctx context.Context, req ctrl.Request) error {
-	args := m.Called(ctx, req)
-	return args.Error(0)
-}
-
-// MockServiceUtils is a mock implementation of ServiceUtils
-type MockServiceUtils struct {
-	mock.Mock
-}
-
-func (m *MockServiceUtils) IsServiceSupported(svc *corev1.Service) bool {
-	args := m.Called(svc)
-	return args.Bool(0)
-}
-
-func (m *MockServiceUtils) IsServicePendingFinalization(svc *corev1.Service) bool {
-	args := m.Called(svc)
-	return args.Bool(0)
-}
-
-var _ = Describe("Service Controller", func() {
-	var (
-		reconciler       *ServiceReconciler
-		mockController   *MockServiceController
-		mockServiceUtils *MockServiceUtils
-		fakeClient       client.Client
-		scheme           *runtime.Scheme
-		ctx              context.Context
-		testNamespace    string
-		testServiceName  string
-	)
-
-	BeforeEach(func() {
-		ctx = context.Background()
-		testNamespace = "test-namespace"
-		testServiceName = "test-service"
-
-		// Setup scheme
-		scheme = runtime.NewScheme()
-		_ = corev1.AddToScheme(scheme)
-
-		// Create fake client
-		fakeClient = fake.NewClientBuilder().
-			WithScheme(scheme).
-			Build()
-
-		// Initialize mocks
-		mockController = new(MockServiceController)
-		mockServiceUtils = new(MockServiceUtils)
-
-		// Initialize reconciler
-		reconciler = &ServiceReconciler{
-			Client:            fakeClient,
-			Scheme:            scheme,
-			ServiceController: mockController,
-			serviceUtils:      mockServiceUtils,
-			eventRecorder:     &record.FakeRecorder{},
-			logger:            zap.New(zap.UseDevMode(true)),
-			reconcileCounters: metricsutil.NewReconcileCounters(),
-			metricsCollector:  lbcmetrics.NewMockCollector(),
-		}
-	})
-
-	Context("When reconciling a LoadBalancer Service", func() {
-		var testService *corev1.Service
+var _ = Describe("Service Reconciler", func() {
+	Context("When creating a LoadBalancer service with manager setup", func() {
+		var (
+			testService *corev1.Service
+			namespace   string
+		)
 
 		BeforeEach(func() {
+			namespace = "test-service-" + fmt.Sprintf("%d", time.Now().UnixNano())
+
+			// Reset mock counters
+			testMockController.Reset()
+
+			// Create namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+
+			// Create test service
 			testService = &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+					Name:      "test-service",
+					Namespace: namespace,
 				},
 				Spec: corev1.ServiceSpec{
 					Type: corev1.ServiceTypeLoadBalancer,
@@ -131,202 +63,265 @@ var _ = Describe("Service Controller", func() {
 							Protocol: corev1.ProtocolTCP,
 						},
 					},
+					Selector: map[string]string{
+						"app": "test",
+					},
 				},
 			}
 		})
 
-		It("should successfully reconcile a new LoadBalancer service", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
-
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil)
-
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+		AfterEach(func() {
+			// Clean up namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
 				},
 			}
-			result, err := reconciler.Reconcile(ctx, req)
-
-			// Verify
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Ensure", mock.Anything, req)
+			k8sClient.Delete(ctx, ns)
 		})
 
-		It("should handle service deletion with finalizer", func() {
-			// Create service with finalizer
-			testService.Finalizers = []string{shared_constants.ServiceFinalizer}
-			now := metav1.Now()
-			testService.DeletionTimestamp = &now
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+		It("should call ServiceController.Ensure once when LoadBalancer service is created", func() {
+			By("Creating a LoadBalancer service")
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(false)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(true)
-			mockController.On("Delete", mock.Anything, mock.Anything).Return(nil)
+			By("Waiting for automatic reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
-
-			// Verify
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Delete", mock.Anything, req)
+			By("Verifying ServiceController.Ensure was called exactly once")
+			Expect(testMockController.GetEnsureCallCount()).To(Equal(1))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
 		})
 
-		It("should ignore non-LoadBalancer services without finalizer", func() {
-			// Create ClusterIP service
+		It("should call ServiceController.Ensure when LoadBalancer service is updated", func() {
+			By("Creating a LoadBalancer service")
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
+
+			By("Waiting for initial reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			By("Updating the service with new annotations")
+			Eventually(func() error {
+				currentService := &corev1.Service{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService); err != nil {
+					return err
+				}
+
+				if currentService.Annotations == nil {
+					currentService.Annotations = make(map[string]string)
+				}
+				currentService.Annotations["test-update"] = "updated-value"
+
+				return k8sClient.Update(ctx, currentService)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for update reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 2))
+
+			By("Verifying ServiceController.Ensure was called multiple times")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 2))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
+		})
+
+		It("should not call ServiceController methods for non-LoadBalancer services", func() {
+			By("Creating a ClusterIP service")
 			testService.Spec.Type = corev1.ServiceTypeClusterIP
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(false)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
+			By("Waiting and ensuring no reconciliation happens")
+			Consistently(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 3*time.Second, 200*time.Millisecond).Should(Equal(0))
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
-
-			// Verify
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertNotCalled(GinkgoT(), "Ensure", mock.Anything, mock.Anything)
-			mockController.AssertNotCalled(GinkgoT(), "Delete", mock.Anything, mock.Anything)
+			By("Verifying no ServiceController methods were called")
+			Expect(testMockController.GetEnsureCallCount()).To(Equal(0))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
 		})
 
-		It("should handle service type change from LoadBalancer to ClusterIP with finalizer", func() {
-			// Create ClusterIP service with finalizer (was LoadBalancer before)
+		It("should not call ServiceController methods for NodePort services", func() {
+			By("Creating a NodePort service")
+			testService.Spec.Type = corev1.ServiceTypeNodePort
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
+
+			By("Waiting and ensuring no reconciliation happens")
+			Consistently(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 3*time.Second, 200*time.Millisecond).Should(Equal(0))
+
+			By("Verifying no ServiceController methods were called")
+			Expect(testMockController.GetEnsureCallCount()).To(Equal(0))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
+		})
+
+		It("should call ServiceController.Ensure when service type changes from ClusterIP to LoadBalancer", func() {
+			By("Creating a ClusterIP service first")
 			testService.Spec.Type = corev1.ServiceTypeClusterIP
-			testService.Finalizers = []string{shared_constants.ServiceFinalizer}
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(false)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(true)
-			mockController.On("Delete", mock.Anything, mock.Anything).Return(nil)
+			By("Waiting and ensuring no reconciliation happens for ClusterIP")
+			Consistently(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 3*time.Second, 200*time.Millisecond).Should(Equal(0))
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
+			By("Updating service type to LoadBalancer")
+			Eventually(func() error {
+				currentService := &corev1.Service{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService); err != nil {
+					return err
+				}
 
-			// Verify
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Delete", mock.Anything, req)
+				currentService.Spec.Type = corev1.ServiceTypeLoadBalancer
+				return k8sClient.Update(ctx, currentService)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for service type change to trigger reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			By("Verifying ServiceController.Ensure was called after type change")
+			Expect(testMockController.GetEnsureCallCount()).To(Equal(1))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
+
+			By("Verifying finalizer was added")
+			currentService := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: testService.Name, Namespace: testService.Namespace,
+			}, currentService)).To(Succeed())
+			Expect(len(currentService.Finalizers)).To(BeNumerically(">", 0))
 		})
 
-		It("should handle service not found error gracefully", func() {
-			// Don't create the service - simulate it being deleted
-			// The fake client might still call Get which returns an empty service
-			// So we need to set up mocks for the empty service case
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(false).Maybe()
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false).Maybe()
+		It("should call ServiceController.Delete when service type changes from LoadBalancer to ClusterIP", func() {
+			By("Creating a LoadBalancer service")
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
+			By("Waiting for initial reconciliation and finalizer to be added")
+			Eventually(func() bool {
+				currentService := &corev1.Service{}
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService)
+				if err != nil {
+					return false
+				}
+				return testMockController.GetEnsureCallCount() >= 1 && len(currentService.Finalizers) > 0
+			}, 10*time.Second, 200*time.Millisecond).Should(BeTrue())
 
-			// Verify - should not return error for NotFound
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertNotCalled(GinkgoT(), "Ensure", mock.Anything, mock.Anything)
-			mockController.AssertNotCalled(GinkgoT(), "Delete", mock.Anything, mock.Anything)
+			// Reset counters after initial setup
+			testMockController.Reset()
+
+			By("Updating service type to ClusterIP")
+			Eventually(func() error {
+				currentService := &corev1.Service{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService); err != nil {
+					return err
+				}
+
+				currentService.Spec.Type = corev1.ServiceTypeClusterIP
+				return k8sClient.Update(ctx, currentService)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for service type change to trigger cleanup")
+			Eventually(func() int {
+				return testMockController.GetDeleteCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			By("Verifying ServiceController.Delete was called due to type change")
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(1))
+
+			By("Verifying service finalizer is eventually removed")
+			Eventually(func() bool {
+				currentService := &corev1.Service{}
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService)
+				if err != nil {
+					return false
+				}
+				return len(currentService.Finalizers) == 0
+			}, 10*time.Second, 200*time.Millisecond).Should(BeTrue())
 		})
 
-		It("should handle controller ensure error with requeue", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+		It("should call ServiceController.Delete when LoadBalancer service is deleted", func() {
+			By("Creating a LoadBalancer service")
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			genericError := errors.New("some transient error")
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(genericError)
+			By("Waiting for initial reconciliation and finalizer to be added")
+			Eventually(func() bool {
+				currentService := &corev1.Service{}
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService)
+				if err != nil {
+					return false
+				}
+				// Check that both Ensure was called and finalizer was added
+				return testMockController.GetEnsureCallCount() >= 1 && len(currentService.Finalizers) > 0
+			}, 10*time.Second, 200*time.Millisecond).Should(BeTrue())
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
+			By("Deleting the service")
+			Expect(k8sClient.Delete(ctx, testService)).To(Succeed())
 
-			// Verify - generic errors should be returned for requeue
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("some transient error"))
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Ensure", mock.Anything, req)
-		})
+			By("Verifying service has deletion timestamp but still exists due to finalizer")
+			Eventually(func() bool {
+				currentService := &corev1.Service{}
+				err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testService.Name, Namespace: testService.Namespace,
+				}, currentService)
+				if err != nil {
+					return false // Service not found
+				}
+				// Service should exist with deletion timestamp and finalizer
+				return !currentService.DeletionTimestamp.IsZero() && len(currentService.Finalizers) > 0
+			}, 5*time.Second, 100*time.Millisecond).Should(BeTrue())
 
-		It("should handle controller delete error", func() {
-			// Create service with finalizer and deletion timestamp
-			testService.Finalizers = []string{shared_constants.ServiceFinalizer}
-			now := metav1.Now()
-			testService.DeletionTimestamp = &now
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+			By("Waiting for delete reconciliation")
+			Eventually(func() int {
+				return testMockController.GetDeleteCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(false)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(true)
-			deleteError := errors.New("failed to delete load balancer")
-			mockController.On("Delete", mock.Anything, mock.Anything).Return(deleteError)
-
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
-
-			// Verify
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to delete load balancer"))
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Delete", mock.Anything, req)
+			By("Verifying ServiceController.Delete was called")
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(1))
 		})
 	})
 
-	Context("When service annotations or spec change", func() {
-		var testService *corev1.Service
+	Context("When endpoint events occur", func() {
+		var (
+			testService  *corev1.Service
+			testEndpoint *corev1.Endpoints
+			namespace    string
+		)
 
 		BeforeEach(func() {
+			namespace = "test-endpoint-" + fmt.Sprintf("%d", time.Now().UnixNano())
+
+			// Reset mock counters
+			testMockController.Reset()
+
+			// Create namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+
+			// Create test service first
 			testService = &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-					Annotations: map[string]string{
-						"service.beta.kubernetes.io/vngcloud-load-balancer-id": "lb-123",
-					},
+					Name:      "endpoint-test-service",
+					Namespace: namespace,
 				},
 				Spec: corev1.ServiceSpec{
 					Type: corev1.ServiceTypeLoadBalancer,
@@ -337,228 +332,430 @@ var _ = Describe("Service Controller", func() {
 							Protocol: corev1.ProtocolTCP,
 						},
 					},
+					Selector: map[string]string{
+						"app": "test",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
+
+			// Wait for initial service reconciliation
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			// Reset counters after initial setup
+			testMockController.Reset()
+
+			// Create corresponding endpoint
+			testEndpoint = &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpoint-test-service", // Same name as service
+					Namespace: namespace,
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{
+								IP: "10.0.0.1",
+							},
+						},
+						Ports: []corev1.EndpointPort{
+							{
+								Name:     "http",
+								Port:     8080,
+								Protocol: corev1.ProtocolTCP,
+							},
+						},
+					},
 				},
 			}
 		})
 
-		It("should reconcile when annotations change", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
-
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil).Once()
-
-			// First reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+		AfterEach(func() {
+			// Clean up namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
 				},
 			}
-			result, err := reconciler.Reconcile(ctx, req)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			// Update annotations
-			var updatedService corev1.Service
-			Expect(fakeClient.Get(ctx, types.NamespacedName{
-				Name:      testServiceName,
-				Namespace: testNamespace,
-			}, &updatedService)).To(Succeed())
-
-			updatedService.Annotations["service.beta.kubernetes.io/vngcloud-load-balancer-scheme"] = "internal"
-			Expect(fakeClient.Update(ctx, &updatedService)).To(Succeed())
-
-			// Setup mocks for second reconcile
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil).Once()
-
-			// Second reconcile after annotation change
-			result, err = reconciler.Reconcile(ctx, req)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			// Verify Ensure was called twice
-			mockController.AssertNumberOfCalls(GinkgoT(), "Ensure", 2)
+			k8sClient.Delete(ctx, ns)
 		})
 
-		It("should reconcile when service ports change", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+		It("should trigger service reconciliation when endpoint is created", func() {
+			By("Creating an endpoint for the LoadBalancer service")
+			Expect(k8sClient.Create(ctx, testEndpoint)).To(Succeed())
 
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil).Once()
+			By("Waiting for endpoint event to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
 
-			// First reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+			By("Verifying ServiceController.Ensure was called due to endpoint event")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
+		})
+
+		It("should trigger service reconciliation when endpoint subsets change", func() {
+			By("Creating an endpoint")
+			Expect(k8sClient.Create(ctx, testEndpoint)).To(Succeed())
+
+			By("Waiting for initial endpoint reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Updating endpoint subsets")
+			Eventually(func() error {
+				currentEndpoint := &corev1.Endpoints{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testEndpoint.Name, Namespace: testEndpoint.Namespace,
+				}, currentEndpoint); err != nil {
+					return err
+				}
+
+				// Add another address to trigger subset change
+				currentEndpoint.Subsets[0].Addresses = append(currentEndpoint.Subsets[0].Addresses,
+					corev1.EndpointAddress{IP: "10.0.0.2"})
+
+				return k8sClient.Update(ctx, currentEndpoint)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for endpoint update to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController.Ensure was called due to endpoint update")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+		})
+
+		It("should trigger service reconciliation when endpoint is deleted", func() {
+			By("Creating an endpoint")
+			Expect(k8sClient.Create(ctx, testEndpoint)).To(Succeed())
+
+			By("Waiting for initial endpoint reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Deleting the endpoint")
+			Expect(k8sClient.Delete(ctx, testEndpoint)).To(Succeed())
+
+			By("Waiting for endpoint deletion to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController.Ensure was called due to endpoint deletion")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+		})
+
+		It("should not trigger reconciliation for endpoints of non-LoadBalancer services", func() {
+			By("Creating a ClusterIP service instead")
+			clusterIPService := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "clusterip-service",
+					Namespace: namespace,
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeClusterIP,
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Selector: map[string]string{
+						"app": "test",
+					},
 				},
 			}
-			result, err := reconciler.Reconcile(ctx, req)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			Expect(k8sClient.Create(ctx, clusterIPService)).To(Succeed())
 
-			// Update service ports
-			var updatedService corev1.Service
-			Expect(fakeClient.Get(ctx, types.NamespacedName{
-				Name:      testServiceName,
-				Namespace: testNamespace,
-			}, &updatedService)).To(Succeed())
+			By("Creating an endpoint for the ClusterIP service")
+			clusterIPEndpoint := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "clusterip-service",
+					Namespace: namespace,
+				},
+				Subsets: []corev1.EndpointSubset{
+					{
+						Addresses: []corev1.EndpointAddress{
+							{IP: "10.0.0.3"},
+						},
+						Ports: []corev1.EndpointPort{
+							{
+								Name:     "http",
+								Port:     8080,
+								Protocol: corev1.ProtocolTCP,
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, clusterIPEndpoint)).To(Succeed())
 
-			updatedService.Spec.Ports = append(updatedService.Spec.Ports, corev1.ServicePort{
-				Name:     "https",
-				Port:     443,
-				Protocol: corev1.ProtocolTCP,
-			})
-			Expect(fakeClient.Update(ctx, &updatedService)).To(Succeed())
+			By("Ensuring no reconciliation happens for ClusterIP service")
+			Consistently(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 3*time.Second, 200*time.Millisecond).Should(Equal(0))
 
-			// Setup mocks for second reconcile
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil).Once()
-
-			// Second reconcile after spec change
-			result, err = reconciler.Reconcile(ctx, req)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-
-			// Verify Ensure was called twice
-			mockController.AssertNumberOfCalls(GinkgoT(), "Ensure", 2)
+			By("Verifying no ServiceController methods were called")
+			Expect(testMockController.GetEnsureCallCount()).To(Equal(0))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
 		})
 	})
 
-	Context("When handling concurrent reconciles", func() {
-		It("should handle multiple services independently", func() {
-			// Create multiple services
-			service1 := &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "service-1",
-					Namespace: testNamespace,
-				},
-				Spec: corev1.ServiceSpec{
-					Type:  corev1.ServiceTypeLoadBalancer,
-					Ports: []corev1.ServicePort{{Port: 80}},
-				},
-			}
-			service2 := &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "service-2",
-					Namespace: testNamespace,
-				},
-				Spec: corev1.ServiceSpec{
-					Type:  corev1.ServiceTypeLoadBalancer,
-					Ports: []corev1.ServicePort{{Port: 8080}},
-				},
-			}
-
-			Expect(fakeClient.Create(ctx, service1)).To(Succeed())
-			Expect(fakeClient.Create(ctx, service2)).To(Succeed())
-
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(nil)
-
-			// Reconcile both services
-			req1 := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      "service-1",
-					Namespace: testNamespace,
-				},
-			}
-			req2 := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      "service-2",
-					Namespace: testNamespace,
-				},
-			}
-
-			result1, err1 := reconciler.Reconcile(ctx, req1)
-			result2, err2 := reconciler.Reconcile(ctx, req2)
-
-			// Verify both reconciles succeeded
-			Expect(err1).NotTo(HaveOccurred())
-			Expect(result1).To(Equal(ctrl.Result{}))
-			Expect(err2).NotTo(HaveOccurred())
-			Expect(result2).To(Equal(ctrl.Result{}))
-
-			// Verify Ensure was called for both
-			mockController.AssertNumberOfCalls(GinkgoT(), "Ensure", 2)
-		})
-	})
-
-	Context("Edge cases and error scenarios", func() {
-		var testService *corev1.Service
+	Context("When node events occur", func() {
+		var (
+			testService *corev1.Service
+			testNode    *corev1.Node
+			namespace   string
+		)
 
 		BeforeEach(func() {
+			namespace = "test-node-" + fmt.Sprintf("%d", time.Now().UnixNano())
+
+			// Reset mock counters
+			testMockController.Reset()
+
+			// Create namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			Expect(k8sClient.Create(ctx, ns)).To(Succeed())
+
+			// Create test service
 			testService = &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+					Name:      "node-test-service",
+					Namespace: namespace,
 				},
 				Spec: corev1.ServiceSpec{
 					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+					Selector: map[string]string{
+						"app": "test",
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, testService)).To(Succeed())
+
+			// Wait for initial service reconciliation
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(Equal(1))
+
+			// Reset counters after initial setup
+			testMockController.Reset()
+
+			// Create test node
+			testNode = &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+					Labels: map[string]string{
+						"kubernetes.io/hostname": "test-node",
+					},
+				},
+				Spec: corev1.NodeSpec{
+					ProviderID: "test://test-node-123",
+				},
+				Status: corev1.NodeStatus{
+					Addresses: []corev1.NodeAddress{
+						{Type: corev1.NodeInternalIP, Address: "10.0.1.100"},
+						{Type: corev1.NodeHostName, Address: "test-node"},
+					},
+					Conditions: []corev1.NodeCondition{
+						{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+					},
 				},
 			}
 		})
 
-		It("should handle context cancellation", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+		AfterEach(func() {
+			// Clean up test node
+			k8sClient.Delete(ctx, testNode)
 
-			// Create a cancelled context
-			cancelledCtx, cancel := context.WithCancel(ctx)
-			cancel()
-
-			// Setup mocks
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Return(context.Canceled)
-
-			// Reconcile with cancelled context
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
+			// Clean up namespace
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
 				},
 			}
-
-			// Note: We use the regular context here because the reconciler creates its own timeout context
-			result, err := reconciler.Reconcile(cancelledCtx, req)
-
-			// Verify context cancellation is handled
-			Expect(err).To(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
+			k8sClient.Delete(ctx, ns)
 		})
 
-		It("should handle timeout", func() {
-			// Create the service
-			Expect(fakeClient.Create(ctx, testService)).To(Succeed())
+		It("should trigger service reconciliation when node is created", func() {
+			By("Creating a new node")
+			Expect(k8sClient.Create(ctx, testNode)).To(Succeed())
 
-			// Setup mocks with a long-running operation
-			mockServiceUtils.On("IsServiceSupported", mock.Anything).Return(true)
-			mockServiceUtils.On("IsServicePendingFinalization", mock.Anything).Return(false)
-			mockController.On("Ensure", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-				// Simulate a long-running operation
-				time.Sleep(100 * time.Millisecond)
-			}).Return(nil)
+			By("Waiting for node event to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
 
-			// Reconcile
-			req := reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testServiceName,
-					Namespace: testNamespace,
-				},
-			}
-			result, err := reconciler.Reconcile(ctx, req)
+			By("Verifying ServiceController.Ensure was called due to node creation")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
+		})
 
-			// Verify
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(ctrl.Result{}))
-			mockController.AssertCalled(GinkgoT(), "Ensure", mock.Anything, req)
+		It("should trigger service reconciliation when node readiness changes", func() {
+			By("Creating a node")
+			Expect(k8sClient.Create(ctx, testNode)).To(Succeed())
+
+			By("Waiting for initial node reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Updating node to make it not ready")
+			Eventually(func() error {
+				currentNode := &corev1.Node{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testNode.Name,
+				}, currentNode); err != nil {
+					return err
+				}
+
+				// Change node to not ready
+				for i, condition := range currentNode.Status.Conditions {
+					if condition.Type == corev1.NodeReady {
+						currentNode.Status.Conditions[i].Status = corev1.ConditionFalse
+						break
+					}
+				}
+
+				return k8sClient.Status().Update(ctx, currentNode)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for node update to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController.Ensure was called due to node readiness change")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+		})
+
+		It("should trigger service reconciliation when node addresses change", func() {
+			By("Creating a node")
+			Expect(k8sClient.Create(ctx, testNode)).To(Succeed())
+
+			By("Waiting for initial node reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Updating node addresses")
+			Eventually(func() error {
+				currentNode := &corev1.Node{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testNode.Name,
+				}, currentNode); err != nil {
+					return err
+				}
+
+				// Add a new address
+				currentNode.Status.Addresses = append(currentNode.Status.Addresses,
+					corev1.NodeAddress{Type: corev1.NodeExternalIP, Address: "203.0.113.1"})
+
+				return k8sClient.Status().Update(ctx, currentNode)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Waiting for node address change to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController.Ensure was called due to node address change")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+		})
+
+		It("should trigger service reconciliation when node is deleted", func() {
+			By("Creating a node")
+			Expect(k8sClient.Create(ctx, testNode)).To(Succeed())
+
+			By("Waiting for initial node reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Deleting the node")
+			Expect(k8sClient.Delete(ctx, testNode)).To(Succeed())
+
+			By("Waiting for node deletion to trigger service reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController.Ensure was called due to node deletion")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+		})
+
+		It("should trigger reconciliation when node annotation changes", func() {
+			By("Creating a node")
+			Expect(k8sClient.Create(ctx, testNode)).To(Succeed())
+
+			By("Waiting for initial node reconciliation")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 10*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			// Reset counter
+			testMockController.Reset()
+
+			By("Updating node annotation")
+			Eventually(func() error {
+				currentNode := &corev1.Node{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{
+					Name: testNode.Name,
+				}, currentNode); err != nil {
+					return err
+				}
+
+				// Add an annotation - this should trigger reconciliation 
+				// because all node updates now trigger reconciliation
+				if currentNode.Annotations == nil {
+					currentNode.Annotations = make(map[string]string)
+				}
+				currentNode.Annotations["test.example.com/annotation"] = "value"
+
+				return k8sClient.Update(ctx, currentNode)
+			}, 5*time.Second, 100*time.Millisecond).Should(Succeed())
+
+			By("Ensuring reconciliation happens for annotation changes")
+			Eventually(func() int {
+				return testMockController.GetEnsureCallCount()
+			}, 3*time.Second, 200*time.Millisecond).Should(BeNumerically(">=", 1))
+
+			By("Verifying ServiceController methods were called")
+			Expect(testMockController.GetEnsureCallCount()).To(BeNumerically(">=", 1))
+			Expect(testMockController.GetDeleteCallCount()).To(Equal(0))
 		})
 	})
 })

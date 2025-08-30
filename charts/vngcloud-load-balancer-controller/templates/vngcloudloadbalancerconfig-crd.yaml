@@ -41,13 +41,472 @@ spec:
           spec:
             description: spec defines the desired state of VngcloudLoadBalancerConfig
             properties:
-              foo:
-                description: foo is an example field of VngcloudLoadBalancerConfig.
-                  Edit vngcloudloadbalancerconfig_types.go to remove/update
+              application:
+                description: |-
+                  Application contains configuration specific to application (L7) load balancers
+                  This field is only valid when Type is "application"
+                properties:
+                  autoReorderPolicies:
+                    description: AutoReorderPolicies enables automatic reordering of
+                      policies
+                    type: boolean
+                  certificateIDs:
+                    description: CertificateIDs are the SSL certificate IDs for HTTPS
+                      listeners
+                    items:
+                      type: string
+                    type: array
+                  clientCertificateID:
+                    description: ClientCertificateID is the client certificate ID for
+                      mutual TLS
+                    type: string
+                  enableStickySession:
+                    description: EnableStickySession enables sticky sessions for application
+                      load balancers
+                    type: boolean
+                  enableTLSEncryption:
+                    description: EnableTLSEncryption enables TLS encryption for application
+                      load balancers
+                    type: boolean
+                  header:
+                    additionalProperties:
+                      type: string
+                    description: Header configuration for application load balancers
+                    type: object
+                  implementationSpecificParams:
+                    additionalProperties:
+                      type: string
+                    description: ImplementationSpecificParams are implementation-specific
+                      parameters
+                    type: object
+                  insertHeaders:
+                    additionalProperties:
+                      type: string
+                    description: InsertHeaders are headers to insert into requests
+                    type: object
+                type: object
+              enableAutoscale:
+                description: EnableAutoscale enables autoscaling for the load balancer
+                type: boolean
+              healthCheck:
+                description: HealthCheck contains health check configuration
+                properties:
+                  healthcheckHttpDomainName:
+                    description: HealthcheckHttpDomainName is the domain name for HTTP/HTTPS
+                      health checks
+                    type: string
+                  healthcheckHttpMethod:
+                    description: HealthcheckHttpMethod is the HTTP method for health
+                      checks
+                    enum:
+                    - GET
+                    - POST
+                    - PUT
+                    - DELETE
+                    - HEAD
+                    type: string
+                  healthcheckHttpVersion:
+                    description: HealthcheckHttpVersion is the HTTP version for health
+                      checks
+                    type: string
+                  healthcheckIntervalSeconds:
+                    description: HealthcheckIntervalSeconds is the interval between
+                      health checks
+                    format: int32
+                    type: integer
+                  healthcheckPath:
+                    description: HealthcheckPath is the path for HTTP/HTTPS health checks
+                    type: string
+                  healthcheckPort:
+                    description: HealthcheckPort is the port for health checks
+                    format: int32
+                    type: integer
+                  healthcheckProtocol:
+                    description: HealthcheckProtocol is the protocol for health checks
+                    enum:
+                    - TCP
+                    - HTTP
+                    - HTTPS
+                    type: string
+                  healthcheckTimeoutSeconds:
+                    description: HealthcheckTimeoutSeconds is the timeout for health
+                      checks
+                    format: int32
+                    type: integer
+                  healthyThresholdCount:
+                    description: HealthyThresholdCount is the number of successful checks
+                      before considering healthy
+                    format: int32
+                    type: integer
+                  successCodes:
+                    description: |-
+                      HTTP/HTTPS specific health check fields
+                      SuccessCodes are the success codes for HTTP/HTTPS health checks
+                    type: string
+                  unhealthyThresholdCount:
+                    description: UnhealthyThresholdCount is the number of failed checks
+                      before considering unhealthy
+                    format: int32
+                    type: integer
+                type: object
+              idleTimeoutClient:
+                description: IdleTimeoutClient is the idle timeout for client connections
+                format: int32
+                type: integer
+              idleTimeoutConnection:
+                description: IdleTimeoutConnection is the idle timeout for connections
+                format: int32
+                type: integer
+              idleTimeoutMember:
+                description: IdleTimeoutMember is the idle timeout for member connections
+                format: int32
+                type: integer
+              ignore:
+                description: Ignore tells the controller to ignore this resource
+                type: boolean
+              inboundCIDRs:
+                description: InboundCIDRs defines the inbound CIDR blocks
+                items:
+                  type: string
+                type: array
+              isPOC:
+                description: IsPOC indicates if this is a proof of concept deployment
+                type: boolean
+              listeners:
+                description: Listeners defines the array of listeners for the load balancer
+                items:
+                  description: Listener defines a listener configuration for the load
+                    balancer
+                  properties:
+                    allowedCidrs:
+                      default: 0.0.0.0/0
+                      description: AllowedCidrs defines the allowed CIDR blocks
+                      type: string
+                    certificateAuthorities:
+                      description: CertificateAuthorities is a list of certificate authority
+                        IDs
+                      items:
+                        type: string
+                      type: array
+                    clientCertificateAuthentication:
+                      description: ClientCertificateAuthentication defines client certificate
+                        authentication settings
+                      type: string
+                    defaultCertificateAuthority:
+                      description: DefaultCertificateAuthority is the default certificate
+                        authority
+                      type: string
+                    defaultPoolName:
+                      description: DefaultPoolName is the name of the default pool
+                      type: string
+                    description:
+                      description: Description is an optional description for the listener
+                      type: string
+                    headers:
+                      description: Headers is a list of headers to forward
+                      items:
+                        type: string
+                      type: array
+                    insertHeaders:
+                      description: InsertHeaders defines headers to insert into requests
+                      items:
+                        description: InsertHeader defines a header to be inserted in
+                          requests
+                        properties:
+                          headerName:
+                            description: HeaderName is the name of the header to insert
+                            type: string
+                          headerValue:
+                            description: HeaderValue is the value of the header to insert
+                            type: string
+                        required:
+                        - headerName
+                        - headerValue
+                        type: object
+                      type: array
+                    name:
+                      description: Name is the name of the listener
+                      type: string
+                    policies:
+                      description: Policies is the list of policies for this listener
+                        (for application load balancers)
+                      items:
+                        description: Policy defines a policy configuration for application
+                          load balancer listeners
+                        properties:
+                          action:
+                            description: Action defines the action to take
+                            enum:
+                            - REDIRECT_TO_POOL
+                            - REDIRECT_TO_URL
+                            - REJECT
+                            type: string
+                          description:
+                            description: Description is an optional description for
+                              the policy
+                            type: string
+                          keepQueryString:
+                            description: KeepQueryString determines if query string
+                              should be kept on redirect
+                            type: boolean
+                          l7Rules:
+                            description: L7Rules is the list of L7 rules for this policy
+                            items:
+                              description: L7Rule defines a Layer 7 rule for policies
+                              properties:
+                                compareType:
+                                  description: CompareType is how to compare the rule
+                                    value
+                                  enum:
+                                  - CONTAINS
+                                  - STARTS_WITH
+                                  - ENDS_WITH
+                                  - REGEX
+                                  - EQUAL_TO
+                                  type: string
+                                ruleType:
+                                  description: RuleType is the type of rule
+                                  enum:
+                                  - HOST_NAME
+                                  - PATH
+                                  - FILE_TYPE
+                                  - HEADER
+                                  - COOKIE
+                                  type: string
+                                ruleValue:
+                                  description: RuleValue is the value to compare against
+                                  type: string
+                              required:
+                              - compareType
+                              - ruleType
+                              - ruleValue
+                              type: object
+                            type: array
+                          name:
+                            description: Name is the name of the policy
+                            type: string
+                          position:
+                            description: Position is the position/priority of the policy
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          redirectHttpCode:
+                            description: RedirectHttpCode is the HTTP code to use for
+                              redirect
+                            enum:
+                            - 301
+                            - 302
+                            - 303
+                            - 307
+                            - 308
+                            format: int32
+                            type: integer
+                          redirectPoolName:
+                            description: RedirectPoolName is the name of the pool to
+                              redirect to
+                            type: string
+                          redirectUrl:
+                            description: RedirectUrl is the URL to redirect to (for
+                              REDIRECT_TO_URL action)
+                            type: string
+                        required:
+                        - action
+                        - name
+                        type: object
+                      type: array
+                    protocol:
+                      description: Protocol is the protocol for the listener
+                      enum:
+                      - TCP
+                      - UDP
+                      - HTTP
+                      - HTTPS
+                      type: string
+                    protocolPort:
+                      description: ProtocolPort is the port number for the listener
+                      format: int32
+                      maximum: 65535
+                      minimum: 1
+                      type: integer
+                    timeoutClient:
+                      default: 50
+                      description: TimeoutClient is the client timeout in seconds
+                      format: int32
+                      type: integer
+                    timeoutConnection:
+                      default: 5
+                      description: TimeoutConnection is the connection timeout in seconds
+                      format: int32
+                      type: integer
+                    timeoutMember:
+                      default: 50
+                      description: TimeoutMember is the member timeout in seconds
+                      format: int32
+                      type: integer
+                  required:
+                  - protocol
+                  - protocolPort
+                  type: object
+                type: array
+              loadBalancerID:
+                description: LoadBalancerID is managed by the controller
                 type: string
+              loadBalancerName:
+                description: |-
+                  General fields for all load balancers
+                  LoadBalancerName is the name of the load balancer (only set via annotation)
+                type: string
+              network:
+                description: |-
+                  Network contains configuration specific to network (L4) load balancers
+                  This field is only valid when Type is "network"
+                properties:
+                  enableProxyProtocol:
+                    description: EnableProxyProtocol enables proxy protocol for network
+                      load balancers
+                    type: boolean
+                type: object
+              packageID:
+                description: PackageID is the size/package of the load balancer
+                type: string
+              poolAlgorithm:
+                description: PoolAlgorithm is the load balancing algorithm
+                enum:
+                - ROUND_ROBIN
+                - LEAST_CONNECTIONS
+                - SOURCE_IP
+                type: string
+              pools:
+                description: Pools defines the array of pools for the load balancer
+                items:
+                  description: Pool defines a pool configuration for the load balancer
+                  properties:
+                    description:
+                      description: Description is an optional description for the pool
+                      type: string
+                    loadBalanceMethod:
+                      default: ROUND_ROBIN
+                      description: LoadBalanceMethod is the load balancing method for
+                        the pool
+                      enum:
+                      - ROUND_ROBIN
+                      - LEAST_CONNECTIONS
+                      - SOURCE_IP
+                      type: string
+                    name:
+                      description: Name is the name of the pool
+                      type: string
+                    protocol:
+                      description: Protocol is the protocol for the pool
+                      enum:
+                      - TCP
+                      - UDP
+                      - HTTP
+                      - HTTPS
+                      - PROXY
+                      type: string
+                    stickiness:
+                      default: false
+                      description: Stickiness enables sticky sessions for the pool
+                      type: boolean
+                    tlsEncryption:
+                      default: false
+                      description: TLSEncryption enables TLS encryption for the pool
+                      type: boolean
+                  required:
+                  - name
+                  - protocol
+                  type: object
+                type: array
+              preferSubnetID:
+                description: PreferSubnetID is the preferred subnet ID for placement
+                type: string
+              preferZoneID:
+                description: PreferZoneID is the preferred zone ID for placement
+                type: string
+              scheme:
+                description: Scheme defines if the load balancer is internal or external
+                enum:
+                - internal
+                - external
+                type: string
+              securityGroups:
+                description: SecurityGroups are the security groups for the load balancer
+                items:
+                  type: string
+                type: array
+              tags:
+                additionalProperties:
+                  type: string
+                description: Tags are key-value pairs for load balancer tagging
+                type: object
+              targetNodeLabels:
+                additionalProperties:
+                  type: string
+                description: TargetNodeLabels are labels for targeting specific nodes
+                type: object
+              targetType:
+                description: TargetType defines the target type (instance or ip)
+                enum:
+                - instance
+                - ip
+                type: string
+              type:
+                allOf:
+                - enum:
+                  - network
+                  - application
+                - enum:
+                  - network
+                  - application
+                description: Type defines the type of load balancer (network or application)
+                type: string
+            required:
+            - type
             type: object
           status:
             description: status defines the observed state of VngcloudLoadBalancerConfig
+            properties:
+              address:
+                description: Address is the DNS name or IP address assigned to the load
+                  balancer
+                type: string
+              loadBalancerID:
+                description: LoadBalancerID is the actual ID of the load balancer in
+                  VNG Cloud
+                type: string
+              loadBalancerName:
+                description: LoadBalancerName is the actual name of the load balancer
+                  in VNG Cloud
+                type: string
+              manageDFPMembers:
+                description: ManageDFPMembers indicates if the controller should manage
+                  DFP members
+                type: boolean
+              manageListeners:
+                description: ManageListeners indicates if the controller should manage
+                  listeners
+                type: boolean
+              managePools:
+                description: ManagePools indicates if the controller should manage pools
+                type: boolean
+              message:
+                description: Message provides human-readable details about the current
+                  state
+                type: string
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed spec
+                format: int64
+                type: integer
+              reason:
+                description: Reason provides a brief reason for the current state
+                type: string
+              updatedAt:
+                description: UpdatedAt is the timestamp when the load balancer was last
+                  updated
+                format: date-time
+                type: string
             type: object
         required:
         - spec

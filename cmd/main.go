@@ -31,7 +31,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	// "github.com/anngdinh/operator-helper/k8s"
+	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/anngdinh/operator-helper/version"
 	"github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -226,7 +226,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	// finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
+	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
 	// vngProvider := &provider.VNGCLOUD_Provider{
 	// 	Config: conf,
 	// }
@@ -271,6 +271,7 @@ func main() {
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
 		ServiceController: corecontroller.NewServiceController(),
+		FinalizerManager:  finalizerManager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
