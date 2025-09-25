@@ -19,6 +19,14 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
+      {{- with .Values.manager.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - args: {{- toYaml .Values.manager.manager.args | nindent 8 }}
         command:
@@ -56,8 +64,10 @@ spec:
         runAsNonRoot: true
       serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
       terminationGracePeriodSeconds: 10
+      {{- with .Values.manager.tolerations }}
       tolerations:
-      - operator: Exists
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
       volumes:
       - name: secret
         secret:

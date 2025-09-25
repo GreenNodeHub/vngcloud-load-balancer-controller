@@ -1,0 +1,24 @@
+# Example custom values for vngcloud-load-balancer-controller
+
+# Configure pod scheduling constraints
+manager:
+  # Pod affinity/anti-affinity rules
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              k8s-app: cilium
+
+  # Node selector to control which nodes pods are scheduled on
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  # Tolerations for pod scheduling to nodes with taints
+  tolerations:
+    - operator: Exists
+    # - key: "key"
+    #   operator: "Equal"
+    #   value: "value"
+    #   effect: "NoSchedule"

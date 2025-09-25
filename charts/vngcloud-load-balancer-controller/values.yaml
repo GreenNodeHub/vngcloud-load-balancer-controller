@@ -24,6 +24,22 @@ manager:
   replicas: 1
   serviceAccount:
     annotations: {}
+  # -- Affinity configuration for pod scheduling
+  affinity: {}
+    # Example pod anti-affinity to prevent pods from being scheduled on the same host as cilium
+    # podAntiAffinity:
+    #   requiredDuringSchedulingIgnoredDuringExecution:
+    #     - topologyKey: kubernetes.io/hostname
+    #       labelSelector:
+    #         matchLabels:
+    #           k8s-app: cilium
+  # -- Node selector for pod scheduling
+  nodeSelector: {}
+    # Example: schedule only on Linux nodes
+    # kubernetes.io/os: linux
+  # -- Tolerations for pod scheduling to nodes with taints
+  tolerations:
+    - operator: Exists
 metricsService:
   ports:
   - name: https
