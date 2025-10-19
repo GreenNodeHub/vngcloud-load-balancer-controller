@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -197,7 +196,7 @@ func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port in
 		}
 	}
 
-	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), namespacedName(svc))
+	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), NamespacedName(svc))
 }
 
 func (r *defaultEndpointResolver) buildNodePortEndpoint(IP, instanceID string, nodePort int32) EndpointAddress {
@@ -264,14 +263,6 @@ func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey 
 
 	r.logger.Debugf("found %d target ports for service %s: %v", len(ports), svcKey, ports)
 	return ports, nil
-}
-
-// namespacedName returns the namespaced name for k8s objects
-func namespacedName(obj metav1.Object) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
 }
 
 // ----------------------------------------------------------------------------

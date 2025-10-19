@@ -17,27 +17,18 @@ limitations under the License.
 package v1alpha1
 
 import (
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// LoadBalancerType defines the type of load balancer
-// +kubebuilder:validation:Enum=network;application
-type LoadBalancerType string
-
-const (
-	// NetworkLoadBalancer is a Layer 4 (network) load balancer
-	NetworkLoadBalancer LoadBalancerType = "network"
-	// ApplicationLoadBalancer is a Layer 7 (application) load balancer
-	ApplicationLoadBalancer LoadBalancerType = "application"
-)
-
 // NetworkLoadBalancerConfig contains configuration specific to network (L4) load balancers
 type NetworkLoadBalancerConfig struct {
 	// EnableProxyProtocol enables proxy protocol for network load balancers
 	// +optional
+	// +kubebuilder:default:false
 	EnableProxyProtocol *bool `json:"enableProxyProtocol,omitempty"`
 }
 
@@ -50,7 +41,7 @@ type HealthCheckConfig struct {
 	// HealthcheckProtocol is the protocol for health checks
 	// +optional
 	// +kubebuilder:validation:Enum=TCP;HTTP;HTTPS
-	HealthcheckProtocol *string `json:"healthcheckProtocol,omitempty"`
+	HealthcheckProtocol *loadbalancerv2.HealthCheckProtocol `json:"healthcheckProtocol,omitempty"`
 
 	// HealthcheckIntervalSeconds is the interval between health checks
 	// +optional
@@ -79,12 +70,13 @@ type HealthCheckConfig struct {
 
 	// HealthcheckHttpMethod is the HTTP method for health checks
 	// +optional
-	// +kubebuilder:validation:Enum=GET;POST;PUT;DELETE;HEAD
-	HealthcheckHttpMethod *string `json:"healthcheckHttpMethod,omitempty"`
+	// +kubebuilder:validation:Enum=GET;POST;PUT
+	HealthcheckHttpMethod *loadbalancerv2.HealthCheckMethod `json:"healthcheckHttpMethod,omitempty"`
 
 	// HealthcheckHttpVersion is the HTTP version for health checks
 	// +optional
-	HealthcheckHttpVersion *string `json:"healthcheckHttpVersion,omitempty"`
+	// +kubebuilder:validation:Enum=1.0;1.1
+	HealthcheckHttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"healthcheckHttpVersion,omitempty"`
 
 	// HealthcheckHttpDomainName is the domain name for HTTP/HTTPS health checks
 	// +optional
@@ -107,7 +99,7 @@ type L7Rule struct {
 	// CompareType is how to compare the rule value
 	// +required
 	// +kubebuilder:validation:Enum=CONTAINS;STARTS_WITH;ENDS_WITH;REGEX;EQUAL_TO
-	CompareType string `json:"compareType"`
+	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
 
 	// RuleValue is the value to compare against
 	// +required
@@ -115,8 +107,8 @@ type L7Rule struct {
 
 	// RuleType is the type of rule
 	// +required
-	// +kubebuilder:validation:Enum=HOST_NAME;PATH;FILE_TYPE;HEADER;COOKIE
-	RuleType string `json:"ruleType"`
+	// +kubebuilder:validation:Enum=HOST_NAME;PATH
+	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
 }
 
 // Policy defines a policy configuration for application load balancer listeners
@@ -136,7 +128,7 @@ type Policy struct {
 	// Action defines the action to take
 	// +required
 	// +kubebuilder:validation:Enum=REDIRECT_TO_POOL;REDIRECT_TO_URL;REJECT
-	Action string `json:"action"`
+	Action loadbalancerv2.PolicyAction `json:"action"`
 
 	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
 	// +optional
@@ -169,18 +161,18 @@ type Pool struct {
 
 	// Protocol is the protocol for the pool
 	// +required
-	// +kubebuilder:validation:Enum=TCP;UDP;HTTP;HTTPS;PROXY
-	Protocol string `json:"protocol"`
+	// +kubebuilder:validation:Enum=TCP;UDP;HTTP;PROXY
+	Protocol loadbalancerv2.PoolProtocol `json:"protocol"`
 
 	// Description is an optional description for the pool
 	// +optional
 	Description *string `json:"description,omitempty"`
 
-	// LoadBalanceMethod is the load balancing method for the pool
+	// Algorithm is the load balancing algorithm for the pool
 	// +optional
 	// +kubebuilder:default=ROUND_ROBIN
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
-	LoadBalanceMethod string `json:"loadBalanceMethod,omitempty"`
+	Algorithm loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
 
 	// Stickiness enables sticky sessions for the pool
 	// +optional
@@ -191,6 +183,14 @@ type Pool struct {
 	// +optional
 	// +kubebuilder:default=false
 	TLSEncryption bool `json:"tlsEncryption,omitempty"`
+
+	// // HealthMonitor defines the health monitor configuration for the pool
+	// // +optional
+	// HealthMonitor *loadbalancerv2.HealthMonitor `json:"healthMonitor,omitempty"`
+
+	// Members is the list of members in the pool
+	// +optional
+	Members []*loadbalancerv2.Member `json:"members,omitempty"`
 }
 
 // Listener defines a listener configuration for the load balancer
@@ -206,7 +206,7 @@ type Listener struct {
 	// Protocol is the protocol for the listener
 	// +required
 	// +kubebuilder:validation:Enum=TCP;UDP;HTTP;HTTPS
-	Protocol string `json:"protocol"`
+	Protocol loadbalancerv2.ListenerProtocol `json:"protocol"`
 
 	// ProtocolPort is the port number for the listener
 	// +required
@@ -307,8 +307,8 @@ type VngcloudLoadBalancerConfigSpec struct {
 
 	// Type defines the type of load balancer (network or application)
 	// +required
-	// +kubebuilder:validation:Enum=network;application
-	Type LoadBalancerType `json:"type"`
+	// +kubebuilder:validation:Enum=Layer 4;Layer 7
+	Type loadbalancerv2.LoadBalancerType `json:"type"`
 
 	// General fields for all load balancers
 	// LoadBalancerName is the name of the load balancer (only set via annotation)
@@ -321,8 +321,8 @@ type VngcloudLoadBalancerConfigSpec struct {
 
 	// Scheme defines if the load balancer is internal or external
 	// +optional
-	// +kubebuilder:validation:Enum=internal;external
-	Scheme *string `json:"scheme,omitempty"`
+	// +kubebuilder:validation:Enum=Internal;Internet
+	Scheme *loadbalancerv2.LoadBalancerScheme `json:"scheme,omitempty"`
 
 	// TargetType defines the target type (instance or ip)
 	// +optional
@@ -360,7 +360,7 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// PoolAlgorithm is the load balancing algorithm
 	// +optional
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
-	PoolAlgorithm *string `json:"poolAlgorithm,omitempty"`
+	PoolAlgorithm *loadbalancerv2.PoolAlgorithm `json:"poolAlgorithm,omitempty"`
 
 	// EnableAutoscale enables autoscaling for the load balancer
 	// +optional

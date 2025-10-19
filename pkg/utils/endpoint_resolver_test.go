@@ -30,18 +30,6 @@ type PodInfo struct {
 	PodIP          string
 }
 
-func PointerOf[T any](t T) *T {
-	return &t
-}
-
-// NamespacedName returns the namespaced name for k8s objects
-func NamespacedName(obj metav1.Object) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
-}
-
 func Test_defaultEndpointResolver_ResolvePodEndpoints(t *testing.T) {
 	testNS := "test-ns"
 	nodeA := &corev1.Node{

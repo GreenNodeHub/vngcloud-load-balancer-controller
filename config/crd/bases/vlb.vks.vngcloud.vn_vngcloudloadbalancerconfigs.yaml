@@ -101,12 +101,13 @@ spec:
                     - GET
                     - POST
                     - PUT
-                    - DELETE
-                    - HEAD
                     type: string
                   healthcheckHttpVersion:
                     description: HealthcheckHttpVersion is the HTTP version for health
                       checks
+                    enum:
+                    - 1
+                    - 1.1
                     type: string
                   healthcheckIntervalSeconds:
                     description: HealthcheckIntervalSeconds is the interval between
@@ -273,9 +274,6 @@ spec:
                                   enum:
                                   - HOST_NAME
                                   - PATH
-                                  - FILE_TYPE
-                                  - HEADER
-                                  - COOKIE
                                   type: string
                                 ruleValue:
                                   description: RuleValue is the value to compare against
@@ -387,19 +385,44 @@ spec:
                 items:
                   description: Pool defines a pool configuration for the load balancer
                   properties:
-                    description:
-                      description: Description is an optional description for the
-                        pool
-                      type: string
-                    loadBalanceMethod:
+                    algorithm:
                       default: ROUND_ROBIN
-                      description: LoadBalanceMethod is the load balancing method
-                        for the pool
+                      description: Algorithm is the load balancing algorithm for the
+                        pool
                       enum:
                       - ROUND_ROBIN
                       - LEAST_CONNECTIONS
                       - SOURCE_IP
                       type: string
+                    description:
+                      description: Description is an optional description for the
+                        pool
+                      type: string
+                    members:
+                      description: Members is the list of members in the pool
+                      items:
+                        properties:
+                          backup:
+                            type: boolean
+                          ipAddress:
+                            type: string
+                          monitorPort:
+                            type: integer
+                          name:
+                            type: string
+                          port:
+                            type: integer
+                          weight:
+                            type: integer
+                        required:
+                        - backup
+                        - ipAddress
+                        - monitorPort
+                        - name
+                        - port
+                        - weight
+                        type: object
+                      type: array
                     name:
                       description: Name is the name of the pool
                       type: string
@@ -409,7 +432,6 @@ spec:
                       - TCP
                       - UDP
                       - HTTP
-                      - HTTPS
                       - PROXY
                       type: string
                     stickiness:
@@ -434,8 +456,8 @@ spec:
               scheme:
                 description: Scheme defines if the load balancer is internal or external
                 enum:
-                - internal
-                - external
+                - Internal
+                - Internet
                 type: string
               securityGroups:
                 description: SecurityGroups are the security groups for the load balancer
@@ -459,14 +481,10 @@ spec:
                 - ip
                 type: string
               type:
-                allOf:
-                - enum:
-                  - network
-                  - application
-                - enum:
-                  - network
-                  - application
                 description: Type defines the type of load balancer (network or application)
+                enum:
+                - Layer 4
+                - Layer 7
                 type: string
             required:
             - type
