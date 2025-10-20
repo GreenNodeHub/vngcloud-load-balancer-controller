@@ -23,7 +23,6 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -32,23 +31,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core/eventhandlers"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 )
 
-const (
-	serviceTagPrefix        = "service.k8s.aws"
-	serviceAnnotationPrefix = "service.beta.kubernetes.io"
-	controllerName          = "service"
-)
-
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
-	Scheme            *runtime.Scheme
-	ServiceController ServiceController
-	FinalizerManager  k8s.FinalizerManager
+	Scheme           *runtime.Scheme
+	serviceUseCase   usecase.IServiceUseCase
+	FinalizerManager k8s.FinalizerManager
 
 	serviceUtils  service.ServiceUtils
 	eventRecorder record.EventRecorder
@@ -112,7 +106,7 @@ func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Reques
 	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
 		return err
 	}
-	return r.ServiceController.Ensure(ctx, req)
+	return r.serviceUseCase.Ensure(ctx, req)
 }
 
 func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -122,7 +116,7 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return nil
 	}
 
-	if err := r.ServiceController.Delete(ctx, req); err != nil {
+	if err := r.serviceUseCase.Delete(ctx, req); err != nil {
 		return err
 	}
 
@@ -151,38 +145,4 @@ func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
 		}).
 		Complete(r)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func NewServiceController() ServiceController {
-	return &serviceController{}
-}
-
-type ServiceController interface {
-	Ensure(ctx context.Context, req ctrl.Request) error
-	Delete(ctx context.Context, req ctrl.Request) error
-}
-
-var _ ServiceController = &serviceController{}
-
-type serviceController struct {
-	client.Client
-}
-
-func (r *serviceController) Ensure(ctx context.Context, req ctrl.Request) error {
-	err := errors.New("not implemented")
-	// some errors should not requeue
-	if err != nil {
-		switch {
-		case errs.IsExceededSecurityGroupPerServerQuota(err),
-			errs.IsLoadBalancerNotFound(err):
-			err = errs.NewNoNeedRequeue(err.Error())
-		}
-	}
-	return nil
-}
-
-func (r *serviceController) Delete(ctx context.Context, req ctrl.Request) error {
-	return nil
 }

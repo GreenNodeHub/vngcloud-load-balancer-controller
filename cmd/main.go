@@ -227,51 +227,10 @@ func main() {
 
 	ctx := context.Background()
 	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
-	// vngProvider := &provider.VNGCLOUD_Provider{
-	// 	Config: conf,
-	// }
-	// updateTracker := controller.NewUpdateTracker(vngProvider)
-
-	// if err = (&controller.ServiceReconciler{
-	// 	Client:           mgr.GetClient(),
-	// 	Scheme:           mgr.GetScheme(),
-	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-	// 	Config:           conf,
-	// 	Provider:         vngProvider,
-	// 	FinalizerManager: finalizerManager,
-	// 	UpdateTracker:    updateTracker,
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "Service")
-	// 	os.Exit(1)
-	// }
-	// if err = (&controller.IngressReconciler{
-	// 	Client:           mgr.GetClient(),
-	// 	Scheme:           mgr.GetScheme(),
-	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-	// 	Config:           conf,
-	// 	Provider:         vngProvider,
-	// 	FinalizerManager: finalizerManager,
-	// 	UpdateTracker:    updateTracker,
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "Ingress")
-	// 	os.Exit(1)
-	// }
-	// if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
-	// 	Client:           mgr.GetClient(),
-	// 	Scheme:           mgr.GetScheme(),
-	// 	Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-	// 	Config:           conf,
-	// 	Provider:         vngProvider,
-	// 	FinalizerManager: finalizerManager,
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
-	// 	os.Exit(1)
-	// }
 	if err := (&corecontroller.ServiceReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		ServiceController: corecontroller.NewServiceController(),
-		FinalizerManager:  finalizerManager,
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		FinalizerManager: finalizerManager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
