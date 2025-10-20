@@ -30,6 +30,6 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the vngcloud-load-balancer-controller itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- vlb_vngcloudloadbalancerconfig_admin_role.yaml
-- vlb_vngcloudloadbalancerconfig_editor_role.yaml
-- vlb_vngcloudloadbalancerconfig_viewer_role.yaml
+- vngcloudloadbalancerconfig_admin_role.yaml
+- vngcloudloadbalancerconfig_editor_role.yaml
+- vngcloudloadbalancerconfig_viewer_role.yaml

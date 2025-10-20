@@ -1,4 +1,4 @@
-apiVersion: vlb.vks.vngcloud.vn/v1alpha1
+apiVersion: vks.vngcloud.vn/v1alpha1
 kind: VngcloudLoadBalancerConfig
 metadata:
   labels:

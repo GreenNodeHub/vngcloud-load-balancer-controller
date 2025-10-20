@@ -79,7 +79,6 @@ func setupSharedManager() {
 		reconciler := &ServiceReconciler{
 			Client:                  testMgr.GetClient(),
 			Scheme:                  testMgr.GetScheme(),
-			ServiceController:       testMockController,
 			FinalizerManager:        k8s.NewDefaultFinalizerManager(testMgr.GetClient(), logr.Discard()),
 			serviceUtils:            service.NewServiceUtils(consts.ServiceFinalizer),
 			eventRecorder:           &record.FakeRecorder{},

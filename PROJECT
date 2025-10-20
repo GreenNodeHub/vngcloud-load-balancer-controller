@@ -33,8 +33,7 @@ resources:
     namespaced: true
   controller: true
   domain: vks.vngcloud.vn
-  group: vlb
   kind: VngcloudLoadBalancerConfig
-  path: github.com/vngcloud/vngcloud-load-balancer-controller/api/vlb/v1alpha1
+  path: github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1
   version: v1alpha1
 version: "3"

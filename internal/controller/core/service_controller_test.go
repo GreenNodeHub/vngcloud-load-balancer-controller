@@ -738,7 +738,7 @@ var _ = Describe("Service Reconciler", func() {
 					return err
 				}
 
-				// Add an annotation - this should trigger reconciliation 
+				// Add an annotation - this should trigger reconciliation
 				// because all node updates now trigger reconciliation
 				if currentNode.Annotations == nil {
 					currentNode.Annotations = make(map[string]string)

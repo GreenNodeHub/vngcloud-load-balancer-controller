@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: vngcloudloadbalancerconfigs.vlb.vks.vngcloud.vn
+  name: vngcloudloadbalancerconfigs.vks.vngcloud.vn
 spec:
-  group: vlb.vks.vngcloud.vn
+  group: vks.vngcloud.vn
   names:
     kind: VngcloudLoadBalancerConfig
     listKind: VngcloudLoadBalancerConfigList

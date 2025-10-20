@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vlb
+package controller
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	vlbv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/vlb/v1alpha1"
+	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
 var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
@@ -40,13 +40,13 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vngcloudloadbalancerconfig := &vlbv1alpha1.VngcloudLoadBalancerConfig{}
+		vngcloudloadbalancerconfig := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind VngcloudLoadBalancerConfig")
 			err := k8sClient.Get(ctx, typeNamespacedName, vngcloudloadbalancerconfig)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &vlbv1alpha1.VngcloudLoadBalancerConfig{
+				resource := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &vlbv1alpha1.VngcloudLoadBalancerConfig{}
+			resource := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

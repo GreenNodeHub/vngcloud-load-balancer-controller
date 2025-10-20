@@ -1,7 +1,7 @@
 # This rule is not used by the project vngcloud-load-balancer-controller itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
-# Grants read-only access to vlb.vks.vngcloud.vn resources.
+# Grants read-only access to vks.vngcloud.vn resources.
 # This role is intended for users who need visibility into these resources
 # without permissions to modify them. It is ideal for monitoring purposes and limited-access viewing.
 
@@ -11,10 +11,10 @@ metadata:
   labels:
     app.kubernetes.io/name: vngcloud-load-balancer-controller
     app.kubernetes.io/managed-by: kustomize
-  name: vlb-vngcloudloadbalancerconfig-viewer-role
+  name: vlbc-viewer-role
 rules:
 - apiGroups:
-  - vlb.vks.vngcloud.vn
+  - vks.vngcloud.vn
   resources:
   - vngcloudloadbalancerconfigs
   verbs:
@@ -22,7 +22,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - vlb.vks.vngcloud.vn
+  - vks.vngcloud.vn
   resources:
   - vngcloudloadbalancerconfigs/status
   verbs:

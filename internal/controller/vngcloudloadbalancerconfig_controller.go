@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package vlb
+package controller
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	vlbv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/vlb/v1alpha1"
+	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
 // VngcloudLoadBalancerConfigReconciler reconciles a VngcloudLoadBalancerConfig object
@@ -33,9 +33,9 @@ type VngcloudLoadBalancerConfigReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=vlb.vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=vlb.vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=vlb.vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -45,7 +45,7 @@ type VngcloudLoadBalancerConfigReconciler struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *VngcloudLoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = logf.FromContext(ctx)
 
@@ -57,7 +57,7 @@ func (r *VngcloudLoadBalancerConfigReconciler) Reconcile(ctx context.Context, re
 // SetupWithManager sets up the controller with the Manager.
 func (r *VngcloudLoadBalancerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vlbv1alpha1.VngcloudLoadBalancerConfig{}).
-		Named("vlb-vngcloudloadbalancerconfig").
+		For(&vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{}).
+		Named("vngcloudloadbalancerconfig").
 		Complete(r)
 }

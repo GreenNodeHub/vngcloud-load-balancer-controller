@@ -178,7 +178,7 @@ go mod tidy
 make generate
 make manifests kustomize helm
 
-kubebuilder create api --group vlb --version v1alpha1 --kind VngcloudLoadBalancerConfig --controller=true --resource=true --namespaced=true
+kubebuilder create api --version v1alpha1 --kind VngcloudLoadBalancerConfig --controller=true --resource=true --namespaced=true
 go mod tidy
 make generate
 make manifests kustomize helm
