@@ -53,7 +53,14 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -76,6 +83,8 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var devMode bool
+	var disableServiceController bool
+	var disableVLBConfigController bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -89,6 +98,10 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.BoolVar(&devMode, "dev-mode", false,
 		"If set, log will be printed in different format, easier to debug")
+	flag.BoolVar(&disableServiceController, "disable-service-controller", false,
+		"If set, the service controller will be disabled")
+	flag.BoolVar(&disableVLBConfigController, "disable-vlb-config-controller", false,
+		"If set, the VngcloudLoadBalancerConfig controller will be disabled")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -221,21 +234,42 @@ func main() {
 
 	ctx := context.Background()
 	finalizerManager := k8s.NewDefaultFinalizerManager(mgr.GetClient(), ctrl.Log)
-	if err := (&corecontroller.ServiceReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		FinalizerManager: finalizerManager,
-	}).SetupWithManager(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Service")
+	k8sRepo := k8s_repo.NewK8sRepository(mgr.GetClient())
+	vngcloudRepo, err := vngcloud_repo.NewVngCloudRepository(ctx, conf)
+	if err != nil {
+		setupLog.Error(err, "unable to create VngCloud repository")
 		os.Exit(1)
 	}
-	if err := (&controller.VngcloudLoadBalancerConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VngcloudLoadBalancerConfig")
-		os.Exit(1)
+	annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+	cniDetector := utils.NewDetector(mgr.GetClient())
+	endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
+	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
+	serviceUseCase := service_uc.NewServiceUseCase(
+		conf, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+
+	if !disableServiceController {
+		reconciler := corecontroller.NewServiceReconciler(
+			serviceUseCase,
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			finalizerManager,
+			mgr.GetEventRecorderFor("service-controller"),
+			serviceUtils,
+		)
+		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Service")
+			os.Exit(1)
+		}
 	}
+
+	if !disableVLBConfigController {
+		reconciler := controller.NewVngcloudLoadBalancerConfigReconciler()
+		if err = reconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "VngcloudLoadBalancerConfig")
+			os.Exit(1)
+		}
+	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

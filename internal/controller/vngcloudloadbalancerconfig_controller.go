@@ -27,6 +27,10 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
+func NewVngcloudLoadBalancerConfigReconciler() *VngcloudLoadBalancerConfigReconciler {
+	return &VngcloudLoadBalancerConfigReconciler{}
+}
+
 // VngcloudLoadBalancerConfigReconciler reconciles a VngcloudLoadBalancerConfig object
 type VngcloudLoadBalancerConfigReconciler struct {
 	client.Client

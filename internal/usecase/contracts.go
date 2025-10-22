@@ -7,6 +7,7 @@ import (
 )
 
 type IServiceUseCase interface {
+	Init(ctx context.Context) error
 	Ensure(ctx context.Context, req ctrl.Request) error
 	Delete(ctx context.Context, req ctrl.Request) error
 }

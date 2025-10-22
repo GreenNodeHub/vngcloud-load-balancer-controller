@@ -18,6 +18,8 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
@@ -29,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
@@ -36,6 +39,30 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 )
+
+const (
+	successIcon = "✅"
+	errorIcon   = "❌"
+	actionIcon  = "🌐"
+)
+
+func NewServiceReconciler(
+	serviceUseCase usecase.IServiceUseCase,
+	client client.Client,
+	scheme *runtime.Scheme,
+	finalizerManager k8s.FinalizerManager,
+	eventRecorder record.EventRecorder,
+	serviceUtils service.ServiceUtils,
+) *ServiceReconciler {
+	return &ServiceReconciler{
+		Client:           client,
+		Scheme:           scheme,
+		serviceUseCase:   serviceUseCase,
+		FinalizerManager: finalizerManager,
+		eventRecorder:    eventRecorder,
+		serviceUtils:     serviceUtils,
+	}
+}
 
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
@@ -53,6 +80,8 @@ type ServiceReconciler struct {
 	// metricsCollector  lbcmetrics.MetricCollector
 
 	maxConcurrentReconciles int
+
+	initDone atomic.Bool
 }
 
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -71,6 +100,11 @@ type ServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if !r.initDone.Load() {
+		ctrl.Log.Info("Init not done yet, requeueing...")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
+
 	ctx = contexts.NewContext(ctx).SetLogName("s/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -89,17 +123,34 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 	logger := contexts.NewContext(ctx).Log()
 	logger.Info("------------------ START ------------------")
 	defer logger.Info("------------------ DONE ------------------")
+	key := fmt.Sprintf("%s/%s", svc.Namespace, svc.Name)
 
 	if !r.serviceUtils.IsServiceSupported(svc) {
 		// in case the service have finalizer but is no longer supported, we still need to call delete to clean up
 		// case the service type is changed from LoadBalancer to ClusterIP/NodePort/Headless
 		if r.serviceUtils.IsServicePendingFinalization(svc) {
-			return r.reconcileDelete(ctx, req, svc)
+			err := r.reconcileDelete(ctx, req, svc)
+			if err != nil {
+				logger.Errorf("%s Delete failed: %v", errorIcon, err)
+				r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedDelete", err.Error())
+				return err
+			}
+			logger.Infof("%s Delete successfully.", successIcon)
+			r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Deleted", key)
+			return nil
 		}
 		return nil
 	}
 
-	return r.reconcileEnsure(ctx, req, svc)
+	err = r.reconcileEnsure(ctx, req, svc)
+	if err != nil {
+		logger.Errorf("%s Ensure failed: %v", errorIcon, err)
+		r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedEnsure", err.Error())
+		return err
+	}
+	logger.Infof("%s Ensure successfully.", successIcon)
+	r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Ensured", key)
+	return nil
 }
 
 func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -128,7 +179,22 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	r.serviceUtils = service.NewServiceUtils(consts.ServiceFinalizer)
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		log := ctrl.Log.WithName("init")
+		log.Info("Running initialization...")
+
+		if err := r.serviceUseCase.Init(ctx); err != nil {
+			log.Error(err, "Fatal: initialization failed")
+			return err // returning error causes manager to stop => pod crash
+		}
+
+		log.Info("Initialization complete")
+		r.initDone.Store(true)
+		return nil
+	})); err != nil {
+		return err
+	}
+
 	svcEventHandler := eventhandlers.NewEnqueueRequestForServiceEvent(r.eventRecorder,
 		r.serviceUtils, r.logger.WithName("eventHandlers").WithName("service"))
 	endpointEventHandler := eventhandlers.NewEnqueueRequestForEndpointEvent(r.Client,

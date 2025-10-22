@@ -20,18 +20,21 @@ const (
 	UnknownCNI          CNIType = "Unknown CNI"
 )
 
-// Detector detects the CNI type used in the Kubernetes cluster.
-type Detector struct {
+type CniDetector interface {
+	DetectCNIType() (CNIType, error)
+}
+
+type detector struct {
 	client.Client
 }
 
-// NewDetector creates a new instance of the CNI Detector.
-func NewDetector(kubeClient client.Client) *Detector {
-	return &Detector{Client: kubeClient}
+// NewDetector creates a new instance of the CNI detector.
+func NewDetector(kubeClient client.Client) CniDetector {
+	return &detector{Client: kubeClient}
 }
 
 // DetectCNIType detects the CNI type in the cluster.
-func (d *Detector) DetectCNIType() (CNIType, error) {
+func (d *detector) DetectCNIType() (CNIType, error) {
 	// Check for Calico
 	if d.isCalicoOverlay() {
 		return CalicoOverlay, nil
@@ -50,7 +53,7 @@ func (d *Detector) DetectCNIType() (CNIType, error) {
 }
 
 // Check if Calico Overlay is running
-func (d *Detector) isCalicoOverlay() bool {
+func (d *detector) isCalicoOverlay() bool {
 	calicoNodeDaemonSet := &appsv1.DaemonSet{}
 	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
 
@@ -64,7 +67,7 @@ func (d *Detector) isCalicoOverlay() bool {
 }
 
 // Check if Cilium Overlay is running
-func (d *Detector) isCiliumOverlay() bool {
+func (d *detector) isCiliumOverlay() bool {
 	ciliumDaemonSet := &appsv1.DaemonSet{}
 	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
 
@@ -78,7 +81,7 @@ func (d *Detector) isCiliumOverlay() bool {
 }
 
 // Check if Cilium Native Routing is running
-func (d *Detector) isCiliumNativeRouting() bool {
+func (d *detector) isCiliumNativeRouting() bool {
 	if !d.isCiliumOverlay() {
 		return false
 	}

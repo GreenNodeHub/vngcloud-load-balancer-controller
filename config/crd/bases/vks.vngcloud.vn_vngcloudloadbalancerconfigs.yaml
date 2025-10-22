@@ -84,6 +84,44 @@ spec:
                     description: InsertHeaders are headers to insert into requests
                     type: object
                 type: object
+              attachSecurityGroupsToNodes:
+                description: AttachSecurityGroupsToNodes contains security groups
+                  to attach to nodes (filter by TargetNodeLabels)
+                items:
+                  type: string
+                type: array
+              autoManageSecurityGroupRules:
+                description: AutoManageSecurityGroupRules defines security group rules
+                  to be auto-managed by the controller attached to nodes (filter by
+                  TargetNodeLabels)
+                items:
+                  properties:
+                    cidr:
+                      description: CIDR is the CIDR block for the rule
+                      type: string
+                    description:
+                      description: Description is an optional description for the
+                        rule
+                      type: string
+                    fromPort:
+                      description: FromPort is the starting port for the rule
+                      format: int32
+                      type: integer
+                    protocol:
+                      description: Protocol is the protocol for the security group
+                        rule
+                      type: string
+                    toPort:
+                      description: ToPort is the ending port for the rule
+                      format: int32
+                      type: integer
+                  required:
+                  - cidr
+                  - fromPort
+                  - protocol
+                  - toPort
+                  type: object
+                type: array
               enableAutoscale:
                 description: EnableAutoscale enables autoscaling for the load balancer
                 type: boolean
@@ -170,7 +208,7 @@ spec:
                 items:
                   type: string
                 type: array
-              isPOC:
+              isPoc:
                 description: IsPOC indicates if this is a proof of concept deployment
                 type: boolean
               listeners:
@@ -181,7 +219,6 @@ spec:
                     balancer
                   properties:
                     allowedCidrs:
-                      default: 0.0.0.0/0
                       description: AllowedCidrs defines the allowed CIDR blocks
                       type: string
                     certificateAuthorities:
@@ -332,22 +369,20 @@ spec:
                       minimum: 1
                       type: integer
                     timeoutClient:
-                      default: 50
                       description: TimeoutClient is the client timeout in seconds
                       format: int32
                       type: integer
                     timeoutConnection:
-                      default: 5
                       description: TimeoutConnection is the connection timeout in
                         seconds
                       format: int32
                       type: integer
                     timeoutMember:
-                      default: 50
                       description: TimeoutMember is the member timeout in seconds
                       format: int32
                       type: integer
                   required:
+                  - name
                   - protocol
                   - protocolPort
                   type: object
@@ -386,7 +421,6 @@ spec:
                   description: Pool defines a pool configuration for the load balancer
                   properties:
                     algorithm:
-                      default: ROUND_ROBIN
                       description: Algorithm is the load balancing algorithm for the
                         pool
                       enum:
@@ -401,26 +435,32 @@ spec:
                     members:
                       description: Members is the list of members in the pool
                       items:
+                        description: PoolMember defines a member of a load balancer
+                          pool
                         properties:
                           backup:
+                            description: Backup indicates if the member is a backup
+                              member
                             type: boolean
-                          ipAddress:
+                          ip:
+                            description: IP is the IP address of the pool member
                             type: string
                           monitorPort:
+                            description: MonitorPort is the monitor port of the pool
+                              member
                             type: integer
                           name:
+                            description: Name is an optional name for the pool member
                             type: string
                           port:
+                            description: Port is the port number of the pool member
                             type: integer
                           weight:
+                            description: Weight is the weight of the pool member
                             type: integer
                         required:
-                        - backup
-                        - ipAddress
-                        - monitorPort
-                        - name
+                        - ip
                         - port
-                        - weight
                         type: object
                       type: array
                     name:
@@ -435,11 +475,9 @@ spec:
                       - PROXY
                       type: string
                     stickiness:
-                      default: false
                       description: Stickiness enables sticky sessions for the pool
                       type: boolean
                     tlsEncryption:
-                      default: false
                       description: TLSEncryption enables TLS encryption for the pool
                       type: boolean
                   required:
@@ -447,9 +485,6 @@ spec:
                   - protocol
                   type: object
                 type: array
-              preferSubnetID:
-                description: PreferSubnetID is the preferred subnet ID for placement
-                type: string
               preferZoneID:
                 description: PreferZoneID is the preferred zone ID for placement
                 type: string
@@ -464,6 +499,9 @@ spec:
                 items:
                   type: string
                 type: array
+              subnetID:
+                description: SubnetID is the subnet ID for the load balancer
+                type: string
               tags:
                 additionalProperties:
                   type: string
@@ -474,12 +512,6 @@ spec:
                   type: string
                 description: TargetNodeLabels are labels for targeting specific nodes
                 type: object
-              targetType:
-                description: TargetType defines the target type (instance or ip)
-                enum:
-                - instance
-                - ip
-                type: string
               type:
                 description: Type defines the type of load balancer (network or application)
                 enum:
@@ -487,6 +519,8 @@ spec:
                 - Layer 7
                 type: string
             required:
+            - loadBalancerName
+            - subnetID
             - type
             type: object
           status:

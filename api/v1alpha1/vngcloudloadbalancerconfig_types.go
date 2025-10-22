@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -170,19 +171,16 @@ type Pool struct {
 
 	// Algorithm is the load balancing algorithm for the pool
 	// +optional
-	// +kubebuilder:default=ROUND_ROBIN
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
-	Algorithm loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
+	Algorithm *loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
 
 	// Stickiness enables sticky sessions for the pool
 	// +optional
-	// +kubebuilder:default=false
-	Stickiness bool `json:"stickiness,omitempty"`
+	Stickiness *bool `json:"stickiness,omitempty"`
 
 	// TLSEncryption enables TLS encryption for the pool
 	// +optional
-	// +kubebuilder:default=false
-	TLSEncryption bool `json:"tlsEncryption,omitempty"`
+	TLSEncryption *bool `json:"tlsEncryption,omitempty"`
 
 	// // HealthMonitor defines the health monitor configuration for the pool
 	// // +optional
@@ -190,14 +188,41 @@ type Pool struct {
 
 	// Members is the list of members in the pool
 	// +optional
-	Members []*loadbalancerv2.Member `json:"members,omitempty"`
+	Members []PoolMember `json:"members,omitempty"`
+}
+
+// PoolMember defines a member of a load balancer pool
+type PoolMember struct {
+	// IP is the IP address of the pool member
+	// +required
+	IP string `json:"ip"`
+
+	// Port is the port number of the pool member
+	// +required
+	Port int `json:"port"`
+
+	// MonitorPort is the monitor port of the pool member
+	// +optional
+	MonitorPort *int `json:"monitorPort,omitempty"`
+
+	// Name is an optional name for the pool member
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Weight is the weight of the pool member
+	// +optional
+	Weight *int `json:"weight,omitempty"`
+
+	// Backup indicates if the member is a backup member
+	// +optional
+	Backup *bool `json:"backup,omitempty"`
 }
 
 // Listener defines a listener configuration for the load balancer
 type Listener struct {
 	// Name is the name of the listener
-	// +optional
-	Name *string `json:"name,omitempty"`
+	// +required
+	Name string `json:"name,omitempty"`
 
 	// Description is an optional description for the listener
 	// +optional
@@ -220,23 +245,19 @@ type Listener struct {
 
 	// TimeoutClient is the client timeout in seconds
 	// +optional
-	// +kubebuilder:default=50
-	TimeoutClient int32 `json:"timeoutClient,omitempty"`
+	TimeoutClient *int32 `json:"timeoutClient,omitempty"`
 
 	// TimeoutMember is the member timeout in seconds
 	// +optional
-	// +kubebuilder:default=50
-	TimeoutMember int32 `json:"timeoutMember,omitempty"`
+	TimeoutMember *int32 `json:"timeoutMember,omitempty"`
 
 	// TimeoutConnection is the connection timeout in seconds
 	// +optional
-	// +kubebuilder:default=5
-	TimeoutConnection int32 `json:"timeoutConnection,omitempty"`
+	TimeoutConnection *int32 `json:"timeoutConnection,omitempty"`
 
 	// AllowedCidrs defines the allowed CIDR blocks
 	// +optional
-	// +kubebuilder:default="0.0.0.0/0"
-	AllowedCidrs string `json:"allowedCidrs,omitempty"`
+	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
 
 	// Headers is a list of headers to forward
 	// +optional
@@ -312,8 +333,12 @@ type VngcloudLoadBalancerConfigSpec struct {
 
 	// General fields for all load balancers
 	// LoadBalancerName is the name of the load balancer (only set via annotation)
-	// +optional
-	LoadBalancerName *string `json:"loadBalancerName,omitempty"`
+	// +required
+	LoadBalancerName string `json:"loadBalancerName,omitempty"`
+
+	// SubnetID is the subnet ID for the load balancer
+	// +required
+	SubnetID string `json:"subnetID,omitempty"`
 
 	// PackageID is the size/package of the load balancer
 	// +optional
@@ -323,11 +348,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	// +kubebuilder:validation:Enum=Internal;Internet
 	Scheme *loadbalancerv2.LoadBalancerScheme `json:"scheme,omitempty"`
-
-	// TargetType defines the target type (instance or ip)
-	// +optional
-	// +kubebuilder:validation:Enum=instance;ip
-	TargetType *string `json:"targetType,omitempty"`
 
 	// LoadBalancerID is managed by the controller
 	// +optional
@@ -380,15 +400,11 @@ type VngcloudLoadBalancerConfigSpec struct {
 
 	// IsPOC indicates if this is a proof of concept deployment
 	// +optional
-	IsPOC *bool `json:"isPOC,omitempty"`
+	IsPoc *bool `json:"isPoc,omitempty"`
 
 	// PreferZoneID is the preferred zone ID for placement
 	// +optional
 	PreferZoneID *string `json:"preferZoneID,omitempty"`
-
-	// PreferSubnetID is the preferred subnet ID for placement
-	// +optional
-	PreferSubnetID *string `json:"preferSubnetID,omitempty"`
 
 	// Listeners defines the array of listeners for the load balancer
 	// +optional
@@ -407,6 +423,36 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// This field is only valid when Type is "application"
 	// +optional
 	Application *ApplicationLoadBalancerConfig `json:"application,omitempty"`
+
+	// AttachSecurityGroupsToNodes contains security groups to attach to nodes (filter by TargetNodeLabels)
+	// +optional
+	AttachSecurityGroupsToNodes []string `json:"attachSecurityGroupsToNodes,omitempty"`
+
+	// AutoManageSecurityGroupRules defines security group rules to be auto-managed by the controller attached to nodes (filter by TargetNodeLabels)
+	// +optional
+	AutoManageSecurityGroupRules []SecurityGroupRule `json:"autoManageSecurityGroupRules,omitempty"`
+}
+
+type SecurityGroupRule struct {
+	// Protocol is the protocol for the security group rule
+	// +required
+	Protocol networkv2.SecgroupRuleProtocol `json:"protocol"`
+
+	// FromPort is the starting port for the rule
+	// +required
+	FromPort int32 `json:"fromPort"`
+
+	// ToPort is the ending port for the rule
+	// +required
+	ToPort int32 `json:"toPort"`
+
+	// CIDR is the CIDR block for the rule
+	// +required
+	CIDR string `json:"cidr"`
+
+	// Description is an optional description for the rule
+	// +optional
+	Description *string `json:"description,omitempty"`
 }
 
 // VngcloudLoadBalancerConfigStatus defines the observed state of VngcloudLoadBalancerConfig.
