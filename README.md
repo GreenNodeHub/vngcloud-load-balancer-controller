@@ -183,3 +183,11 @@ go mod tidy
 make generate
 make manifests kustomize helm
 ```
+
+Mockery generation:
+
+```bash
+go install github.com/vektra/mockery/v3@v3.5.5
+mockery init "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+mockery
+```
