@@ -200,9 +200,6 @@ spec:
                 description: IdleTimeoutMember is the idle timeout for member connections
                 format: int32
                 type: integer
-              ignore:
-                description: Ignore tells the controller to ignore this resource
-                type: boolean
               inboundCIDRs:
                 description: InboundCIDRs defines the inbound CIDR blocks
                 items:

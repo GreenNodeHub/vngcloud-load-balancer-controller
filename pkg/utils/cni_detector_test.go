@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func TestDetectCNIType(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithObjects(calicoDaemonSet).Build()
 
 		detector := NewDetector(fakeClient)
-		cniType, err := detector.DetectCNIType()
+		cniType, err := detector.DetectCNIType(context.Background())
 
 		assert.NoError(t, err)
 		assert.Equal(t, CalicoOverlay, cniType)
@@ -50,7 +51,7 @@ func TestDetectCNIType(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithObjects(ciliumDaemonSet, ciliumConfigMap).Build()
 
 		detector := NewDetector(fakeClient)
-		cniType, err := detector.DetectCNIType()
+		cniType, err := detector.DetectCNIType(context.Background())
 
 		assert.NoError(t, err)
 		assert.Equal(t, CiliumNativeRouting, cniType)
@@ -76,7 +77,7 @@ func TestDetectCNIType(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().WithObjects(ciliumDaemonSet, ciliumConfigMap).Build()
 
 		detector := NewDetector(fakeClient)
-		cniType, err := detector.DetectCNIType()
+		cniType, err := detector.DetectCNIType(context.Background())
 
 		assert.NoError(t, err)
 		assert.Equal(t, CiliumOverlay, cniType)
@@ -87,7 +88,7 @@ func TestDetectCNIType(t *testing.T) {
 		fakeClient := fake.NewClientBuilder().Build()
 
 		detector := NewDetector(fakeClient)
-		cniType, err := detector.DetectCNIType()
+		cniType, err := detector.DetectCNIType(context.Background())
 
 		assert.NoError(t, err)
 		assert.Equal(t, UnknownCNI, cniType)
@@ -112,7 +113,7 @@ func TestRealCluster(t *testing.T) {
 	}
 
 	detector := NewDetector(clientset)
-	cniType, err := detector.DetectCNIType()
+	cniType, err := detector.DetectCNIType(context.Background())
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

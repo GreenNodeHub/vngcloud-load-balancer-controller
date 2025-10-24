@@ -21,7 +21,7 @@ const (
 )
 
 type CniDetector interface {
-	DetectCNIType() (CNIType, error)
+	DetectCNIType(ctx context.Context) (CNIType, error)
 }
 
 type detector struct {
@@ -34,18 +34,18 @@ func NewDetector(kubeClient client.Client) CniDetector {
 }
 
 // DetectCNIType detects the CNI type in the cluster.
-func (d *detector) DetectCNIType() (CNIType, error) {
+func (d *detector) DetectCNIType(ctx context.Context) (CNIType, error) {
 	// Check for Calico
-	if d.isCalicoOverlay() {
+	if d.isCalicoOverlay(ctx) {
 		return CalicoOverlay, nil
 	}
 
 	// Check for Cilium
-	if d.isCiliumNativeRouting() {
+	if d.isCiliumNativeRouting(ctx) {
 		return CiliumNativeRouting, nil
 	}
 
-	if d.isCiliumOverlay() {
+	if d.isCiliumOverlay(ctx) {
 		return CiliumOverlay, nil
 	}
 
@@ -53,9 +53,9 @@ func (d *detector) DetectCNIType() (CNIType, error) {
 }
 
 // Check if Calico Overlay is running
-func (d *detector) isCalicoOverlay() bool {
+func (d *detector) isCalicoOverlay(ctx context.Context) bool {
 	calicoNodeDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
+	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -67,9 +67,9 @@ func (d *detector) isCalicoOverlay() bool {
 }
 
 // Check if Cilium Overlay is running
-func (d *detector) isCiliumOverlay() bool {
+func (d *detector) isCiliumOverlay(ctx context.Context) bool {
 	ciliumDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
+	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -81,14 +81,14 @@ func (d *detector) isCiliumOverlay() bool {
 }
 
 // Check if Cilium Native Routing is running
-func (d *detector) isCiliumNativeRouting() bool {
-	if !d.isCiliumOverlay() {
+func (d *detector) isCiliumNativeRouting(ctx context.Context) bool {
+	if !d.isCiliumOverlay(ctx) {
 		return false
 	}
 
 	// get cilium-config config map
 	ciliumConfigMap := &corev1.ConfigMap{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
+	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {

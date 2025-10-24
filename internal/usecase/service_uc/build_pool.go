@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/anngdinh/operator-helper/contexts"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
@@ -24,7 +24,6 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 		return nil
 	}
 
-	logger := contexts.NewContext(ctx).Log()
 	resolveOpts := []utils.EndpointResolveOption{
 		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(t.vlbConfig.Spec.TargetNodeLabels))),
 	}
@@ -34,12 +33,10 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 	defaultIdleTimeoutMember := t.buildIdleTimeoutMember(ctx)
 	defaultIdleTimeoutConnection := t.buildIdleTimeoutConnection(ctx)
 	defaultAllowedCidrs := t.buildInboundCIDRs(ctx)
+	defaultEnableProxyProtocol := t.buildEnableProxyProtocol(ctx)
 
 	// Build pool and listener
 	for _, port := range ports {
-		poolName := t.nameHelper.GenL4PoolName(port, "TODO")
-		listenerName := t.nameHelper.GenL4ListenerName(port)
-
 		// nodePort if target type is instance, targetPort if target type is ip
 		var membersAddr []utils.EndpointAddress
 		var err error
@@ -47,14 +44,14 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 			membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
-				logger.Errorf("failed to resolve node port endpoints: %v", err)
+				t.logger.Errorf("failed to resolve node port endpoints: %v", err)
 				return err
 			}
 		} else {
 			membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
-				logger.Errorf("failed to resolve pod endpoints: %v", err)
+				t.logger.Errorf("failed to resolve pod endpoints: %v", err)
 				return err
 			}
 		}
@@ -75,18 +72,25 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 		}
 
 		newPool := v1alpha1.Pool{
-			Name:      poolName,
+			Name:      t.nameHelper.GenL4PoolName(port, string(port.Protocol)),
 			Protocol:  loadbalancerv2.PoolProtocol(port.Protocol),
 			Members:   poolMembers,
 			Algorithm: defaultPoolAlgorithm,
 		}
+		for _, name := range defaultEnableProxyProtocol {
+			if (name == "*" || name == port.Name) && port.Protocol == corev1.ProtocolTCP {
+				newPool.Protocol = loadbalancerv2.PoolProtocolProxy
+				newPool.Name = t.nameHelper.GenL4PoolName(port, string(loadbalancerv2.PoolProtocolProxy))
+				break
+			}
+		}
 		allPools = append(allPools, newPool)
 
 		newListener := v1alpha1.Listener{
-			Name:              listenerName,
+			Name:              t.nameHelper.GenL4ListenerName(port),
 			Protocol:          loadbalancerv2.ListenerProtocol(port.Protocol),
 			ProtocolPort:      int32(port.Port), // TODO
-			DefaultPoolName:   &poolName,
+			DefaultPoolName:   &newPool.Name,
 			TimeoutClient:     defaultIdleTimeoutClient,
 			TimeoutMember:     defaultIdleTimeoutMember,
 			TimeoutConnection: defaultIdleTimeoutConnection,
@@ -110,41 +114,39 @@ func (t *defaultModelBuildTask) getTargetType(_ context.Context) string {
 	return "instance"
 }
 
-func (t *defaultModelBuildTask) buildHealthcheckPort(ctx context.Context) *int {
-	logger := contexts.NewContext(ctx).Log()
+func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 	optionsInt64 := int64(0)
 	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckPort, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
 			annotations.SuffixHealthcheckPort, 0)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
-		logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535, using default value %d",
+		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535, using default value %d",
 			annotations.SuffixHealthcheckPort, optionsInt64, 0)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
 }
 
-func (t *defaultModelBuildTask) buildPoolAlgorithm(ctx context.Context) *loadbalancerv2.PoolAlgorithm {
+func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *loadbalancerv2.PoolAlgorithm {
 	option := ""
 	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixPoolAlgorithm, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
 
-	logger := contexts.NewContext(ctx).Log()
 	switch option {
 	case string(loadbalancerv2.PoolAlgorithmLeastConn),
 		string(loadbalancerv2.PoolAlgorithmRoundRobin),
 		string(loadbalancerv2.PoolAlgorithmSourceIP):
 		return ptr.To(loadbalancerv2.PoolAlgorithm(option))
 	default:
-		logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixPoolAlgorithm,
 			loadbalancerv2.PoolAlgorithmLeastConn,
 			loadbalancerv2.PoolAlgorithmRoundRobin,
@@ -153,52 +155,49 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(ctx context.Context) *loadbal
 	return nil
 }
 
-func (t *defaultModelBuildTask) buildIdleTimeoutClient(ctx context.Context) *int32 {
-	logger := contexts.NewContext(ctx).Log()
+func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
 	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutClient, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
 			annotations.SuffixIdleTimeoutClient, 0)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
 }
 
-func (t *defaultModelBuildTask) buildIdleTimeoutMember(ctx context.Context) *int32 {
-	logger := contexts.NewContext(ctx).Log()
+func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
 	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutMember, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
 			annotations.SuffixIdleTimeoutMember, 0)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
 }
 
-func (t *defaultModelBuildTask) buildIdleTimeoutConnection(ctx context.Context) *int32 {
-	logger := contexts.NewContext(ctx).Log()
+func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
 	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutConnection, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
 			annotations.SuffixIdleTimeoutConnection, 0)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
 }
 
-func (t *defaultModelBuildTask) buildInboundCIDRs(ctx context.Context) *string {
+func (t *defaultModelBuildTask) buildInboundCIDRs(_ context.Context) *string {
 	option := []string{}
 	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixInboundCIDRs, &option, t.service.Annotations)
 	if !exist {
@@ -207,6 +206,14 @@ func (t *defaultModelBuildTask) buildInboundCIDRs(ctx context.Context) *string {
 	return ptr.To(strings.Join(option, ","))
 }
 
-// func (t *defaultModelBuildTask) build
+func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []string {
+	option := []string{}
+	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixEnableProxyProtocol, &option, t.service.Annotations)
+	if !exist {
+		return nil
+	}
+	return option
+}
+
 // func (t *defaultModelBuildTask) build
 // func (t *defaultModelBuildTask) build

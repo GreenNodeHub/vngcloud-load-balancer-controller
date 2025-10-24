@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/anngdinh/operator-helper/contexts"
@@ -77,4 +78,42 @@ func (r *k8sRepository) PatchVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLo
 
 func (r *k8sRepository) UpdateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.UpdateOption) error {
 	return r.client.Update(ctx, vlbc, opts...)
+}
+
+func (r *k8sRepository) PatchMutateStatusVLBC(
+	ctx context.Context,
+	vlbc *v1alpha1.VngcloudLoadBalancerConfig,
+	mutate func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig),
+) error {
+	return r.patchMutateStatusObject(ctx, vlbc, func(ctx context.Context, obj client.Object) {
+		// type-assert so you can use strongly typed fields
+		mutate(ctx, obj.(*v1alpha1.VngcloudLoadBalancerConfig))
+	})
+}
+
+func (r *k8sRepository) patchMutateStatusObject(
+	ctx context.Context,
+	obj client.Object,
+	mutate func(ctx context.Context, obj client.Object),
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// get fresh copy
+		objGet := obj.DeepCopyObject().(client.Object)
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		}, objGet); err != nil {
+			return err
+		}
+
+		// deep copy for diff/patch base
+		oldObject := objGet.DeepCopyObject().(client.Object)
+
+		// mutate the fetched object (not the input)
+		mutate(ctx, objGet)
+
+		// patch only status, with optimistic lock
+		return r.client.Status().Patch(ctx, objGet,
+			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
+	})
 }

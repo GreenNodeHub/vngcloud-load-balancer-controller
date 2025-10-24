@@ -586,11 +586,6 @@ func (in *VngcloudLoadBalancerConfigSpec) DeepCopyInto(out *VngcloudLoadBalancer
 		*out = new(string)
 		**out = **in
 	}
-	if in.Ignore != nil {
-		in, out := &in.Ignore, &out.Ignore
-		*out = new(bool)
-		**out = **in
-	}
 	if in.IdleTimeoutClient != nil {
 		in, out := &in.IdleTimeoutClient, &out.IdleTimeoutClient
 		*out = new(int32)

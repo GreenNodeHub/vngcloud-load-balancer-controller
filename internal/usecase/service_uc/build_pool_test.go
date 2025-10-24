@@ -175,7 +175,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:       "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      "instance",
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
@@ -220,6 +220,214 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name: "Service with proxy protocol enabled for specific port",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: corev1.ProtocolTCP,
+							NodePort: 30080,
+						},
+					},
+				},
+			},
+			resolveNodePortEndpoints: []utils.EndpointAddress{
+				{
+					IP:   "10.0.0.1",
+					Port: 30080,
+					Name: "node-1",
+				},
+			},
+			expectedPools: []v1alpha1.Pool{
+				{
+					Name:     "test-pool-name",
+					Protocol: loadbalancerv2.PoolProtocolProxy, // Should be PROXY protocol
+					Members: []v1alpha1.PoolMember{
+						{
+							IP:          "10.0.0.1",
+							Port:        30080,
+							MonitorPort: ptr.To(30080),
+							Name:        "node-1",
+						},
+					},
+				},
+			},
+			expectedListeners: []v1alpha1.Listener{
+				{
+					Name:         "test-listener-name",
+					Protocol:     loadbalancerv2.ListenerProtocol(corev1.ProtocolTCP),
+					ProtocolPort: 80,
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Service with proxy protocol enabled for all ports (wildcard)",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "http",
+							Port:     80,
+							Protocol: corev1.ProtocolTCP,
+							NodePort: 30080,
+						},
+					},
+				},
+			},
+			resolveNodePortEndpoints: []utils.EndpointAddress{
+				{
+					IP:   "10.0.0.1",
+					Port: 30080,
+					Name: "node-1",
+				},
+			},
+			expectedPools: []v1alpha1.Pool{
+				{
+					Name:     "test-pool-name",
+					Protocol: loadbalancerv2.PoolProtocolProxy, // Should be PROXY protocol
+					Members: []v1alpha1.PoolMember{
+						{
+							IP:          "10.0.0.1",
+							Port:        30080,
+							MonitorPort: ptr.To(30080),
+							Name:        "node-1",
+						},
+					},
+				},
+			},
+			expectedListeners: []v1alpha1.Listener{
+				{
+					Name:         "test-listener-name",
+					Protocol:     loadbalancerv2.ListenerProtocol(corev1.ProtocolTCP),
+					ProtocolPort: 80,
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Service with proxy protocol enabled but UDP protocol (should not apply)",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "ip",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:       "dns",
+							Port:       53,
+							Protocol:   corev1.ProtocolUDP,
+							TargetPort: intstr.FromInt(5353),
+						},
+					},
+				},
+			},
+			resolvePodEndpoints: []utils.EndpointAddress{
+				{
+					IP:   "10.1.0.1",
+					Port: 5353,
+					Name: "pod-1",
+				},
+			},
+			expectedPools: []v1alpha1.Pool{
+				{
+					Name:     "test-pool-name",
+					Protocol: loadbalancerv2.PoolProtocol(corev1.ProtocolUDP), // Should remain UDP, not PROXY
+					Members: []v1alpha1.PoolMember{
+						{
+							IP:          "10.1.0.1",
+							Port:        5353,
+							MonitorPort: ptr.To(5353),
+							Name:        "pod-1",
+						},
+					},
+				},
+			},
+			expectedListeners: []v1alpha1.Listener{
+				{
+					Name:         "test-listener-name",
+					Protocol:     loadbalancerv2.ListenerProtocol(corev1.ProtocolUDP),
+					ProtocolPort: 53,
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "Service with proxy protocol enabled for non-matching port name",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "https", // different from port name
+					},
+				},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Name:     "http", // port name is 'http', not 'https'
+							Port:     80,
+							Protocol: corev1.ProtocolTCP,
+							NodePort: 30080,
+						},
+					},
+				},
+			},
+			resolveNodePortEndpoints: []utils.EndpointAddress{
+				{
+					IP:   "10.0.0.1",
+					Port: 30080,
+					Name: "node-1",
+				},
+			},
+			expectedPools: []v1alpha1.Pool{
+				{
+					Name:     "test-pool-name",
+					Protocol: loadbalancerv2.PoolProtocol(corev1.ProtocolTCP), // Should remain TCP, not PROXY
+					Members: []v1alpha1.PoolMember{
+						{
+							IP:          "10.0.0.1",
+							Port:        30080,
+							MonitorPort: ptr.To(30080),
+							Name:        "node-1",
+						},
+					},
+				},
+			},
+			expectedListeners: []v1alpha1.Listener{
+				{
+					Name:         "test-listener-name",
+					Protocol:     loadbalancerv2.ListenerProtocol(corev1.ProtocolTCP),
+					ProtocolPort: 80,
+				},
+			},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -227,7 +435,14 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 			// Create mocks
 			mockEndpointResolver := utils.NewMockEndpointResolver(t)
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
-			mockNameHelper := utils.NewMockNameHelper(t)
+
+			// Create real name helper
+			realNameHelper := utils.NewNameHelper(
+				"test-cluster-id",
+				"service",
+				tt.service.Namespace,
+				tt.service.Name,
+			)
 
 			// Set up mock expectations
 			if tt.resolveNodePortEndpoints != nil {
@@ -242,11 +457,6 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Return(tt.resolvePodEndpoints, nil)
 			}
 
-			// Set up name helper expectations
-			// TODO: use real naming logic or parameterized names
-			mockNameHelper.EXPECT().GenL4PoolName(mock.Anything, mock.Anything).Return("test-pool-name").Maybe()
-			mockNameHelper.EXPECT().GenL4ListenerName(mock.Anything).Return("test-listener-name").Maybe()
-
 			// Create VLBC config
 			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
 				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
@@ -259,7 +469,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 				service:          tt.service,
 				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
-				nameHelper:       mockNameHelper,
+				nameHelper:       realNameHelper,
 				endpointResolver: mockEndpointResolver,
 			}
 
@@ -271,23 +481,27 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				
+
 				// Check pools
 				assert.Equal(t, len(tt.expectedPools), len(task.vlbConfig.Spec.Pools))
 				for i, expectedPool := range tt.expectedPools {
 					actualPool := task.vlbConfig.Spec.Pools[i]
-					assert.Equal(t, expectedPool.Name, actualPool.Name)
 					assert.Equal(t, expectedPool.Protocol, actualPool.Protocol)
 					assert.ElementsMatch(t, expectedPool.Members, actualPool.Members)
+					// For real name helper, verify full generated pool name matches expected format
+					expectedPoolName := realNameHelper.GenL4PoolName(tt.service.Spec.Ports[i], "TODO")
+					assert.Equal(t, expectedPoolName, actualPool.Name)
 				}
 
 				// Check listeners
 				assert.Equal(t, len(tt.expectedListeners), len(task.vlbConfig.Spec.Listeners))
 				for i, expectedListener := range tt.expectedListeners {
 					actualListener := task.vlbConfig.Spec.Listeners[i]
-					assert.Equal(t, expectedListener.Name, actualListener.Name)
 					assert.Equal(t, expectedListener.Protocol, actualListener.Protocol)
 					assert.Equal(t, expectedListener.ProtocolPort, actualListener.ProtocolPort)
+					// For real name helper, verify full generated listener name matches expected
+					expectedListenerName := realNameHelper.GenL4ListenerName(tt.service.Spec.Ports[i])
+					assert.Equal(t, expectedListenerName, actualListener.Name)
 				}
 			}
 		})
@@ -300,16 +514,19 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
 		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
-		mockNameHelper := utils.NewMockNameHelper(t)
+
+		// Create real name helper
+		realNameHelper := utils.NewNameHelper(
+			"test-cluster-id",
+			"service",
+			"default",
+			"test-service",
+		)
 
 		// Set up mock expectations
 		mockEndpointResolver.EXPECT().
 			ResolveNodePortEndpoints(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("endpoint resolution error"))
-		
-		// Set up name helper expectations
-		mockNameHelper.EXPECT().GenL4PoolName(mock.Anything, mock.Anything).Return("test-pool").Maybe()
-		mockNameHelper.EXPECT().GenL4ListenerName(mock.Anything).Return("test-listener").Maybe()
 
 		// Create service with instance target type
 		service := &corev1.Service{
@@ -344,7 +561,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 			service:          service,
 			vlbConfig:        vlbc,
 			annotationParser: mockAnnotationParser,
-			nameHelper:       mockNameHelper,
+			nameHelper:       realNameHelper,
 			endpointResolver: mockEndpointResolver,
 		}
 
@@ -360,16 +577,19 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
 		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
-		mockNameHelper := utils.NewMockNameHelper(t)
+
+		// Create real name helper
+		realNameHelper := utils.NewNameHelper(
+			"test-cluster-id",
+			"service",
+			"default",
+			"test-service",
+		)
 
 		// Set up mock expectations
 		mockEndpointResolver.EXPECT().
 			ResolvePodEndpoints(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("endpoint resolution error"))
-		
-		// Set up name helper expectations
-		mockNameHelper.EXPECT().GenL4PoolName(mock.Anything, mock.Anything).Return("test-pool").Maybe()
-		mockNameHelper.EXPECT().GenL4ListenerName(mock.Anything).Return("test-listener").Maybe()
 
 		// Create service with IP target type
 		service := &corev1.Service{
@@ -404,7 +624,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 			service:          service,
 			vlbConfig:        vlbc,
 			annotationParser: mockAnnotationParser,
-			nameHelper:       mockNameHelper,
+			nameHelper:       realNameHelper,
 			endpointResolver: mockEndpointResolver,
 		}
 
@@ -496,10 +716,10 @@ func TestGetTargetType(t *testing.T) {
 
 func TestBuildHealthcheckPort(t *testing.T) {
 	tests := []struct {
-		name              string
-		service           *corev1.Service
-		expectedPort      *int
-		expectParseError  bool
+		name             string
+		service          *corev1.Service
+		expectedPort     *int
+		expectParseError bool
 	}{
 		{
 			name: "No health check port annotation",
@@ -596,9 +816,9 @@ func TestBuildHealthcheckPort(t *testing.T) {
 
 func TestBuildPoolAlgorithm(t *testing.T) {
 	tests := []struct {
-		name                 string
-		service              *corev1.Service
-		expectedAlgorithm    *loadbalancerv2.PoolAlgorithm
+		name              string
+		service           *corev1.Service
+		expectedAlgorithm *loadbalancerv2.PoolAlgorithm
 	}{
 		{
 			name: "No pool algorithm annotation",
@@ -695,9 +915,9 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 
 func TestBuildIdleTimeoutClient(t *testing.T) {
 	tests := []struct {
-		name              string
-		service           *corev1.Service
-		expectedTimeout   *int32
+		name            string
+		service         *corev1.Service
+		expectedTimeout *int32
 	}{
 		{
 			name: "No idle timeout client annotation",
@@ -768,9 +988,9 @@ func TestBuildIdleTimeoutClient(t *testing.T) {
 
 func TestBuildIdleTimeoutMember(t *testing.T) {
 	tests := []struct {
-		name              string
-		service           *corev1.Service
-		expectedTimeout   *int32
+		name            string
+		service         *corev1.Service
+		expectedTimeout *int32
 	}{
 		{
 			name: "No idle timeout member annotation",
@@ -841,9 +1061,9 @@ func TestBuildIdleTimeoutMember(t *testing.T) {
 
 func TestBuildIdleTimeoutConnection(t *testing.T) {
 	tests := []struct {
-		name              string
-		service           *corev1.Service
-		expectedTimeout   *int32
+		name            string
+		service         *corev1.Service
+		expectedTimeout *int32
 	}{
 		{
 			name: "No idle timeout connection annotation",
@@ -914,9 +1134,9 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 
 func TestBuildInboundCIDRs(t *testing.T) {
 	tests := []struct {
-		name           string
-		service        *corev1.Service
-		expectedCIDRs  *string
+		name          string
+		service       *corev1.Service
+		expectedCIDRs *string
 	}{
 		{
 			name: "No inbound CIDRs annotation",
@@ -981,6 +1201,105 @@ func TestBuildInboundCIDRs(t *testing.T) {
 
 			// Assert
 			assert.Equal(t, tt.expectedCIDRs, result)
+		})
+	}
+}
+
+func TestBuildEnableProxyProtocol(t *testing.T) {
+	tests := []struct {
+		name                  string
+		service               *corev1.Service
+		expectedProxyProtocol []string
+	}{
+		{
+			name: "No enable proxy protocol annotation",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-service",
+					Namespace:   "default",
+					Annotations: map[string]string{},
+				},
+			},
+			expectedProxyProtocol: nil,
+		},
+		{
+			name: "Single port name in proxy protocol annotation",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
+					},
+				},
+			},
+			expectedProxyProtocol: []string{"http"},
+		},
+		{
+			name: "Multiple port names in proxy protocol annotation",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http,https",
+					},
+				},
+			},
+			expectedProxyProtocol: []string{"http", "https"},
+		},
+		{
+			name: "Wildcard proxy protocol annotation",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+					},
+				},
+			},
+			expectedProxyProtocol: []string{"*"},
+		},
+		{
+			name: "Mix of wildcard and specific port names",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+					Annotations: map[string]string{
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*,http,https",
+					},
+				},
+			},
+			expectedProxyProtocol: []string{"*", "http", "https"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mocks
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+
+			// Create VLBC config
+			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
+				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+					TargetNodeLabels: map[string]string{},
+				},
+			}
+
+			// Create the task
+			task := &defaultModelBuildTask{
+				service:          tt.service,
+				vlbConfig:        vlbc,
+				annotationParser: mockAnnotationParser,
+			}
+
+			// Call the function
+			result := task.buildEnableProxyProtocol(context.Background())
+
+			// Assert
+			assert.Equal(t, tt.expectedProxyProtocol, result)
 		})
 	}
 }

@@ -118,6 +118,16 @@ func (m *VngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 	return nil
 }
 
+func (r *VngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
+	logger := contexts.NewContext(ctx).Log()
+	lb, sdkErr := r.client.VLBGateway().V2().LoadBalancerService().GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID).AddUserAgent(r.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetLoadBalancerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return lb, nil
+}
+
 func (r *VngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	return nil, nil
 }

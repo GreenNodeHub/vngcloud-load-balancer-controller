@@ -353,10 +353,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	LoadBalancerID *string `json:"loadBalancerID,omitempty"`
 
-	// Ignore tells the controller to ignore this resource
-	// +optional
-	Ignore *bool `json:"ignore,omitempty"`
-
 	// IdleTimeoutClient is the idle timeout for client connections
 	// +optional
 	IdleTimeoutClient *int32 `json:"idleTimeoutClient,omitempty"`

@@ -3,6 +3,7 @@ package service_uc
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +28,9 @@ func (t *defaultModelBuildTask) buildIsAutoCreateSecGroup(_ context.Context) (is
 	return false, option
 }
 
-func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Context) ([]v1alpha1.SecurityGroupRule, error) {
+// buildDefaultSecurityGroupRule builds default security group rules
+// based on the service ports and resolved member addresses.
+func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Context, subnetCidr string) ([]v1alpha1.SecurityGroupRule, error) {
 	secgroupRules := make([]v1alpha1.SecurityGroupRule, 0)
 	resolveOpts := []utils.EndpointResolveOption{
 		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(t.vlbConfig.Spec.TargetNodeLabels))),
@@ -52,13 +55,20 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 				if err != nil {
 					return nil, err
 				}
+				allSubnetCidrs, err := t.getAllSubnetCidrs(ctx)
+				if err != nil {
+					return nil, err
+				}
 				for _, podPort := range podPorts {
-					secgroupRules = append(secgroupRules, v1alpha1.SecurityGroupRule{
-						Protocol: t.coreProtocolToSecgroupProtocol(port.Protocol),
-						FromPort: int32(podPort),
-						ToPort:   int32(podPort),
-						// CIDR:     t.AllSubnetCIDRs, // TODO: need to get network CIDRs or all subnet CIDRs
-					})
+					for _, cidr := range allSubnetCidrs {
+						secgroupRules = append(secgroupRules, v1alpha1.SecurityGroupRule{
+							Protocol:    t.coreProtocolToSecgroupProtocol(port.Protocol),
+							FromPort:    int32(podPort),
+							ToPort:      int32(podPort),
+							CIDR:        cidr,
+							Description: ptr.To("Allow other node access pod's port"), // TODO: improve description
+						})
+					}
 				}
 			}
 		} else {
@@ -75,7 +85,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 				Protocol: t.coreProtocolToSecgroupProtocol(port.Protocol),
 				FromPort: int32(*healthCheckPort),
 				ToPort:   int32(*healthCheckPort),
-				CIDR:     t.subnetCIDR,
+				CIDR:     subnetCidr,
 			})
 		}
 
@@ -86,7 +96,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 				Protocol: t.coreProtocolToSecgroupProtocol(port.Protocol),
 				FromPort: int32(member.Port),
 				ToPort:   int32(member.Port),
-				CIDR:     t.subnetCIDR,
+				CIDR:     subnetCidr,
 			})
 		}
 	}
@@ -148,7 +158,35 @@ func (t *defaultModelBuildTask) coreProtocolToSecgroupProtocol(protocol corev1.P
 	}
 }
 
-// func (t *defaultModelBuildTask) build
+func (t *defaultModelBuildTask) getAllSubnetCidrs(ctx context.Context) ([]string, error) {
+	subnetCidrs := make([]string, 0)
+
+	nodes := &corev1.NodeList{}
+	err := t.k8sRepo.ListNode(ctx, nodes)
+	if err != nil {
+		t.logger.Errorf("failed to list nodes: %v", err)
+		return nil, err
+	}
+
+	providerIds := utils.GetListProviderIdFromNodeList(nodes)
+	for _, providerId := range providerIds {
+		_, _, _, cidr, err := t.vngcloudRepo.GetServerNetworkInfo(ctx, providerId)
+		if err != nil {
+			t.logger.Errorf("failed to get server network info for providerId %s: %v", providerId, err)
+			return nil, err
+		}
+		if cidr == "" {
+			continue
+		}
+		if slices.Contains(subnetCidrs, cidr) {
+			continue
+		}
+		subnetCidrs = append(subnetCidrs, cidr)
+	}
+
+	return subnetCidrs, nil
+}
+
 // func (t *defaultModelBuildTask) build
 // func (t *defaultModelBuildTask) build
 // func (t *defaultModelBuildTask) build

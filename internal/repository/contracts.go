@@ -13,10 +13,15 @@ import (
 )
 
 type IVngCloudRepository interface {
+	// Load Balancer
+	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 	CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, lbID string) error
 
+	// Subnet
 	GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error)
+
+	// Server
 	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkId, subnetID, subnetCIDR string, err error)
 }
 
@@ -32,4 +37,5 @@ type IK8sRepository interface {
 	DeleteVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig) error
 	PatchVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error
 	UpdateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.UpdateOption) error
+	PatchMutateStatusVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig)) error
 }

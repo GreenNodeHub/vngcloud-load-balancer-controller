@@ -127,8 +127,8 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "instance",
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort:                                     "8080",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -299,17 +299,17 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 
 			// Create the task
 			task := &defaultModelBuildTask{
-				service:          tt.service,
-				vlbConfig:        vlbc,
-				annotationParser: mockAnnotationParser,
-				nameHelper:       mockNameHelper,
-				cniMode:          tt.cniMode,
-				endpointResolver: mockEndpointResolver,
-				subnetCIDR:       "192.168.1.0/24",
+				service:           tt.service,
+				vlbConfig:         vlbc,
+				annotationParser:  mockAnnotationParser,
+				nameHelper:        mockNameHelper,
+				cniMode:           tt.cniMode,
+				endpointResolver:  mockEndpointResolver,
+				defaultSubnetCIDR: "192.168.1.0/24",
 			}
 
 			// Call the function
-			result, err := task.buildDefaultSecurityGroupRule(context.Background())
+			result, err := task.buildDefaultSecurityGroupRule(context.Background(), task.defaultSubnetCIDR)
 
 			// Assert
 			if tt.expectError {
@@ -560,17 +560,17 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 
 		// Create the task
 		task := &defaultModelBuildTask{
-			service:          service,
-			vlbConfig:        vlbc,
-			annotationParser: mockAnnotationParser,
-			nameHelper:       mockNameHelper,
-			cniMode:          utils.CalicoOverlay,
-			endpointResolver: mockEndpointResolver,
-			subnetCIDR:       "192.168.1.0/24",
+			service:           service,
+			vlbConfig:         vlbc,
+			annotationParser:  mockAnnotationParser,
+			nameHelper:        mockNameHelper,
+			cniMode:           utils.CalicoOverlay,
+			endpointResolver:  mockEndpointResolver,
+			defaultSubnetCIDR: "192.168.1.0/24",
 		}
 
 		// Call the function
-		result, err := task.buildDefaultSecurityGroupRule(context.Background())
+		result, err := task.buildDefaultSecurityGroupRule(context.Background(), task.defaultSubnetCIDR)
 
 		// Assert
 		assert.Error(t, err)
@@ -619,17 +619,17 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 
 		// Create the task
 		task := &defaultModelBuildTask{
-			service:          service,
-			vlbConfig:        vlbc,
-			annotationParser: mockAnnotationParser,
-			nameHelper:       mockNameHelper,
-			cniMode:          utils.CalicoOverlay,
-			endpointResolver: mockEndpointResolver,
-			subnetCIDR:       "192.168.1.0/24",
+			service:           service,
+			vlbConfig:         vlbc,
+			annotationParser:  mockAnnotationParser,
+			nameHelper:        mockNameHelper,
+			cniMode:           utils.CalicoOverlay,
+			endpointResolver:  mockEndpointResolver,
+			defaultSubnetCIDR: "192.168.1.0/24",
 		}
 
 		// Call the function
-		result, err := task.buildDefaultSecurityGroupRule(context.Background())
+		result, err := task.buildDefaultSecurityGroupRule(context.Background(), task.defaultSubnetCIDR)
 
 		// Assert
 		assert.Error(t, err)
@@ -653,7 +653,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 					Name: "node-1",
 				},
 			}, nil)
-		
+
 		mockEndpointResolver.EXPECT().
 			GetListTargetPort(mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("failed to get target ports"))
@@ -688,17 +688,17 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 
 		// Create the task
 		task := &defaultModelBuildTask{
-			service:          service,
-			vlbConfig:        vlbc,
-			annotationParser: mockAnnotationParser,
-			nameHelper:       mockNameHelper,
-			cniMode:          utils.CiliumNativeRouting,
-			endpointResolver: mockEndpointResolver,
-			subnetCIDR:       "192.168.1.0/24",
+			service:           service,
+			vlbConfig:         vlbc,
+			annotationParser:  mockAnnotationParser,
+			nameHelper:        mockNameHelper,
+			cniMode:           utils.CiliumNativeRouting,
+			endpointResolver:  mockEndpointResolver,
+			defaultSubnetCIDR: "192.168.1.0/24",
 		}
 
 		// Call the function
-		result, err := task.buildDefaultSecurityGroupRule(context.Background())
+		result, err := task.buildDefaultSecurityGroupRule(context.Background(), task.defaultSubnetCIDR)
 
 		// Assert
 		assert.Error(t, err)

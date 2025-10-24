@@ -895,7 +895,7 @@ func (r *ServiceReconciler) Init(client client.Client) error {
 	}
 
 	// init cni mode
-	r.cniMode, err = utils.NewDetector(client).DetectCNIType()
+	r.cniMode, err = utils.NewDetector(client).DetectCNIType(context.TODO())
 	if err != nil {
 		logrus.Error("Failed to detect CNI type: ", err)
 		return err

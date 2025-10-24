@@ -41,8 +41,8 @@ func (_m *MockCniDetector) EXPECT() *MockCniDetector_Expecter {
 }
 
 // DetectCNIType provides a mock function for the type MockCniDetector
-func (_mock *MockCniDetector) DetectCNIType() (CNIType, error) {
-	ret := _mock.Called()
+func (_mock *MockCniDetector) DetectCNIType(ctx context.Context) (CNIType, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DetectCNIType")
@@ -50,16 +50,16 @@ func (_mock *MockCniDetector) DetectCNIType() (CNIType, error) {
 
 	var r0 CNIType
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (CNIType, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (CNIType, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() CNIType); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) CNIType); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		r0 = ret.Get(0).(CNIType)
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -72,13 +72,20 @@ type MockCniDetector_DetectCNIType_Call struct {
 }
 
 // DetectCNIType is a helper method to define mock.On call
-func (_e *MockCniDetector_Expecter) DetectCNIType() *MockCniDetector_DetectCNIType_Call {
-	return &MockCniDetector_DetectCNIType_Call{Call: _e.mock.On("DetectCNIType")}
+//   - ctx context.Context
+func (_e *MockCniDetector_Expecter) DetectCNIType(ctx interface{}) *MockCniDetector_DetectCNIType_Call {
+	return &MockCniDetector_DetectCNIType_Call{Call: _e.mock.On("DetectCNIType", ctx)}
 }
 
-func (_c *MockCniDetector_DetectCNIType_Call) Run(run func()) *MockCniDetector_DetectCNIType_Call {
+func (_c *MockCniDetector_DetectCNIType_Call) Run(run func(ctx context.Context)) *MockCniDetector_DetectCNIType_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -88,7 +95,7 @@ func (_c *MockCniDetector_DetectCNIType_Call) Return(cNIType CNIType, err error)
 	return _c
 }
 
-func (_c *MockCniDetector_DetectCNIType_Call) RunAndReturn(run func() (CNIType, error)) *MockCniDetector_DetectCNIType_Call {
+func (_c *MockCniDetector_DetectCNIType_Call) RunAndReturn(run func(ctx context.Context) (CNIType, error)) *MockCniDetector_DetectCNIType_Call {
 	_c.Call.Return(run)
 	return _c
 }

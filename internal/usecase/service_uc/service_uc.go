@@ -73,7 +73,7 @@ func (uc *ServiceUseCase) Init(ctx context.Context) error {
 
 	// check if network info is available
 	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
-		providerIds := utils.GetListProviderIdFromNodeList(nodes)
+		providerIds := utils.GetListProviderIdFromNodeList(nodes) // TODO do we need get all provider ids?
 		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerIds[0])
 		if err != nil {
 			logger.Errorf("failed to get default network info: %v", err)
@@ -102,7 +102,7 @@ func (uc *ServiceUseCase) Init(ctx context.Context) error {
 	}
 
 	// init cni mode
-	uc.cniMode, err = uc.cniDetector.DetectCNIType()
+	uc.cniMode, err = uc.cniDetector.DetectCNIType(ctx)
 	if err != nil {
 		logger.Errorf("failed to detect CNI type: %v", err)
 		return err
@@ -165,6 +165,7 @@ func (uc *ServiceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 		annotationParser: uc.annotationParser,
 		serviceUtils:     uc.serviceUtils,
 
+		logger:           logger,
 		service:          svc,
 		vlbConfig:        vlbc,
 		vngcloudRepo:     uc.vngcloudRepo,
@@ -173,10 +174,10 @@ func (uc *ServiceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 		cniMode:          uc.cniMode,
 		endpointResolver: uc.endpointResolver,
 
-		networkId:  uc.defaultNetworkId,
-		subnetId:   uc.defaultSubnetId,
-		subnetCIDR: uc.defaultSubnetCIDR,
-		zone:       uc.defaultZone,
+		defaultZone:       uc.defaultZone,
+		defaultNetworkId:  uc.defaultNetworkId,
+		defaultSubnetId:   uc.defaultSubnetId,
+		defaultSubnetCIDR: uc.defaultSubnetCIDR,
 	}
 
 	if err := task.run(ctx); err != nil {
@@ -190,8 +191,6 @@ func (uc *ServiceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 			return err
 		}
 	} else {
-		logger.Debug("name: ", task.vlbConfig.Spec.LoadBalancerName)
-		logger.Debug("subnet: ", task.vlbConfig.Spec.SubnetID)
 		err = uc.k8sRepo.PatchVLBC(ctx, task.vlbConfig, client.MergeFrom(oldVLBConfig))
 		if err != nil {
 			logger.Errorf("failed to patch VLBC: %v", err)
