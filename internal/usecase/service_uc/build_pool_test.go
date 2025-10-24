@@ -474,7 +474,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 			}
 
 			// Call the function
-			err := task.buildPoolsAndListeners(context.Background())
+			pools, listeners, err := task.buildPoolsAndListeners(context.Background(), map[string]string{})
 
 			// Assert
 			if tt.expectError {
@@ -483,9 +483,9 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Check pools
-				assert.Equal(t, len(tt.expectedPools), len(task.vlbConfig.Spec.Pools))
+				assert.Equal(t, len(tt.expectedPools), len(pools))
 				for i, expectedPool := range tt.expectedPools {
-					actualPool := task.vlbConfig.Spec.Pools[i]
+					actualPool := pools[i]
 					assert.Equal(t, expectedPool.Protocol, actualPool.Protocol)
 					assert.ElementsMatch(t, expectedPool.Members, actualPool.Members)
 					// For real name helper, verify full generated pool name matches expected format
@@ -494,9 +494,9 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 				}
 
 				// Check listeners
-				assert.Equal(t, len(tt.expectedListeners), len(task.vlbConfig.Spec.Listeners))
+				assert.Equal(t, len(tt.expectedListeners), len(listeners))
 				for i, expectedListener := range tt.expectedListeners {
-					actualListener := task.vlbConfig.Spec.Listeners[i]
+					actualListener := listeners[i]
 					assert.Equal(t, expectedListener.Protocol, actualListener.Protocol)
 					assert.Equal(t, expectedListener.ProtocolPort, actualListener.ProtocolPort)
 					// For real name helper, verify full generated listener name matches expected
@@ -566,7 +566,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 		}
 
 		// Call the function
-		err := task.buildPoolsAndListeners(context.Background())
+		_, _, err := task.buildPoolsAndListeners(context.Background(), map[string]string{})
 
 		// Assert
 		assert.Error(t, err)
@@ -629,7 +629,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 		}
 
 		// Call the function
-		err := task.buildPoolsAndListeners(context.Background())
+		_, _, err := task.buildPoolsAndListeners(context.Background(), map[string]string{})
 
 		// Assert
 		assert.Error(t, err)

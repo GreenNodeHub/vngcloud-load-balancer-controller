@@ -15,17 +15,17 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
-func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) error {
+func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targetNodeLabels map[string]string) ([]v1alpha1.Pool, []v1alpha1.Listener, error) {
 	allPools := make([]v1alpha1.Pool, 0)
 	allListeners := make([]v1alpha1.Listener, 0)
 
 	ports := t.service.Spec.Ports
 	if len(ports) <= 0 {
-		return nil
+		return nil, nil, nil
 	}
 
 	resolveOpts := []utils.EndpointResolveOption{
-		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(t.vlbConfig.Spec.TargetNodeLabels))),
+		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(targetNodeLabels))),
 	}
 	defaultPoolAlgorithm := t.buildPoolAlgorithm(ctx)
 	defaultHealthcheckPort := t.buildHealthcheckPort(ctx)
@@ -45,14 +45,14 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
 				t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-				return err
+				return nil, nil, err
 			}
 		} else {
 			membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
 				t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-				return err
+				return nil, nil, err
 			}
 		}
 
@@ -99,9 +99,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context) erro
 		allListeners = append(allListeners, newListener)
 	}
 
-	t.vlbConfig.Spec.Pools = allPools
-	t.vlbConfig.Spec.Listeners = allListeners
-	return nil
+	return allPools, allListeners, nil
 }
 
 func (t *defaultModelBuildTask) getTargetType(_ context.Context) string {

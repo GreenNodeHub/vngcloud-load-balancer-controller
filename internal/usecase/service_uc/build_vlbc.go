@@ -91,8 +91,11 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 		t.vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
 	}
 
-	if err := t.buildPoolsAndListeners(ctx); err != nil {
+	if pools, listeners, err := t.buildPoolsAndListeners(ctx, t.vlbConfig.Spec.TargetNodeLabels); err != nil {
 		return err
+	} else {
+		t.vlbConfig.Spec.Pools = pools
+		t.vlbConfig.Spec.Listeners = listeners
 	}
 	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
 		t.vlbConfig.Spec.AutoManageSecurityGroupRules = nil
