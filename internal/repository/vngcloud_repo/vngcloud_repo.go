@@ -46,7 +46,7 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 	if cfg == nil {
 		return nil, errors.New("config is nil")
 	}
-	vngcloudRepo := &VngCloudRepository{
+	vngcloudRepo := &vngCloudRepository{
 		cfg: cfg,
 	}
 
@@ -75,7 +75,7 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 	return vngcloudRepo, nil
 }
 
-type VngCloudRepository struct {
+type vngCloudRepository struct {
 	cfg       *config.Config
 	client    client.IClient
 	userAgent string
@@ -95,7 +95,7 @@ type VngCloudRepository struct {
 	// cacheSubnetIDToZoneID     sync.Map // map[string]common.Zone
 }
 
-func (m *VngCloudRepository) setupProjectId(ctx context.Context, pmetadataService metadata.IMetadata) error {
+func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataService metadata.IMetadata) error {
 	if m.cfg != nil && m.cfg.Global.ProjectID != "" {
 		m.projectId = m.cfg.Global.ProjectID
 		return nil
@@ -134,7 +134,7 @@ func (m *VngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 
 // --------------------------- Load Balancer ---------------------------
 
-func (m *VngCloudRepository) ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error) {
+func (m *vngCloudRepository) ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error) {
 	logger := contexts.NewContext(ctx).Log()
 	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
@@ -143,7 +143,7 @@ func (m *VngCloudRepository) ListLoadBalancers(ctx context.Context, tags []strin
 	}
 	return lbs, nil
 }
-func (m *VngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
+func (m *vngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
 	lb, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
@@ -153,7 +153,7 @@ func (m *VngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID strin
 	return lb, nil
 }
 
-func (m *VngCloudRepository) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
+func (m *vngCloudRepository) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
 	allLBs, err := m.ListLoadBalancers(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (m *VngCloudRepository) GetLoadBalancerByName(ctx context.Context, name str
 	return nil, nil
 }
 
-func (m *VngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
+func (m *vngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create load balancer.", icon)
 	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
@@ -176,7 +176,7 @@ func (m *VngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions l
 	}
 	return newLB, nil
 }
-func (m *VngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string) error {
+func (m *vngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete load balancer %s", icon, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
@@ -186,7 +186,7 @@ func (m *VngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string
 	}
 	return nil
 }
-func (m *VngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
+func (m *vngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request resize load balancer %s to package %s", icon, lbID, packageID)
 
@@ -198,7 +198,7 @@ func (m *VngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packa
 	}
 	return nil
 }
-func (m *VngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
+func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Waiting for load balancer %s to be ready", waitIcon, lbID)
 	var resultLb *entityv2.LoadBalancer
@@ -238,7 +238,7 @@ func (m *VngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (
 
 ////////////////////////////////////////////////////////////////////////
 
-func (r *VngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
+func (r *vngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
 	logger := contexts.NewContext(ctx).Log()
 	subnet, sdkErr := r.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(r.userAgent))
 	if sdkErr != nil {
@@ -248,7 +248,7 @@ func (r *VngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subne
 	return subnet, nil
 }
 
-func (m *VngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceID string) (zoneID common.Zone, networkID, subnetID, subnetCIDR string, err error) {
+func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceID string) (zoneID common.Zone, networkID, subnetID, subnetCIDR string, err error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	if instanceID == "" {
@@ -282,7 +282,7 @@ func (m *VngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 	return common.Zone(zoneID), networkID, subnetID, subnetCIDR, nil
 }
 
-func (m *VngCloudRepository) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {
+func (m *vngCloudRepository) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	opt := computev2.NewGetServerByIdRequest(serverID)
@@ -294,7 +294,7 @@ func (m *VngCloudRepository) GetServerByID(ctx context.Context, serverID string)
 	return server, nil
 }
 
-func (m *VngCloudRepository) getSubnetCIDR(ctx context.Context, networkId, subnetID string) (string, error) {
+func (m *vngCloudRepository) getSubnetCIDR(ctx context.Context, networkId, subnetID string) (string, error) {
 	subnet, err := m.GetSubnetByID(ctx, networkId, subnetID)
 	if err != nil {
 		return "", err
@@ -307,11 +307,11 @@ func (m *VngCloudRepository) getSubnetCIDR(ctx context.Context, networkId, subne
 
 // --------------------------- Pool ---------------------------
 
-//	func (m *VngCloudRepository) GetPoolByName(ctx context.Context,lbID, name string) (*objects.Pool, error) {
+//	func (m *vngCloudRepository) GetPoolByName(ctx context.Context,lbID, name string) (*objects.Pool, error) {
 //		logger.Error("not implemented yet")
 //		return nil, ErrorNotImplemented
 //	}
-func (m *VngCloudRepository) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
+func (m *vngCloudRepository) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create pool of load balancer %s", icon, lbID)
 	pool, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePool(opt.AddUserAgent(m.userAgent))
@@ -321,7 +321,7 @@ func (m *VngCloudRepository) CreatePool(ctx context.Context, lbID string, opt lo
 	}
 	return pool, nil
 }
-func (m *VngCloudRepository) ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error) {
+func (m *vngCloudRepository) ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListPoolsByLoadBalancerIdRequest(lbID)
 	pools, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolsByLoadBalancerId(opt.AddUserAgent(m.userAgent))
@@ -331,7 +331,7 @@ func (m *VngCloudRepository) ListPool(ctx context.Context, lbID string) (*entity
 	}
 	return pools, nil
 }
-func (m *VngCloudRepository) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
+func (m *vngCloudRepository) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update pool members of pool %s of load balancer %s", icon, poolID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePoolMembers(members.AddUserAgent(m.userAgent))
@@ -342,13 +342,13 @@ func (m *VngCloudRepository) UpdatePoolMembers(ctx context.Context, lbID, poolID
 	return nil
 }
 
-func (m *VngCloudRepository) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {
+func (m *vngCloudRepository) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Error("not implemented yet")
 	return nil, ErrorNotImplemented
 }
 
-func (m *VngCloudRepository) GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error) {
+func (m *vngCloudRepository) GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewListPoolMembersRequest(lbID, poolID)
 	members, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListPoolMembers(opt.AddUserAgent(m.userAgent))
@@ -359,7 +359,7 @@ func (m *VngCloudRepository) GetPoolMembers(ctx context.Context, lbID, poolID st
 	return members, nil
 }
 
-func (m *VngCloudRepository) DeletePool(ctx context.Context, lbID, poolID string) error {
+func (m *vngCloudRepository) DeletePool(ctx context.Context, lbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request delete pool %s of load balancer %s", icon, poolID, lbID)
 	opt := loadbalancerv2.NewDeletePoolByIdRequest(lbID, poolID)
@@ -371,7 +371,7 @@ func (m *VngCloudRepository) DeletePool(ctx context.Context, lbID, poolID string
 	return nil
 }
 
-func (m *VngCloudRepository) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
+func (m *vngCloudRepository) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request update pool %s of load balancer %s", icon, poolID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePool(opt.AddUserAgent(m.userAgent))
@@ -382,7 +382,7 @@ func (m *VngCloudRepository) UpdatePool(ctx context.Context, lbID, poolID string
 	return nil
 }
 
-func (m *VngCloudRepository) GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error) {
+func (m *vngCloudRepository) GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error) {
 	logger := contexts.NewContext(ctx).Log()
 	opt := loadbalancerv2.NewGetPoolHealthMonitorByIdRequest(lbID, poolID)
 	monitor, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetPoolHealthMonitorById(opt.AddUserAgent(m.userAgent))
@@ -391,4 +391,48 @@ func (m *VngCloudRepository) GetPoolHealthMonitorById(ctx context.Context, lbID,
 		return nil, sdkErr.GetError()
 	}
 	return monitor, nil
+}
+
+// --------------------------- Listener ---------------------------
+
+func (m *vngCloudRepository) CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create listener of load balancer %s", icon, lbID)
+	listener, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateListener(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - CreateListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return listener, nil
+}
+func (m *vngCloudRepository) ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error) {
+	logger := contexts.NewContext(ctx).Log()
+	opt := loadbalancerv2.NewListListenersByLoadBalancerIdRequest(lbID)
+	listeners, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListListenersByLoadBalancerId(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListListenerOfLB: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return listeners, nil
+}
+func (m *vngCloudRepository) DeleteListener(ctx context.Context, lbID, listenerID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request delete listener %s of load balancer %s", icon, listenerID, lbID)
+	opt := loadbalancerv2.NewDeleteListenerByIdRequest(lbID, listenerID)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteListenerById(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - DeleteListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
+}
+func (m *vngCloudRepository) UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request update listener %s of load balancer %s", icon, listenerID, lbID)
+	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateListener(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - UpdateListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return sdkErr.GetError()
+	}
+	return nil
 }

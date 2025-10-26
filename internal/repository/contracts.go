@@ -36,6 +36,12 @@ type IVngCloudRepository interface {
 	DeletePool(ctx context.Context, lbID, poolID string) error
 	UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error
 	GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error)
+
+	// Listener
+	CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error)
+	ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error)
+	DeleteListener(ctx context.Context, lbID, listenerID string) error
+	UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error
 }
 
 type IK8sRepository interface {
