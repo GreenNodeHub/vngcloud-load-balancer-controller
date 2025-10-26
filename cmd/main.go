@@ -56,11 +56,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -240,14 +242,14 @@ func main() {
 		setupLog.Error(err, "unable to create VngCloud repository")
 		os.Exit(1)
 	}
-	annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
-	cniDetector := utils.NewDetector(mgr.GetClient())
-	endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
-	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
-	serviceUseCase := service_uc.NewServiceUseCase(
-		conf, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 
 	if !disableServiceController {
+		annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+		cniDetector := utils.NewDetector(mgr.GetClient())
+		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
+		serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
+		serviceUseCase := service_uc.NewServiceUseCase(
+			conf, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 		reconciler := corecontroller.NewServiceReconciler(
 			serviceUseCase,
 			mgr.GetClient(),
@@ -263,8 +265,19 @@ func main() {
 	}
 
 	if !disableVLBConfigController {
-		reconciler := controller.NewVngcloudLoadBalancerConfigReconciler()
-		if err = reconciler.SetupWithManager(mgr); err != nil {
+		vlbcUtils := vlbc.NewVLBCUtils(consts.VLBCFinalizer)
+		vlbcUseCase := vlbc_uc.NewVLBCUseCase(
+			conf, k8sRepo, vngcloudRepo,
+		)
+		reconciler := controller.NewVngcloudLoadBalancerConfigReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			vlbcUseCase,
+			mgr.GetEventRecorderFor("vngcloud-load-balancer-config-controller"),
+			finalizerManager,
+			vlbcUtils,
+		)
+		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "VngcloudLoadBalancerConfig")
 			os.Exit(1)
 		}

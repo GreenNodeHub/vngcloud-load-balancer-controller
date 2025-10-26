@@ -20,7 +20,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
-type ServiceUseCase struct {
+type serviceUseCase struct {
 	cfg              *config.Config
 	k8sRepo          repository.IK8sRepository
 	vngcloudRepo     repository.IVngCloudRepository
@@ -49,7 +49,7 @@ func NewServiceUseCase(
 	endpointResolver utils.EndpointResolver,
 	// k8sClient client.Client,
 ) usecase.IServiceUseCase {
-	return &ServiceUseCase{
+	return &serviceUseCase{
 		cfg:              cfg,
 		k8sRepo:          k8sRepo,
 		vngcloudRepo:     vngcloudRepo,
@@ -61,7 +61,7 @@ func NewServiceUseCase(
 	}
 }
 
-func (uc *ServiceUseCase) Init(ctx context.Context) error {
+func (uc *serviceUseCase) Init(ctx context.Context) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	nodes := &corev1.NodeList{}
@@ -111,7 +111,7 @@ func (uc *ServiceUseCase) Init(ctx context.Context) error {
 	return nil
 }
 
-func (uc *ServiceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *serviceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	err := uc.ensure(ctx, req)
 	// some errors should not requeue
 	if err != nil {
@@ -124,13 +124,13 @@ func (uc *ServiceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	return err
 }
 
-func (uc *ServiceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+func (uc *serviceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 	return nil
 }
 
 ////////////////////////////////////////////////////////////////
 
-func (uc *ServiceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	svc, err := uc.k8sRepo.GetService(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)

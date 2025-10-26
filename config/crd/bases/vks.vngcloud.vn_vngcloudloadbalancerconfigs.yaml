@@ -125,69 +125,6 @@ spec:
               enableAutoscale:
                 description: EnableAutoscale enables autoscaling for the load balancer
                 type: boolean
-              healthCheck:
-                description: HealthCheck contains health check configuration
-                properties:
-                  healthcheckHttpDomainName:
-                    description: HealthcheckHttpDomainName is the domain name for
-                      HTTP/HTTPS health checks
-                    type: string
-                  healthcheckHttpMethod:
-                    description: HealthcheckHttpMethod is the HTTP method for health
-                      checks
-                    enum:
-                    - GET
-                    - POST
-                    - PUT
-                    type: string
-                  healthcheckHttpVersion:
-                    description: HealthcheckHttpVersion is the HTTP version for health
-                      checks
-                    enum:
-                    - 1
-                    - 1.1
-                    type: string
-                  healthcheckIntervalSeconds:
-                    description: HealthcheckIntervalSeconds is the interval between
-                      health checks
-                    format: int32
-                    type: integer
-                  healthcheckPath:
-                    description: HealthcheckPath is the path for HTTP/HTTPS health
-                      checks
-                    type: string
-                  healthcheckPort:
-                    description: HealthcheckPort is the port for health checks
-                    format: int32
-                    type: integer
-                  healthcheckProtocol:
-                    description: HealthcheckProtocol is the protocol for health checks
-                    enum:
-                    - TCP
-                    - HTTP
-                    - HTTPS
-                    type: string
-                  healthcheckTimeoutSeconds:
-                    description: HealthcheckTimeoutSeconds is the timeout for health
-                      checks
-                    format: int32
-                    type: integer
-                  healthyThresholdCount:
-                    description: HealthyThresholdCount is the number of successful
-                      checks before considering healthy
-                    format: int32
-                    type: integer
-                  successCodes:
-                    description: |-
-                      HTTP/HTTPS specific health check fields
-                      SuccessCodes are the success codes for HTTP/HTTPS health checks
-                    type: string
-                  unhealthyThresholdCount:
-                    description: UnhealthyThresholdCount is the number of failed checks
-                      before considering unhealthy
-                    format: int32
-                    type: integer
-                type: object
               idleTimeoutClient:
                 description: IdleTimeoutClient is the idle timeout for client connections
                 format: int32
@@ -429,6 +366,52 @@ spec:
                       description: Description is an optional description for the
                         pool
                       type: string
+                    healthMonitor:
+                      description: HealthMonitor defines the health monitor configuration
+                        for the pool
+                      properties:
+                        domainName:
+                          description: DomainName is the hostname sent in the HTTP
+                            Host header
+                          type: string
+                        healthCheckMethod:
+                          description: HealthCheckMethod specifies how the health
+                            check request is made (e.g., GET, TCP)
+                          type: string
+                        healthCheckPath:
+                          description: HealthCheckPath is the path used for HTTP health
+                            checks
+                          type: string
+                        healthyThreshold:
+                          description: HealthyThreshold is the number of consecutive
+                            successful checks before marking healthy
+                          type: integer
+                        httpVersion:
+                          description: HttpVersion defines which HTTP version to use
+                            for HTTP-based health checks
+                          type: string
+                        interval:
+                          description: Interval is the time in seconds between each
+                            health check
+                          type: integer
+                        protocol:
+                          description: Protocol is the protocol used for health checks
+                          type: string
+                        successCode:
+                          description: SuccessCode specifies which HTTP codes indicate
+                            a healthy response
+                          type: string
+                        timeout:
+                          description: Timeout is the maximum time in seconds to wait
+                            for a response
+                          type: integer
+                        unhealthyThreshold:
+                          description: UnhealthyThreshold is the number of consecutive
+                            failed checks before marking unhealthy
+                          type: integer
+                      required:
+                      - protocol
+                      type: object
                     members:
                       description: Members is the list of members in the pool
                       items:
@@ -457,6 +440,7 @@ spec:
                             type: integer
                         required:
                         - ip
+                        - monitorPort
                         - port
                         type: object
                       type: array
@@ -531,10 +515,6 @@ spec:
                 description: LoadBalancerID is the actual ID of the load balancer
                   in VNG Cloud
                 type: string
-              loadBalancerName:
-                description: LoadBalancerName is the actual name of the load balancer
-                  in VNG Cloud
-                type: string
               manageDFPMembers:
                 description: ManageDFPMembers indicates if the controller should manage
                   DFP members
@@ -559,6 +539,11 @@ spec:
               reason:
                 description: Reason provides a brief reason for the current state
                 type: string
+              tags:
+                additionalProperties:
+                  type: string
+                description: Tags are key-value pairs for load balancer tagging
+                type: object
               updatedAt:
                 description: UpdatedAt is the timestamp when the load balancer was
                   last updated

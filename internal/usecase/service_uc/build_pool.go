@@ -62,20 +62,30 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 			poolMember := v1alpha1.PoolMember{
 				IP:          member.IP,
 				Port:        member.Port,
-				MonitorPort: &(member.Port), // default monitor port = member port, can be override by annotation
+				MonitorPort: member.Port, // default monitor port = member port, can be override by annotation
 				Name:        member.Name,
 			}
 			if defaultHealthcheckPort != nil {
-				poolMember.MonitorPort = defaultHealthcheckPort
+				poolMember.MonitorPort = *defaultHealthcheckPort
 			}
 			poolMembers = append(poolMembers, poolMember)
 		}
 
+		// build healthcheck
+		healthMonitor := v1alpha1.PoolHealthMonitor{
+			Protocol:           t.buildPoolHealthCheckProtocol(ctx, port.Protocol),
+			HealthyThreshold:   t.buildPoolHealthyThresholdCount(ctx),
+			UnhealthyThreshold: t.buildPoolUnhealthyThresholdCount(ctx),
+			Interval:           t.buildPoolHealthcheckIntervalSeconds(ctx),
+			Timeout:            t.buildPoolHealthcheckTimeoutSeconds(ctx),
+		}
+
 		newPool := v1alpha1.Pool{
-			Name:      t.nameHelper.GenL4PoolName(port, string(port.Protocol)),
-			Protocol:  loadbalancerv2.PoolProtocol(port.Protocol),
-			Members:   poolMembers,
-			Algorithm: defaultPoolAlgorithm,
+			Name:          t.nameHelper.GenL4PoolName(port, string(port.Protocol)),
+			Protocol:      loadbalancerv2.PoolProtocol(port.Protocol),
+			Members:       poolMembers,
+			Algorithm:     defaultPoolAlgorithm,
+			HealthMonitor: healthMonitor,
 		}
 		for _, name := range defaultEnableProxyProtocol {
 			if (name == "*" || name == port.Name) && port.Protocol == corev1.ProtocolTCP {
@@ -213,5 +223,84 @@ func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []st
 	return option
 }
 
-// func (t *defaultModelBuildTask) build
+func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(ctx context.Context, pPoolProtocol corev1.Protocol) loadbalancerv2.HealthCheckProtocol {
+	switch pPoolProtocol {
+	case corev1.ProtocolUDP:
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	option := ""
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckProtocol, &option, t.service.Annotations)
+	if !exist {
+		return loadbalancerv2.HealthCheckProtocolTCP
+	}
+
+	switch strings.TrimSpace(strings.ToUpper(option)) {
+	case string(loadbalancerv2.HealthCheckProtocolHTTP):
+		return loadbalancerv2.HealthCheckProtocolHTTP
+	case string(loadbalancerv2.HealthCheckProtocolHTTPs):
+		return loadbalancerv2.HealthCheckProtocolHTTPs
+	case string(loadbalancerv2.HealthCheckProtocolPINGUDP):
+		return loadbalancerv2.HealthCheckProtocolPINGUDP
+	}
+
+	return loadbalancerv2.HealthCheckProtocolTCP
+}
+
+func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context) *int {
+	optionsInt64 := int64(0)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthyThresholdCount, &optionsInt64, t.service.Annotations)
+	if !exists {
+		return nil
+	}
+	if err != nil {
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixHealthyThresholdCount)
+		return nil
+	}
+	return ptr.To(int(optionsInt64))
+}
+
+func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Context) *int {
+	optionsInt64 := int64(0)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixUnhealthyThresholdCount, &optionsInt64, t.service.Annotations)
+	if !exists {
+		return nil
+	}
+	if err != nil {
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixUnhealthyThresholdCount)
+		return nil
+	}
+	return ptr.To(int(optionsInt64))
+}
+
+func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Context) *int {
+	optionsInt64 := int64(0)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckIntervalSeconds, &optionsInt64, t.service.Annotations)
+	if !exists {
+		return nil
+	}
+	if err != nil {
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixHealthcheckIntervalSeconds)
+		return nil
+	}
+	return ptr.To(int(optionsInt64))
+}
+
+func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Context) *int {
+	optionsInt64 := int64(0)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckTimeoutSeconds, &optionsInt64, t.service.Annotations)
+	if !exists {
+		return nil
+	}
+	if err != nil {
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixHealthcheckTimeoutSeconds)
+		return nil
+	}
+	return ptr.To(int(optionsInt64))
+}
+
 // func (t *defaultModelBuildTask) build

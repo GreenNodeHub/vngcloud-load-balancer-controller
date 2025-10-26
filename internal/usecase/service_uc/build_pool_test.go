@@ -85,13 +85,13 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.0.0.1",
 							Port:        30080,
-							MonitorPort: ptr.To(30080),
+							MonitorPort: 30080,
 							Name:        "node-1",
 						},
 						{
 							IP:          "10.0.0.2",
 							Port:        30080,
-							MonitorPort: ptr.To(30080),
+							MonitorPort: 30080,
 							Name:        "node-2",
 						},
 					},
@@ -147,13 +147,13 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.1.0.1",
 							Port:        5353,
-							MonitorPort: ptr.To(5353),
+							MonitorPort: 5353,
 							Name:        "pod-1",
 						},
 						{
 							IP:          "10.1.0.2",
 							Port:        5353,
-							MonitorPort: ptr.To(5353),
+							MonitorPort: 5353,
 							Name:        "pod-2",
 						},
 					},
@@ -205,7 +205,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.0.0.1",
 							Port:        30080,
-							MonitorPort: ptr.To(8080), // Should use health check port
+							MonitorPort: 8080, // Should use health check port
 							Name:        "node-1",
 						},
 					},
@@ -257,7 +257,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.0.0.1",
 							Port:        30080,
-							MonitorPort: ptr.To(30080),
+							MonitorPort: 30080,
 							Name:        "node-1",
 						},
 					},
@@ -309,7 +309,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.0.0.1",
 							Port:        30080,
-							MonitorPort: ptr.To(30080),
+							MonitorPort: 30080,
 							Name:        "node-1",
 						},
 					},
@@ -361,7 +361,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.1.0.1",
 							Port:        5353,
-							MonitorPort: ptr.To(5353),
+							MonitorPort: 5353,
 							Name:        "pod-1",
 						},
 					},
@@ -413,7 +413,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 						{
 							IP:          "10.0.0.1",
 							Port:        30080,
-							MonitorPort: ptr.To(30080),
+							MonitorPort: 30080,
 							Name:        "node-1",
 						},
 					},

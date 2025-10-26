@@ -33,57 +33,6 @@ type NetworkLoadBalancerConfig struct {
 	EnableProxyProtocol *bool `json:"enableProxyProtocol,omitempty"`
 }
 
-// HealthCheckConfig contains health check configuration
-type HealthCheckConfig struct {
-	// HealthcheckPort is the port for health checks
-	// +optional
-	HealthcheckPort *int32 `json:"healthcheckPort,omitempty"`
-
-	// HealthcheckProtocol is the protocol for health checks
-	// +optional
-	// +kubebuilder:validation:Enum=TCP;HTTP;HTTPS
-	HealthcheckProtocol *loadbalancerv2.HealthCheckProtocol `json:"healthcheckProtocol,omitempty"`
-
-	// HealthcheckIntervalSeconds is the interval between health checks
-	// +optional
-	HealthcheckIntervalSeconds *int32 `json:"healthcheckIntervalSeconds,omitempty"`
-
-	// HealthcheckTimeoutSeconds is the timeout for health checks
-	// +optional
-	HealthcheckTimeoutSeconds *int32 `json:"healthcheckTimeoutSeconds,omitempty"`
-
-	// HealthyThresholdCount is the number of successful checks before considering healthy
-	// +optional
-	HealthyThresholdCount *int32 `json:"healthyThresholdCount,omitempty"`
-
-	// UnhealthyThresholdCount is the number of failed checks before considering unhealthy
-	// +optional
-	UnhealthyThresholdCount *int32 `json:"unhealthyThresholdCount,omitempty"`
-
-	// HTTP/HTTPS specific health check fields
-	// SuccessCodes are the success codes for HTTP/HTTPS health checks
-	// +optional
-	SuccessCodes *string `json:"successCodes,omitempty"`
-
-	// HealthcheckPath is the path for HTTP/HTTPS health checks
-	// +optional
-	HealthcheckPath *string `json:"healthcheckPath,omitempty"`
-
-	// HealthcheckHttpMethod is the HTTP method for health checks
-	// +optional
-	// +kubebuilder:validation:Enum=GET;POST;PUT
-	HealthcheckHttpMethod *loadbalancerv2.HealthCheckMethod `json:"healthcheckHttpMethod,omitempty"`
-
-	// HealthcheckHttpVersion is the HTTP version for health checks
-	// +optional
-	// +kubebuilder:validation:Enum=1.0;1.1
-	HealthcheckHttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"healthcheckHttpVersion,omitempty"`
-
-	// HealthcheckHttpDomainName is the domain name for HTTP/HTTPS health checks
-	// +optional
-	HealthcheckHttpDomainName *string `json:"healthcheckHttpDomainName,omitempty"`
-}
-
 // InsertHeader defines a header to be inserted in requests
 type InsertHeader struct {
 	// HeaderName is the name of the header to insert
@@ -182,13 +131,55 @@ type Pool struct {
 	// +optional
 	TLSEncryption *bool `json:"tlsEncryption,omitempty"`
 
-	// // HealthMonitor defines the health monitor configuration for the pool
-	// // +optional
-	// HealthMonitor *loadbalancerv2.HealthMonitor `json:"healthMonitor,omitempty"`
+	// HealthMonitor defines the health monitor configuration for the pool
+	// +optional
+	HealthMonitor PoolHealthMonitor `json:"healthMonitor,omitempty"`
 
 	// Members is the list of members in the pool
 	// +optional
 	Members []PoolMember `json:"members,omitempty"`
+}
+
+type PoolHealthMonitor struct {
+	// Protocol is the protocol used for health checks
+	// +required
+	Protocol loadbalancerv2.HealthCheckProtocol `json:"protocol"`
+
+	// HealthyThreshold is the number of consecutive successful checks before marking healthy
+	// +optional
+	HealthyThreshold *int `json:"healthyThreshold"`
+
+	// UnhealthyThreshold is the number of consecutive failed checks before marking unhealthy
+	// +optional
+	UnhealthyThreshold *int `json:"unhealthyThreshold"`
+
+	// Interval is the time in seconds between each health check
+	// +optional
+	Interval *int `json:"interval"`
+
+	// Timeout is the maximum time in seconds to wait for a response
+	// +optional
+	Timeout *int `json:"timeout"`
+
+	// HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
+	// +optional
+	HealthCheckMethod *loadbalancerv2.HealthCheckMethod `json:"healthCheckMethod,omitempty"`
+
+	// HttpVersion defines which HTTP version to use for HTTP-based health checks
+	// +optional
+	HttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"httpVersion,omitempty"`
+
+	// HealthCheckPath is the path used for HTTP health checks
+	// +optional
+	HealthCheckPath *string `json:"healthCheckPath,omitempty"`
+
+	// DomainName is the hostname sent in the HTTP Host header
+	// +optional
+	DomainName *string `json:"domainName,omitempty"`
+
+	// SuccessCode specifies which HTTP codes indicate a healthy response
+	// +optional
+	SuccessCode *string `json:"successCode,omitempty"`
 }
 
 // PoolMember defines a member of a load balancer pool
@@ -202,8 +193,8 @@ type PoolMember struct {
 	Port int `json:"port"`
 
 	// MonitorPort is the monitor port of the pool member
-	// +optional
-	MonitorPort *int `json:"monitorPort,omitempty"`
+	// +required
+	MonitorPort int `json:"monitorPort,omitempty"`
 
 	// Name is an optional name for the pool member
 	// +optional
@@ -369,10 +360,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	InboundCIDRs []string `json:"inboundCIDRs,omitempty"`
 
-	// HealthCheck contains health check configuration
-	// +optional
-	HealthCheck *HealthCheckConfig `json:"healthCheck,omitempty"`
-
 	// PoolAlgorithm is the load balancing algorithm
 	// +optional
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
@@ -480,9 +467,9 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerID *string `json:"loadBalancerID,omitempty"`
 
-	// LoadBalancerName is the actual name of the load balancer in VNG Cloud
+	// Tags are key-value pairs for load balancer tagging
 	// +optional
-	LoadBalancerName *string `json:"loadBalancerName,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 
 	// ManagePools indicates if the controller should manage pools
 	// +optional

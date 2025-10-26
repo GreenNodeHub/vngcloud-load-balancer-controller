@@ -18,6 +18,8 @@ type Config struct {
 		Region      string `mapstructure:"region"`      // region of cluster
 	} `mapstructure:"cluster"`
 
+	LoadBalancerOpts LoadBalancerOpts `mapstructure:"loadBalancerOpts"`
+
 	Global   AuthOpts `mapstructure:"global"`
 	Metadata metadata.Opts
 }
@@ -29,6 +31,17 @@ type AuthOpts struct {
 	ClientSecret string `gcfg:"client-secret" mapstructure:"clientSecret" name:"client-secret"`
 	// it should help in dev mode, pass the projectID directly
 	ProjectID string `gcfg:"project-id" mapstructure:"projectID" name:"project-id"`
+}
+
+type LoadBalancerOpts struct {
+	DefaultL4PackageId        string `gcfg:"default-l4-package-id" mapstructure:"defaultL4PackageId" name:"default-l4-package-id"`
+	DefaultL7PackageId        string `gcfg:"default-l7-package-id" mapstructure:"defaultL7PackageId" name:"default-l7-package-id"`
+	DefaultScheme             string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
+	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`
+	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`
+	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"`
+	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`
+	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`
 }
 
 func NewConfig() *Config {

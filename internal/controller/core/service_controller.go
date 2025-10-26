@@ -121,8 +121,6 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 	}
 
 	logger := contexts.NewContext(ctx).Log()
-	logger.Info("------------------ START ------------------")
-	defer logger.Info("------------------ DONE ------------------")
 	key := fmt.Sprintf("%s/%s", svc.Namespace, svc.Name)
 
 	if !r.serviceUtils.IsServiceSupported(svc) {

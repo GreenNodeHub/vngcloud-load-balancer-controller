@@ -14,15 +14,28 @@ import (
 
 type IVngCloudRepository interface {
 	// Load Balancer
+	ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error)
 	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
+	GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error)
 	CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)
 	DeleteLoadBalancer(ctx context.Context, lbID string) error
+	ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error
+	WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 
 	// Subnet
 	GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error)
 
 	// Server
 	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkId, subnetID, subnetCIDR string, err error)
+
+	// Pool
+	CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error)
+	ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error)
+	UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error
+	GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error)
+	DeletePool(ctx context.Context, lbID, poolID string) error
+	UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error
+	GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error)
 }
 
 type IK8sRepository interface {

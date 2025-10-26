@@ -11,3 +11,9 @@ type IServiceUseCase interface {
 	Ensure(ctx context.Context, req ctrl.Request) error
 	Delete(ctx context.Context, req ctrl.Request) error
 }
+
+type IVLBConfigUseCase interface {
+	Init(ctx context.Context) error
+	Ensure(ctx context.Context, req ctrl.Request) error
+	Delete(ctx context.Context, req ctrl.Request) error
+}
