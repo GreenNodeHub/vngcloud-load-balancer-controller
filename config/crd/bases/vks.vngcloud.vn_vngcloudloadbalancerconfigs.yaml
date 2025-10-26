@@ -511,6 +511,28 @@ spec:
                 description: Address is the DNS name or IP address assigned to the
                   load balancer
                 type: string
+              createdListeners:
+                description: CreatedListeners is the list of created listener IDs
+                items:
+                  properties:
+                    id:
+                      description: Id is the ID of the created listener
+                      type: string
+                  required:
+                  - id
+                  type: object
+                type: array
+              createdPools:
+                description: CreatedListeners is the list of created listener IDs
+                items:
+                  properties:
+                    id:
+                      description: Id is the ID of the created pool
+                      type: string
+                  required:
+                  - id
+                  type: object
+                type: array
               loadBalancerID:
                 description: LoadBalancerID is the actual ID of the load balancer
                   in VNG Cloud
@@ -518,14 +540,6 @@ spec:
               manageDFPMembers:
                 description: ManageDFPMembers indicates if the controller should manage
                   DFP members
-                type: boolean
-              manageListeners:
-                description: ManageListeners indicates if the controller should manage
-                  listeners
-                type: boolean
-              managePools:
-                description: ManagePools indicates if the controller should manage
-                  pools
                 type: boolean
               message:
                 description: Message provides human-readable details about the current

@@ -471,17 +471,29 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
-	// ManagePools indicates if the controller should manage pools
+	// CreatedListeners is the list of created listener IDs
 	// +optional
-	ManagePools *bool `json:"managePools,omitempty"`
+	CreatedPools []CreatedPool `json:"createdPools,omitempty"`
 
-	// ManageListeners indicates if the controller should manage listeners
+	// CreatedListeners is the list of created listener IDs
 	// +optional
-	ManageListeners *bool `json:"manageListeners,omitempty"`
+	CreatedListeners []CreatedListener `json:"createdListeners,omitempty"`
 
 	// ManageDFPMembers indicates if the controller should manage DFP members
 	// +optional
 	ManageDFPMembers *bool `json:"manageDFPMembers,omitempty"`
+}
+
+type CreatedPool struct {
+	// Id is the ID of the created pool
+	// +required
+	Id string `json:"id,omitempty"`
+}
+
+type CreatedListener struct {
+	// Id is the ID of the created listener
+	// +required
+	Id string `json:"id,omitempty"`
 }
 
 // +kubebuilder:object:root=true

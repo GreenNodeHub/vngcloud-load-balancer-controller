@@ -17,18 +17,21 @@ import (
 // oldPools are in Status
 // newPools are in Spec
 // ensure them to portal. Don't delete old pool becasue some listener is using them
-func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) error {
+func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (map[string]string, error) {
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	mapPoolNameToID := make(map[string]string)
 	for _, pool := range t.vlbConfig.Spec.Pools {
-		if _, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
-			return err
+		if poolId, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
+			return nil, err
+		} else {
+			mapPoolNameToID[pool.Name] = poolId
 		}
 	}
-	return nil
+	return mapPoolNameToID, nil
 }
 
 func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, pool *v1alpha1.Pool, currentPools *entityv2.ListPools) (string, error) {
@@ -327,6 +330,60 @@ func (t *defaultModelDeployTask) buildPoolMemberUpdateRequest(ctx context.Contex
 }
 
 // delete pools created not in use anymore
-func (t *defaultModelDeployTask) deployRedundantPools(ctx context.Context) error {
+// should check if pool is used by other listeners (user use) then ignore
+func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context, lbId string, status v1alpha1.VngcloudLoadBalancerConfigStatus) error {
+	deleteCandidates := make([]string, 0)
+	for _, pool := range status.CreatedPools {
+		deleteCandidates = append(deleteCandidates, pool.Id)
+	}
+
+	currentListeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
+	if err != nil {
+		t.logger.Error("Failed to list listeners of load balancer: ", err)
+		return err
+	}
+	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
+	if err != nil {
+		t.logger.Error("Failed to list pools of load balancer: ", err)
+		return err
+	}
+	isPoolExist := func(poolId string) bool {
+		for _, p := range currentPools.Items {
+			if p.UUID == poolId {
+				return true
+			}
+		}
+		return false
+	}
+
+	isPoolInUse := func(poolId string) bool {
+		for _, listener := range currentListeners.Items {
+			if listener.DefaultPoolId == poolId {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, candidateId := range deleteCandidates {
+		if isPoolInUse(candidateId) {
+			continue
+		}
+		if !isPoolExist(candidateId) {
+			t.logger.Warnf("Pool %s not found in load balancer %s, skip delete", candidateId, lbId)
+			continue
+		}
+
+		// delete pool
+		err := t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
+		if err != nil {
+			t.logger.Error("Failed to delete pool: ", err)
+			return err
+		}
+		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+			t.logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
+		}
+	}
 	return nil
 }

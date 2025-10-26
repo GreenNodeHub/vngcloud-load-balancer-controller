@@ -34,14 +34,22 @@ type AuthOpts struct {
 }
 
 type LoadBalancerOpts struct {
-	DefaultL4PackageId        string `gcfg:"default-l4-package-id" mapstructure:"defaultL4PackageId" name:"default-l4-package-id"`
-	DefaultL7PackageId        string `gcfg:"default-l7-package-id" mapstructure:"defaultL7PackageId" name:"default-l7-package-id"`
-	DefaultScheme             string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
+	DefaultL4PackageId string `gcfg:"default-l4-package-id" mapstructure:"defaultL4PackageId" name:"default-l4-package-id"`
+	DefaultL7PackageId string `gcfg:"default-l7-package-id" mapstructure:"defaultL7PackageId" name:"default-l7-package-id"`
+	DefaultScheme      string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
+
+	// Pool defaults
 	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`
 	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`
 	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"`
 	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`
 	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`
+
+	// Listener defaults
+	DefaultTimeoutClient     int    `gcfg:"default-timeout-client" mapstructure:"defaultTimeoutClient" name:"default-timeout-client"`
+	DefaultTimeoutMember     int    `gcfg:"default-timeout-member" mapstructure:"defaultTimeoutMember" name:"default-timeout-member"`
+	DefaultTimeoutConnection int    `gcfg:"default-timeout-connection" mapstructure:"defaultTimeoutConnection" name:"default-timeout-connection"`
+	DefaultAllowedCidrs      string `gcfg:"default-allowed-cidrs" mapstructure:"defaultAllowedCidrs" name:"default-allowed-cidrs"`
 }
 
 func NewConfig() *Config {

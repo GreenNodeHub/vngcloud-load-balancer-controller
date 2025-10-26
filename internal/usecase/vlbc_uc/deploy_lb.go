@@ -25,7 +25,39 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return t.deployPools(ctx, lbId)
+	mapPoolNameToID, err := t.deployPools(ctx, lbId)
+	if err != nil {
+		return err
+	}
+	mapListenerPortToID, err := t.deployListeners(ctx, lbId, mapPoolNameToID)
+	if err != nil {
+		return err
+	}
+
+	err = t.deployDeleteRedundantListeners(ctx, lbId, mapListenerPortToID, t.vlbConfig.Status)
+	if err != nil {
+		return err
+	}
+	err = t.deployDeleteRedundantPools(ctx, lbId, t.vlbConfig.Status)
+	if err != nil {
+		return err
+	}
+
+	// update status
+	return t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+		obj.Status.CreatedListeners = make([]v1alpha1.CreatedListener, 0)
+		for _, listenerId := range mapListenerPortToID {
+			obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{
+				Id: listenerId,
+			})
+		}
+		obj.Status.CreatedPools = make([]v1alpha1.CreatedPool, 0)
+		for _, poolId := range mapPoolNameToID {
+			obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{
+				Id: poolId,
+			})
+		}
+	})
 }
 
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
