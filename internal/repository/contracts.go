@@ -5,6 +5,7 @@ import (
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -22,11 +23,28 @@ type IVngCloudRepository interface {
 	ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error
 	WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 
+	// Tags
+	ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error)
+	// overwrites the tags of the resource
+	CreateTags(ctx context.Context, resourceID string, tags map[string]string) error
+	// adding or updating the tags to the resource
+	UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error
+
+	// Security Group
+	ListSecurityGroups(ctx context.Context) (*entityv2.ListSecgroups, error)
+	// should check if server is not active yet
+	UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error)
+	GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error)
+	DeleteSecurityGroup(ctx context.Context, secgroupID string) error
+	CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error)
+
 	// Subnet
 	GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error)
 
 	// Server
 	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkId, subnetID, subnetCIDR string, err error)
+	WaitForServerActive(ctx context.Context, serverID string) error
+	ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error)
 
 	// Pool
 	CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error)
@@ -42,6 +60,39 @@ type IVngCloudRepository interface {
 	ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error)
 	DeleteListener(ctx context.Context, lbID, listenerID string) error
 	UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error
+
+	// Policy
+	CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error)
+	ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error)
+	UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error
+	DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error
+	ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error
+
+	// Certificate
+	ListCertificates(ctx context.Context) (*entityv2.ListCertificates, error)
+	GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error)
+	ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error)
+	DeleteCertificate(ctx context.Context, certID string) error
+
+	// Global Load Balancer
+	ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error)
+	GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+	GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+	CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error)
+	DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error
+	WaitGlobalLoadBalancerActive(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
+
+	ListGlobalPools(ctx context.Context, glbID string) (*entityv2.ListGlobalPools, error)
+	CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error)
+	DeleteGlobalPool(ctx context.Context, glbID, poolID string) error
+	UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error
+	ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error)
+	PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error
+
+	ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error)
+	CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error)
+	DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error
+	UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error
 }
 
 type IK8sRepository interface {
