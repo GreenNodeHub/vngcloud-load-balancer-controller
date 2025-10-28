@@ -25,83 +25,75 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NetworkLoadBalancerConfig contains configuration specific to network (L4) load balancers
-type NetworkLoadBalancerConfig struct {
-	// EnableProxyProtocol enables proxy protocol for network load balancers
-	// +optional
-	// +kubebuilder:default:false
-	EnableProxyProtocol *bool `json:"enableProxyProtocol,omitempty"`
-}
+// // InsertHeader defines a header to be inserted in requests
+// type InsertHeader struct {
+// 	// HeaderName is the name of the header to insert
+// 	// +required
+// 	HeaderName string `json:"headerName"`
 
-// InsertHeader defines a header to be inserted in requests
-type InsertHeader struct {
-	// HeaderName is the name of the header to insert
-	// +required
-	HeaderName string `json:"headerName"`
+// 	// HeaderValue is the value of the header to insert
+// 	// +required
+// 	HeaderValue string `json:"headerValue"`
+// }
 
-	// HeaderValue is the value of the header to insert
-	// +required
-	HeaderValue string `json:"headerValue"`
-}
+// // L7Rule defines a Layer 7 rule for policies
+// type L7Rule struct {
+// 	// CompareType is how to compare the rule value
+// 	// +required
+// 	// +kubebuilder:validation:Enum=CONTAINS;STARTS_WITH;ENDS_WITH;REGEX;EQUAL_TO
+// 	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
 
-// L7Rule defines a Layer 7 rule for policies
-type L7Rule struct {
-	// CompareType is how to compare the rule value
-	// +required
-	// +kubebuilder:validation:Enum=CONTAINS;STARTS_WITH;ENDS_WITH;REGEX;EQUAL_TO
-	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
+// 	// RuleValue is the value to compare against
+// 	// +required
+// 	RuleValue string `json:"ruleValue"`
 
-	// RuleValue is the value to compare against
-	// +required
-	RuleValue string `json:"ruleValue"`
+// 	// RuleType is the type of rule
+// 	// +required
+// 	// +kubebuilder:validation:Enum=HOST_NAME;PATH
+// 	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
+// }
 
-	// RuleType is the type of rule
-	// +required
-	// +kubebuilder:validation:Enum=HOST_NAME;PATH
-	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
-}
+// // Policy defines a policy configuration for application load balancer listeners
+// type Policy struct {
+// 	// Name is the name of the policy
+// 	// +required
+// 	Name string `json:"name"`
 
-// Policy defines a policy configuration for application load balancer listeners
-type Policy struct {
-	// Name is the name of the policy
-	// +required
-	Name string `json:"name"`
+// 	// Description is an optional description for the policy
+// 	// +optional
+// 	Description *string `json:"description,omitempty"`
 
-	// Description is an optional description for the policy
-	// +optional
-	Description *string `json:"description,omitempty"`
+// 	// RedirectPoolName is the name of the pool to redirect to
+// 	// +optional
+// 	RedirectPoolName *string `json:"redirectPoolName,omitempty"`
 
-	// RedirectPoolName is the name of the pool to redirect to
-	// +optional
-	RedirectPoolName *string `json:"redirectPoolName,omitempty"`
+// 	// Action defines the action to take
+// 	// +required
+// 	// +kubebuilder:validation:Enum=REDIRECT_TO_POOL;REDIRECT_TO_URL;REJECT
+// 	Action loadbalancerv2.PolicyAction `json:"action"`
 
-	// Action defines the action to take
-	// +required
-	// +kubebuilder:validation:Enum=REDIRECT_TO_POOL;REDIRECT_TO_URL;REJECT
-	Action loadbalancerv2.PolicyAction `json:"action"`
+// 	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
+// 	// +optional
+// 	RedirectUrl *string `json:"redirectUrl,omitempty"`
 
-	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
-	// +optional
-	RedirectUrl *string `json:"redirectUrl,omitempty"`
+// 	// RedirectHttpCode is the HTTP code to use for redirect
+// 	// +optional
+// 	// +kubebuilder:validation:Enum=301;302;303;307;308
+// 	RedirectHttpCode *int32 `json:"redirectHttpCode,omitempty"`
 
-	// RedirectHttpCode is the HTTP code to use for redirect
-	// +optional
-	// +kubebuilder:validation:Enum=301;302;303;307;308
-	RedirectHttpCode *int32 `json:"redirectHttpCode,omitempty"`
+// 	// KeepQueryString determines if query string should be kept on redirect
+// 	// +optional
+// 	KeepQueryString *bool `json:"keepQueryString,omitempty"`
 
-	// KeepQueryString determines if query string should be kept on redirect
-	// +optional
-	KeepQueryString *bool `json:"keepQueryString,omitempty"`
+// 	// Position is the position/priority of the policy
+// 	// +optional
+// 	// +kubebuilder:validation:Minimum=1
+// 	Position int32 `json:"position,omitempty"`
 
-	// Position is the position/priority of the policy
-	// +optional
-	// +kubebuilder:validation:Minimum=1
-	Position int32 `json:"position,omitempty"`
-
-	// L7Rules is the list of L7 rules for this policy
-	// +optional
-	L7Rules []L7Rule `json:"l7Rules,omitempty"`
-}
+// 	// L7Rules is the list of L7 rules for this policy
+// 	// +optional
+// 	L7Rules []L7Rule `json:"l7Rules,omitempty"`
+// }
 
 // Pool defines a pool configuration for the load balancer
 type Pool struct {
@@ -123,13 +115,13 @@ type Pool struct {
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
 	Algorithm *loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
 
-	// Stickiness enables sticky sessions for the pool
-	// +optional
-	Stickiness *bool `json:"stickiness,omitempty"`
+	// // Stickiness enables sticky sessions for the pool
+	// // +optional
+	// Stickiness *bool `json:"stickiness,omitempty"`
 
-	// TLSEncryption enables TLS encryption for the pool
-	// +optional
-	TLSEncryption *bool `json:"tlsEncryption,omitempty"`
+	// // TLSEncryption enables TLS encryption for the pool
+	// // +optional
+	// TLSEncryption *bool `json:"tlsEncryption,omitempty"`
 
 	// HealthMonitor defines the health monitor configuration for the pool
 	// +optional
@@ -161,25 +153,25 @@ type PoolHealthMonitor struct {
 	// +optional
 	Timeout *int `json:"timeout"`
 
-	// HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
-	// +optional
-	HealthCheckMethod *loadbalancerv2.HealthCheckMethod `json:"healthCheckMethod,omitempty"`
+	// // HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
+	// // +optional
+	// HealthCheckMethod *loadbalancerv2.HealthCheckMethod `json:"healthCheckMethod,omitempty"`
 
-	// HttpVersion defines which HTTP version to use for HTTP-based health checks
-	// +optional
-	HttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"httpVersion,omitempty"`
+	// // HttpVersion defines which HTTP version to use for HTTP-based health checks
+	// // +optional
+	// HttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"httpVersion,omitempty"`
 
-	// HealthCheckPath is the path used for HTTP health checks
-	// +optional
-	HealthCheckPath *string `json:"healthCheckPath,omitempty"`
+	// // HealthCheckPath is the path used for HTTP health checks
+	// // +optional
+	// HealthCheckPath *string `json:"healthCheckPath,omitempty"`
 
-	// DomainName is the hostname sent in the HTTP Host header
-	// +optional
-	DomainName *string `json:"domainName,omitempty"`
+	// // DomainName is the hostname sent in the HTTP Host header
+	// // +optional
+	// DomainName *string `json:"domainName,omitempty"`
 
-	// SuccessCode specifies which HTTP codes indicate a healthy response
-	// +optional
-	SuccessCode *string `json:"successCode,omitempty"`
+	// // SuccessCode specifies which HTTP codes indicate a healthy response
+	// // +optional
+	// SuccessCode *string `json:"successCode,omitempty"`
 }
 
 // PoolMember defines a member of a load balancer pool
@@ -250,64 +242,53 @@ type Listener struct {
 	// +optional
 	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
 
-	// Headers is a list of headers to forward
-	// +optional
-	Headers []string `json:"headers,omitempty"`
+	// // Headers is a list of headers to forward
+	// // +optional
+	// Headers []string `json:"headers,omitempty"`
 
-	// InsertHeaders defines headers to insert into requests
-	// +optional
-	InsertHeaders []InsertHeader `json:"insertHeaders,omitempty"`
+	// // InsertHeaders defines headers to insert into requests
+	// // +optional
+	// InsertHeaders []InsertHeader `json:"insertHeaders,omitempty"`
 
-	// CertificateAuthorities is a list of certificate authority IDs
-	// +optional
-	CertificateAuthorities []string `json:"certificateAuthorities,omitempty"`
+	// // CertificateAuthorities is a list of certificate authority IDs
+	// // +optional
+	// CertificateAuthorities []string `json:"certificateAuthorities,omitempty"`
 
-	// DefaultCertificateAuthority is the default certificate authority
-	// +optional
-	DefaultCertificateAuthority *string `json:"defaultCertificateAuthority,omitempty"`
+	// // DefaultCertificateAuthority is the default certificate authority
+	// // +optional
+	// DefaultCertificateAuthority *string `json:"defaultCertificateAuthority,omitempty"`
 
-	// ClientCertificateAuthentication defines client certificate authentication settings
-	// +optional
-	ClientCertificateAuthentication *string `json:"clientCertificateAuthentication,omitempty"`
+	// // ClientCertificateAuthentication defines client certificate authentication settings
+	// // +optional
+	// ClientCertificateAuthentication *string `json:"clientCertificateAuthentication,omitempty"`
 
-	// Policies is the list of policies for this listener (for application load balancers)
-	// +optional
-	Policies []Policy `json:"policies,omitempty"`
-}
+	// // Policies is the list of policies for this listener (for application load balancers)
+	// // +optional
+	// Policies []Policy `json:"policies,omitempty"`
 
-// ApplicationLoadBalancerConfig contains configuration specific to application (L7) load balancers
-type ApplicationLoadBalancerConfig struct {
-	// EnableStickySession enables sticky sessions for application load balancers
-	// +optional
-	EnableStickySession *bool `json:"enableStickySession,omitempty"`
+	// // AutoReorderPolicies enables automatic reordering of policies
+	// // +optional
+	// AutoReorderPolicies *bool `json:"autoReorderPolicies,omitempty"`
 
-	// EnableTLSEncryption enables TLS encryption for application load balancers
-	// +optional
-	EnableTLSEncryption *bool `json:"enableTLSEncryption,omitempty"`
+	// // EnableStickySession enables sticky sessions for application load balancers
+	// // +optional
+	// EnableStickySession *bool `json:"enableStickySession,omitempty"`
 
-	// CertificateIDs are the SSL certificate IDs for HTTPS listeners
-	// +optional
-	CertificateIDs []string `json:"certificateIDs,omitempty"`
+	// // EnableTLSEncryption enables TLS encryption for application load balancers
+	// // +optional
+	// EnableTLSEncryption *bool `json:"enableTLSEncryption,omitempty"`
 
-	// ClientCertificateID is the client certificate ID for mutual TLS
-	// +optional
-	ClientCertificateID *string `json:"clientCertificateID,omitempty"`
+	// // CertificateIDs are the SSL certificate IDs for HTTPS listeners
+	// // +optional
+	// CertificateIDs []string `json:"certificateIDs,omitempty"`
 
-	// Header configuration for application load balancers
-	// +optional
-	Header map[string]string `json:"header,omitempty"`
+	// // ClientCertificateID is the client certificate ID for mutual TLS
+	// // +optional
+	// ClientCertificateID *string `json:"clientCertificateID,omitempty"`
 
-	// InsertHeaders are headers to insert into requests
-	// +optional
-	InsertHeaders map[string]string `json:"insertHeaders,omitempty"`
-
-	// ImplementationSpecificParams are implementation-specific parameters
-	// +optional
-	ImplementationSpecificParams map[string]string `json:"implementationSpecificParams,omitempty"`
-
-	// AutoReorderPolicies enables automatic reordering of policies
-	// +optional
-	AutoReorderPolicies *bool `json:"autoReorderPolicies,omitempty"`
+	// // ImplementationSpecificParams are implementation-specific parameters
+	// // +optional
+	// ImplementationSpecificParams map[string]string `json:"implementationSpecificParams,omitempty"`
 }
 
 // VngcloudLoadBalancerConfigSpec defines the desired state of VngcloudLoadBalancerConfig
@@ -344,27 +325,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	LoadBalancerID *string `json:"loadBalancerID,omitempty"`
 
-	// IdleTimeoutClient is the idle timeout for client connections
-	// +optional
-	IdleTimeoutClient *int32 `json:"idleTimeoutClient,omitempty"`
-
-	// IdleTimeoutMember is the idle timeout for member connections
-	// +optional
-	IdleTimeoutMember *int32 `json:"idleTimeoutMember,omitempty"`
-
-	// IdleTimeoutConnection is the idle timeout for connections
-	// +optional
-	IdleTimeoutConnection *int32 `json:"idleTimeoutConnection,omitempty"`
-
-	// InboundCIDRs defines the inbound CIDR blocks
-	// +optional
-	InboundCIDRs []string `json:"inboundCIDRs,omitempty"`
-
-	// PoolAlgorithm is the load balancing algorithm
-	// +optional
-	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
-	PoolAlgorithm *loadbalancerv2.PoolAlgorithm `json:"poolAlgorithm,omitempty"`
-
 	// EnableAutoscale enables autoscaling for the load balancer
 	// +optional
 	EnableAutoscale *bool `json:"enableAutoscale,omitempty"`
@@ -385,10 +345,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	IsPoc *bool `json:"isPoc,omitempty"`
 
-	// PreferZoneID is the preferred zone ID for placement
-	// +optional
-	PreferZoneID *string `json:"preferZoneID,omitempty"`
-
 	// Listeners defines the array of listeners for the load balancer
 	// +optional
 	Listeners []Listener `json:"listeners,omitempty"`
@@ -396,16 +352,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// Pools defines the array of pools for the load balancer
 	// +optional
 	Pools []Pool `json:"pools,omitempty"`
-
-	// Network contains configuration specific to network (L4) load balancers
-	// This field is only valid when Type is "network"
-	// +optional
-	Network *NetworkLoadBalancerConfig `json:"network,omitempty"`
-
-	// Application contains configuration specific to application (L7) load balancers
-	// This field is only valid when Type is "application"
-	// +optional
-	Application *ApplicationLoadBalancerConfig `json:"application,omitempty"`
 
 	// AttachSecurityGroupsToNodes contains security groups to attach to nodes (filter by TargetNodeLabels)
 	// +optional
@@ -459,9 +405,9 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// +optional
 	Address *string `json:"address,omitempty"`
 
-	// UpdatedAt is the timestamp when the load balancer was last updated
-	// +optional
-	UpdatedAt *metav1.Time `json:"updatedAt,omitempty"`
+	// // UpdatedAt is the timestamp when the load balancer was last updated
+	// // +optional
+	// UpdatedAt *metav1.Time `json:"updatedAt,omitempty"`
 
 	// LoadBalancerID is the actual ID of the load balancer in VNG Cloud
 	// +optional
@@ -479,9 +425,9 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// +optional
 	CreatedListeners []CreatedListener `json:"createdListeners,omitempty"`
 
-	// ManageDFPMembers indicates if the controller should manage DFP members
-	// +optional
-	ManageDFPMembers *bool `json:"manageDFPMembers,omitempty"`
+	// // ManageDFPMembers indicates if the controller should manage DFP members
+	// // +optional
+	// ManageDFPMembers *bool `json:"manageDFPMembers,omitempty"`
 }
 
 type CreatedPool struct {
