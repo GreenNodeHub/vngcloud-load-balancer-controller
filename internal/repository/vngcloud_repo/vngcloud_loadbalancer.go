@@ -49,7 +49,7 @@ func (m *vngCloudRepository) GetLoadBalancerByName(ctx context.Context, name str
 
 func (m *vngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", icon)
+	logger.Infof("%s Request create load balancer.", RequestIcon)
 	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreateLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -59,7 +59,7 @@ func (m *vngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions l
 }
 func (m *vngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s", icon, lbID)
+	logger.Infof("%s Request delete load balancer %s", RequestIcon, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -69,7 +69,7 @@ func (m *vngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string
 }
 func (m *vngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request resize load balancer %s to package %s", icon, lbID, packageID)
+	logger.Infof("%s Request resize load balancer %s to package %s", RequestIcon, lbID, packageID)
 
 	opt := loadbalancerv2.NewResizeLoadBalancerRequest(lbID, packageID)
 	_, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ResizeLoadBalancer(opt.AddUserAgent(m.userAgent))
@@ -81,7 +81,7 @@ func (m *vngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packa
 }
 func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for load balancer %s to be ready", waitIcon, lbID)
+	logger.Infof("%s Waiting for load balancer %s to be ready", WaitIcon, lbID)
 	var resultLb *entityv2.LoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -96,7 +96,7 @@ func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ACTIVE_LOADBALANCER_STATUS &&
 			strings.ToUpper(lb.ProgressStatus) == consts.CREATED_LOADBALANCER_STATUS {
-			logger.Infof("%s Load balancer %s is ready", readyIcon, lbID)
+			logger.Infof("%s Load balancer %s is ready", ReadyIcon, lbID)
 			resultLb = lb
 			return true, nil
 		}
@@ -106,7 +106,7 @@ func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (
 			return true, ErrorLoadBalancerStatusError
 		}
 
-		logger.Infof("%s Load balancer %s is not ready yet, waiting...", waitIcon, lbID)
+		logger.Infof("%s Load balancer %s is not ready yet, waiting...", WaitIcon, lbID)
 		return false, nil
 	})
 

@@ -16,7 +16,7 @@ import (
 //	}
 func (m *vngCloudRepository) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create pool of load balancer %s", icon, lbID)
+	logger.Infof("%s Request create pool of load balancer %s", RequestIcon, lbID)
 	pool, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePool(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreatePool: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -36,7 +36,7 @@ func (m *vngCloudRepository) ListPool(ctx context.Context, lbID string) (*entity
 }
 func (m *vngCloudRepository) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool members of pool %s of load balancer %s", icon, poolID, lbID)
+	logger.Infof("%s Request update pool members of pool %s of load balancer %s", RequestIcon, poolID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePoolMembers(members.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePoolMembers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -64,7 +64,7 @@ func (m *vngCloudRepository) GetPoolMembers(ctx context.Context, lbID, poolID st
 
 func (m *vngCloudRepository) DeletePool(ctx context.Context, lbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete pool %s of load balancer %s", icon, poolID, lbID)
+	logger.Infof("%s Request delete pool %s of load balancer %s", RequestIcon, poolID, lbID)
 	opt := loadbalancerv2.NewDeletePoolByIdRequest(lbID, poolID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePoolById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
@@ -76,7 +76,7 @@ func (m *vngCloudRepository) DeletePool(ctx context.Context, lbID, poolID string
 
 func (m *vngCloudRepository) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool %s of load balancer %s", icon, poolID, lbID)
+	logger.Infof("%s Request update pool %s of load balancer %s", RequestIcon, poolID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePool(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePool: ", sdkErr, ", params: ", sdkErr.GetListParameters())

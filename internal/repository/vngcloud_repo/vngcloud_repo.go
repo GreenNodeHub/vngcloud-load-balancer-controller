@@ -24,9 +24,9 @@ var (
 )
 
 const (
-	icon      = "🌐"
-	waitIcon  = "⏳"
-	readyIcon = "👍"
+	RequestIcon = "🌐"
+	WaitIcon    = "⏳"
+	ReadyIcon   = "👍"
 
 	defaultOffset = 0
 	// defaultPageList = 1

@@ -27,7 +27,7 @@ func (m *vngCloudRepository) ListSecurityGroups(ctx context.Context) (*entityv2.
 
 func (m *vngCloudRepository) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update security groups of server %s", icon, instanceID)
+	logger.Infof("%s Request update security groups of server %s", RequestIcon, instanceID)
 
 	opt := computev2.NewUpdateServerSecgroupsRequest(instanceID, secgroups...)
 	IsServerNotReady := func(err error) bool {
@@ -40,7 +40,7 @@ func (m *vngCloudRepository) UpdateSecGroupsOfServer(ctx context.Context, instan
 		server, sdkErr = m.client.VServerGateway().V2().ComputeService().UpdateServerSecgroupsByServerId(opt.AddUserAgent(m.userAgent))
 		if sdkErr != nil {
 			if IsServerNotReady(sdkErr.GetError()) {
-				logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, instanceID)
+				logger.Infof("%s Server %s is not ready yet, waiting...", WaitIcon, instanceID)
 				time.Sleep(5 * time.Second)
 				continue
 			} else {
@@ -67,7 +67,7 @@ func (m *vngCloudRepository) GetSecurityGroup(ctx context.Context, secgroupID st
 
 func (m *vngCloudRepository) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group %s", icon, secgroupID)
+	logger.Infof("%s Request delete security group %s", RequestIcon, secgroupID)
 
 	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupById(networkv2.NewDeleteSecgroupByIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
@@ -79,7 +79,7 @@ func (m *vngCloudRepository) DeleteSecurityGroup(ctx context.Context, secgroupID
 
 func (m *vngCloudRepository) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group %s", icon, name)
+	logger.Infof("%s Request create security group %s", RequestIcon, name)
 
 	opt := networkv2.NewCreateSecgroupRequest(name, description)
 	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroup(opt.AddUserAgent(m.userAgent))
@@ -92,7 +92,7 @@ func (m *vngCloudRepository) CreateSecurityGroup(ctx context.Context, name strin
 
 func (m *vngCloudRepository) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group rule of security group %s", icon, secgroupID)
+	logger.Infof("%s Request create security group rule of security group %s", RequestIcon, secgroupID)
 
 	rule, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroupRule(opts.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
@@ -104,7 +104,7 @@ func (m *vngCloudRepository) CreateSecurityGroupRule(ctx context.Context, secgro
 
 func (m *vngCloudRepository) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group rule %s of security group %s", icon, ruleID, secgroupID)
+	logger.Infof("%s Request delete security group rule %s of security group %s", RequestIcon, ruleID, secgroupID)
 
 	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupRuleById(networkv2.NewDeleteSecgroupRuleByIdRequest(ruleID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {

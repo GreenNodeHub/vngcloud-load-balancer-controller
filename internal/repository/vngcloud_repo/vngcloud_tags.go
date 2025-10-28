@@ -23,7 +23,7 @@ func (m *vngCloudRepository) ListTags(ctx context.Context, resourceID string) (*
 
 func (m *vngCloudRepository) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create tags for resource %s", icon, resourceID)
+	logger.Infof("%s Request create tags for resource %s", RequestIcon, resourceID)
 	opt := loadbalancerv2.NewCreateTagsRequest(resourceID)
 	arr := make([]string, 0)
 	for k, v := range tags {
@@ -42,7 +42,7 @@ func (m *vngCloudRepository) CreateTags(ctx context.Context, resourceID string, 
 
 func (m *vngCloudRepository) UpdateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update tags for resource %s", icon, resourceID)
+	logger.Infof("%s Request update tags for resource %s", RequestIcon, resourceID)
 	opt := loadbalancerv2.NewUpdateTagsRequest(resourceID)
 	arr := make([]string, 0)
 	for k, v := range tags {

@@ -96,7 +96,7 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 
 func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for server %s to be ready", waitIcon, serverID)
+	logger.Infof("%s Waiting for server %s to be ready", WaitIcon, serverID)
 
 	var server *entityv2.Server
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -111,7 +111,7 @@ func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID s
 			return false, _err
 		}
 		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Server %s is ready", readyIcon, serverID)
+			logger.Infof("%s Server %s is ready", ReadyIcon, serverID)
 			return true, nil
 		}
 		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
@@ -119,7 +119,7 @@ func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID s
 			return true, errors.New("server status is error")
 		}
 
-		logger.Infof("%s Server %s is not ready yet, waiting...", waitIcon, serverID)
+		logger.Infof("%s Server %s is not ready yet, waiting...", WaitIcon, serverID)
 		return false, nil
 	})
 
