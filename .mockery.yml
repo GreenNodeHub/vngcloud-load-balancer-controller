@@ -15,3 +15,9 @@ packages:
   github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils:
     config:
       all: true
+  github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository:
+    config:
+      all: true
+  github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase:
+    config:
+      all: true
