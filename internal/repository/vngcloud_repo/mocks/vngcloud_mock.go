@@ -19,8 +19,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
@@ -301,7 +301,8 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 		return "", "", "", "", sdkErr
 	}
 	if server == nil {
-		return "", "", "", "", vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - GetServerNetworkInfo: server not found")
+		return "", "", "", "", domain.ErrorNotFound
 	}
 
 	networkID = server.InternalInterfaces[0].NetworkUuid
@@ -310,7 +311,7 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 
 	if networkID == "" || subnetID == "" {
 		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, netID: %s, subnetID: %s", networkID, subnetID)
-		return "", "", "", "", vngcloud_repo.ErrorNotFound
+		return "", "", "", "", domain.ErrorNotFound
 	}
 
 	subnet, err := m.GetSubnetByID(ctx, networkID, subnetID)
@@ -318,7 +319,8 @@ func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string
 		return "", "", "", "", err
 	}
 	if subnet == nil {
-		return "", "", "", "", vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - GetServerNetworkInfo: subnet not found")
+		return "", "", "", "", domain.ErrorNotFound
 	}
 	subnetCIDR = subnet.Cidr
 
@@ -378,7 +380,7 @@ func (m *MockProvider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSe
 
 func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update security groups of server %s", vngcloud_repo.RequestIcon, instanceID)
+	logger.Infof("%s Request update security groups of server %s", domain.RequestIcon, instanceID)
 
 	var server *entityv2.Server
 	for _, s := range m.servers {
@@ -388,7 +390,8 @@ func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID s
 		}
 	}
 	if server == nil {
-		return nil, vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - UpdateSecGroupsOfServer: server not found")
+		return nil, domain.ErrorNotFound
 	}
 
 	// check secgroups is valid
@@ -409,12 +412,14 @@ func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID s
 }
 
 func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) (*entityv2.Secgroup, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, s := range m.secgroups {
 		if s.Id == secgroupID {
 			return clone.Clone(s.Secgroup).(*entityv2.Secgroup), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetSecurityGroup: security group not found")
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
@@ -444,7 +449,7 @@ func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID strin
 
 func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group %s", vngcloud_repo.RequestIcon, name)
+	logger.Infof("%s Request create security group %s", domain.RequestIcon, name)
 
 	secgroupID := "secgroup-" + randID()
 	newSecgroup := &wrapSecgroup{
@@ -464,7 +469,7 @@ func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, des
 
 func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group rule for security group %s", vngcloud_repo.RequestIcon, secgroupID)
+	logger.Infof("%s Request create security group rule for security group %s", domain.RequestIcon, secgroupID)
 
 	// valid secgroupID
 	_, err := m.GetSecurityGroup(ctx, secgroupID)
@@ -495,7 +500,7 @@ func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID s
 
 func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group rule %s of security group %s", vngcloud_repo.RequestIcon, ruleID, secgroupID)
+	logger.Infof("%s Request delete security group rule %s of security group %s", domain.RequestIcon, ruleID, secgroupID)
 
 	// valid secgroupID
 	_, err := m.GetSecurityGroup(ctx, secgroupID)
@@ -515,7 +520,8 @@ func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID s
 	}
 
 	if !isFound {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - DeleteSecurityGroupRule: rule not found")
+		return domain.ErrorNotFound
 	}
 
 	m.mu.Lock()
@@ -564,7 +570,7 @@ func (m *MockProvider) ListTags(ctx context.Context, resourceID string) (*entity
 
 func (m *MockProvider) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create tags for resource %s", vngcloud_repo.RequestIcon, resourceID)
+	logger.Infof("%s Request create tags for resource %s", domain.RequestIcon, resourceID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.tags == nil {
@@ -594,7 +600,7 @@ func (m *MockProvider) GetSubnetByID(ctx context.Context, networkID, subnetID st
 
 	if networkID != m.netID {
 		logger.Errorf("networkID %s not found", networkID)
-		return nil, vngcloud_repo.ErrorNotFound
+		return nil, domain.ErrorNotFound
 	}
 
 	for _, s := range m.subnet {
@@ -602,23 +608,26 @@ func (m *MockProvider) GetSubnetByID(ctx context.Context, networkID, subnetID st
 			return clone.Clone(s.Subnet).(*entityv2.Subnet), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("subnetID %s not found", subnetID)
+	return nil, domain.ErrorNotFound
 }
 
 // // --------------------------- Server ---------------------------
 
 func (m *MockProvider) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, s := range m.servers {
 		if s.Uuid == serverID {
 			return clone.Clone(s.Server).(*entityv2.Server), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("serverID %s not found", serverID)
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for server %s to be ready", vngcloud_repo.WaitIcon, serverID)
+	logger.Infof("%s Waiting for server %s to be ready", domain.WaitIcon, serverID)
 
 	var server *entityv2.Server
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -633,7 +642,7 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 			return false, _err
 		}
 		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Server %s is ready", vngcloud_repo.ReadyIcon, serverID)
+			logger.Infof("%s Server %s is ready", domain.ReadyIcon, serverID)
 			return true, nil
 		}
 		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
@@ -641,7 +650,7 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 			return true, errors.New("server status is error")
 		}
 
-		logger.Infof("%s Server %s is not ready yet, waiting...", vngcloud_repo.WaitIcon, serverID)
+		logger.Infof("%s Server %s is not ready yet, waiting...", domain.WaitIcon, serverID)
 		return false, nil
 	})
 
@@ -687,12 +696,14 @@ func (m *MockProvider) ListLoadBalancers(ctx context.Context, tags []string) (*e
 	return lbs, nil
 }
 func (m *MockProvider) GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, lb := range m.loadBalancers {
 		if lb.GetId() == lbID {
 			return clone.Clone(lb).(*entityv2.LoadBalancer), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetLoadBalancerByID: load balancer not found: %s", lbID)
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
@@ -710,16 +721,16 @@ func (m *MockProvider) GetLoadBalancerByName(ctx context.Context, name string) (
 
 func (m *MockProvider) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", vngcloud_repo.RequestIcon)
+	logger.Infof("%s Request create load balancer.", domain.RequestIcon)
 	if lbOptions == nil {
-		return nil, vngcloud_repo.ErrorInvalidInput
+		return nil, domain.ErrorInvalidInput
 	}
 
 	var lbOpt *loadbalancerv2.CreateLoadBalancerRequest
 	if opt, ok := lbOptions.(*loadbalancerv2.CreateLoadBalancerRequest); ok {
 		lbOpt = opt
 	} else {
-		return nil, vngcloud_repo.ErrorInvalidInput
+		return nil, domain.ErrorInvalidInput
 	}
 
 	lbID := "lb-" + randID()
@@ -829,7 +840,7 @@ func (m *MockProvider) readyAfterTime(lbID string) {
 
 func (m *MockProvider) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s", vngcloud_repo.RequestIcon, lbID)
+	logger.Infof("%s Request delete load balancer %s", domain.RequestIcon, lbID)
 	newListeners := make([]*wrapListener, 0)
 	for i, lb := range m.listeners {
 		if lb.lbID != lbID {
@@ -856,7 +867,8 @@ func (m *MockProvider) DeleteLoadBalancer(ctx context.Context, lbID string) erro
 		}
 	}
 	if len(newLBs) == len(m.loadBalancers) {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - DeleteLoadBalancer: load balancer not found")
+		return domain.ErrorNotFound
 	}
 
 	m.loadBalancers = newLBs
@@ -865,11 +877,11 @@ func (m *MockProvider) DeleteLoadBalancer(ctx context.Context, lbID string) erro
 func (m *MockProvider) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Error("not implemented yet", "ResizeLoadBalancer")
-	return vngcloud_repo.ErrorNotImplemented
+	return domain.ErrorNotImplemented
 }
 func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for load balancer %s to be ready", vngcloud_repo.WaitIcon, lbID)
+	logger.Infof("%s Waiting for load balancer %s to be ready", domain.WaitIcon, lbID)
 	var resultLb *entityv2.LoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -884,17 +896,17 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ACTIVE_LOADBALANCER_STATUS &&
 			strings.ToUpper(lb.ProgressStatus) == consts.CREATED_LOADBALANCER_STATUS {
-			logger.Infof("%s Load balancer %s is ready", vngcloud_repo.ReadyIcon, lbID)
+			logger.Infof("%s Load balancer %s is ready", domain.ReadyIcon, lbID)
 			resultLb = lb
 			return true, nil
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ERROR_LOADBALANCER_STATUS {
 			logger.Errorf("Load balancer %s is in error status", lbID)
 			resultLb = lb
-			return true, vngcloud_repo.ErrorLoadBalancerStatusError
+			return true, domain.ErrorLoadBalancerStatusError
 		}
 
-		logger.Infof("%s Load balancer %s is not ready yet, waiting...", vngcloud_repo.WaitIcon, lbID)
+		logger.Infof("%s Load balancer %s is not ready yet, waiting...", domain.WaitIcon, lbID)
 		return false, nil
 	})
 
@@ -909,16 +921,16 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 
 //	func (m *MockProvider) GetListenerByName(ctx context.Context, lbID, name string) (*objects.Listener, error) {
 //		logger.Error("not implemented yet", "GetListenerByName")
-//		return nil, vngcloud_repo.ErrorNotImplemented
+//		return nil, domain.ErrorNotImplemented
 //	}
 //
 //	func (m *MockProvider) GetListenerByPort(ctx context.Context, lbID string, port int) (*objects.Listener, error) {
 //		logger.Error("not implemented yet", "GetListenerByPort")
-//		return nil, vngcloud_repo.ErrorNotImplemented
+//		return nil, domain.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create listener of load balancer %s", vngcloud_repo.RequestIcon, lbID)
+	logger.Infof("%s Request create listener of load balancer %s", domain.RequestIcon, lbID)
 	listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	newListener := &wrapListener{
 		lbID: lbID,
@@ -997,7 +1009,7 @@ func (m *MockProvider) ListListenerOfLB(ctx context.Context, lbID string) (*enti
 }
 func (m *MockProvider) DeleteListener(ctx context.Context, lbID, listenerID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete listener %s of load balancer %s", vngcloud_repo.RequestIcon, listenerID, lbID)
+	logger.Infof("%s Request delete listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
 	isFound := false
 	newListeners := make([]*wrapListener, 0)
 	for i, l := range m.listeners {
@@ -1008,7 +1020,8 @@ func (m *MockProvider) DeleteListener(ctx context.Context, lbID, listenerID stri
 		}
 	}
 	if !isFound {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - DeleteListener: listener not found")
+		return domain.ErrorNotFound
 	}
 	m.listeners = newListeners
 
@@ -1018,7 +1031,7 @@ func (m *MockProvider) DeleteListener(ctx context.Context, lbID, listenerID stri
 }
 func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update listener %s of load balancer %s", vngcloud_repo.RequestIcon, listenerID, lbID)
+	logger.Infof("%s Request update listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdateListenerRequest)
 	var listener *wrapListener
 	for _, l := range m.listeners {
@@ -1028,7 +1041,8 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 		}
 	}
 	if listener == nil {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - UpdateListener: listener not found")
+		return domain.ErrorNotFound
 	}
 	listener.Listener.TimeoutClient = updateOpt.TimeoutClient
 	listener.Listener.TimeoutConnection = updateOpt.TimeoutConnection
@@ -1066,24 +1080,26 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 
 //	func (m *MockProvider) GetPolicyByName(ctx context.Context, lbID, listenerID, name string) (*objects.Policy, error) {
 //		logger.Error("not implemented yet", "GetPolicyByName")
-//		return nil, vngcloud_repo.ErrorNotImplemented
+//		return nil, domain.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create policy of listener %s of load balancer %s", vngcloud_repo.RequestIcon, listenerID, lbID)
+	logger.Infof("%s Request create policy of listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
 	lb, err := m.GetLoadBalancerByID(ctx, lbID)
 	if err != nil {
 		return nil, err
 	}
 	if lb == nil {
-		return nil, vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - CreatePolicy: load balancer not found")
+		return nil, domain.ErrorNotFound
 	}
 	listeners, err := m.ListListenerOfLB(ctx, lbID)
 	if err != nil {
 		return nil, err
 	}
 	if listeners == nil {
-		return nil, vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - CreatePolicy: listener not found")
+		return nil, domain.ErrorNotFound
 	}
 	isFound := false
 	for _, l := range listeners.Items {
@@ -1093,7 +1109,8 @@ func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string
 		}
 	}
 	if !isFound {
-		return nil, vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - CreatePolicy: listener not found")
+		return nil, domain.ErrorNotFound
 	}
 
 	policy := opt.(*loadbalancerv2.CreatePolicyRequest)
@@ -1123,7 +1140,8 @@ func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string
 		if pool != nil {
 			newPolicy.RedirectPoolName = pool.Name
 		} else {
-			return nil, vngcloud_repo.ErrorNotFound
+			logger.Errorf("[ERROR] - CreatePolicy: redirect pool not found")
+			return nil, domain.ErrorNotFound
 		}
 	}
 	newRules := make([]*entityv2.L7Rule, 0)
@@ -1162,11 +1180,11 @@ func (m *MockProvider) ListPolicyOfListener(ctx context.Context, lbID, listenerI
 
 //	func (m *MockProvider) GetPolicyByID(ctx context.Context, policyID string) (*objects.Policy, error) {
 //		logger.Error("not implemented yet", "GetPolicyByID")
-//		return nil, vngcloud_repo.ErrorNotImplemented
+//		return nil, domain.ErrorNotImplemented
 //	}
 func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", vngcloud_repo.RequestIcon, policyID, listenerID, lbID)
+	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", domain.RequestIcon, policyID, listenerID, lbID)
 	updateOpt := opt.(*loadbalancerv2.UpdatePolicyRequest)
 	var policy *wrapPolicy
 	for _, p := range m.policies {
@@ -1176,7 +1194,8 @@ func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, polic
 		}
 	}
 	if policy == nil {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - UpdatePolicy: policy not found")
+		return domain.ErrorNotFound
 	}
 	policy.Policy.RedirectPoolID = updateOpt.RedirectPoolID
 	policy.Policy.Action = string(updateOpt.Action)
@@ -1211,7 +1230,9 @@ func (m *MockProvider) DeletePolicy(ctx context.Context, lbID, listenerID, polic
 		}
 	}
 	if !isFound {
-		return vngcloud_repo.ErrorNotFound
+		logger := contexts.NewContext(ctx).Log()
+		logger.Errorf("[ERROR] - DeletePolicy: policy not found")
+		return domain.ErrorNotFound
 	}
 	m.policies = newPolicies
 
@@ -1222,7 +1243,7 @@ func (m *MockProvider) DeletePolicy(ctx context.Context, lbID, listenerID, polic
 
 func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request reorder policies of listener %s of load balancer %s", vngcloud_repo.RequestIcon, listenerID, lbID)
+	logger.Infof("%s Request reorder policies of listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
 	var listener *wrapListener
 	for _, l := range m.listeners {
 		if l.lbID == lbID && l.GetId() == listenerID {
@@ -1231,7 +1252,8 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 		}
 	}
 	if listener == nil {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - ReorderPolicies: listener not found")
+		return domain.ErrorNotFound
 	}
 	newPolicies := make([]*wrapPolicy, 0)
 	for _, p := range m.policies {
@@ -1248,7 +1270,8 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 			}
 		}
 		if !isFound {
-			return vngcloud_repo.ErrorNotFound
+			logger.Errorf("[ERROR] - ReorderPolicies: policy not found")
+			return domain.ErrorNotFound
 		}
 	}
 	m.policies = append(m.policies, newPolicies...)
@@ -1269,11 +1292,11 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 
 //	func (m *MockProvider) GetPoolByName(ctx context.Context, lbID, name string) (*objects.Pool, error) {
 //		logger.Error("not implemented yet", "GetPoolByName")
-//		return nil, vngcloud_repo.ErrorNotImplemented
+//		return nil, domain.ErrorNotImplemented
 //	}
 func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create pool of load balancer %s", vngcloud_repo.RequestIcon, lbID)
+	logger.Infof("%s Request create pool of load balancer %s", domain.RequestIcon, lbID)
 	var (
 		pool          *loadbalancerv2.CreatePoolRequest
 		healthMonitor *loadbalancerv2.HealthMonitor
@@ -1284,7 +1307,8 @@ func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbala
 
 	lb, _ := m.GetLoadBalancerByID(ctx, lbID)
 	if lb == nil {
-		return nil, vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - CreatePool: load balancer not found")
+		return nil, domain.ErrorNotFound
 	}
 
 	newPool := &wrapPool{
@@ -1394,7 +1418,7 @@ func (m *MockProvider) ListPool(ctx context.Context, lbID string) (*entityv2.Lis
 }
 func (m *MockProvider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool members %s of load balancer %s", vngcloud_repo.RequestIcon, poolID, lbID)
+	logger.Infof("%s Request update pool members %s of load balancer %s", domain.RequestIcon, poolID, lbID)
 	updateOpt := members.(*loadbalancerv2.UpdatePoolMembersRequest)
 	var pool *wrapPool
 	for _, p := range m.pools {
@@ -1404,7 +1428,8 @@ func (m *MockProvider) UpdatePoolMembers(ctx context.Context, lbID, poolID strin
 		}
 	}
 	if pool == nil {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - UpdatePoolMembers: pool not found")
+		return domain.ErrorNotFound
 	}
 	newMembers := make([]*entityv2.Member, 0)
 	for _, m := range updateOpt.Members {
@@ -1435,26 +1460,30 @@ func (m *MockProvider) UpdatePoolMembers(ctx context.Context, lbID, poolID strin
 }
 
 func (m *MockProvider) GetPoolByID(ctx context.Context, lbID, poolID string) (*entityv2.Pool, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
 			return clone.Clone(p.Pool).(*entityv2.Pool), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetPoolByID: pool not found")
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) GetPoolMembers(ctx context.Context, lbID, poolID string) (*entityv2.ListMembers, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
 			return clone.Clone(p.Members).(*entityv2.ListMembers), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetPoolMembers: pool not found")
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) DeletePool(ctx context.Context, lbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete pool %s of load balancer %s", vngcloud_repo.RequestIcon, poolID, lbID)
+	logger.Infof("%s Request delete pool %s of load balancer %s", domain.RequestIcon, poolID, lbID)
 	isFound := false
 	newPools := make([]*wrapPool, 0)
 	for i, p := range m.pools {
@@ -1465,7 +1494,8 @@ func (m *MockProvider) DeletePool(ctx context.Context, lbID, poolID string) erro
 		}
 	}
 	if !isFound {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - DeletePool: pool not found")
+		return domain.ErrorNotFound
 	}
 	m.pools = newPools
 
@@ -1476,7 +1506,7 @@ func (m *MockProvider) DeletePool(ctx context.Context, lbID, poolID string) erro
 
 func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool %s of load balancer %s", vngcloud_repo.RequestIcon, poolID, lbID)
+	logger.Infof("%s Request update pool %s of load balancer %s", domain.RequestIcon, poolID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdatePoolRequest)
 	var pool *wrapPool
 	for _, p := range m.pools {
@@ -1486,7 +1516,8 @@ func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt 
 		}
 	}
 	if pool == nil {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - UpdatePool: pool not found")
+		return domain.ErrorNotFound
 	}
 	pool.Pool.LoadBalanceMethod = string(updateOpt.Algorithm)
 
@@ -1507,12 +1538,14 @@ func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt 
 }
 
 func (m *MockProvider) GetPoolHealthMonitorById(ctx context.Context, lbID, poolID string) (*entityv2.HealthMonitor, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, p := range m.pools {
 		if p.lbID == lbID && p.GetId() == poolID {
 			return clone.Clone(p.HealthMonitor).(*entityv2.HealthMonitor), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetPoolHealthMonitorById: pool not found")
+	return nil, domain.ErrorNotFound
 }
 
 // // --------------------------- Certificate ---------------------------
@@ -1528,17 +1561,19 @@ func (m *MockProvider) ListCertificates(ctx context.Context) (*entityv2.ListCert
 }
 
 func (m *MockProvider) GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error) {
+	logger := contexts.NewContext(ctx).Log()
 	for _, c := range m.certs {
 		if c.Certificate.UUID == certID {
 			return clone.Clone(*c.Certificate).(*entityv2.Certificate), nil
 		}
 	}
-	return nil, vngcloud_repo.ErrorNotFound
+	logger.Errorf("[ERROR] - GetCertificateByID: certificate not found")
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request import certificate", vngcloud_repo.RequestIcon)
+	logger.Infof("%s Request import certificate", domain.RequestIcon)
 	cert := opt.ToRequestBody().(*loadbalancerv2.CreateCertificateRequest)
 	newCert := &wrapCertificate{
 		Certificate: &entityv2.Certificate{
@@ -1558,7 +1593,7 @@ func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2
 
 func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete certificate %s", vngcloud_repo.RequestIcon, certID)
+	logger.Infof("%s Request delete certificate %s", domain.RequestIcon, certID)
 	isFound := false
 	newCerts := make([]*wrapCertificate, 0)
 	for i, c := range m.certs {
@@ -1569,7 +1604,8 @@ func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) err
 		}
 	}
 	if !isFound {
-		return vngcloud_repo.ErrorNotFound
+		logger.Errorf("[ERROR] - DeleteCertificate: certificate not found")
+		return domain.ErrorNotFound
 	}
 	m.certs = newCerts
 	return nil

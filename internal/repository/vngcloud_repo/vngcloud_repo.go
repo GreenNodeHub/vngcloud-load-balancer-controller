@@ -16,18 +16,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
 )
 
-var (
-	ErrorInvalidInput            = errors.New("invalid input")
-	ErrorNotImplemented          = errors.New("not implemented yet")
-	ErrorNotFound                = errors.New("not found")
-	ErrorLoadBalancerStatusError = errors.New("load balancer status is error")
-)
-
 const (
-	RequestIcon = "🌐"
-	WaitIcon    = "⏳"
-	ReadyIcon   = "👍"
-
 	defaultOffset = 0
 	// defaultPageList = 1
 	defaultPageSize = 1000

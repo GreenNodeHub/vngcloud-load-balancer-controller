@@ -137,8 +137,8 @@ spec:
                   - protocolPort
                   type: object
                 type: array
-              loadBalancerID:
-                description: LoadBalancerID is managed by the controller
+              loadBalancerId:
+                description: LoadBalancerId is managed by the controller
                 type: string
               loadBalancerName:
                 description: |-
@@ -269,6 +269,9 @@ spec:
                 - Layer 4
                 - Layer 7
                 type: string
+              zoneId:
+                description: ZoneId specifies the zone for the load balancer
+                type: string
             required:
             - loadBalancerName
             - subnetID
@@ -303,8 +306,8 @@ spec:
                   - id
                   type: object
                 type: array
-              loadBalancerID:
-                description: LoadBalancerID is the actual ID of the load balancer
+              loadBalancerId:
+                description: LoadBalancerId is the actual ID of the load balancer
                   in VNG Cloud
                 type: string
               message:

@@ -1,5 +1,5 @@
 /*
-Copyright 2024.
+Copyright 2025 annd2.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -42,8 +43,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -56,9 +67,8 @@ var (
 	testEnv               *envtest.Environment
 	ctx                   context.Context
 	cancel                context.CancelFunc
-	mockIngressReconciler *IngressReconciler
-	mockServiceReconciler *ServiceReconciler
-	mockVGLBReconciler    *VngcloudGlobalLoadBalancerReconciler
+	mockServiceReconciler *core.ServiceReconciler
+	mockVLBCReconciler    *VngcloudLoadBalancerConfigReconciler
 	mockProvider          *provider.MockProvider
 
 	mockConfig = &config.Config{
@@ -208,93 +218,79 @@ var _ = BeforeSuite(func() {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	By("bootstrapping test environment")
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: false,
-
-		// The BinaryAssetsDirectory is only required if you want to run the tests directly
-		// without call the makefile target test. If not informed it will look for the
-		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
-		// Note that you must have the required binaries setup under the bin directory to perform
-		// the tests directly. When we run make test it will be setup and used automatically.
-		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
-	}
-
 	var err error
-	// cfg is defined in this file globally.
-	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
-
 	err = corev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
 	err = networkingv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
 	err = v1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 
+	By("bootstrapping test environment")
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		ErrorIfCRDPathMissing: false,
+	}
+
+	// Retrieve the first found binary directory to allow running tests from IDEs
+	if getFirstFoundEnvTestBinaryDir() != "" {
+		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
+	}
+
+	// cfg is defined in this file globally.
+	cfg, err = testEnv.Start()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	ctx, cancel = context.WithCancel(context.TODO())
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
 	})
 	Expect(err).ToNot(HaveOccurred())
 
 	finalizerManager := k8s.NewDefaultFinalizerManager(k8sManager.GetClient(), ctrl.Log)
-	mockProvider = provider.NewMockProvider()
-	updateTracker := NewUpdateTracker(mockProvider)
-	mockIngressReconciler = &IngressReconciler{
-		modeTest: true,
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+	k8sRepo := k8s_repo.NewK8sRepository(k8sManager.GetClient())
+	// vngcloudRepo, err := vngcloud_repo.NewVngCloudRepository(ctx, mockConfig)
+	vngcloudRepo := mocks.NewMockProvider()
+	err = vngcloudRepo.Init(nil)
+	Expect(err).NotTo(HaveOccurred())
 
-		Config:              mockConfig,
-		Provider:            mockProvider,
-		FinalizerManager:    finalizerManager,
-		timeReconcilePeriod: 2 * time.Second,
-		UpdateTracker:       updateTracker,
-	}
-	err = mockIngressReconciler.SetupWithManager(k8sManager)
+	annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+	cniDetector := utils.NewDetector(k8sManager.GetClient())
+	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
+	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
+	serviceUseCase := service_uc.NewServiceUseCase(
+		mockConfig, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+	mockServiceReconciler = core.NewServiceReconciler(
+		serviceUseCase,
+		k8sManager.GetClient(),
+		k8sManager.GetScheme(),
+		finalizerManager,
+		k8sManager.GetEventRecorderFor("service-controller"),
+		serviceUtils,
+	)
+	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	mockServiceReconciler = &ServiceReconciler{
-		modeTest: true,
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-
-		Config:              mockConfig,
-		Provider:            mockProvider,
-		FinalizerManager:    finalizerManager,
-		timeReconcilePeriod: 2 * time.Second,
-		UpdateTracker:       updateTracker,
-	}
-	err = mockServiceReconciler.SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	mockVGLBReconciler = &VngcloudGlobalLoadBalancerReconciler{
-		// modeTest: true,
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-
-		Config:           mockConfig,
-		Provider:         mockProvider,
-		FinalizerManager: finalizerManager,
-		// timeReconcilePeriod: 2 * time.Second,
-		// UpdateTracker:       updateTracker,
-	}
-	err = mockVGLBReconciler.SetupWithManager(k8sManager)
+	vlbcUseCase := vlbc_uc.NewVLBCUseCase(
+		mockConfig,
+		k8sRepo,
+		vngcloudRepo,
+	)
+	mockVLBCReconciler = NewVngcloudLoadBalancerConfigReconciler(
+		k8sManager.GetClient(),
+		k8sManager.GetScheme(),
+		vlbcUseCase,
+		k8sManager.GetEventRecorderFor("vlbc-controller"),
+		finalizerManager,
+		vlbc.NewVLBCUtils(consts.VLBCFinalizer),
+	)
+	err = mockVLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
@@ -349,7 +345,7 @@ func newEndpointResource(name, namespace string) *corev1.Endpoints {
 					{
 						IP:       "172.172.172.0",
 						Hostname: "test",
-						NodeName: PointerOf("test"),
+						NodeName: ptr.To("test"),
 						TargetRef: &corev1.ObjectReference{
 							Kind:      "Pod",
 							Namespace: namespace,
@@ -362,10 +358,33 @@ func newEndpointResource(name, namespace string) *corev1.Endpoints {
 						Name:        "http",
 						Port:        80,
 						Protocol:    corev1.ProtocolTCP,
-						AppProtocol: PointerOf("http"),
+						AppProtocol: ptr.To("http"),
 					},
 				},
 			},
 		},
 	}
+}
+
+// getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
+// ENVTEST-based tests depend on specific binaries, usually located in paths set by
+// controller-runtime. When running tests directly (e.g., via an IDE) without using
+// Makefile targets, the 'BinaryAssetsDirectory' must be explicitly configured.
+//
+// This function streamlines the process by finding the required binaries, similar to
+// setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
+// properly set up, run 'make setup-envtest' beforehand.
+func getFirstFoundEnvTestBinaryDir() string {
+	basePath := filepath.Join("..", "..", "bin", "k8s")
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		logf.Log.Error(err, "Failed to read directory", "path", basePath)
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			return filepath.Join(basePath, entry.Name())
+		}
+	}
+	return ""
 }

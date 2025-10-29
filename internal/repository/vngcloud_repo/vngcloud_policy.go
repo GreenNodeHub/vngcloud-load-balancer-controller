@@ -7,6 +7,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // --------------------------- Policy ---------------------------
@@ -17,7 +18,7 @@ import (
 //	}
 func (m *vngCloudRepository) CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create policy of listener %s of load balancer %s", RequestIcon, listenerID, lbID)
+	logger.Infof("%s Request create policy of listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
 	policy, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreatePolicy(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - CreatePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -41,7 +42,7 @@ func (m *vngCloudRepository) ListPolicyOfListener(ctx context.Context, lbID, lis
 //	}
 func (m *vngCloudRepository) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", RequestIcon, policyID, listenerID, lbID)
+	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", domain.RequestIcon, policyID, listenerID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdatePolicy(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - UpdatePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -51,7 +52,7 @@ func (m *vngCloudRepository) UpdatePolicy(ctx context.Context, lbID, listenerID,
 }
 func (m *vngCloudRepository) DeletePolicy(ctx context.Context, lbID, listenerID, policyID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete policy %s of listener %s of load balancer %s", RequestIcon, policyID, listenerID, lbID)
+	logger.Infof("%s Request delete policy %s of listener %s of load balancer %s", domain.RequestIcon, policyID, listenerID, lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeletePolicyById(loadbalancerv2.NewDeletePolicyByIdRequest(lbID, listenerID, policyID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeletePolicy: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -62,7 +63,7 @@ func (m *vngCloudRepository) DeletePolicy(ctx context.Context, lbID, listenerID,
 
 func (m *vngCloudRepository) ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request reorder policies policyIDs=[%s]", RequestIcon, strings.Join(policyIDs, ","))
+	logger.Infof("%s Request reorder policies policyIDs=[%s]", domain.RequestIcon, strings.Join(policyIDs, ","))
 	opt := loadbalancerv2.NewReorderPoliciesRequest(lbID, listenerID).WithPoliciesOrder(policyIDs)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ReorderPolicies(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {

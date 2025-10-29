@@ -11,6 +11,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	computev2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/compute/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -30,7 +31,7 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 
 	if instanceID == "" {
 		logger.Error("[ERROR] - GetServerNetworkInfo: serverID is empty")
-		return "", "", "", "", ErrorInvalidInput
+		return "", "", "", "", domain.ErrorInvalidInput
 	}
 
 	server, sdkErr := m.GetServerByID(ctx, instanceID)
@@ -38,7 +39,7 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 		return "", "", "", "", sdkErr
 	}
 	if server == nil {
-		return "", "", "", "", ErrorNotFound
+		return "", "", "", "", domain.ErrorNotFound
 	}
 
 	networkID = server.InternalInterfaces[0].NetworkUuid
@@ -47,7 +48,7 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 
 	if subnetID == "" {
 		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, subnetID: %s", subnetID)
-		return "", "", "", "", ErrorNotFound
+		return "", "", "", "", domain.ErrorNotFound
 	}
 
 	subnetCIDR, err = m.getSubnetCIDR(ctx, networkID, subnetID)
@@ -77,7 +78,7 @@ func (m *vngCloudRepository) getSubnetCIDR(ctx context.Context, networkId, subne
 		return "", err
 	}
 	if subnet == nil {
-		return "", ErrorNotFound
+		return "", domain.ErrorNotFound
 	}
 	return subnet.Cidr, nil
 }
@@ -96,7 +97,7 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 
 func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for server %s to be ready", WaitIcon, serverID)
+	logger.Infof("%s Waiting for server %s to be ready", domain.WaitIcon, serverID)
 
 	var server *entityv2.Server
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -111,7 +112,7 @@ func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID s
 			return false, _err
 		}
 		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Server %s is ready", ReadyIcon, serverID)
+			logger.Infof("%s Server %s is ready", domain.ReadyIcon, serverID)
 			return true, nil
 		}
 		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
@@ -119,7 +120,7 @@ func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID s
 			return true, errors.New("server status is error")
 		}
 
-		logger.Infof("%s Server %s is not ready yet, waiting...", WaitIcon, serverID)
+		logger.Infof("%s Server %s is not ready yet, waiting...", domain.WaitIcon, serverID)
 		return false, nil
 	})
 

@@ -11,7 +11,7 @@ import (
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
@@ -92,7 +92,7 @@ func (m *MockProvider) GetGlobalLoadBalancerByID(ctx context.Context, glbID stri
 	}
 	logger := contexts.NewContext(ctx).Log()
 	logger.Error("Global Load Balancer not found")
-	return nil, vngcloud_repo.ErrorNotFound
+	return nil, domain.ErrorNotFound
 }
 
 func (m *MockProvider) GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
@@ -106,16 +106,16 @@ func (m *MockProvider) GetGlobalLoadBalancerByName(ctx context.Context, glbID st
 
 func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", vngcloud_repo.RequestIcon)
+	logger.Infof("%s Request create load balancer.", domain.RequestIcon)
 	if glbOptions == nil {
-		return nil, vngcloud_repo.ErrorInvalidInput
+		return nil, domain.ErrorInvalidInput
 	}
 
 	var lbOpt *global.CreateGlobalLoadBalancerRequest
 	if opt, ok := glbOptions.(*global.CreateGlobalLoadBalancerRequest); ok {
 		lbOpt = opt
 	} else {
-		return nil, vngcloud_repo.ErrorInvalidInput
+		return nil, domain.ErrorInvalidInput
 	}
 
 	lbID := "glb-" + randID()
@@ -158,7 +158,7 @@ func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions 
 
 func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s.", vngcloud_repo.RequestIcon, glbID)
+	logger.Infof("%s Request delete load balancer %s.", domain.RequestIcon, glbID)
 	newLBs := make([]*entityv2.GlobalLoadBalancer, 0)
 	for i := range m.glbs {
 		if m.glbs[i].ID != glbID {
@@ -167,7 +167,7 @@ func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID strin
 	}
 	if len(newLBs) == len(m.glbs) {
 		logger.Error("Global Load Balancer not found")
-		return vngcloud_repo.ErrorNotFound
+		return domain.ErrorNotFound
 	}
 
 	m.glbs = newLBs
@@ -176,7 +176,7 @@ func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID strin
 
 func (m *MockProvider) WaitGlobalLoadBalancerActive(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for global load balancer %s to be ready", vngcloud_repo.WaitIcon, glbID)
+	logger.Infof("%s Waiting for global load balancer %s to be ready", domain.WaitIcon, glbID)
 	var resultLB *entityv2.GlobalLoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -190,12 +190,12 @@ func (m *MockProvider) WaitGlobalLoadBalancerActive(ctx context.Context, glbID s
 			return false, err
 		}
 		if strings.ToUpper(lb.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Global load balancer %s is ready", vngcloud_repo.ReadyIcon, glbID)
+			logger.Infof("%s Global load balancer %s is ready", domain.ReadyIcon, glbID)
 			resultLB = lb
 			return true, nil
 		}
 
-		logger.Infof("%s Global load balancer %s is `%s`, waiting...", vngcloud_repo.WaitIcon, glbID, lb.Status)
+		logger.Infof("%s Global load balancer %s is `%s`, waiting...", domain.WaitIcon, glbID, lb.Status)
 		return false, nil
 	})
 
@@ -220,7 +220,7 @@ func (m *MockProvider) ListGlobalPools(ctx context.Context, glbID string) (*enti
 
 func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create global pool of load balancer %s", vngcloud_repo.RequestIcon, glbID)
+	logger.Infof("%s Request create global pool of load balancer %s", domain.RequestIcon, glbID)
 	pool := opt.ToRequestBody().(*global.CreateGlobalPoolRequest)
 	newPool := &wrapGlobalPool{
 		lbID: glbID,
@@ -317,7 +317,7 @@ func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt g
 
 func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete global pool %s of load balancer %s", vngcloud_repo.RequestIcon, poolID, glbID)
+	logger.Infof("%s Request delete global pool %s of load balancer %s", domain.RequestIcon, poolID, glbID)
 	isFound := false
 	newPools := make([]*wrapGlobalPool, 0)
 	for i, p := range m.globalPools {
@@ -329,7 +329,7 @@ func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID strin
 	}
 	if !isFound {
 		logger.Error("Pool not found")
-		return vngcloud_repo.ErrorNotFound
+		return domain.ErrorNotFound
 	}
 	m.globalPools = newPools
 
@@ -341,7 +341,7 @@ func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID strin
 func (m *MockProvider) UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Error("not implemented yet")
-	return vngcloud_repo.ErrorNotImplemented
+	return domain.ErrorNotImplemented
 }
 
 func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error) {
@@ -361,7 +361,7 @@ func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID 
 
 func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request patch global pool member of load balancer %s", vngcloud_repo.RequestIcon, glbID)
+	logger.Infof("%s Request patch global pool member of load balancer %s", domain.RequestIcon, glbID)
 
 	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMemberRequest)
 	for _, action := range patch.BulkActions {
@@ -435,7 +435,7 @@ func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID 
 			}
 			if !isFound {
 				logger.Error("Pool member not found")
-				return vngcloud_repo.ErrorNotFound
+				return domain.ErrorNotFound
 			}
 			m.mu.Lock()
 			for _, p := range m.globalPools {
@@ -494,14 +494,14 @@ func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID 
 			}
 			if !isFound {
 				logger.Error("Pool member not found")
-				return vngcloud_repo.ErrorNotFound
+				return domain.ErrorNotFound
 			}
 			m.updatingGlobalStatus(glbID)
 			go m.readyGlobalAfterTime(glbID)
 
 		} else {
 			logger.Error("Invalid bulk action")
-			return vngcloud_repo.ErrorInvalidInput
+			return domain.ErrorInvalidInput
 		}
 	}
 
@@ -522,7 +522,7 @@ func (m *MockProvider) ListGlobalListeners(ctx context.Context, glbID string) (*
 
 func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create global listener of load balancer %s", vngcloud_repo.RequestIcon, glbID)
+	logger.Infof("%s Request create global listener of load balancer %s", domain.RequestIcon, glbID)
 	listener := opt.ToRequestBody().(*global.CreateGlobalListenerRequest)
 	newListener := &wrapGlobalListener{
 		lbID: glbID,
@@ -556,7 +556,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 	}, nil
 
 	// logger := contexts.NewContext(ctx).Log()
-	// logger.Infof("%s Request create listener of load balancer %s", vngcloud_repo.RequestIcon, lbID)
+	// logger.Infof("%s Request create listener of load balancer %s", domain.RequestIcon, lbID)
 	// listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	// newListener := &wrapListener{
 	// 	lbID: lbID,
@@ -625,7 +625,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 
 func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete global listener %s of load balancer %s", vngcloud_repo.RequestIcon, listenerID, glbID)
+	logger.Infof("%s Request delete global listener %s of load balancer %s", domain.RequestIcon, listenerID, glbID)
 	isFound := false
 	newListeners := make([]*wrapGlobalListener, 0)
 	for i, l := range m.globalListeners {
@@ -637,7 +637,7 @@ func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listener
 	}
 	if !isFound {
 		logger.Error("Listener not found")
-		return vngcloud_repo.ErrorNotFound
+		return domain.ErrorNotFound
 	}
 	m.globalListeners = newListeners
 
@@ -649,5 +649,5 @@ func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listener
 func (m *MockProvider) UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Error("not implemented yet")
-	return vngcloud_repo.ErrorNotImplemented
+	return domain.ErrorNotImplemented
 }

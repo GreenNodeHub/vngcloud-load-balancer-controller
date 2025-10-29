@@ -7,9 +7,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
 type defaultModelDeployTask struct {
@@ -62,18 +66,18 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
 	// if already an exist lb
-	if t.vlbConfig.Status.LoadBalancerID != nil && *t.vlbConfig.Status.LoadBalancerID != "" {
-		if t.vlbConfig.Spec.LoadBalancerID != nil && *t.vlbConfig.Spec.LoadBalancerID != "" {
-			return t.migrateLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerID, *t.vlbConfig.Spec.LoadBalancerID)
+	if t.vlbConfig.Status.LoadBalancerId != nil && *t.vlbConfig.Status.LoadBalancerId != "" {
+		if t.vlbConfig.Spec.LoadBalancerId != nil && *t.vlbConfig.Spec.LoadBalancerId != "" {
+			return t.migrateLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerId, *t.vlbConfig.Spec.LoadBalancerId)
 		} else {
-			return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerID, nil)
+			return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerId, nil)
 		}
 	}
 
 	// if not exist lbId in status
 	// try to use spec lbId
-	if t.vlbConfig.Spec.LoadBalancerID != nil && *t.vlbConfig.Spec.LoadBalancerID != "" {
-		return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Spec.LoadBalancerID, nil)
+	if t.vlbConfig.Spec.LoadBalancerId != nil && *t.vlbConfig.Spec.LoadBalancerId != "" {
+		return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Spec.LoadBalancerId, nil)
 	}
 
 	// try to use spec lb Name
@@ -91,8 +95,30 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 }
 
 func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string, error) {
-	// TODO
-	return "", nil
+	lbEntity, err := t.vngcloudRepo.CreateLoadBalancer(ctx, t.buildCreateLoadBalancerRequest(ctx))
+	if err != nil {
+		return "", err
+	}
+	if lbEntity == nil || lbEntity.UUID == "" {
+		return "", errors.New("load balancer not have UUID after create, need to retry")
+	}
+
+	// wait for loadbalancer active, if lb is error, delete it and return error
+	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
+		if err == domain.ErrorLoadBalancerStatusError {
+			if err := t.vngcloudRepo.DeleteLoadBalancer(ctx, lbEntity.UUID); err != nil {
+				t.logger.Error("Failed to delete loadbalancer: ", err)
+				return "", err
+			}
+			t.logger.Infof("Delete loadbalancer \"%s\" because of status error, recreate now.", lbEntity.UUID)
+			return "", errs.NewRequeueNeeded("loadbalancer status is error, delete and recreate")
+		}
+		t.logger.Error("Failed to wait for loadbalancer active: ", err)
+		return "", err
+	}
+
+	t.logger.Infof("Created load balancer with ID %s", lbEntity.UUID)
+	return t.ensureExistLoadBalancer(ctx, lbEntity.UUID, nil)
 }
 
 // when update load balancer id to new value
@@ -114,6 +140,14 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		}
 	}
 
+	// update status
+	if err := t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+		obj.Status.LoadBalancerId = &lbId
+		obj.Status.Address = &lbEntity.Address
+	}); err != nil {
+		return "", err
+	}
+
 	if err := t.deployTags(ctx); err != nil {
 		return "", err
 	}
@@ -123,7 +157,7 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 
 	return lbId, t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
-		obj.Status.LoadBalancerID = &lbId
+		obj.Status.LoadBalancerId = &lbId
 		obj.Status.Address = &lbEntity.Address
 	})
 }
@@ -141,6 +175,8 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context) error {
 	// })
 }
 
+// resize load balancer if packageID in spec is different from current one
+// ignore if this lb is autoscaled
 func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *entity.LoadBalancer) error {
 	if t.vlbConfig.Spec.PackageID == nil || *t.vlbConfig.Spec.PackageID == "" {
 		return nil
@@ -149,6 +185,11 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 		return errors.New("load balancer entity is nil")
 	}
 	if *t.vlbConfig.Spec.PackageID == lbEntity.PackageID {
+		return nil
+	}
+
+	if lbEntity.AutoScalable {
+		t.logger.Infof("Loadbalancer is autoscaled, skip resizing.")
 		return nil
 	}
 
@@ -163,5 +204,43 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	return nil
 }
 
-// func  (t *defaultModelDeployTask)
+func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context) loadbalancerv2.ICreateLoadBalancerRequest {
+	request := loadbalancerv2.NewCreateLoadBalancerRequest(
+		t.vlbConfig.Spec.LoadBalancerName,
+		t.cfg.LoadBalancerOpts.DefaultL4PackageId,
+		t.vlbConfig.Spec.SubnetID,
+	)
+
+	if t.vlbConfig.Spec.PackageID != nil && *t.vlbConfig.Spec.PackageID != "" {
+		request = request.WithPackageId(*t.vlbConfig.Spec.PackageID)
+	}
+
+	if t.vlbConfig.Spec.Scheme != nil {
+		request = request.WithScheme(*t.vlbConfig.Spec.Scheme)
+	}
+
+	if t.vlbConfig.Spec.EnableAutoscale != nil {
+		request = request.WithAutoScalable(*t.vlbConfig.Spec.EnableAutoscale)
+	}
+
+	if t.vlbConfig.Spec.Type != "" {
+		request = request.WithType(t.vlbConfig.Spec.Type)
+	}
+
+	if t.vlbConfig.Spec.IsPoc != nil {
+		request = request.WithPoc(*t.vlbConfig.Spec.IsPoc)
+	}
+
+	if t.vlbConfig.Spec.ZoneId != nil {
+		request = request.WithZoneId(*t.vlbConfig.Spec.ZoneId)
+	}
+
+	// TODO: add more fields
+	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
+	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
+	// WithTags(ptags ...string) ICreateLoadBalancerRequest
+
+	return request
+}
+
 // func  (t *defaultModelDeployTask)

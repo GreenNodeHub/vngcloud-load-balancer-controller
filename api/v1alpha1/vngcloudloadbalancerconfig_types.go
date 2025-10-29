@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -321,9 +322,9 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +kubebuilder:validation:Enum=Internal;Internet
 	Scheme *loadbalancerv2.LoadBalancerScheme `json:"scheme,omitempty"`
 
-	// LoadBalancerID is managed by the controller
+	// LoadBalancerId is managed by the controller
 	// +optional
-	LoadBalancerID *string `json:"loadBalancerID,omitempty"`
+	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
 	// EnableAutoscale enables autoscaling for the load balancer
 	// +optional
@@ -344,6 +345,10 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// IsPOC indicates if this is a proof of concept deployment
 	// +optional
 	IsPoc *bool `json:"isPoc,omitempty"`
+
+	// ZoneId specifies the zone for the load balancer
+	// +optional
+	ZoneId *common.Zone `json:"zoneId,omitempty"`
 
 	// Listeners defines the array of listeners for the load balancer
 	// +optional
@@ -409,9 +414,9 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// // +optional
 	// UpdatedAt *metav1.Time `json:"updatedAt,omitempty"`
 
-	// LoadBalancerID is the actual ID of the load balancer in VNG Cloud
+	// LoadBalancerId is the actual ID of the load balancer in VNG Cloud
 	// +optional
-	LoadBalancerID *string `json:"loadBalancerID,omitempty"`
+	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
 	// Tags are key-value pairs for load balancer tagging
 	// +optional

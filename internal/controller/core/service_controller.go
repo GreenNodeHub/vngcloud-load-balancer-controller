@@ -34,16 +34,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core/eventhandlers"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
-)
-
-const (
-	successIcon = "✅"
-	errorIcon   = "❌"
-	actionIcon  = "🌐"
 )
 
 func NewServiceReconciler(
@@ -129,11 +124,11 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 		if r.serviceUtils.IsServicePendingFinalization(svc) {
 			err := r.reconcileDelete(ctx, req, svc)
 			if err != nil {
-				logger.Errorf("%s Delete failed: %v", errorIcon, err)
+				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 				r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				return err
 			}
-			logger.Infof("%s Delete successfully.", successIcon)
+			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
 			r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Deleted", key)
 			return nil
 		}
@@ -142,11 +137,11 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 
 	err = r.reconcileEnsure(ctx, req, svc)
 	if err != nil {
-		logger.Errorf("%s Ensure failed: %v", errorIcon, err)
+		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
-	logger.Infof("%s Ensure successfully.", successIcon)
+	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
 	r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Ensured", key)
 	return nil
 }

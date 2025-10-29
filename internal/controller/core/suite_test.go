@@ -20,26 +20,18 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 
-	"github.com/anngdinh/operator-helper/k8s"
-	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,92 +45,6 @@ var (
 	cfg       *rest.Config
 	k8sClient client.Client
 )
-
-// Shared manager and mock for service controller tests
-var (
-	testMgr            ctrl.Manager
-	testMockController *mockServiceController
-	testMgrContext     context.Context
-	testMgrCancel      context.CancelFunc
-	setupOnce          sync.Once
-)
-
-func setupSharedManager() {
-	setupOnce.Do(func() {
-		// Create mock service controller
-		testMockController = &mockServiceController{}
-
-		// Create manager
-		var err error
-		testMgr, err = ctrl.NewManager(cfg, ctrl.Options{
-			Scheme: k8sClient.Scheme(),
-		})
-		Expect(err).ToNot(HaveOccurred())
-
-		// Create ServiceReconciler with the new architecture
-		reconciler := &ServiceReconciler{
-			Client:                  testMgr.GetClient(),
-			Scheme:                  testMgr.GetScheme(),
-			FinalizerManager:        k8s.NewDefaultFinalizerManager(testMgr.GetClient(), logr.Discard()),
-			serviceUtils:            service.NewServiceUtils(consts.ServiceFinalizer),
-			eventRecorder:           &record.FakeRecorder{},
-			logger:                  logr.Discard(),
-			maxConcurrentReconciles: 1,
-		}
-
-		// Setup controller with manager
-		err = reconciler.SetupWithManager(ctx, testMgr)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Start manager in background
-		testMgrContext, testMgrCancel = context.WithCancel(ctx)
-		go func() {
-			defer GinkgoRecover()
-			err := testMgr.Start(testMgrContext)
-			Expect(err).ToNot(HaveOccurred())
-		}()
-	})
-}
-
-// Mock implementations for service controller testing
-type mockServiceController struct {
-	mu          sync.Mutex
-	ensureCalls int
-	deleteCalls int
-}
-
-func (m *mockServiceController) Ensure(ctx context.Context, req ctrl.Request) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureCalls++
-	return nil
-}
-
-func (m *mockServiceController) Delete(ctx context.Context, req ctrl.Request) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.deleteCalls++
-	return nil
-}
-
-func (m *mockServiceController) GetEnsureCallCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.ensureCalls
-}
-
-func (m *mockServiceController) GetDeleteCallCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.deleteCalls
-}
-
-func (m *mockServiceController) Reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.ensureCalls = 0
-	m.deleteCalls = 0
-}
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -176,19 +82,10 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	// Setup shared manager for service controller tests
-	setupSharedManager()
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
-
-	// Stop the shared manager first
-	if testMgrCancel != nil {
-		testMgrCancel()
-	}
-
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())

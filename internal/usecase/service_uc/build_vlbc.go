@@ -66,7 +66,10 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 		return err
 	}
 
-	// t.vlbConfig.Labels["TODO"] = "add-labels" // TODO
+	if t.vlbConfig.Labels == nil {
+		t.vlbConfig.Labels = make(map[string]string)
+	}
+	t.vlbConfig.Labels["belong-to-service"] = t.service.Name // TODO
 	t.vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
 	t.vlbConfig.Spec.SubnetID = subnetId
 	t.vlbConfig.OwnerReferences = []metav1.OwnerReference{
@@ -79,7 +82,7 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 		},
 	}
 
-	t.vlbConfig.Spec.LoadBalancerID = t.buildLoadBalancerId(ctx)
+	t.vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
 	t.vlbConfig.Spec.PackageID = t.buildPackageId(ctx)
 	t.vlbConfig.Spec.Scheme = t.buildScheme(ctx)
 	t.vlbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)

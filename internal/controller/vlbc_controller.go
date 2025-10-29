@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
@@ -111,11 +112,11 @@ func (r *VngcloudLoadBalancerConfigReconciler) reconcile(ctx context.Context, re
 		if r.vlbcUtils.IsPendingFinalization(object) {
 			err := r.reconcileDelete(ctx, req, object)
 			if err != nil {
-				logger.Errorf("%s Delete failed: %v", errorIcon, err)
+				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 				r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				return err
 			}
-			logger.Infof("%s Delete successfully.", successIcon)
+			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
 			r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
 			return nil
 		}
@@ -124,11 +125,11 @@ func (r *VngcloudLoadBalancerConfigReconciler) reconcile(ctx context.Context, re
 
 	err = r.reconcileEnsure(ctx, req, object)
 	if err != nil {
-		logger.Errorf("%s Ensure failed: %v", errorIcon, err)
+		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
-	logger.Infof("%s Ensure successfully.", successIcon)
+	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
 	r.eventRecorder.Event(object, corev1.EventTypeNormal, "Ensured", key)
 	return nil
 }

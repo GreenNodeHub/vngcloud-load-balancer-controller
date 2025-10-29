@@ -21,13 +21,17 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
 var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
@@ -40,18 +44,22 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vngcloudloadbalancerconfig := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{}
+		vngcloudloadbalancerconfig := &v1alpha1.VngcloudLoadBalancerConfig{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind VngcloudLoadBalancerConfig")
 			err := k8sClient.Get(ctx, typeNamespacedName, vngcloudloadbalancerconfig)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{
+				resource := &v1alpha1.VngcloudLoadBalancerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+						Type:             "Layer 4",
+						LoadBalancerName: "TODO",
+						SubnetID:         "TODO",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -59,7 +67,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &vksvngcloudvnv1alpha1.VngcloudLoadBalancerConfig{}
+			resource := &v1alpha1.VngcloudLoadBalancerConfig{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -81,4 +89,53 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
 	})
+
+	Context("When create service with specific annotation", func() {
+		It("created load balancer shoud have specific attribute", func() {
+
+			// create default service
+			service := newServiceResource("test-service", "default")
+			Expect(service).NotTo(BeNil())
+			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+
+			// expect create vlbc with label: belong-to-service=test-service. List vlbc to check
+			vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+			Eventually(func() bool {
+				err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{"belong-to-service": "test-service"})
+				if err != nil {
+					return false
+				}
+				return len(vlbcList.Items) == 1
+			}, timeout, interval).Should(BeTrue())
+
+			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
+			vlbc = &vlbcList.Items[0]
+			Expect(vlbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
+			// Expect(vlbc.Spec.SubnetID).Should(Equal(mockProvider.GetDefaultSubnetID()))
+			// Expect(vlbc.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
+
+			// clean up
+			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
+		})
+	})
 })
+
+var _ = newServiceResource("placeholder", "placeholder")
+
+func newServiceResource(name, namespace string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{Name: "http", Port: 80, TargetPort: intstr.FromInt(80)},
+			},
+			Selector: map[string]string{
+				"app": "test",
+			},
+		},
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // // --------------------------- Certificate ---------------------------
@@ -32,7 +33,7 @@ func (m *vngCloudRepository) GetCertificateByID(ctx context.Context, certID stri
 
 func (m *vngCloudRepository) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request import certificate", RequestIcon)
+	logger.Infof("%s Request import certificate", domain.RequestIcon)
 	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateCertificate(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ImportCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
@@ -43,7 +44,7 @@ func (m *vngCloudRepository) ImportCertificate(ctx context.Context, opt loadbala
 
 func (m *vngCloudRepository) DeleteCertificate(ctx context.Context, certID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete certificate %s", RequestIcon, certID)
+	logger.Infof("%s Request delete certificate %s", domain.RequestIcon, certID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteCertificateById(loadbalancerv2.NewDeleteCertificateByIdRequest(certID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - DeleteCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
