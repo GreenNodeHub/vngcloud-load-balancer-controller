@@ -33,6 +33,9 @@ const (
 
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
+
+	LabelOwnerResourceType = "vks.vngcloud.vn/owner-resource-type"
+	LabelOwnerResourceName = "vks.vngcloud.vn/owner-resource-name"
 )
 const (
 	DEFAULT_LB_PREFIX_NAME = "vks" // "vks" is abbreviated of "cluster"

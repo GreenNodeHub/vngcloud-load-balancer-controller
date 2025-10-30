@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/stretchr/testify/mock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -51,7 +52,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
@@ -69,7 +69,8 @@ var (
 	cancel                context.CancelFunc
 	mockServiceReconciler *core.ServiceReconciler
 	mockVLBCReconciler    *VngcloudLoadBalancerConfigReconciler
-	mockProvider          *provider.MockProvider
+	vngcloudRepo          *mocks.MockProvider
+	cniDetector           *utils.MockCniDetector
 
 	mockConfig = &config.Config{
 		Cluster: struct {
@@ -78,6 +79,15 @@ var (
 			ClusterID   string `mapstructure:"clusterID"`   // clusterID of cluster
 			Region      string `mapstructure:"region"`      // region of cluster
 		}{IsRunRemote: false, ClusterID: mockClusterID},
+		LoadBalancerOpts: config.LoadBalancerOpts{
+			DefaultL4PackageId:   "default-l4-package",
+			DefaultL7PackageId:   "default-l7-package",
+			DefaultPoolAlgorithm: "ROUND_ROBIN",
+
+			DefaultTimeoutClient:     50,
+			DefaultTimeoutConnection: 5,
+			DefaultTimeoutMember:     50,
+		},
 	}
 
 	mockNode1 = &corev1.Node{
@@ -256,12 +266,13 @@ var _ = BeforeSuite(func() {
 	finalizerManager := k8s.NewDefaultFinalizerManager(k8sManager.GetClient(), ctrl.Log)
 	k8sRepo := k8s_repo.NewK8sRepository(k8sManager.GetClient())
 	// vngcloudRepo, err := vngcloud_repo.NewVngCloudRepository(ctx, mockConfig)
-	vngcloudRepo := mocks.NewMockProvider()
+	vngcloudRepo = mocks.NewMockProvider()
 	err = vngcloudRepo.Init(nil)
 	Expect(err).NotTo(HaveOccurred())
 
 	annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
-	cniDetector := utils.NewDetector(k8sManager.GetClient())
+	cniDetector = new(utils.MockCniDetector)
+	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.UnknownCNI, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
 	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
 	serviceUseCase := service_uc.NewServiceUseCase(

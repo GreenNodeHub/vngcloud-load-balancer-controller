@@ -11,10 +11,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -125,6 +127,40 @@ func (uc *serviceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 }
 
 func (uc *serviceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+	svc, err := uc.k8sRepo.GetService(ctx, req.NamespacedName)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+
+	// check if have isIgnore annotation
+	var isIgnore bool
+	uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, svc.Annotations)
+	if isIgnore {
+		logger.Info("Service has ignore load balancer config annotation, skip.")
+		return nil
+	}
+
+	// get all VLBCs created by this service by using label selector
+	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+	err = uc.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
+		consts.LabelOwnerResourceName: svc.GetName(),
+		consts.LabelOwnerResourceType: svc.Kind,
+	})
+	if err != nil {
+		logger.Errorf("failed to list VLBCs by label: %v", err)
+		return err
+	}
+
+	// delete all VLBCs found
+	for _, vlbc := range vlbcList.Items {
+		err = uc.k8sRepo.DeleteVLBC(ctx, &vlbc)
+		if client.IgnoreNotFound(err) != nil {
+			logger.Errorf("failed to delete VLBC %s/%s: %v", vlbc.Namespace, vlbc.Name, err)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -162,6 +198,7 @@ func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	}
 
 	task := &defaultModelBuildTask{
+		clusterId:        uc.clusterId,
 		annotationParser: uc.annotationParser,
 		serviceUtils:     uc.serviceUtils,
 

@@ -4156,6 +4156,78 @@ func (_c *MockIK8sRepository_ListNode_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// ListVLBC provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, list, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, list)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListVLBC")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.VngcloudLoadBalancerConfigList, ...client.ListOption) error); ok {
+		r0 = returnFunc(ctx, list, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_ListVLBC_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListVLBC'
+type MockIK8sRepository_ListVLBC_Call struct {
+	*mock.Call
+}
+
+// ListVLBC is a helper method to define mock.On call
+//   - ctx context.Context
+//   - list *v1alpha1.VngcloudLoadBalancerConfigList
+//   - opts ...client.ListOption
+func (_e *MockIK8sRepository_Expecter) ListVLBC(ctx interface{}, list interface{}, opts ...interface{}) *MockIK8sRepository_ListVLBC_Call {
+	return &MockIK8sRepository_ListVLBC_Call{Call: _e.mock.On("ListVLBC",
+		append([]interface{}{ctx, list}, opts...)...)}
+}
+
+func (_c *MockIK8sRepository_ListVLBC_Call) Run(run func(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption)) *MockIK8sRepository_ListVLBC_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.VngcloudLoadBalancerConfigList
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.VngcloudLoadBalancerConfigList)
+		}
+		var arg2 []client.ListOption
+		var variadicArgs []client.ListOption
+		if len(args) > 2 {
+			variadicArgs = args[2].([]client.ListOption)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_ListVLBC_Call) Return(err error) *MockIK8sRepository_ListVLBC_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_ListVLBC_Call) RunAndReturn(run func(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error) *MockIK8sRepository_ListVLBC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PatchMutateStatusVLBC provides a mock function for the type MockIK8sRepository
 func (_mock *MockIK8sRepository) PatchMutateStatusVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig)) error {
 	ret := _mock.Called(ctx, vlbc, mutateFunc)

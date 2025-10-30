@@ -148,7 +148,7 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
-	if err := t.deployTags(ctx); err != nil {
+	if err := t.deployTags(ctx, lbId); err != nil {
 		return "", err
 	}
 
@@ -160,19 +160,6 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		obj.Status.LoadBalancerId = &lbId
 		obj.Status.Address = &lbEntity.Address
 	})
-}
-
-// oldTags: obj.Status.Tags
-// newTags: obj.Spec.Tags
-// currentTags: get in portal
-// merge them and update
-// also add tag vks_cluster_ids
-func (t *defaultModelDeployTask) deployTags(ctx context.Context) error {
-	// TODO
-	return nil
-	// return t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
-	// 	obj.Status.Tags = &lbId
-	// })
 }
 
 // resize load balancer if packageID in spec is different from current one

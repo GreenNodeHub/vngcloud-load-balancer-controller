@@ -78,6 +78,10 @@ spec:
                   - toPort
                   type: object
                 type: array
+              clusterId:
+                description: ClusterId is the ID of the cluster where the load balancer
+                  will be deployed. It helps in organizing resources.
+                type: string
               enableAutoscale:
                 description: EnableAutoscale enables autoscaling for the load balancer
                 type: boolean
@@ -306,6 +310,11 @@ spec:
                   - id
                   type: object
                 type: array
+              createdTags:
+                additionalProperties:
+                  type: string
+                description: CreatedTags is the map of tags created on the load balancer
+                type: object
               loadBalancerId:
                 description: LoadBalancerId is the actual ID of the load balancer
                   in VNG Cloud
@@ -322,11 +331,6 @@ spec:
               reason:
                 description: Reason provides a brief reason for the current state
                 type: string
-              tags:
-                additionalProperties:
-                  type: string
-                description: Tags are key-value pairs for load balancer tagging
-                type: object
             type: object
         required:
         - spec

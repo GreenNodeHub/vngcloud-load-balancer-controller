@@ -13,12 +13,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 type defaultModelBuildTask struct {
-	// clusterName      string
+	clusterId string
 	// vpcID            string
 	annotationParser annotations.Parser
 	serviceUtils     service.ServiceUtils
@@ -69,19 +70,25 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 	if t.vlbConfig.Labels == nil {
 		t.vlbConfig.Labels = make(map[string]string)
 	}
-	t.vlbConfig.Labels["belong-to-service"] = t.service.Name // TODO
+	t.vlbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
+	t.vlbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
 	t.vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
 	t.vlbConfig.Spec.SubnetID = subnetId
-	t.vlbConfig.OwnerReferences = []metav1.OwnerReference{
-		{
-			APIVersion: t.service.APIVersion,
-			Kind:       t.service.Kind,
-			Name:       t.service.Name,
-			UID:        t.service.UID,
-			// TODO
-		},
-	}
 
+	// should not set owner reference because sometimes user want to keep VLBC after service is deleted
+	// t.vlbConfig.OwnerReferences = []metav1.OwnerReference{
+	// 	{
+	// 		APIVersion: t.service.APIVersion,
+	// 		Kind:       t.service.Kind,
+	// 		Name:       t.service.Name,
+	// 		UID:        t.service.UID,
+	// 		// TODO
+	// 	},
+	// }
+
+	if t.clusterId != "" {
+		t.vlbConfig.Spec.ClusterId = &t.clusterId
+	}
 	t.vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
 	t.vlbConfig.Spec.PackageID = t.buildPackageId(ctx)
 	t.vlbConfig.Spec.Scheme = t.buildScheme(ctx)
@@ -89,10 +96,7 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 	t.vlbConfig.Spec.Tags = t.buildTags(ctx)
 	t.vlbConfig.Spec.TargetNodeLabels = t.buildTargetNodeLabels(ctx)
 	t.vlbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
-
-	if t.vlbConfig.Spec.LoadBalancerName == "" {
-		t.vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
-	}
+	t.vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
 
 	if pools, listeners, err := t.buildPoolsAndListeners(ctx, t.vlbConfig.Spec.TargetNodeLabels); err != nil {
 		return err

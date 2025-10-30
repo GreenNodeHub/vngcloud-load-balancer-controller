@@ -1,13 +1,13 @@
 package controller
 
 import (
-	"fmt"
+	// "fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	// "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	// "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	// "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -128,21 +128,21 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 	printEndTest()
 }
 
-// get load balancer by id in resource annotation
-func getLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.LoadBalancer {
-	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
-	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-	Expect(loadbalancerID).ShouldNot(BeEmpty())
-	loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
-	Expect(err).ShouldNot(HaveOccurred())
-	return loadbalancer
-}
+// // get load balancer by id in resource annotation
+// func getLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.LoadBalancer {
+// 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
+// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+// 	Expect(loadbalancerID).ShouldNot(BeEmpty())
+// 	loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
+// 	Expect(err).ShouldNot(HaveOccurred())
+// 	return loadbalancer
+// }
 
-func getGLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.GlobalLoadBalancer {
-	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
-	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
-	Expect(loadbalancerID).ShouldNot(BeEmpty())
-	loadbalancer, err := mockProvider.GetGlobalLoadBalancerByID(ctx, loadbalancerID)
-	Expect(err).ShouldNot(HaveOccurred())
-	return loadbalancer
-}
+// func getGLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.GlobalLoadBalancer {
+// 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
+// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+// 	Expect(loadbalancerID).ShouldNot(BeEmpty())
+// 	loadbalancer, err := mockProvider.GetGlobalLoadBalancerByID(ctx, loadbalancerID)
+// 	Expect(err).ShouldNot(HaveOccurred())
+// 	return loadbalancer
+// }

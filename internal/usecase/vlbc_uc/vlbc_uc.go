@@ -40,6 +40,24 @@ func (uc *vlbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 }
 
 func (uc *vlbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+	vlbConfig, err := uc.k8sRepo.GetVLBC(ctx, req.NamespacedName)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+	task := &defaultModelDeleteTask{
+		logger:       logger,
+		cfg:          uc.cfg,
+		vlbConfig:    vlbConfig,
+		vngcloudRepo: uc.vngcloudRepo,
+		k8sRepo:      uc.k8sRepo,
+	}
+
+	if err := task.delete(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 

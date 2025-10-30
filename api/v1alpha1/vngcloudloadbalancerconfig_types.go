@@ -304,6 +304,10 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +kubebuilder:validation:Enum=Layer 4;Layer 7
 	Type loadbalancerv2.LoadBalancerType `json:"type"`
 
+	// ClusterId is the ID of the cluster where the load balancer will be deployed. It helps in organizing resources.
+	// +optional
+	ClusterId *string `json:"clusterId,omitempty"`
+
 	// General fields for all load balancers
 	// LoadBalancerName is the name of the load balancer (only set via annotation)
 	// +required
@@ -418,9 +422,9 @@ type VngcloudLoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
-	// Tags are key-value pairs for load balancer tagging
+	// CreatedTags is the map of tags created on the load balancer
 	// +optional
-	Tags map[string]string `json:"tags,omitempty"`
+	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
 	// +optional

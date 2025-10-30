@@ -117,3 +117,7 @@ func (r *k8sRepository) patchMutateStatusObject(
 			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
 	})
 }
+
+func (r *k8sRepository) ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error {
+	return r.client.List(ctx, list, opts...)
+}
