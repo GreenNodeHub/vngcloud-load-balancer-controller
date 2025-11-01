@@ -115,6 +115,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - nodesecuritygroups
   - vngcloudgloballoadbalancers
   - vngcloudloadbalancerconfigs
   verbs:
@@ -128,6 +129,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - nodesecuritygroups/finalizers
   - vngcloudgloballoadbalancers/finalizers
   - vngcloudloadbalancerconfigs/finalizers
   verbs:
@@ -135,6 +137,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - nodesecuritygroups/status
   - vngcloudgloballoadbalancers/status
   - vngcloudloadbalancerconfigs/status
   verbs:

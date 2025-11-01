@@ -36,4 +36,12 @@ resources:
   kind: VngcloudLoadBalancerConfig
   path: github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: vks.vngcloud.vn
+  kind: NodeSecurityGroup
+  path: github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1
+  version: v1alpha1
 version: "3"

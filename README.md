@@ -182,6 +182,11 @@ kubebuilder create api --version v1alpha1 --kind VngcloudLoadBalancerConfig --co
 go mod tidy
 make generate
 make manifests kustomize helm
+
+kubebuilder create api --version v1alpha1 --kind NodeSecurityGroup --controller=true --resource=true --namespaced=true
+go mod tidy
+make generate
+make manifests kustomize helm
 ```
 
 Mockery generation:
@@ -191,3 +196,12 @@ go install github.com/vektra/mockery/v3@v3.5.5
 mockery init "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 mockery
 ```
+
+my aim is to create the best of the best vngcloud-load-balancer-controller. It must use:
+- mockery for testing
+- golangci-lint for linting
+- github actions for ci/cd
+- helm for deployment
+- end to end tests
+- dependency injection
+- 

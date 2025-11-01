@@ -87,6 +87,7 @@ func main() {
 	var devMode bool
 	var disableServiceController bool
 	var disableVLBConfigController bool
+	var disableNodeSecurityGroupController bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -104,6 +105,8 @@ func main() {
 		"If set, the service controller will be disabled")
 	flag.BoolVar(&disableVLBConfigController, "disable-vlb-config-controller", false,
 		"If set, the VngcloudLoadBalancerConfig controller will be disabled")
+	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
+		"If set, the NodeSecurityGroup controller will be disabled")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -283,6 +286,15 @@ func main() {
 		}
 	}
 
+	if !disableNodeSecurityGroupController {
+		if err := (&controller.NodeSecurityGroupReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
