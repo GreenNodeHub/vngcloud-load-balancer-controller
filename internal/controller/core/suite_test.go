@@ -225,7 +225,7 @@ var _ = BeforeSuite(func() {
 
 	// Setup Service reconciler
 	serviceUseCase := service_uc.NewServiceUseCase(
-		mockConfig, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+		mockClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 	mockServiceReconciler = NewServiceReconciler(
 		serviceUseCase,
 		k8sManager.GetClient(),

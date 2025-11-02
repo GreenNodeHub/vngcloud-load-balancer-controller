@@ -278,7 +278,7 @@ var _ = BeforeSuite(func() {
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
 	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
 	serviceUseCase := service_uc.NewServiceUseCase(
-		mockConfig, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+		mockClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 	mockServiceReconciler = core.NewServiceReconciler(
 		serviceUseCase,
 		k8sManager.GetClient(),

@@ -254,7 +254,7 @@ func main() {
 		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 		serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
 		serviceUseCase := service_uc.NewServiceUseCase(
-			conf, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 		reconciler := corecontroller.NewServiceReconciler(
 			serviceUseCase,
 			mgr.GetClient(),

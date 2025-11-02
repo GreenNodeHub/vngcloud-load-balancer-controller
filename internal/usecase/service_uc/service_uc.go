@@ -14,7 +14,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
@@ -22,7 +21,6 @@ import (
 )
 
 type serviceUseCase struct {
-	cfg              *config.Config
 	k8sRepo          repository.K8sRepository
 	vngcloudRepo     repository.VngCloudRepository
 	annotationParser annotations.Parser
@@ -38,7 +36,7 @@ type serviceUseCase struct {
 }
 
 func NewServiceUseCase(
-	cfg *config.Config,
+	clusterId string,
 	k8sRepo repository.K8sRepository,
 	vngcloudRepo repository.VngCloudRepository,
 	annotationParser annotations.Parser,
@@ -47,7 +45,7 @@ func NewServiceUseCase(
 	endpointResolver utils.EndpointResolver,
 ) usecase.ServiceUseCase {
 	return &serviceUseCase{
-		cfg:              cfg,
+		clusterId:        clusterId,
 		k8sRepo:          k8sRepo,
 		vngcloudRepo:     vngcloudRepo,
 		annotationParser: annotationParser,
@@ -80,9 +78,8 @@ func (uc *serviceUseCase) Init(ctx context.Context) error {
 		}
 	}
 
-	uc.clusterId = uc.cfg.Cluster.ClusterID
 	// if clusterID is empty, get from node label
-	if uc.cfg.Cluster.ClusterID == "" {
+	if uc.clusterId == "" {
 		clusterID := ""
 		for _, node := range nodes.Items {
 			if node.Labels != nil && node.Labels["vks.vngcloud.vn/cluster-id"] != "" {
