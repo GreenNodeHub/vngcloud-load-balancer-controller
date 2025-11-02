@@ -43,7 +43,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
@@ -69,7 +69,7 @@ var (
 	mockServiceReconciler *ServiceReconciler
 	mockLBCReconciler     *controller.LoadBalancerConfigReconciler
 	mockNSGReconciler     *controller.NodeSecurityGroupReconciler
-	vngcloudRepo          *mocks.MockProvider
+	vngcloudRepo          *vngcloud_mocks.MockProvider
 	cniDetector           *utils.MockCniDetector
 
 	mockConfig = &config.Config{
@@ -212,7 +212,7 @@ var _ = BeforeSuite(func() {
 	k8sRepo := k8s_repo.NewK8sRepository(k8sManager.GetClient())
 
 	// Setup mock VNG Cloud repository
-	vngcloudRepo = mocks.NewMockProvider()
+	vngcloudRepo = vngcloud_mocks.NewMockProvider()
 	err = vngcloudRepo.Init(nil)
 	Expect(err).NotTo(HaveOccurred())
 

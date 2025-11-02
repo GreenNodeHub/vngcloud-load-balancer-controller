@@ -1,4 +1,4 @@
-package mocks
+package vngcloud_mocks
 
 import (
 	"context"

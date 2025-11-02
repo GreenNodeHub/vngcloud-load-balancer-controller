@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
@@ -1125,9 +1125,9 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 						expectPortRangeMax := []int{80, 80, 80, 8080, 8080, 8080, 31000, 65535, 65535}
 						expectPortRangeMin := []int{80, 80, 80, 8080, 8080, 8080, 31000, 0, 0}
 						expectCIDRs := []string{
-							mocks.MockSubnetCIDR, mocks.MockSubnetCIDR, mocks.MockSubnetCIDR,
-							mocks.MockSubnetCIDR_1b_1, mocks.MockSubnetCIDR_1b_1,
-							mocks.MockSubnetCIDR_1b_2, mocks.MockSubnetCIDR_1b_2,
+							vngcloud_mocks.MockSubnetCIDR, vngcloud_mocks.MockSubnetCIDR, vngcloud_mocks.MockSubnetCIDR,
+							vngcloud_mocks.MockSubnetCIDR_1b_1, vngcloud_mocks.MockSubnetCIDR_1b_1,
+							vngcloud_mocks.MockSubnetCIDR_1b_2, vngcloud_mocks.MockSubnetCIDR_1b_2,
 							"::/0", "0.0.0.0/0",
 						}
 						for _, rule := range rules.Items {
@@ -1220,8 +1220,8 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								}, time.Second*10, interval).Should(HaveLen(6)) // 1 nodeport + 3 x 1 (1 pod port x 3 subnets (4 nodes in 3 subnets)) + 2 engress default allow all
 								expectPortRangeMax := []int{80, 80, 80, 31000, 65535, 65535}
 								expectCIDRs := []string{
-									mocks.MockSubnetCIDR, mocks.MockSubnetCIDR,
-									mocks.MockSubnetCIDR_1b_1, mocks.MockSubnetCIDR_1b_2,
+									vngcloud_mocks.MockSubnetCIDR, vngcloud_mocks.MockSubnetCIDR,
+									vngcloud_mocks.MockSubnetCIDR_1b_1, vngcloud_mocks.MockSubnetCIDR_1b_2,
 									"::/0", "0.0.0.0/0",
 								}
 								for _, rule := range rules.Items {
@@ -1457,7 +1457,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(rule.Direction).Should(BeElementOf([]string{"ingress", "egress"}))
 							Expect(rule.EtherType).Should(BeElementOf([]string{"IPv4", "IPv6"}))
 							Expect(rule.Protocol).Should(BeElementOf([]string{"tcp", "any"}))
-							Expect(rule.RemoteIPPrefix).Should(BeElementOf([]string{mocks.MockSubnetCIDR, "0.0.0.0/0", "::/0"}))
+							Expect(rule.RemoteIPPrefix).Should(BeElementOf([]string{vngcloud_mocks.MockSubnetCIDR, "0.0.0.0/0", "::/0"}))
 						}
 
 						// check server have secgroup
@@ -1703,7 +1703,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 					if service.Annotations == nil {
 						service.Annotations = map[string]string{}
 					}
-					service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName)] = mocks.MockLBNameError
+					service.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName)] = vngcloud_mocks.MockLBNameError
 					return []ObjectAndExpect[*corev1.Service]{{obj: service, expect: func() {}}}
 				},
 				expect: func() {
