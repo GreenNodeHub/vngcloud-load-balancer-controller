@@ -1,25 +1,21 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-vlbc-editor-role
+  name: {{ include "vngcloud-load-balancer-controller.fullname" . }}-lbc-viewer-role
   labels:
   {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
-  - vngcloudloadbalancerconfigs
+  - loadbalancerconfigs
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - vks.vngcloud.vn
   resources:
-  - vngcloudloadbalancerconfigs/status
+  - loadbalancerconfigs/status
   verbs:
   - get

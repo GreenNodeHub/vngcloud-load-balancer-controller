@@ -22,14 +22,14 @@ import (
 
 type nsgUseCase struct {
 	cfg          *config.Config
-	k8sRepo      repository.IK8sRepository
-	vngcloudRepo repository.IVngCloudRepository
+	k8sRepo      repository.K8sRepository
+	vngcloudRepo repository.VngCloudRepository
 }
 
 func NewNSGUseCase(
 	cfg *config.Config,
-	k8sRepo repository.IK8sRepository,
-	vngcloudRepo repository.IVngCloudRepository,
+	k8sRepo repository.K8sRepository,
+	vngcloudRepo repository.VngCloudRepository,
 ) usecase.NodeSecurityGroupUseCase {
 	return &nsgUseCase{
 		cfg:          cfg,

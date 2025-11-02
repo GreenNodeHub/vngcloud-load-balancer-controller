@@ -30,7 +30,7 @@ const (
 
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
 	GLBFinalizer     = "glb.vngcloud.vn/resources"
-	VLBCFinalizer    = "vlbc.vngcloud.vn/resources" // TODO: plan this finalizer name
+	LBCFinalizer     = "lbc.vngcloud.vn/resources" // TODO: plan this finalizer name
 	NSGFinalizer     = "nsg.vngcloud.vn/resources"
 
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"

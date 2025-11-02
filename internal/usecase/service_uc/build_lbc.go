@@ -29,8 +29,8 @@ type defaultModelBuildTask struct {
 
 	logger           *logrus.Entry
 	service          *corev1.Service
-	vngcloudRepo     repository.IVngCloudRepository
-	k8sRepo          repository.IK8sRepository
+	vngcloudRepo     repository.VngCloudRepository
+	k8sRepo          repository.K8sRepository
 	nameHelper       utils.NameHelper
 	endpointResolver utils.EndpointResolver
 
@@ -53,7 +53,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		}
 		return nil
 	}
-	if err := t.buildVngcloudLoadBalancerConfig(ctx); err != nil {
+	if err := t.buildLoadBalancerConfig(ctx); err != nil {
 		return err
 	}
 	if err := t.buildNodeSecurityGroup(ctx); err != nil {
@@ -61,7 +61,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	}
 
 	// update service address
-	address := t.getVLBCAddress(ctx)
+	address := t.getLBCAddress(ctx)
 	if address != "" {
 		err := t.k8sRepo.UpdateServiceStatusAddress(ctx, utils.NamespacedName(t.service), address)
 		if err != nil {
@@ -72,35 +72,35 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	return nil
 }
 
-func (t *defaultModelBuildTask) buildVngcloudLoadBalancerConfig(ctx context.Context) error {
-	// list VLBC by label selector
-	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-	err := t.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
+func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) error {
+	// list LBC by label selector
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
 		consts.LabelOwnerResourceName: t.service.Name,
 		consts.LabelOwnerResourceType: t.service.Kind,
 	})
 	if err != nil {
-		t.logger.Errorf("failed to list VLBC: %v", err)
+		t.logger.Errorf("failed to list LBC: %v", err)
 		return err
 	}
-	if len(vlbcList.Items) > 1 {
-		t.logger.Errorf("found multiple VLBC for service %s/%s", t.service.Namespace, t.service.Name)
-		return errors.New("found multiple VLBC for service " + t.service.Namespace + "/" + t.service.Name)
+	if len(lbcList.Items) > 1 {
+		t.logger.Errorf("found multiple LBC for service %s/%s", t.service.Namespace, t.service.Name)
+		return errors.New("found multiple LBC for service " + t.service.Namespace + "/" + t.service.Name)
 	}
-	vlbConfig := &v1alpha1.VngcloudLoadBalancerConfig{}
+	lbConfig := &v1alpha1.LoadBalancerConfig{}
 	isCreated := false
-	oldVLBConfig := vlbConfig.DeepCopy()
-	if len(vlbcList.Items) == 1 {
-		vlbConfig = &vlbcList.Items[0]
+	oldLBConfig := lbConfig.DeepCopy()
+	if len(lbcList.Items) == 1 {
+		lbConfig = &lbcList.Items[0]
 		isCreated = true
-		oldVLBConfig = vlbConfig.DeepCopy()
+		oldLBConfig = lbConfig.DeepCopy()
 	} else {
-		vlbConfig = &v1alpha1.VngcloudLoadBalancerConfig{
+		lbConfig = &v1alpha1.LoadBalancerConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      utils.GenerateLBConfigName("svc", t.service.Name),
 				Namespace: t.service.Namespace,
 			},
-			Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{},
+			Spec: v1alpha1.LoadBalancerConfigSpec{},
 		}
 		isCreated = false
 	}
@@ -121,17 +121,17 @@ func (t *defaultModelBuildTask) buildVngcloudLoadBalancerConfig(ctx context.Cont
 	t.subnetId = subnetId
 	t.subnetCidr = subnetCidr
 
-	if vlbConfig.Labels == nil {
-		vlbConfig.Labels = make(map[string]string)
+	if lbConfig.Labels == nil {
+		lbConfig.Labels = make(map[string]string)
 	}
-	vlbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
-	vlbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
-	vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
-	vlbConfig.Spec.SubnetId = subnetId
-	vlbConfig.Spec.ZoneId = zoneId
+	lbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
+	lbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
+	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
+	lbConfig.Spec.SubnetId = subnetId
+	lbConfig.Spec.ZoneId = zoneId
 
-	// should not set owner reference because sometimes user want to keep VLBC after service is deleted
-	// vlbConfig.OwnerReferences = []metav1.OwnerReference{
+	// should not set owner reference because sometimes user want to keep LBC after service is deleted
+	// lbConfig.OwnerReferences = []metav1.OwnerReference{
 	// 	{
 	// 		APIVersion: t.service.APIVersion,
 	// 		Kind:       t.service.Kind,
@@ -142,35 +142,35 @@ func (t *defaultModelBuildTask) buildVngcloudLoadBalancerConfig(ctx context.Cont
 	// }
 
 	if t.clusterId != "" {
-		vlbConfig.Spec.ClusterId = &t.clusterId
+		lbConfig.Spec.ClusterId = &t.clusterId
 	}
-	vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
-	vlbConfig.Spec.PackageId = t.buildPackageId(ctx)
-	vlbConfig.Spec.Scheme = t.buildScheme(ctx)
-	vlbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
-	vlbConfig.Spec.Tags = t.buildTags(ctx)
-	vlbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
-	vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+	lbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
+	lbConfig.Spec.PackageId = t.buildPackageId(ctx)
+	lbConfig.Spec.Scheme = t.buildScheme(ctx)
+	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
+	lbConfig.Spec.Tags = t.buildTags(ctx)
+	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
+	lbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	if pools, listeners, err := t.buildPoolsAndListeners(ctx, targetNodeLabels); err != nil {
 		return err
 	} else {
-		vlbConfig.Spec.Pools = pools
-		vlbConfig.Spec.Listeners = listeners
+		lbConfig.Spec.Pools = pools
+		lbConfig.Spec.Listeners = listeners
 	}
 
-	// create or update VLBC
+	// create or update LBC
 	if !isCreated {
-		err = t.k8sRepo.CreateVLBC(ctx, vlbConfig)
+		err = t.k8sRepo.CreateLoadBalancerConfig(ctx, lbConfig)
 		if err != nil {
-			t.logger.Errorf("failed to create VLBC: %v", err)
+			t.logger.Errorf("failed to create LBC: %v", err)
 			return err
 		}
 	} else {
-		err = t.k8sRepo.PatchVLBC(ctx, vlbConfig, client.MergeFrom(oldVLBConfig))
+		err = t.k8sRepo.PatchLoadBalancerConfig(ctx, lbConfig, client.MergeFrom(oldLBConfig))
 		if err != nil {
-			t.logger.Errorf("failed to patch VLBC: %v", err)
+			t.logger.Errorf("failed to patch LBC: %v", err)
 			return err
 		}
 	}
@@ -434,27 +434,27 @@ func (t *defaultModelBuildTask) buildIsPoc(_ context.Context) *bool {
 	return &isPoc
 }
 
-// get vlbc address from status
-func (t *defaultModelBuildTask) getVLBCAddress(ctx context.Context) string {
-	// list VLBC by label selector
-	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-	err := t.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
+// get lbc address from status
+func (t *defaultModelBuildTask) getLBCAddress(ctx context.Context) string {
+	// list LBC by label selector
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
 		consts.LabelOwnerResourceName: t.service.Name,
 		consts.LabelOwnerResourceType: t.service.Kind,
 	})
 	if err != nil {
-		t.logger.Warnf("failed to list VLBC: %v", err)
+		t.logger.Warnf("failed to list LBC: %v", err)
 		return ""
 	}
-	if len(vlbcList.Items) > 1 {
-		t.logger.Warnf("found multiple VLBC for service %s/%s", t.service.Namespace, t.service.Name)
+	if len(lbcList.Items) > 1 {
+		t.logger.Warnf("found multiple LBC for service %s/%s", t.service.Namespace, t.service.Name)
 		return ""
 	}
-	if len(vlbcList.Items) == 0 {
+	if len(lbcList.Items) == 0 {
 		return ""
 	}
-	if vlbcList.Items[0].Status.Address != nil {
-		return *vlbcList.Items[0].Status.Address
+	if lbcList.Items[0].Status.Address != nil {
+		return *lbcList.Items[0].Status.Address
 	}
 	return ""
 }

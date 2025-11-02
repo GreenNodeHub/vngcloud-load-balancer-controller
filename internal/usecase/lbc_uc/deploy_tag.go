@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -23,20 +23,20 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		currentTags[tag.Key] = tag.Value
 	}
 	ensuredTags := make(map[string]string)
-	if t.vlbConfig.Spec.Tags != nil {
-		ensuredTags = t.vlbConfig.Spec.Tags
+	if t.lbConfig.Spec.Tags != nil {
+		ensuredTags = t.lbConfig.Spec.Tags
 	}
 	createdTags := make(map[string]string)
-	for k, v := range t.vlbConfig.Status.CreatedTags {
+	for k, v := range t.lbConfig.Status.CreatedTags {
 		createdTags[k] = v
 	}
 
-	if t.vlbConfig.Spec.ClusterId != nil && *t.vlbConfig.Spec.ClusterId != "" {
+	if t.lbConfig.Spec.ClusterId != nil && *t.lbConfig.Spec.ClusterId != "" {
 		// ensure have cluster ids tag
 		vksClusterTags := currentTags[consts.VKS_TAG_KEY]
-		if !strings.Contains(vksClusterTags, *t.vlbConfig.Spec.ClusterId) {
+		if !strings.Contains(vksClusterTags, *t.lbConfig.Spec.ClusterId) {
 			t.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
-			vksClusterTags = t.joinVKSTag(vksClusterTags, *t.vlbConfig.Spec.ClusterId)
+			vksClusterTags = t.joinVKSTag(vksClusterTags, *t.lbConfig.Spec.ClusterId)
 			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
 		} else {
 			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
@@ -47,7 +47,7 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		return err
 	}
 
-	return t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
 		obj.Status.CreatedTags = ensuredTags
 	})
 }

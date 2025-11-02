@@ -23,8 +23,8 @@ import (
 
 type serviceUseCase struct {
 	cfg              *config.Config
-	k8sRepo          repository.IK8sRepository
-	vngcloudRepo     repository.IVngCloudRepository
+	k8sRepo          repository.K8sRepository
+	vngcloudRepo     repository.VngCloudRepository
 	annotationParser annotations.Parser
 	serviceUtils     service.ServiceUtils
 	cniDetector      utils.CniDetector
@@ -39,14 +39,13 @@ type serviceUseCase struct {
 
 func NewServiceUseCase(
 	cfg *config.Config,
-	k8sRepo repository.IK8sRepository,
-	vngcloudRepo repository.IVngCloudRepository,
+	k8sRepo repository.K8sRepository,
+	vngcloudRepo repository.VngCloudRepository,
 	annotationParser annotations.Parser,
 	serviceUtils service.ServiceUtils,
 	cniDetector utils.CniDetector,
 	endpointResolver utils.EndpointResolver,
-	// k8sClient client.Client,
-) usecase.IServiceUseCase {
+) usecase.ServiceUseCase {
 	return &serviceUseCase{
 		cfg:              cfg,
 		k8sRepo:          k8sRepo,
@@ -55,7 +54,6 @@ func NewServiceUseCase(
 		serviceUtils:     serviceUtils,
 		cniDetector:      cniDetector,
 		endpointResolver: endpointResolver,
-		// k8sClient:        k8sClient,
 	}
 }
 
@@ -138,22 +136,22 @@ func (uc *serviceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 		return nil
 	}
 
-	// get all VLBCs created by this service by using label selector
-	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-	err = uc.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
+	// get all LBCs created by this service by using label selector
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err = uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
 		consts.LabelOwnerResourceName: svc.GetName(),
 		consts.LabelOwnerResourceType: svc.Kind,
 	})
 	if err != nil {
-		logger.Errorf("failed to list VLBCs by label: %v", err)
+		logger.Errorf("failed to list LBCs by label: %v", err)
 		return err
 	}
 
-	// delete all VLBCs found
-	for _, vlbc := range vlbcList.Items {
-		err = uc.k8sRepo.DeleteVLBC(ctx, &vlbc)
+	// delete all LBCs found
+	for _, lbc := range lbcList.Items {
+		err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
 		if client.IgnoreNotFound(err) != nil {
-			logger.Errorf("failed to delete VLBC %s/%s: %v", vlbc.Namespace, vlbc.Name, err)
+			logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
 			return err
 		}
 	}

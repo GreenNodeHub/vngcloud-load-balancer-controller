@@ -36,59 +36,59 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 )
 
-func NewVngcloudLoadBalancerConfigReconciler(
+func NewLoadBalancerConfigReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	vlbcUseCase usecase.IVLBConfigUseCase,
+	lbcUseCase usecase.LoadBalancerConfigUseCase,
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
-	vlbcUtils vlbc.VLBCUtils,
-) *VngcloudLoadBalancerConfigReconciler {
-	return &VngcloudLoadBalancerConfigReconciler{
+	lbcUtils lbc.LBCUtils,
+) *LoadBalancerConfigReconciler {
+	return &LoadBalancerConfigReconciler{
 		Client:           client,
 		Scheme:           scheme,
-		vlbcUseCase:      vlbcUseCase,
+		lbcUseCase:       lbcUseCase,
 		eventRecorder:    eventRecorder,
 		finalizerManager: finalizerManager,
-		vlbcUtils:        vlbcUtils,
+		lbcUtils:         lbcUtils,
 	}
 }
 
-// VngcloudLoadBalancerConfigReconciler reconciles a VngcloudLoadBalancerConfig object
-type VngcloudLoadBalancerConfigReconciler struct {
+// LoadBalancerConfigReconciler reconciles a LoadBalancerConfig object
+type LoadBalancerConfigReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
-	vlbcUseCase      usecase.IVLBConfigUseCase
+	lbcUseCase       usecase.LoadBalancerConfigUseCase
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
-	vlbcUtils        vlbc.VLBCUtils
+	lbcUtils         lbc.LBCUtils
 
 	initDone atomic.Bool
 }
 
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudloadbalancerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the VngcloudLoadBalancerConfig object against the actual cluster state, and then
+// the LoadBalancerConfig object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
-func (r *VngcloudLoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *LoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	ctx = contexts.NewContext(ctx).SetLogName("vlbc/" + req.Namespace + "/" + req.Name).GetContext()
+	ctx = contexts.NewContext(ctx).SetLogName("lbc/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
@@ -96,8 +96,8 @@ func (r *VngcloudLoadBalancerConfigReconciler) Reconcile(ctx context.Context, re
 	return errs.HandleReconcileError(r.reconcile(ctx, req), logger)
 }
 
-func (r *VngcloudLoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
-	object := &v1alpha1.VngcloudLoadBalancerConfig{}
+func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
+	object := &v1alpha1.LoadBalancerConfig{}
 	err := r.Client.Get(ctx, req.NamespacedName, object)
 	if err != nil {
 		return client.IgnoreNotFound(err)
@@ -106,10 +106,10 @@ func (r *VngcloudLoadBalancerConfigReconciler) reconcile(ctx context.Context, re
 	logger := contexts.NewContext(ctx).Log()
 	key := fmt.Sprintf("%s/%s", object.Namespace, object.Name)
 
-	if !r.vlbcUtils.IsSupported(object) {
+	if !r.lbcUtils.IsSupported(object) {
 		// in case the service have finalizer but is no longer supported, we still need to call delete to clean up
 		// case the service type is changed from LoadBalancer to ClusterIP/NodePort/Headless
-		if r.vlbcUtils.IsPendingFinalization(object) {
+		if r.lbcUtils.IsPendingFinalization(object) {
 			err := r.reconcileDelete(ctx, req, object)
 			if err != nil {
 				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
@@ -134,37 +134,37 @@ func (r *VngcloudLoadBalancerConfigReconciler) reconcile(ctx context.Context, re
 	return nil
 }
 
-func (r *VngcloudLoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.VLBCFinalizer); err != nil {
+func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
 		return err
 	}
-	return r.vlbcUseCase.Ensure(ctx, req)
+	return r.lbcUseCase.Ensure(ctx, req)
 }
 
-func (r *VngcloudLoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
+func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s.HasFinalizer(obj, consts.VLBCFinalizer) {
+	if !k8s.HasFinalizer(obj, consts.LBCFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
 
-	if err := r.vlbcUseCase.Delete(ctx, req); err != nil {
+	if err := r.lbcUseCase.Delete(ctx, req); err != nil {
 		return err
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.VLBCFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
 		return err
 	}
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *VngcloudLoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
 
-		if err := r.vlbcUseCase.Init(ctx); err != nil {
+		if err := r.lbcUseCase.Init(ctx); err != nil {
 			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}
@@ -177,7 +177,7 @@ func (r *VngcloudLoadBalancerConfigReconciler) SetupWithManager(ctx context.Cont
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.VngcloudLoadBalancerConfig{}).
-		Named("vngcloudloadbalancerconfig").
+		For(&v1alpha1.LoadBalancerConfig{}).
+		Named("loadbalancerconfig").
 		Complete(r)
 }

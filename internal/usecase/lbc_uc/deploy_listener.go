@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -20,7 +20,7 @@ func (t *defaultModelDeployTask) deployListeners(ctx context.Context, lbId strin
 	}
 
 	mapListenerPortToID := make(map[int]string)
-	for _, listener := range t.vlbConfig.Spec.Listeners {
+	for _, listener := range t.lbConfig.Spec.Listeners {
 		if listenerId, err := t.deployListener(ctx, lbId, listener, currentListeners, mapPoolNameToID); err != nil {
 			return nil, err
 		} else {
@@ -304,7 +304,7 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 
 // delete redundant listeners
 // mapListenerPortToID is the listeners that are still in use
-func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Context, lbId string, mapListenerPortToID map[int]string, status v1alpha1.VngcloudLoadBalancerConfigStatus) error {
+func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Context, lbId string, mapListenerPortToID map[int]string, status v1alpha1.LoadBalancerConfigStatus) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
 	for _, listener := range status.CreatedListeners {

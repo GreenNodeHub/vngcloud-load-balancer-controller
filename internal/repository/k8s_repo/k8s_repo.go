@@ -15,7 +15,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 )
 
-func NewK8sRepository(client client.Client) repository.IK8sRepository {
+func NewK8sRepository(client client.Client) repository.K8sRepository {
 	return &k8sRepository{
 		client: client,
 	}
@@ -57,38 +57,38 @@ func (r *k8sRepository) ListNode(ctx context.Context, list *corev1.NodeList, opt
 	return r.client.List(ctx, list, opts...)
 }
 
-func (r *k8sRepository) GetVLBC(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudLoadBalancerConfig, error) {
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
-	err := r.client.Get(ctx, n, vlbc)
-	return vlbc, err
+func (r *k8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.LoadBalancerConfig, error) {
+	lbc := &v1alpha1.LoadBalancerConfig{}
+	err := r.client.Get(ctx, n, lbc)
+	return lbc, err
 }
 
-func (r *k8sRepository) CreateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.CreateOption) error {
+func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("Creating VLBC %s/%s", vlbc.Namespace, vlbc.Name)
-	return r.client.Create(ctx, vlbc, opts...)
+	logger.Debugf("Creating LBC %s/%s", lbc.Namespace, lbc.Name)
+	return r.client.Create(ctx, lbc, opts...)
 }
 
-func (r *k8sRepository) DeleteVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig) error {
-	return r.client.Delete(ctx, vlbc)
+func (r *k8sRepository) DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error {
+	return r.client.Delete(ctx, lbc)
 }
 
-func (r *k8sRepository) PatchVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
-	return r.client.Patch(ctx, vlbc, patch, opts...)
+func (r *k8sRepository) PatchLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
+	return r.client.Patch(ctx, lbc, patch, opts...)
 }
 
-func (r *k8sRepository) UpdateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.UpdateOption) error {
-	return r.client.Update(ctx, vlbc, opts...)
+func (r *k8sRepository) UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.UpdateOption) error {
+	return r.client.Update(ctx, lbc, opts...)
 }
 
-func (r *k8sRepository) PatchMutateStatusVLBC(
+func (r *k8sRepository) PatchMutateStatusLoadBalancerConfig(
 	ctx context.Context,
-	vlbc *v1alpha1.VngcloudLoadBalancerConfig,
-	mutate func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig),
+	lbc *v1alpha1.LoadBalancerConfig,
+	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig),
 ) error {
-	return r.patchMutateStatusObject(ctx, vlbc, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, lbc, func(ctx context.Context, obj client.Object) {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.VngcloudLoadBalancerConfig))
+		mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
 	})
 }
 
@@ -119,7 +119,7 @@ func (r *k8sRepository) patchMutateStatusObject(
 	})
 }
 
-func (r *k8sRepository) ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error {
+func (r *k8sRepository) ListLoadBalancerConfig(ctx context.Context, list *v1alpha1.LoadBalancerConfigList, opts ...client.ListOption) error {
 	return r.client.List(ctx, list, opts...)
 }
 

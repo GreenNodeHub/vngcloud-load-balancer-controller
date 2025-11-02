@@ -1,11 +1,11 @@
-package vlbc_uc
+package lbc_uc
 
 import "context"
 
 // delete redundant pools, should check if pool is used by other listeners or policy then ignore
 func (t *defaultModelDeleteTask) deleteRedundantPools(ctx context.Context, lbId string) error {
 	deleteCandidates := make([]string, 0)
-	for _, pool := range t.vlbConfig.Status.CreatedPools {
+	for _, pool := range t.lbConfig.Status.CreatedPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
 	}
 

@@ -47,16 +47,16 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -70,7 +70,7 @@ var (
 	ctx                   context.Context
 	cancel                context.CancelFunc
 	mockServiceReconciler *core.ServiceReconciler
-	mockVLBCReconciler    *VngcloudLoadBalancerConfigReconciler
+	mockLBCReconciler     *LoadBalancerConfigReconciler
 	mockNSGReconciler     *NodeSecurityGroupReconciler
 	vngcloudRepo          *mocks.MockProvider
 	cniDetector           *utils.MockCniDetector
@@ -290,20 +290,20 @@ var _ = BeforeSuite(func() {
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	vlbcUseCase := vlbc_uc.NewVLBCUseCase(
+	lbcUseCase := lbc_uc.NewLBCUseCase(
 		mockConfig,
 		k8sRepo,
 		vngcloudRepo,
 	)
-	mockVLBCReconciler = NewVngcloudLoadBalancerConfigReconciler(
+	mockLBCReconciler = NewLoadBalancerConfigReconciler(
 		k8sManager.GetClient(),
 		k8sManager.GetScheme(),
-		vlbcUseCase,
-		k8sManager.GetEventRecorderFor("vlbc-controller"),
+		lbcUseCase,
+		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
-		vlbc.NewVLBCUtils(consts.VLBCFinalizer),
+		lbc.NewLBCUtils(consts.LBCFinalizer),
 	)
-	err = mockVLBCReconciler.SetupWithManager(ctx, k8sManager)
+	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	nsgUseCase := nsg_uc.NewNSGUseCase(

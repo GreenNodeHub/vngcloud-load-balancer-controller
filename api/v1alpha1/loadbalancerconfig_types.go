@@ -291,8 +291,8 @@ type Listener struct {
 	// ImplementationSpecificParams map[string]string `json:"implementationSpecificParams,omitempty"`
 }
 
-// VngcloudLoadBalancerConfigSpec defines the desired state of VngcloudLoadBalancerConfig
-type VngcloudLoadBalancerConfigSpec struct {
+// LoadBalancerConfigSpec defines the desired state of LoadBalancerConfig
+type LoadBalancerConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	// The following markers will use OpenAPI v3 schema to validate the value
@@ -354,8 +354,8 @@ type VngcloudLoadBalancerConfigSpec struct {
 	Pools []Pool `json:"pools,omitempty"`
 }
 
-// VngcloudLoadBalancerConfigStatus defines the observed state of VngcloudLoadBalancerConfig.
-type VngcloudLoadBalancerConfigStatus struct {
+// LoadBalancerConfigStatus defines the observed state of LoadBalancerConfig.
+type LoadBalancerConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -414,37 +414,37 @@ type CreatedListener struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=vlbc
+// +kubebuilder:resource:shortName=lbc
 // +kubebuilder:printcolumn:name="LoadBalancer-ID",type="string",JSONPath=".status.loadBalancerId"
 // +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.address"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// VngcloudLoadBalancerConfig is the Schema for the vngcloudloadbalancerconfigs API
-type VngcloudLoadBalancerConfig struct {
+// LoadBalancerConfig is the Schema for the loadbalancerconfigs API
+type LoadBalancerConfig struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// metadata is a standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty,omitzero"`
 
-	// spec defines the desired state of VngcloudLoadBalancerConfig
+	// spec defines the desired state of LoadBalancerConfig
 	// +required
-	Spec VngcloudLoadBalancerConfigSpec `json:"spec"`
+	Spec LoadBalancerConfigSpec `json:"spec"`
 
-	// status defines the observed state of VngcloudLoadBalancerConfig
+	// status defines the observed state of LoadBalancerConfig
 	// +optional
-	Status VngcloudLoadBalancerConfigStatus `json:"status,omitempty,omitzero"`
+	Status LoadBalancerConfigStatus `json:"status,omitempty,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 
-// VngcloudLoadBalancerConfigList contains a list of VngcloudLoadBalancerConfig
-type VngcloudLoadBalancerConfigList struct {
+// LoadBalancerConfigList contains a list of LoadBalancerConfig
+type LoadBalancerConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []VngcloudLoadBalancerConfig `json:"items"`
+	Items           []LoadBalancerConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&VngcloudLoadBalancerConfig{}, &VngcloudLoadBalancerConfigList{})
+	SchemeBuilder.Register(&LoadBalancerConfig{}, &LoadBalancerConfigList{})
 }

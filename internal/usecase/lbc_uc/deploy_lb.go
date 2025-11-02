@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -19,9 +19,9 @@ import (
 type defaultModelDeployTask struct {
 	logger       *logrus.Entry
 	cfg          *config.Config
-	vngcloudRepo repository.IVngCloudRepository
-	k8sRepo      repository.IK8sRepository
-	vlbConfig    *v1alpha1.VngcloudLoadBalancerConfig
+	vngcloudRepo repository.VngCloudRepository
+	k8sRepo      repository.K8sRepository
+	lbConfig     *v1alpha1.LoadBalancerConfig
 }
 
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
@@ -38,17 +38,17 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 
-	err = t.deployDeleteRedundantListeners(ctx, lbId, mapListenerPortToID, t.vlbConfig.Status)
+	err = t.deployDeleteRedundantListeners(ctx, lbId, mapListenerPortToID, t.lbConfig.Status)
 	if err != nil {
 		return err
 	}
-	err = t.deployDeleteRedundantPools(ctx, lbId, t.vlbConfig.Status)
+	err = t.deployDeleteRedundantPools(ctx, lbId, t.lbConfig.Status)
 	if err != nil {
 		return err
 	}
 
 	// update status
-	return t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
 		obj.Status.CreatedListeners = make([]v1alpha1.CreatedListener, 0)
 		for _, listenerId := range mapListenerPortToID {
 			obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{
@@ -66,23 +66,23 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
 	// if already an exist lb
-	if t.vlbConfig.Status.LoadBalancerId != nil && *t.vlbConfig.Status.LoadBalancerId != "" {
-		if t.vlbConfig.Spec.LoadBalancerId != nil && *t.vlbConfig.Spec.LoadBalancerId != "" {
-			return t.migrateLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerId, *t.vlbConfig.Spec.LoadBalancerId)
+	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
+		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
+			return t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
 		} else {
-			return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Status.LoadBalancerId, nil)
+			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
 		}
 	}
 
 	// if not exist lbId in status
 	// try to use spec lbId
-	if t.vlbConfig.Spec.LoadBalancerId != nil && *t.vlbConfig.Spec.LoadBalancerId != "" {
-		return t.ensureExistLoadBalancer(ctx, *t.vlbConfig.Spec.LoadBalancerId, nil)
+	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
+		return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
 	}
 
 	// try to use spec lb Name
-	if t.vlbConfig.Spec.LoadBalancerName != "" {
-		lb, err := t.vngcloudRepo.GetLoadBalancerByName(ctx, t.vlbConfig.Spec.LoadBalancerName)
+	if t.lbConfig.Spec.LoadBalancerName != "" {
+		lb, err := t.vngcloudRepo.GetLoadBalancerByName(ctx, t.lbConfig.Spec.LoadBalancerName)
 		if err != nil {
 			return "", err
 		}
@@ -146,7 +146,7 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 
 	// update status
-	if err := t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+	if err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
 		obj.Status.LoadBalancerId = &lbId
 		obj.Status.Address = &lbEntity.Address
 	}); err != nil {
@@ -161,7 +161,7 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
-	return lbId, t.k8sRepo.PatchMutateStatusVLBC(ctx, t.vlbConfig, func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig) {
+	return lbId, t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
 		obj.Status.LoadBalancerId = &lbId
 		obj.Status.Address = &lbEntity.Address
 	})
@@ -170,13 +170,13 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 // resize load balancer if packageID in spec is different from current one
 // ignore if this lb is autoscaled
 func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *entity.LoadBalancer) error {
-	if t.vlbConfig.Spec.PackageId == nil || *t.vlbConfig.Spec.PackageId == "" {
+	if t.lbConfig.Spec.PackageId == nil || *t.lbConfig.Spec.PackageId == "" {
 		return nil
 	}
 	if lbEntity == nil {
 		return errors.New("load balancer entity is nil")
 	}
-	if *t.vlbConfig.Spec.PackageId == lbEntity.PackageID {
+	if *t.lbConfig.Spec.PackageId == lbEntity.PackageID {
 		return nil
 	}
 
@@ -185,8 +185,8 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 		return nil
 	}
 
-	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.PackageID, *t.vlbConfig.Spec.PackageId)
-	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.UUID, *t.vlbConfig.Spec.PackageId); err != nil {
+	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.PackageID, *t.lbConfig.Spec.PackageId)
+	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.UUID, *t.lbConfig.Spec.PackageId); err != nil {
 		return err
 	}
 	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
@@ -198,11 +198,11 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 
 func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context) (loadbalancerv2.ICreateLoadBalancerRequest, error) {
 	packageId := ""
-	if t.vlbConfig.Spec.PackageId != nil && *t.vlbConfig.Spec.PackageId != "" {
-		packageId = *t.vlbConfig.Spec.PackageId
+	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
+		packageId = *t.lbConfig.Spec.PackageId
 	} else {
 		// use default package from config, get default package id from name and zone
-		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.vlbConfig.Spec.ZoneId)
+		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.lbConfig.Spec.ZoneId)
 		if err != nil {
 			return nil, err
 		}
@@ -213,30 +213,30 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 			}
 		}
 		if packageId == "" {
-			return nil, errors.Errorf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.vlbConfig.Spec.ZoneId)
+			return nil, errors.Errorf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId)
 		}
 	}
 
 	request := loadbalancerv2.NewCreateLoadBalancerRequest(
-		t.vlbConfig.Spec.LoadBalancerName,
+		t.lbConfig.Spec.LoadBalancerName,
 		packageId,
-		t.vlbConfig.Spec.SubnetId,
-	).WithZoneId(t.vlbConfig.Spec.ZoneId).WithScheme(loadbalancerv2.LoadBalancerScheme(t.cfg.LoadBalancerOpts.DefaultScheme))
+		t.lbConfig.Spec.SubnetId,
+	).WithZoneId(t.lbConfig.Spec.ZoneId).WithScheme(loadbalancerv2.LoadBalancerScheme(t.cfg.LoadBalancerOpts.DefaultScheme))
 
-	if t.vlbConfig.Spec.Scheme != nil {
-		request = request.WithScheme(*t.vlbConfig.Spec.Scheme)
+	if t.lbConfig.Spec.Scheme != nil {
+		request = request.WithScheme(*t.lbConfig.Spec.Scheme)
 	}
 
-	if t.vlbConfig.Spec.EnableAutoscale != nil {
-		request = request.WithAutoScalable(*t.vlbConfig.Spec.EnableAutoscale)
+	if t.lbConfig.Spec.EnableAutoscale != nil {
+		request = request.WithAutoScalable(*t.lbConfig.Spec.EnableAutoscale)
 	}
 
-	if t.vlbConfig.Spec.Type != "" {
-		request = request.WithType(t.vlbConfig.Spec.Type)
+	if t.lbConfig.Spec.Type != "" {
+		request = request.WithType(t.lbConfig.Spec.Type)
 	}
 
-	if t.vlbConfig.Spec.IsPoc != nil {
-		request = request.WithPoc(*t.vlbConfig.Spec.IsPoc)
+	if t.lbConfig.Spec.IsPoc != nil {
+		request = request.WithPoc(*t.lbConfig.Spec.IsPoc)
 	}
 
 	// TODO: add more fields

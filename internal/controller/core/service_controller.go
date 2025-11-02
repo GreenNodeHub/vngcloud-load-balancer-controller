@@ -42,7 +42,7 @@ import (
 )
 
 func NewServiceReconciler(
-	serviceUseCase usecase.IServiceUseCase,
+	serviceUseCase usecase.ServiceUseCase,
 	client client.Client,
 	scheme *runtime.Scheme,
 	finalizerManager k8s.FinalizerManager,
@@ -63,7 +63,7 @@ func NewServiceReconciler(
 type ServiceReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
-	serviceUseCase   usecase.IServiceUseCase
+	serviceUseCase   usecase.ServiceUseCase
 	FinalizerManager k8s.FinalizerManager
 
 	serviceUtils  service.ServiceUtils

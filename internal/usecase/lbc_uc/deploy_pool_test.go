@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -29,8 +29,8 @@ func TestDefaultModelDeployTask_DeployPools_Success(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			Pools: []v1alpha1.Pool{
 				{
 					Name:     "test-pool-1",
@@ -56,7 +56,7 @@ func TestDefaultModelDeployTask_DeployPools_Success(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	// Mock empty current pools (need to create new)
@@ -117,7 +117,7 @@ func TestDefaultModelDeployTask_DeployPool_CreateNew(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	currentPools := &entity.ListPools{Items: []*entity.Pool{}}
@@ -211,7 +211,7 @@ func TestDefaultModelDeployTask_DeployPool_UpdateExisting(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	// Mock get health monitor
@@ -312,7 +312,7 @@ func TestDefaultModelDeployTask_DeployPool_UpdateMembers(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	// Mock get health monitor
@@ -507,7 +507,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantPools(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	status := v1alpha1.VngcloudLoadBalancerConfigStatus{
+	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedPools: []v1alpha1.CreatedPool{
 			{Id: "pool-1"},
 			{Id: "pool-2"},
@@ -520,7 +520,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantPools(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	// Mock current listeners (pool-1 and pool-2 are in use)

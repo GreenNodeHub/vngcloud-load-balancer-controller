@@ -116,9 +116,9 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - loadbalancerconfigs
   - nodesecuritygroups
   - vngcloudgloballoadbalancers
-  - vngcloudloadbalancerconfigs
   verbs:
   - create
   - delete
@@ -130,17 +130,17 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - loadbalancerconfigs/finalizers
   - nodesecuritygroups/finalizers
   - vngcloudgloballoadbalancers/finalizers
-  - vngcloudloadbalancerconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - loadbalancerconfigs/status
   - nodesecuritygroups/status
   - vngcloudgloballoadbalancers/status
-  - vngcloudloadbalancerconfigs/status
   verbs:
   - get
   - patch

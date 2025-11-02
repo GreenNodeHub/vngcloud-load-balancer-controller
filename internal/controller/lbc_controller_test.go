@@ -44,7 +44,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
-var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
+var _ = Describe("LoadBalancerConfig Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -54,18 +54,18 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		vngcloudloadbalancerconfig := &v1alpha1.VngcloudLoadBalancerConfig{}
+		vngcloudloadbalancerconfig := &v1alpha1.LoadBalancerConfig{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind VngcloudLoadBalancerConfig")
+			By("creating the custom resource for the Kind LoadBalancerConfig")
 			err := k8sClient.Get(ctx, typeNamespacedName, vngcloudloadbalancerconfig)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &v1alpha1.VngcloudLoadBalancerConfig{
+				resource := &v1alpha1.LoadBalancerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+					Spec: v1alpha1.LoadBalancerConfigSpec{
 						Type:             "Layer 4",
 						LoadBalancerName: "TODO",
 						SubnetId:         "TODO",
@@ -77,17 +77,17 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &v1alpha1.VngcloudLoadBalancerConfig{}
+			resource := &v1alpha1.LoadBalancerConfig{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance VngcloudLoadBalancerConfig")
+			By("Cleanup the specific resource instance LoadBalancerConfig")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			// Skip("Skip test")
 			By("Reconciling the created resource")
-			controllerReconciler := &VngcloudLoadBalancerConfigReconciler{
+			controllerReconciler := &LoadBalancerConfigReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}
@@ -937,7 +937,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 				Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
 				// expect create vlbc with label: belong-to-service=test-service. List vlbc to check
-				vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+				vlbcList := &v1alpha1.LoadBalancerConfigList{}
 				Eventually(func() bool {
 					err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{
 						consts.LabelOwnerResourceName: service.Name,
@@ -948,7 +948,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 					return len(vlbcList.Items) == 1
 				}, time.Second*10, interval).Should(BeTrue())
 
-				vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
+				vlbc := &v1alpha1.LoadBalancerConfig{}
 				vlbc = &vlbcList.Items[0]
 				Expect(vlbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
 				// logrus.Infof("VLBC created:%+v", vlbc)
@@ -956,7 +956,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 				// get load balancer id from vlbc status
 				loadbalancerId := ""
 				Eventually(func() bool {
-					getVLBC := &v1alpha1.VngcloudLoadBalancerConfig{}
+					getVLBC := &v1alpha1.LoadBalancerConfig{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: vlbc.Name, Namespace: vlbc.Namespace}, getVLBC)).Should(Succeed())
 					if getVLBC.Status.LoadBalancerId != nil {
 						loadbalancerId = *getVLBC.Status.LoadBalancerId
@@ -1607,7 +1607,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 				Expect(k8sClient.Create(ctx, obj)).Should(Succeed())
 
 				// expect create vlbc with label: belong-to-service=test-service. List vlbc to check
-				vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+				vlbcList := &v1alpha1.LoadBalancerConfigList{}
 				Eventually(func() bool {
 					err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{
 						consts.LabelOwnerResourceName: obj.GetName(),
@@ -1618,7 +1618,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 					return len(vlbcList.Items) == 1
 				}, time.Second*10, interval).Should(BeTrue())
 
-				vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
+				vlbc := &v1alpha1.LoadBalancerConfig{}
 				vlbc = &vlbcList.Items[0]
 				Expect(vlbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
 				// logrus.Infof("VLBC created:%+v", vlbc)
@@ -1626,7 +1626,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 				// get load balancer id from vlbc status
 				loadbalancerID := ""
 				Eventually(func() bool {
-					getVLBC := &v1alpha1.VngcloudLoadBalancerConfig{}
+					getVLBC := &v1alpha1.LoadBalancerConfig{}
 					Expect(k8sClient.Get(ctx, client.ObjectKey{Name: vlbc.Name, Namespace: vlbc.Namespace}, getVLBC)).Should(Succeed())
 					if getVLBC.Status.LoadBalancerId != nil {
 						loadbalancerID = *getVLBC.Status.LoadBalancerId
@@ -1744,7 +1744,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 							// Expect(loadbalancer.Name).Should(Equal("normal-name"))
 
 							// expect create vlbc with label: belong-to-service=test-service. List vlbc to check
-							vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+							vlbcList := &v1alpha1.LoadBalancerConfigList{}
 							Eventually(func() bool {
 								err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{
 									consts.LabelOwnerResourceName: "test-service-error",
@@ -1755,7 +1755,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 								return len(vlbcList.Items) == 1
 							}, time.Second*10, interval).Should(BeTrue())
 
-							vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
+							vlbc := &v1alpha1.LoadBalancerConfig{}
 							vlbc = &vlbcList.Items[0]
 							Expect(vlbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
 							// logrus.Infof("VLBC created:%+v", vlbc)
@@ -1763,7 +1763,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 							// get load balancer id from vlbc status
 							loadbalancerID := ""
 							Eventually(func() bool {
-								getVLBC := &v1alpha1.VngcloudLoadBalancerConfig{}
+								getVLBC := &v1alpha1.LoadBalancerConfig{}
 								Expect(k8sClient.Get(ctx, client.ObjectKey{Name: vlbc.Name, Namespace: vlbc.Namespace}, getVLBC)).Should(Succeed())
 								if getVLBC.Status.LoadBalancerId != nil {
 									loadbalancerID = *getVLBC.Status.LoadBalancerId

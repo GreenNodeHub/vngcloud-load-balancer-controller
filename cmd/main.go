@@ -55,16 +55,16 @@ import (
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -88,7 +88,7 @@ func main() {
 	var enableHTTP2 bool
 	var devMode bool
 	var disableServiceController bool
-	var disableVLBConfigController bool
+	var disableLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -105,8 +105,8 @@ func main() {
 		"If set, log will be printed in different format, easier to debug")
 	flag.BoolVar(&disableServiceController, "disable-service-controller", false,
 		"If set, the service controller will be disabled")
-	flag.BoolVar(&disableVLBConfigController, "disable-vlb-config-controller", false,
-		"If set, the VngcloudLoadBalancerConfig controller will be disabled")
+	flag.BoolVar(&disableLoadBalancerConfigController, "disable-load-balancer-config-controller", false,
+		"If set, the LoadBalancerConfig controller will be disabled")
 	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
 		"If set, the NodeSecurityGroup controller will be disabled")
 	opts := zap.Options{
@@ -269,21 +269,21 @@ func main() {
 		}
 	}
 
-	if !disableVLBConfigController {
-		vlbcUtils := vlbc.NewVLBCUtils(consts.VLBCFinalizer)
-		vlbcUseCase := vlbc_uc.NewVLBCUseCase(
+	if !disableLoadBalancerConfigController {
+		lbcUtils := lbc.NewLBCUtils(consts.LBCFinalizer)
+		lbcUseCase := lbc_uc.NewLBCUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
-		reconciler := controller.NewVngcloudLoadBalancerConfigReconciler(
+		reconciler := controller.NewLoadBalancerConfigReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
-			vlbcUseCase,
-			mgr.GetEventRecorderFor("vngcloud-load-balancer-config-controller"),
+			lbcUseCase,
+			mgr.GetEventRecorderFor("load-balancer-config-controller"),
 			finalizerManager,
-			vlbcUtils,
+			lbcUtils,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "VngcloudLoadBalancerConfig")
+			setupLog.Error(err, "unable to create controller", "controller", "LoadBalancerConfig")
 			os.Exit(1)
 		}
 	}

@@ -22,7 +22,7 @@ const (
 	defaultPageSize = 1000
 )
 
-func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.IVngCloudRepository, error) {
+func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.VngCloudRepository, error) {
 	if cfg == nil {
 		return nil, errors.New("config is nil")
 	}

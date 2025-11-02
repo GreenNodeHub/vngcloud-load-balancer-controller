@@ -37,13 +37,13 @@ var _ = Describe("Service Controller", func() {
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
 		expectNoServices()
-		expectNoVLBCs()
+		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
 	})
 
 	Context("When creating a LoadBalancer service", func() {
-		It("should create VLBC, LoadBalancer and SecurityGroup", func() {
+		It("should create LBC, LoadBalancer and SecurityGroup", func() {
 			serviceName := "test-lb-service"
 			namespace := "default"
 
@@ -55,24 +55,24 @@ var _ = Describe("Service Controller", func() {
 			service := newServiceResource(serviceName, namespace)
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for VLBC to be created
-			var vlbcList *v1alpha1.VngcloudLoadBalancerConfigList
+			// Wait for LBC to be created
+			var lbcList *v1alpha1.LoadBalancerConfigList
 			Eventually(func() int {
-				list, err := getVLBCListForService(serviceName, namespace)
+				list, err := getLBCListForService(serviceName, namespace)
 				if err != nil {
 					return -1
 				}
-				vlbcList = list
+				lbcList = list
 				return len(list.Items)
 			}, timeout*2, interval).Should(Equal(1))
 
-			vlbc := &vlbcList.Items[0]
+			lbc := &lbcList.Items[0]
 
-			// Verify VLBC spec
-			Expect(vlbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
+			// Verify LBC spec
+			Expect(lbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
 
-			// Wait for LoadBalancer ID in VLBC status
-			loadbalancerId, err := waitForLoadBalancerId(vlbc.Name, vlbc.Namespace)
+			// Wait for LoadBalancer ID in LBC status
+			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(loadbalancerId).ShouldNot(BeEmpty())
 

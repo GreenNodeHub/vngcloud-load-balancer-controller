@@ -1,11 +1,11 @@
-package vlbc_uc
+package lbc_uc
 
 import "context"
 
 func (t *defaultModelDeleteTask) deleteRedundantListeners(ctx context.Context, lbId string) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
-	for _, listener := range t.vlbConfig.Status.CreatedListeners {
+	for _, listener := range t.lbConfig.Status.CreatedListeners {
 		deleteCandidates = append(deleteCandidates, listener.Id)
 	}
 

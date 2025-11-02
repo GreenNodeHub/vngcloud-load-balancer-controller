@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -19,39 +19,39 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 )
 
-func TestNewVLBCUseCase(t *testing.T) {
+func TestNewLBCUseCase(t *testing.T) {
 	cfg := &config.Config{}
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	assert.NotNil(t, uc)
-	assert.IsType(t, &vlbcUseCase{}, uc)
+	assert.IsType(t, &lbcUseCase{}, uc)
 }
 
-func TestVLBCUseCase_Init(t *testing.T) {
+func TestLBCUseCase_Init(t *testing.T) {
 	cfg := &config.Config{}
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	err := uc.Init(context.Background())
 	assert.NoError(t, err)
 }
 
-func TestVLBCUseCase_Delete(t *testing.T) {
+func TestLBCUseCase_Delete(t *testing.T) {
 	cfg := &config.Config{}
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "default",
-			Name:      "test-vlbc",
+			Name:      "test-lbc",
 		},
 	}
 
@@ -59,35 +59,35 @@ func TestVLBCUseCase_Delete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestVLBCUseCase_Ensure_VLBCNotFound(t *testing.T) {
+func TestLBCUseCase_Ensure_LBCNotFound(t *testing.T) {
 	cfg := &config.Config{}
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "default",
-			Name:      "test-vlbc",
+			Name:      "test-lbc",
 		},
 	}
 
-	// Mock GetVLBC to return NotFound error - using proper Kubernetes NotFound error
+	// Mock GetLoadBalancerConfig to return NotFound error - using proper Kubernetes NotFound error
 	notFoundErr := apierrors.NewNotFound(schema.GroupResource{
 		Group:    "vngcloud.vn",
-		Resource: "vngcloudloadbalancerconfigs",
-	}, "test-vlbc")
+		Resource: "loadbalancerconfigs",
+	}, "test-lbc")
 
 	mockK8sRepo.EXPECT().
-		GetVLBC(mock.Anything, req.NamespacedName).
+		GetLoadBalancerConfig(mock.Anything, req.NamespacedName).
 		Return(nil, notFoundErr)
 
 	err := uc.Ensure(context.Background(), req)
 	assert.NoError(t, err) // Should ignore NotFound errors
 }
 
-func TestVLBCUseCase_Ensure_Success(t *testing.T) {
+func TestLBCUseCase_Ensure_Success(t *testing.T) {
 	cfg := &config.Config{
 		LoadBalancerOpts: config.LoadBalancerOpts{
 			DefaultHealthyThreshold:   3,
@@ -104,25 +104,25 @@ func TestVLBCUseCase_Ensure_Success(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "default",
-			Name:      "test-vlbc",
+			Name:      "test-lbc",
 		},
 	}
 
-	// Create a test VLBC
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	// Create a test LBC
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			LoadBalancerId:   ptr.To("lb-12345"),
 			LoadBalancerName: "test-lb",
 			PackageId:        ptr.To("package-1"),
 			Pools:            []v1alpha1.Pool{},
 			Listeners:        []v1alpha1.Listener{},
 		},
-		Status: v1alpha1.VngcloudLoadBalancerConfigStatus{
+		Status: v1alpha1.LoadBalancerConfigStatus{
 			LoadBalancerId: ptr.To("lb-12345"),
 			Address:        ptr.To("10.0.0.1"),
 		},
@@ -138,8 +138,8 @@ func TestVLBCUseCase_Ensure_Success(t *testing.T) {
 
 	// Set up expectations
 	mockK8sRepo.EXPECT().
-		GetVLBC(mock.Anything, req.NamespacedName).
-		Return(vlbc, nil)
+		GetLoadBalancerConfig(mock.Anything, req.NamespacedName).
+		Return(lbc, nil)
 
 	mockVngcloudRepo.EXPECT().
 		GetLoadBalancerByID(mock.Anything, "lb-12345").
@@ -154,14 +154,14 @@ func TestVLBCUseCase_Ensure_Success(t *testing.T) {
 		Return(&entity.ListListeners{Items: []*entity.Listener{}}, nil)
 
 	mockK8sRepo.EXPECT().
-		PatchMutateStatusVLBC(mock.Anything, vlbc, mock.AnythingOfType("func(context.Context, *v1alpha1.VngcloudLoadBalancerConfig)")).
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
 	err := uc.Ensure(context.Background(), req)
 	assert.NoError(t, err)
 }
 
-func TestVLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
+func TestLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 	cfg := &config.Config{
 		LoadBalancerOpts: config.LoadBalancerOpts{
 			DefaultHealthyThreshold:   3,
@@ -178,23 +178,23 @@ func TestVLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	uc := NewVLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: "default",
-			Name:      "test-vlbc",
+			Name:      "test-lbc",
 		},
 	}
 
-	// Create a test VLBC with only LoadBalancerName specified
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	// Create a test LBC with only LoadBalancerName specified
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			LoadBalancerName: "test-lb-by-name",
 			Pools:            []v1alpha1.Pool{},
 			Listeners:        []v1alpha1.Listener{},
 		},
-		Status: v1alpha1.VngcloudLoadBalancerConfigStatus{},
+		Status: v1alpha1.LoadBalancerConfigStatus{},
 	}
 
 	// Mock load balancer entity
@@ -207,8 +207,8 @@ func TestVLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 
 	// Set up expectations
 	mockK8sRepo.EXPECT().
-		GetVLBC(mock.Anything, req.NamespacedName).
-		Return(vlbc, nil)
+		GetLoadBalancerConfig(mock.Anything, req.NamespacedName).
+		Return(lbc, nil)
 
 	mockVngcloudRepo.EXPECT().
 		GetLoadBalancerByName(mock.Anything, "test-lb-by-name").
@@ -223,7 +223,7 @@ func TestVLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 		Return(&entity.ListListeners{Items: []*entity.Listener{}}, nil)
 
 	mockK8sRepo.EXPECT().
-		PatchMutateStatusVLBC(mock.Anything, vlbc, mock.AnythingOfType("func(context.Context, *v1alpha1.VngcloudLoadBalancerConfig)")).
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
 	err := uc.Ensure(context.Background(), req)
@@ -243,11 +243,11 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_ExistingLBID(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			LoadBalancerId: ptr.To("lb-existing"),
 		},
-		Status: v1alpha1.VngcloudLoadBalancerConfigStatus{
+		Status: v1alpha1.LoadBalancerConfigStatus{
 			LoadBalancerId: ptr.To("lb-existing"),
 		},
 	}
@@ -264,7 +264,7 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_ExistingLBID(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	mockVngcloudRepo.EXPECT().
@@ -272,7 +272,7 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_ExistingLBID(t *testing.T) {
 		Return(loadBalancer, nil)
 
 	mockK8sRepo.EXPECT().
-		PatchMutateStatusVLBC(mock.Anything, vlbc, mock.AnythingOfType("func(context.Context, *v1alpha1.VngcloudLoadBalancerConfig)")).
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
 	lbID, err := task.deployLoadBalancer(context.Background())
@@ -293,11 +293,11 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_Migration(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			LoadBalancerId: ptr.To("lb-new"),
 		},
-		Status: v1alpha1.VngcloudLoadBalancerConfigStatus{
+		Status: v1alpha1.LoadBalancerConfigStatus{
 			LoadBalancerId: ptr.To("lb-old"),
 		},
 	}
@@ -314,7 +314,7 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_Migration(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	mockVngcloudRepo.EXPECT().
@@ -322,7 +322,7 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_Migration(t *testing.T) {
 		Return(newLoadBalancer, nil)
 
 	mockK8sRepo.EXPECT().
-		PatchMutateStatusVLBC(mock.Anything, vlbc, mock.AnythingOfType("func(context.Context, *v1alpha1.VngcloudLoadBalancerConfig)")).
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
 	lbID, err := task.deployLoadBalancer(context.Background())
@@ -335,8 +335,8 @@ func TestDefaultModelDeployTask_DeployPackageId_NoPackageUpdate(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			PackageId: ptr.To("package-1"),
 		},
 	}
@@ -351,7 +351,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NoPackageUpdate(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	err := task.deployPackageId(context.Background(), loadBalancer)
@@ -363,8 +363,8 @@ func TestDefaultModelDeployTask_DeployPackageId_NeedResize(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			PackageId: ptr.To("package-2"),
 		},
 	}
@@ -384,7 +384,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NeedResize(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	mockVngcloudRepo.EXPECT().
@@ -404,8 +404,8 @@ func TestDefaultModelDeployTask_DeployPackageId_EmptyPackageID(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			// No PackageID specified
 		},
 	}
@@ -420,7 +420,7 @@ func TestDefaultModelDeployTask_DeployPackageId_EmptyPackageID(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	err := task.deployPackageId(context.Background(), loadBalancer)
@@ -432,8 +432,8 @@ func TestDefaultModelDeployTask_DeployPackageId_NilLoadBalancer(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			PackageId: ptr.To("package-2"),
 		},
 	}
@@ -443,7 +443,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NilLoadBalancer(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	err := task.deployPackageId(context.Background(), nil)

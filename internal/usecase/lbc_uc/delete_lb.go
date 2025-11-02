@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -15,19 +15,19 @@ import (
 type defaultModelDeleteTask struct {
 	logger       *logrus.Entry
 	cfg          *config.Config
-	vngcloudRepo repository.IVngCloudRepository
-	k8sRepo      repository.IK8sRepository
-	vlbConfig    *v1alpha1.VngcloudLoadBalancerConfig
+	vngcloudRepo repository.VngCloudRepository
+	k8sRepo      repository.K8sRepository
+	lbConfig     *v1alpha1.LoadBalancerConfig
 }
 
 func (t *defaultModelDeleteTask) delete(ctx context.Context) error {
 	// if status.lbId is empty, skip
-	if t.vlbConfig.Status.LoadBalancerId == nil || *t.vlbConfig.Status.LoadBalancerId == "" {
-		t.logger.Infof("VLBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.vlbConfig.Namespace, t.vlbConfig.Name)
+	if t.lbConfig.Status.LoadBalancerId == nil || *t.lbConfig.Status.LoadBalancerId == "" {
+		t.logger.Infof("LBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
 		return nil
 	}
 
-	lbId := *t.vlbConfig.Status.LoadBalancerId
+	lbId := *t.lbConfig.Status.LoadBalancerId
 
 	if err := t.deleteLoadBalancer(ctx, lbId); err != nil {
 		return err
@@ -50,7 +50,7 @@ func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId st
 		return err
 	}
 	if canDelete {
-		t.logger.Infof("Deleting load balancer %s in VNGCloud for VLBC %s/%s", lbId, t.vlbConfig.Namespace, t.vlbConfig.Name)
+		t.logger.Infof("Deleting load balancer %s in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 		err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 		if err != nil {
 			return err
@@ -73,7 +73,7 @@ func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId st
 			return err
 		}
 		if isEmpty {
-			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for VLBC %s/%s", lbId, t.vlbConfig.Namespace, t.vlbConfig.Name)
+			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 			if err != nil {
 				return err
@@ -94,9 +94,9 @@ func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context,
 	}
 	// if len(oldListeners) < len(currentListeners), can't delete whole loadbalancer
 	// because some listeners are created by other resources
-	if len(t.vlbConfig.Status.CreatedListeners) < len(listeners.Items) {
+	if len(t.lbConfig.Status.CreatedListeners) < len(listeners.Items) {
 		t.logger.Infof("Can't delete whole loadbalancer, len(oldListeners) < len(currentListeners) (%d < %d)",
-			len(t.vlbConfig.Status.CreatedListeners), len(listeners.Items))
+			len(t.lbConfig.Status.CreatedListeners), len(listeners.Items))
 		return false, nil
 	}
 
@@ -104,9 +104,9 @@ func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-	if len(t.vlbConfig.Status.CreatedPools) < len(pools.Items) {
+	if len(t.lbConfig.Status.CreatedPools) < len(pools.Items) {
 		t.logger.Infof("Can't delete whole loadbalancer, len(oldPools) < len(currentPools) (%d < %d)",
-			len(t.vlbConfig.Status.CreatedPools), len(pools.Items))
+			len(t.lbConfig.Status.CreatedPools), len(pools.Items))
 		return false, nil
 	}
 
@@ -121,7 +121,7 @@ func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context,
 
 	// if listener not exists, return false
 	// TODO: why? this is old logic, need to confirm
-	for _, listener := range t.vlbConfig.Status.CreatedListeners {
+	for _, listener := range t.lbConfig.Status.CreatedListeners {
 		currentListener := searchListenerById(listener.Id)
 		if currentListener == nil {
 			t.logger.Infof("Can't delete whole loadbalancer, listener not exists: %s", listener.Id)
@@ -155,7 +155,7 @@ func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context,
 	}
 
 	// if pool not exists, return false
-	for _, pool := range t.vlbConfig.Status.CreatedPools {
+	for _, pool := range t.lbConfig.Status.CreatedPools {
 		if currentPool := searchPoolById(pool.Id); currentPool == nil {
 			t.logger.Infof("Can't delete whole loadbalancer, pool not exists: %s", pool.Id)
 			return false, nil

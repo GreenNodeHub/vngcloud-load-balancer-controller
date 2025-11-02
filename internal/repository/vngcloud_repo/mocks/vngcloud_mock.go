@@ -61,7 +61,7 @@ func randRange(min, max int) int {
 	return rand.IntN(max-min) + min
 }
 
-var _ repository.IVngCloudRepository = &MockProvider{}
+var _ repository.VngCloudRepository = &MockProvider{}
 
 type wrapListener struct {
 	*entityv2.Listener

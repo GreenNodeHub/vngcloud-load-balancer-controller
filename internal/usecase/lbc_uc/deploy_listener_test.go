@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -28,8 +28,8 @@ func TestDefaultModelDeployTask_DeployListeners_Success(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
 			Listeners: []v1alpha1.Listener{
 				{
 					Name:            "test-listener-1",
@@ -52,7 +52,7 @@ func TestDefaultModelDeployTask_DeployListeners_Success(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    vlbc,
+		lbConfig:     lbc,
 	}
 
 	mapPoolNameToID := map[string]string{
@@ -133,7 +133,7 @@ func TestDefaultModelDeployTask_DeployListener_CreateNew(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	mapPoolNameToID := map[string]string{
@@ -218,7 +218,7 @@ func TestDefaultModelDeployTask_DeployListener_UpdateExisting(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	mapPoolNameToID := map[string]string{
@@ -275,7 +275,7 @@ func TestDefaultModelDeployTask_DeployListener_ProtocolMismatch(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	mapPoolNameToID := map[string]string{}
@@ -331,7 +331,7 @@ func TestDefaultModelDeployTask_DeployListener_NoUpdate(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	mapPoolNameToID := map[string]string{
@@ -357,9 +357,9 @@ func TestDefaultModelDeployTask_BuildCreateListenerRequest(t *testing.T) {
 	}
 
 	task := &defaultModelDeployTask{
-		logger:    logrus.NewEntry(logrus.New()),
-		cfg:       cfg,
-		vlbConfig: &v1alpha1.VngcloudLoadBalancerConfig{},
+		logger:   logrus.NewEntry(logrus.New()),
+		cfg:      cfg,
+		lbConfig: &v1alpha1.LoadBalancerConfig{},
 	}
 
 	tests := []struct {
@@ -448,7 +448,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantListeners(t *testing.T) {
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	status := v1alpha1.VngcloudLoadBalancerConfigStatus{
+	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedListeners: []v1alpha1.CreatedListener{
 			{Id: "listener-1"},
 			{Id: "listener-2"},
@@ -467,7 +467,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantListeners(t *testing.T) {
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	// Mock current listeners (all listeners exist)
@@ -501,7 +501,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantListeners_ListenerNotFound(
 	mockK8sRepo := repository.NewMockIK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
 
-	status := v1alpha1.VngcloudLoadBalancerConfigStatus{
+	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedListeners: []v1alpha1.CreatedListener{
 			{Id: "listener-missing"}, // This listener doesn't exist anymore
 		},
@@ -516,7 +516,7 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantListeners_ListenerNotFound(
 		cfg:          cfg,
 		vngcloudRepo: mockVngcloudRepo,
 		k8sRepo:      mockK8sRepo,
-		vlbConfig:    &v1alpha1.VngcloudLoadBalancerConfig{},
+		lbConfig:     &v1alpha1.LoadBalancerConfig{},
 	}
 
 	// Mock current listeners (listener-missing doesn't exist)

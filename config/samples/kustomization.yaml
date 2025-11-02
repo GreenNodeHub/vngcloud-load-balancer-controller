@@ -1,6 +1,6 @@
 ## Append samples of your project ##
 resources:
 - v1alpha1_vngcloudgloballoadbalancer.yaml
-- v1alpha1_vngcloudloadbalancerconfig.yaml
 - v1alpha1_nodesecuritygroup.yaml
+- v1alpha1_loadbalancerconfig.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

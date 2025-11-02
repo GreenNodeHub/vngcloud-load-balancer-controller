@@ -44,16 +44,16 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -67,7 +67,7 @@ var (
 	cfg                   *rest.Config
 	k8sClient             client.Client
 	mockServiceReconciler *ServiceReconciler
-	mockVLBCReconciler    *controller.VngcloudLoadBalancerConfigReconciler
+	mockLBCReconciler     *controller.LoadBalancerConfigReconciler
 	mockNSGReconciler     *controller.NodeSecurityGroupReconciler
 	vngcloudRepo          *mocks.MockProvider
 	cniDetector           *utils.MockCniDetector
@@ -237,21 +237,21 @@ var _ = BeforeSuite(func() {
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	// Setup VLBC reconciler
-	vlbcUseCase := vlbc_uc.NewVLBCUseCase(
+	// Setup LBC reconciler
+	lbcUseCase := lbc_uc.NewLBCUseCase(
 		mockConfig,
 		k8sRepo,
 		vngcloudRepo,
 	)
-	mockVLBCReconciler = controller.NewVngcloudLoadBalancerConfigReconciler(
+	mockLBCReconciler = controller.NewLoadBalancerConfigReconciler(
 		k8sManager.GetClient(),
 		k8sManager.GetScheme(),
-		vlbcUseCase,
-		k8sManager.GetEventRecorderFor("vlbc-controller"),
+		lbcUseCase,
+		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
-		vlbc.NewVLBCUtils(consts.VLBCFinalizer),
+		lbc.NewLBCUtils(consts.LBCFinalizer),
 	)
-	err = mockVLBCReconciler.SetupWithManager(ctx, k8sManager)
+	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	// Setup NSG reconciler

@@ -3,8 +3,8 @@
 # It should be run by config/default
 resources:
 - bases/vks.vngcloud.vn_vngcloudgloballoadbalancers.yaml
-- bases/vks.vngcloud.vn_vngcloudloadbalancerconfigs.yaml
 - bases/vks.vngcloud.vn_nodesecuritygroups.yaml
+- bases/vks.vngcloud.vn_loadbalancerconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

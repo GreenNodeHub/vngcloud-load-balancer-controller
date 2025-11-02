@@ -76,22 +76,22 @@ func expectNoServices() {
 	}, timeout*4, interval).Should(Equal(0), "Expected no services in any namespace")
 }
 
-func expectNoVLBCs() {
+func expectNoLBCs() {
 	Eventually(func() int {
-		vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-		err := k8sClient.List(ctx, vlbcList)
+		lbcList := &v1alpha1.LoadBalancerConfigList{}
+		err := k8sClient.List(ctx, lbcList)
 		if err != nil {
 			return -1
 		}
-		count := len(vlbcList.Items)
+		count := len(lbcList.Items)
 		if count > 0 {
-			GinkgoWriter.Printf("⚠️  Found %d VLBCs still present:\n", count)
-			for _, vlbc := range vlbcList.Items {
-				GinkgoWriter.Printf("   - %s/%s\n", vlbc.Namespace, vlbc.Name)
+			GinkgoWriter.Printf("⚠️  Found %d LBCs still present:\n", count)
+			for _, lbc := range lbcList.Items {
+				GinkgoWriter.Printf("   - %s/%s\n", lbc.Namespace, lbc.Name)
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no VLBCs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no LBCs in any namespace")
 }
 
 func expectNoNSGs() {
@@ -164,14 +164,14 @@ func cleanupAllEndpoints(namespace string) {
 	}
 }
 
-func cleanupAllVLBCs(namespace string) {
-	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-	err := k8sClient.List(ctx, vlbcList, client.InNamespace(namespace))
+func cleanupAllLBCs(namespace string) {
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace))
 	if err != nil {
 		return
 	}
-	for _, vlbc := range vlbcList.Items {
-		k8sClient.Delete(ctx, &vlbc)
+	for _, lbc := range lbcList.Items {
+		k8sClient.Delete(ctx, &lbc)
 	}
 }
 
@@ -199,24 +199,24 @@ func getServiceResource(serviceName, namespace string) (*corev1.Service, error) 
 	return service, nil
 }
 
-func getVLBCListForService(serviceName, namespace string) (*v1alpha1.VngcloudLoadBalancerConfigList, error) {
-	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
-	err := k8sClient.List(ctx, vlbcList, client.InNamespace(namespace), client.MatchingLabels{
+func getLBCListForService(serviceName, namespace string) (*v1alpha1.LoadBalancerConfigList, error) {
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		consts.LabelOwnerResourceName: serviceName,
 		consts.LabelOwnerResourceType: "Service",
 	})
-	return vlbcList, err
+	return lbcList, err
 }
 
-func getVLBCForService(serviceName, namespace string) (*v1alpha1.VngcloudLoadBalancerConfig, error) {
-	vlbcList, err := getVLBCListForService(serviceName, namespace)
+func getLBCForService(serviceName, namespace string) (*v1alpha1.LoadBalancerConfig, error) {
+	lbcList, err := getLBCListForService(serviceName, namespace)
 	if err != nil {
 		return nil, err
 	}
-	if len(vlbcList.Items) == 0 {
+	if len(lbcList.Items) == 0 {
 		return nil, nil
 	}
-	return &vlbcList.Items[0], nil
+	return &lbcList.Items[0], nil
 }
 
 func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurityGroupList, error) {
@@ -232,17 +232,17 @@ func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurity
 // Helper functions to wait for resources
 // ============================================================================
 
-func waitForLoadBalancerId(vlbcName, namespace string) (string, error) {
+func waitForLoadBalancerId(lbcName, namespace string) (string, error) {
 	var loadbalancerId string
 
 	success := Eventually(func() bool {
-		vlbc := &v1alpha1.VngcloudLoadBalancerConfig{}
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: vlbcName, Namespace: namespace}, vlbc)
+		lbc := &v1alpha1.LoadBalancerConfig{}
+		err := k8sClient.Get(ctx, client.ObjectKey{Name: lbcName, Namespace: namespace}, lbc)
 		if err != nil {
 			return false
 		}
-		if vlbc.Status.LoadBalancerId != nil {
-			loadbalancerId = *vlbc.Status.LoadBalancerId
+		if lbc.Status.LoadBalancerId != nil {
+			loadbalancerId = *lbc.Status.LoadBalancerId
 			return loadbalancerId != ""
 		}
 		return false

@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  name: vngcloudloadbalancerconfigs.vks.vngcloud.vn
+  name: loadbalancerconfigs.vks.vngcloud.vn
 spec:
   group: vks.vngcloud.vn
   names:
-    kind: VngcloudLoadBalancerConfig
-    listKind: VngcloudLoadBalancerConfigList
-    plural: vngcloudloadbalancerconfigs
+    kind: LoadBalancerConfig
+    listKind: LoadBalancerConfigList
+    plural: loadbalancerconfigs
     shortNames:
-    - vlbc
-    singular: vngcloudloadbalancerconfig
+    - lbc
+    singular: loadbalancerconfig
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -29,7 +29,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: VngcloudLoadBalancerConfig is the Schema for the vngcloudloadbalancerconfigs
+        description: LoadBalancerConfig is the Schema for the loadbalancerconfigs
           API
         properties:
           apiVersion:
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: spec defines the desired state of VngcloudLoadBalancerConfig
+            description: spec defines the desired state of LoadBalancerConfig
             properties:
               clusterId:
                 description: ClusterId is the ID of the cluster where the load balancer
@@ -248,7 +248,7 @@ spec:
             - zoneId
             type: object
           status:
-            description: status defines the observed state of VngcloudLoadBalancerConfig
+            description: status defines the observed state of LoadBalancerConfig
             properties:
               address:
                 description: Address is the DNS name or IP address assigned to the

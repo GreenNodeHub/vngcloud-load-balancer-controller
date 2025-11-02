@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 	}
 
 	mapPoolNameToID := make(map[string]string)
-	for _, pool := range t.vlbConfig.Spec.Pools {
+	for _, pool := range t.lbConfig.Spec.Pools {
 		if poolId, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
 			return nil, err
 		} else {
@@ -215,7 +215,7 @@ func (t *defaultModelDeployTask) buildPoolUpdateRequest(ctx context.Context, lbI
 		TLSEncryption: nil,
 		HealthMonitor: healthMonitor,
 	}
-	if t.vlbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
+	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
 		updateOptions.Stickiness = &current.Stickiness
 		updateOptions.TLSEncryption = &current.TLSEncryption
 
@@ -331,7 +331,7 @@ func (t *defaultModelDeployTask) buildPoolMemberUpdateRequest(ctx context.Contex
 
 // delete pools created not in use anymore
 // should check if pool is used by other listeners (user use) then ignore
-func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context, lbId string, status v1alpha1.VngcloudLoadBalancerConfigStatus) error {
+func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context, lbId string, status v1alpha1.LoadBalancerConfigStatus) error {
 	deleteCandidates := make([]string, 0)
 	for _, pool := range status.CreatedPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)

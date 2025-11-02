@@ -1,4 +1,4 @@
-package vlbc_uc
+package lbc_uc
 
 import (
 	"context"
@@ -12,35 +12,35 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 )
 
-type vlbcUseCase struct {
+type lbcUseCase struct {
 	cfg          *config.Config
-	k8sRepo      repository.IK8sRepository
-	vngcloudRepo repository.IVngCloudRepository
+	k8sRepo      repository.K8sRepository
+	vngcloudRepo repository.VngCloudRepository
 }
 
-func NewVLBCUseCase(
+func NewLBCUseCase(
 	cfg *config.Config,
-	k8sRepo repository.IK8sRepository,
-	vngcloudRepo repository.IVngCloudRepository,
-) usecase.IVLBConfigUseCase {
-	return &vlbcUseCase{
+	k8sRepo repository.K8sRepository,
+	vngcloudRepo repository.VngCloudRepository,
+) usecase.LoadBalancerConfigUseCase {
+	return &lbcUseCase{
 		cfg:          cfg,
 		k8sRepo:      k8sRepo,
 		vngcloudRepo: vngcloudRepo,
 	}
 }
 
-func (uc *vlbcUseCase) Init(ctx context.Context) error {
+func (uc *lbcUseCase) Init(ctx context.Context) error {
 	return nil
 }
 
-func (uc *vlbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *lbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	err := uc.ensure(ctx, req)
 	return err
 }
 
-func (uc *vlbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
-	vlbConfig, err := uc.k8sRepo.GetVLBC(ctx, req.NamespacedName)
+func (uc *lbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -49,7 +49,7 @@ func (uc *vlbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 	task := &defaultModelDeleteTask{
 		logger:       logger,
 		cfg:          uc.cfg,
-		vlbConfig:    vlbConfig,
+		lbConfig:     lbConfig,
 		vngcloudRepo: uc.vngcloudRepo,
 		k8sRepo:      uc.k8sRepo,
 	}
@@ -63,8 +63,8 @@ func (uc *vlbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 
 //////////////////////////////////////////////////////////////////////////
 
-func (uc *vlbcUseCase) ensure(ctx context.Context, req ctrl.Request) error {
-	vlbConfig, err := uc.k8sRepo.GetVLBC(ctx, req.NamespacedName)
+func (uc *lbcUseCase) ensure(ctx context.Context, req ctrl.Request) error {
+	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -73,7 +73,7 @@ func (uc *vlbcUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	task := &defaultModelDeployTask{
 		logger:       logger,
 		cfg:          uc.cfg,
-		vlbConfig:    vlbConfig,
+		lbConfig:     lbConfig,
 		vngcloudRepo: uc.vngcloudRepo,
 		k8sRepo:      uc.k8sRepo,
 	}
