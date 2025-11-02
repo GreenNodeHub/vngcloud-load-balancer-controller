@@ -16,7 +16,17 @@ spec:
     singular: vngcloudloadbalancerconfig
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.loadBalancerId
+      name: LoadBalancer-ID
+      type: string
+    - jsonPath: .status.address
+      name: Address
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: VngcloudLoadBalancerConfig is the Schema for the vngcloudloadbalancerconfigs
@@ -113,8 +123,8 @@ spec:
                   General fields for all load balancers
                   LoadBalancerName is the name of the load balancer (only set via annotation)
                 type: string
-              packageID:
-                description: PackageID is the size/package of the load balancer
+              packageId:
+                description: PackageId is the size/package of the load balancer
                 type: string
               pools:
                 description: Pools defines the array of pools for the load balancer
@@ -213,8 +223,8 @@ spec:
                 - Internal
                 - Internet
                 type: string
-              subnetID:
-                description: SubnetID is the subnet ID for the load balancer
+              subnetId:
+                description: SubnetId is the subnet id for the load balancer
                 type: string
               tags:
                 additionalProperties:
@@ -228,12 +238,14 @@ spec:
                 - Layer 7
                 type: string
               zoneId:
-                description: ZoneId specifies the zone for the load balancer
+                description: ZoneId must be the zone where the load balancer will
+                  be created
                 type: string
             required:
             - loadBalancerName
-            - subnetID
+            - subnetId
             - type
+            - zoneId
             type: object
           status:
             description: status defines the observed state of VngcloudLoadBalancerConfig

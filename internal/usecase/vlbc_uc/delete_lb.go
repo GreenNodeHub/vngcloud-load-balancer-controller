@@ -7,6 +7,7 @@ import (
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 )
@@ -36,6 +37,14 @@ func (t *defaultModelDeleteTask) delete(ctx context.Context) error {
 }
 
 func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId string) error {
+	// check if load balancer is exists
+	if _, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId); err != nil {
+		if domain.IsLoadBalancerNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	canDelete, err := t.canDeleteWholeLoadBalancer(ctx, lbId)
 	if err != nil {
 		return err

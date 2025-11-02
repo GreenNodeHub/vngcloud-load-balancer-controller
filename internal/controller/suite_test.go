@@ -83,8 +83,7 @@ var (
 			Region      string `mapstructure:"region"`      // region of cluster
 		}{IsRunRemote: false, ClusterID: mockClusterID},
 		LoadBalancerOpts: config.LoadBalancerOpts{
-			DefaultL4PackageId:   "default-l4-package",
-			DefaultL7PackageId:   "default-l7-package",
+			DefaultL4PackageName: "NLB_Small",
 			DefaultPoolAlgorithm: "ROUND_ROBIN",
 
 			DefaultTimeoutClient:     50,

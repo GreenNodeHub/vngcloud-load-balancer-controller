@@ -24,6 +24,9 @@ type IVngCloudRepository interface {
 	ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error
 	WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
 
+	// Load Balancer Package
+	ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error)
+
 	// Tags
 	ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error)
 	// overwrites the tags of the resource

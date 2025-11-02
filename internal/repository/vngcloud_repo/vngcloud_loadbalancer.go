@@ -7,6 +7,7 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -116,4 +117,16 @@ func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (
 	}
 
 	return resultLb, err
+}
+
+func (m *vngCloudRepository) ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
+	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent).WithZoneId(zone))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListLoadBalancerPackageByZone: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return packages, nil
 }

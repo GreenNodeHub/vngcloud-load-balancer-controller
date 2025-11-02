@@ -118,7 +118,7 @@ func TestVLBCUseCase_Ensure_Success(t *testing.T) {
 		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
 			LoadBalancerId:   ptr.To("lb-12345"),
 			LoadBalancerName: "test-lb",
-			PackageID:        ptr.To("package-1"),
+			PackageId:        ptr.To("package-1"),
 			Pools:            []v1alpha1.Pool{},
 			Listeners:        []v1alpha1.Listener{},
 		},
@@ -337,7 +337,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NoPackageUpdate(t *testing.T) {
 
 	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
 		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-			PackageID: ptr.To("package-1"),
+			PackageId: ptr.To("package-1"),
 		},
 	}
 
@@ -365,7 +365,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NeedResize(t *testing.T) {
 
 	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
 		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-			PackageID: ptr.To("package-2"),
+			PackageId: ptr.To("package-2"),
 		},
 	}
 
@@ -434,7 +434,7 @@ func TestDefaultModelDeployTask_DeployPackageId_NilLoadBalancer(t *testing.T) {
 
 	vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
 		Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-			PackageID: ptr.To("package-2"),
+			PackageId: ptr.To("package-2"),
 		},
 	}
 

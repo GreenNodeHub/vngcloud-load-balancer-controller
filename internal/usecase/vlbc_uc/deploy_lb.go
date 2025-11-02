@@ -95,7 +95,11 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 }
 
 func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string, error) {
-	lbEntity, err := t.vngcloudRepo.CreateLoadBalancer(ctx, t.buildCreateLoadBalancerRequest(ctx))
+	createRequest, err := t.buildCreateLoadBalancerRequest(ctx)
+	if err != nil {
+		return "", err
+	}
+	lbEntity, err := t.vngcloudRepo.CreateLoadBalancer(ctx, createRequest)
 	if err != nil {
 		return "", err
 	}
@@ -124,6 +128,7 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string
 // when update load balancer id to new value
 func (t *defaultModelDeployTask) migrateLoadBalancer(ctx context.Context, oldId, newId string) (string, error) {
 	// currently not do anything to old lb
+	t.logger.Infof("Migrate load balancer from %s to %s...", oldId, newId)
 	return t.ensureExistLoadBalancer(ctx, newId, nil)
 }
 
@@ -165,13 +170,13 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 // resize load balancer if packageID in spec is different from current one
 // ignore if this lb is autoscaled
 func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *entity.LoadBalancer) error {
-	if t.vlbConfig.Spec.PackageID == nil || *t.vlbConfig.Spec.PackageID == "" {
+	if t.vlbConfig.Spec.PackageId == nil || *t.vlbConfig.Spec.PackageId == "" {
 		return nil
 	}
 	if lbEntity == nil {
 		return errors.New("load balancer entity is nil")
 	}
-	if *t.vlbConfig.Spec.PackageID == lbEntity.PackageID {
+	if *t.vlbConfig.Spec.PackageId == lbEntity.PackageID {
 		return nil
 	}
 
@@ -180,8 +185,8 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 		return nil
 	}
 
-	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.PackageID, *t.vlbConfig.Spec.PackageID)
-	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.UUID, *t.vlbConfig.Spec.PackageID); err != nil {
+	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.PackageID, *t.vlbConfig.Spec.PackageId)
+	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.UUID, *t.vlbConfig.Spec.PackageId); err != nil {
 		return err
 	}
 	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
@@ -191,16 +196,32 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	return nil
 }
 
-func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context) loadbalancerv2.ICreateLoadBalancerRequest {
+func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context) (loadbalancerv2.ICreateLoadBalancerRequest, error) {
+	packageId := ""
+	if t.vlbConfig.Spec.PackageId != nil && *t.vlbConfig.Spec.PackageId != "" {
+		packageId = *t.vlbConfig.Spec.PackageId
+	} else {
+		// use default package from config, get default package id from name and zone
+		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.vlbConfig.Spec.ZoneId)
+		if err != nil {
+			return nil, err
+		}
+		for _, pkg := range listPackages.Items {
+			if pkg.Name == t.cfg.LoadBalancerOpts.DefaultL4PackageName {
+				packageId = pkg.UUID
+				break
+			}
+		}
+		if packageId == "" {
+			return nil, errors.Errorf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.vlbConfig.Spec.ZoneId)
+		}
+	}
+
 	request := loadbalancerv2.NewCreateLoadBalancerRequest(
 		t.vlbConfig.Spec.LoadBalancerName,
-		t.cfg.LoadBalancerOpts.DefaultL4PackageId,
-		t.vlbConfig.Spec.SubnetID,
-	)
-
-	if t.vlbConfig.Spec.PackageID != nil && *t.vlbConfig.Spec.PackageID != "" {
-		request = request.WithPackageId(*t.vlbConfig.Spec.PackageID)
-	}
+		packageId,
+		t.vlbConfig.Spec.SubnetId,
+	).WithZoneId(t.vlbConfig.Spec.ZoneId).WithScheme(loadbalancerv2.LoadBalancerScheme(t.cfg.LoadBalancerOpts.DefaultScheme))
 
 	if t.vlbConfig.Spec.Scheme != nil {
 		request = request.WithScheme(*t.vlbConfig.Spec.Scheme)
@@ -218,16 +239,12 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 		request = request.WithPoc(*t.vlbConfig.Spec.IsPoc)
 	}
 
-	if t.vlbConfig.Spec.ZoneId != nil {
-		request = request.WithZoneId(*t.vlbConfig.Spec.ZoneId)
-	}
-
 	// TODO: add more fields
 	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
 	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
 	// WithTags(ptags ...string) ICreateLoadBalancerRequest
 
-	return request
+	return request, nil
 }
 
 // func  (t *defaultModelDeployTask)

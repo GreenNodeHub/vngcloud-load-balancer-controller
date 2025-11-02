@@ -129,7 +129,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet",
 					Cidr:      MockSubnetCIDR,
-					ZoneID:    common.HCM_03_1A_ZONE,
+					ZoneID:    string(common.HCM_03_1A_ZONE),
 				},
 			},
 			&wrapSubnet{
@@ -138,7 +138,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet-2a",
 					Cidr:      MockSubnetCIDR_1b_1,
-					ZoneID:    common.HCM_03_1B_ZONE,
+					ZoneID:    string(common.HCM_03_1B_ZONE),
 				},
 			},
 			&wrapSubnet{
@@ -147,7 +147,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet-2b",
 					Cidr:      MockSubnetCIDR_1b_2,
-					ZoneID:    common.HCM_03_1B_ZONE,
+					ZoneID:    string(common.HCM_03_1B_ZONE),
 				},
 			},
 		},
@@ -182,10 +182,10 @@ func (m *MockProvider) Init(_ []string) error {
 			serverIDs[3]: MockSubnetID_1b_2,
 		}
 		mapServerZone := map[string]string{
-			serverIDs[0]: common.HCM_03_1A_ZONE,
-			serverIDs[1]: common.HCM_03_1A_ZONE,
-			serverIDs[2]: common.HCM_03_1B_ZONE,
-			serverIDs[3]: common.HCM_03_1B_ZONE,
+			serverIDs[0]: string(common.HCM_03_1A_ZONE),
+			serverIDs[1]: string(common.HCM_03_1A_ZONE),
+			serverIDs[2]: string(common.HCM_03_1B_ZONE),
+			serverIDs[3]: string(common.HCM_03_1B_ZONE),
 		}
 		for _, id := range serverIDs {
 			m.servers = append(m.servers, &wrapServer{

@@ -41,6 +41,7 @@ type defaultModelBuildTask struct {
 	defaultSubnetCIDR string
 
 	// this is the current vlb config
+	zoneId     common.Zone
 	subnetId   string
 	subnetCidr string
 }
@@ -52,16 +53,26 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		}
 		return nil
 	}
-	if err := t.buildModel(ctx); err != nil {
+	if err := t.buildVngcloudLoadBalancerConfig(ctx); err != nil {
 		return err
 	}
 	if err := t.buildNodeSecurityGroup(ctx); err != nil {
 		return err
 	}
+
+	// update service address
+	address := t.getVLBCAddress(ctx)
+	if address != "" {
+		err := t.k8sRepo.UpdateServiceStatusAddress(ctx, utils.NamespacedName(t.service), address)
+		if err != nil {
+			t.logger.Errorf("failed to update service status address: %v", err)
+			return err
+		}
+	}
 	return nil
 }
 
-func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
+func (t *defaultModelBuildTask) buildVngcloudLoadBalancerConfig(ctx context.Context) error {
 	// list VLBC by label selector
 	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
 	err := t.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
@@ -102,10 +113,11 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 		return nil
 	}
 
-	_, _, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
+	zoneId, _, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
 	if err != nil {
 		return err
 	}
+	t.zoneId = zoneId
 	t.subnetId = subnetId
 	t.subnetCidr = subnetCidr
 
@@ -115,7 +127,8 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 	vlbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
 	vlbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
 	vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
-	vlbConfig.Spec.SubnetID = subnetId
+	vlbConfig.Spec.SubnetId = subnetId
+	vlbConfig.Spec.ZoneId = zoneId
 
 	// should not set owner reference because sometimes user want to keep VLBC after service is deleted
 	// vlbConfig.OwnerReferences = []metav1.OwnerReference{
@@ -132,7 +145,7 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 		vlbConfig.Spec.ClusterId = &t.clusterId
 	}
 	vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
-	vlbConfig.Spec.PackageID = t.buildPackageId(ctx)
+	vlbConfig.Spec.PackageId = t.buildPackageId(ctx)
 	vlbConfig.Spec.Scheme = t.buildScheme(ctx)
 	vlbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	vlbConfig.Spec.Tags = t.buildTags(ctx)
@@ -419,6 +432,31 @@ func (t *defaultModelBuildTask) buildIsPoc(_ context.Context) *bool {
 		}
 	}
 	return &isPoc
+}
+
+// get vlbc address from status
+func (t *defaultModelBuildTask) getVLBCAddress(ctx context.Context) string {
+	// list VLBC by label selector
+	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+	err := t.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
+		consts.LabelOwnerResourceName: t.service.Name,
+		consts.LabelOwnerResourceType: t.service.Kind,
+	})
+	if err != nil {
+		t.logger.Warnf("failed to list VLBC: %v", err)
+		return ""
+	}
+	if len(vlbcList.Items) > 1 {
+		t.logger.Warnf("found multiple VLBC for service %s/%s", t.service.Namespace, t.service.Name)
+		return ""
+	}
+	if len(vlbcList.Items) == 0 {
+		return ""
+	}
+	if vlbcList.Items[0].Status.Address != nil {
+		return *vlbcList.Items[0].Status.Address
+	}
+	return ""
 }
 
 // func (t *defaultModelBuildTask) build

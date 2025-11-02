@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -362,6 +363,15 @@ func (uc *nsgUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, secgroupID string) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("Delete managed security group %s if unused", secgroupID)
+
+	// check if secgroup is exists
+	if _, err := uc.vngcloudRepo.GetSecurityGroup(ctx, secgroupID); err != nil {
+		if domain.IsSecurityGroupNotFound(err) {
+			logger.Infof("Security group %s not found, skip delete", secgroupID)
+			return nil
+		}
+		return err
+	}
 
 	serverList, err := uc.vngcloudRepo.ListServerBySecgroupID(ctx, secgroupID)
 	if err != nil {

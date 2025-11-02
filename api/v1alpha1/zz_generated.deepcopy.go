@@ -21,7 +21,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -597,8 +596,8 @@ func (in *VngcloudLoadBalancerConfigSpec) DeepCopyInto(out *VngcloudLoadBalancer
 		*out = new(string)
 		**out = **in
 	}
-	if in.PackageID != nil {
-		in, out := &in.PackageID, &out.PackageID
+	if in.PackageId != nil {
+		in, out := &in.PackageId, &out.PackageId
 		*out = new(string)
 		**out = **in
 	}
@@ -627,11 +626,6 @@ func (in *VngcloudLoadBalancerConfigSpec) DeepCopyInto(out *VngcloudLoadBalancer
 	if in.IsPoc != nil {
 		in, out := &in.IsPoc, &out.IsPoc
 		*out = new(bool)
-		**out = **in
-	}
-	if in.ZoneId != nil {
-		in, out := &in.ZoneId, &out.ZoneId
-		*out = new(common.Zone)
 		**out = **in
 	}
 	if in.Listeners != nil {

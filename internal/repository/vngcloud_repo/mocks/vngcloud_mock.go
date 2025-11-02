@@ -138,7 +138,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet",
 					Cidr:      MockSubnetCIDR,
-					ZoneID:    common.HCM_03_1A_ZONE,
+					ZoneID:    string(common.HCM_03_1A_ZONE),
 				},
 			},
 			&wrapSubnet{
@@ -147,7 +147,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet-2a",
 					Cidr:      MockSubnetCIDR_1b_1,
-					ZoneID:    common.HCM_03_1B_ZONE,
+					ZoneID:    string(common.HCM_03_1B_ZONE),
 				},
 			},
 			&wrapSubnet{
@@ -156,7 +156,7 @@ func NewMockProvider() *MockProvider {
 					NetworkId: MockNetID,
 					Name:      "mock-subnet-2b",
 					Cidr:      MockSubnetCIDR_1b_2,
-					ZoneID:    common.HCM_03_1B_ZONE,
+					ZoneID:    string(common.HCM_03_1B_ZONE),
 				},
 			},
 		},
@@ -191,10 +191,10 @@ func (m *MockProvider) Init(_ []string) error {
 			serverIDs[3]: MockSubnetID_1b_2,
 		}
 		mapServerZone := map[string]string{
-			serverIDs[0]: common.HCM_03_1A_ZONE,
-			serverIDs[1]: common.HCM_03_1A_ZONE,
-			serverIDs[2]: common.HCM_03_1B_ZONE,
-			serverIDs[3]: common.HCM_03_1B_ZONE,
+			serverIDs[0]: string(common.HCM_03_1A_ZONE),
+			serverIDs[1]: string(common.HCM_03_1A_ZONE),
+			serverIDs[2]: string(common.HCM_03_1B_ZONE),
+			serverIDs[3]: string(common.HCM_03_1B_ZONE),
 		}
 		for _, id := range serverIDs {
 			m.servers = append(m.servers, &wrapServer{
@@ -285,12 +285,10 @@ func (m *MockProvider) subnetToZone(subnetID string) string {
 	return ""
 }
 
-func (m *MockProvider) GetDefaultPackageNetworkLB(zone common.Zone) (string, error) {
-	return DEFAULT_L4_PACKAGE_ID, nil
-}
-
-func (m *MockProvider) GetDefaultPackageApplicationLB(zone common.Zone) (string, error) {
-	return DEFAULT_L7_PACKAGE_ID, nil
+func (m *MockProvider) ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request list load balancer packages in zone %s", domain.RequestIcon, zone)
+	return nil, domain.ErrorNotImplemented
 }
 
 func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkID, subnetID, subnetCIDR string, err error) {

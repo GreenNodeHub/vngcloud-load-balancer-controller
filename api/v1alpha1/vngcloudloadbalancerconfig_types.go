@@ -312,13 +312,17 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +required
 	LoadBalancerName string `json:"loadBalancerName,omitempty"`
 
-	// SubnetID is the subnet ID for the load balancer
+	// SubnetId is the subnet id for the load balancer
 	// +required
-	SubnetID string `json:"subnetID,omitempty"`
+	SubnetId string `json:"subnetId,omitempty"`
 
-	// PackageID is the size/package of the load balancer
+	// ZoneId must be the zone where the load balancer will be created
+	// +required
+	ZoneId common.Zone `json:"zoneId,omitempty"`
+
+	// PackageId is the size/package of the load balancer
 	// +optional
-	PackageID *string `json:"packageID,omitempty"`
+	PackageId *string `json:"packageId,omitempty"`
 
 	// Scheme defines if the load balancer is internal or external
 	// +optional
@@ -340,10 +344,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// IsPOC indicates if this is a proof of concept deployment
 	// +optional
 	IsPoc *bool `json:"isPoc,omitempty"`
-
-	// ZoneId specifies the zone for the load balancer
-	// +optional
-	ZoneId *common.Zone `json:"zoneId,omitempty"`
 
 	// Listeners defines the array of listeners for the load balancer
 	// +optional
@@ -415,6 +415,9 @@ type CreatedListener struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=vlbc
+// +kubebuilder:printcolumn:name="LoadBalancer-ID",type="string",JSONPath=".status.loadBalancerId"
+// +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.address"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // VngcloudLoadBalancerConfig is the Schema for the vngcloudloadbalancerconfigs API
 type VngcloudLoadBalancerConfig struct {

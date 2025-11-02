@@ -34,9 +34,8 @@ type AuthOpts struct {
 }
 
 type LoadBalancerOpts struct {
-	DefaultL4PackageId string `gcfg:"default-l4-package-id" mapstructure:"defaultL4PackageId" name:"default-l4-package-id"`
-	DefaultL7PackageId string `gcfg:"default-l7-package-id" mapstructure:"defaultL7PackageId" name:"default-l7-package-id"`
-	DefaultScheme      string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
+	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"`
+	DefaultScheme        string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
 
 	// Pool defaults
 	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`
