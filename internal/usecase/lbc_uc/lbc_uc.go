@@ -18,7 +18,7 @@ type lbcUseCase struct {
 	vngcloudRepo repository.VngCloudRepository
 }
 
-func NewLBCUseCase(
+func NewLoadBalancerConfigUseCase(
 	cfg *config.Config,
 	k8sRepo repository.K8sRepository,
 	vngcloudRepo repository.VngCloudRepository,
@@ -35,8 +35,25 @@ func (uc *lbcUseCase) Init(ctx context.Context) error {
 }
 
 func (uc *lbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
-	err := uc.ensure(ctx, req)
-	return err
+	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+	task := &defaultModelDeployTask{
+		logger:       logger,
+		cfg:          uc.cfg,
+		lbConfig:     lbConfig,
+		vngcloudRepo: uc.vngcloudRepo,
+		k8sRepo:      uc.k8sRepo,
+	}
+
+	if err := task.deploy(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (uc *lbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
@@ -55,30 +72,6 @@ func (uc *lbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 	}
 
 	if err := task.delete(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-//////////////////////////////////////////////////////////////////////////
-
-func (uc *lbcUseCase) ensure(ctx context.Context, req ctrl.Request) error {
-	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
-	if err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	logger := contexts.NewContext(ctx).Log()
-	task := &defaultModelDeployTask{
-		logger:       logger,
-		cfg:          uc.cfg,
-		lbConfig:     lbConfig,
-		vngcloudRepo: uc.vngcloudRepo,
-		k8sRepo:      uc.k8sRepo,
-	}
-
-	if err := task.deploy(ctx); err != nil {
 		return err
 	}
 

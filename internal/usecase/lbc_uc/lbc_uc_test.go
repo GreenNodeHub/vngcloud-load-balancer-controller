@@ -24,7 +24,7 @@ func TestNewLBCUseCase(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	assert.NotNil(t, uc)
 	assert.IsType(t, &lbcUseCase{}, uc)
@@ -35,7 +35,7 @@ func TestLBCUseCase_Init(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	err := uc.Init(context.Background())
 	assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestLBCUseCase_Delete(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
@@ -64,7 +64,7 @@ func TestLBCUseCase_Ensure_LBCNotFound(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
@@ -104,7 +104,7 @@ func TestLBCUseCase_Ensure_Success(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{
@@ -178,7 +178,7 @@ func TestLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 	mockK8sRepo := repository.NewMockK8sRepository(t)
 	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
-	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
+	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
 	req := ctrl.Request{
 		NamespacedName: types.NamespacedName{

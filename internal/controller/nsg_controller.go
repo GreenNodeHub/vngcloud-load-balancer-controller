@@ -45,7 +45,7 @@ func NewNodeSecurityGroupReconciler(
 	nsgUseCase usecase.NodeSecurityGroupUseCase,
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
-	nsgUtils nsg.NSGUtils,
+	nsgUtils nsg.NodeSecurityGroupUtils,
 ) *NodeSecurityGroupReconciler {
 	return &NodeSecurityGroupReconciler{
 		Client:           client,
@@ -64,7 +64,7 @@ type NodeSecurityGroupReconciler struct {
 	nsgUseCase       usecase.NodeSecurityGroupUseCase
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
-	nsgUtils         nsg.NSGUtils
+	nsgUtils         nsg.NodeSecurityGroupUtils
 
 	initDone atomic.Bool
 }

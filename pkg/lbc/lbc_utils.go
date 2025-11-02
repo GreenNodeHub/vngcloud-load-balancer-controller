@@ -5,36 +5,31 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-// LBCUtils to check if the service is supported by the controller
-type LBCUtils interface {
-	// IsSupported returns true if the service is supported by the controller
+// LoadBalancerConfigUtils to check if the object is supported by the controller
+type LoadBalancerConfigUtils interface {
+	// IsSupported returns true if the object is supported by the controller
 	IsSupported(object *v1alpha1.LoadBalancerConfig) bool
 
-	// IsPendingFinalization returns true if the service contains the aws-load-balancer-controller finalizer
+	// IsPendingFinalization returns true if the object contains the vngcloud-load-balancer-controller finalizer
 	IsPendingFinalization(object *v1alpha1.LoadBalancerConfig) bool
 }
 
-func NewLBCUtils(objectFinalizer string) *defaultLBCUtils {
+func NewLoadBalancerConfigUtils(objectFinalizer string) LoadBalancerConfigUtils {
 	return &defaultLBCUtils{
 		objectFinalizer: objectFinalizer,
 	}
 }
 
-var _ LBCUtils = (*defaultLBCUtils)(nil)
-
 type defaultLBCUtils struct {
 	objectFinalizer string
 }
 
-// IsPendingFinalization returns true if service has the aws-load-balancer-controller finalizer
-func (u *defaultLBCUtils) IsPendingFinalization(service *v1alpha1.LoadBalancerConfig) bool {
-	return k8s.HasFinalizer(service, u.objectFinalizer)
+// IsPendingFinalization returns true if object has the vngcloud-load-balancer-controller finalizer
+func (u *defaultLBCUtils) IsPendingFinalization(object *v1alpha1.LoadBalancerConfig) bool {
+	return k8s.HasFinalizer(object, u.objectFinalizer)
 }
 
-// IsSupported returns true if the service is supported by the controller
-func (u *defaultLBCUtils) IsSupported(service *v1alpha1.LoadBalancerConfig) bool {
-	if !service.DeletionTimestamp.IsZero() {
-		return false
-	}
-	return true
+// IsSupported returns true if the object is supported by the controller
+func (u *defaultLBCUtils) IsSupported(object *v1alpha1.LoadBalancerConfig) bool {
+	return object.DeletionTimestamp.IsZero()
 }

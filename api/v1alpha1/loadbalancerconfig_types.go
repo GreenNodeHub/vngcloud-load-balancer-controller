@@ -359,17 +359,17 @@ type LoadBalancerConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// ObservedGeneration reflects the generation of the most recently observed spec
-	// +optional
-	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// // ObservedGeneration reflects the generation of the most recently observed spec
+	// // +optional
+	// ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 
-	// Message provides human-readable details about the current state
-	// +optional
-	Message *string `json:"message,omitempty"`
+	// // Message provides human-readable details about the current state
+	// // +optional
+	// Message *string `json:"message,omitempty"`
 
-	// Reason provides a brief reason for the current state
-	// +optional
-	Reason *string `json:"reason,omitempty"`
+	// // Reason provides a brief reason for the current state
+	// // +optional
+	// Reason *string `json:"reason,omitempty"`
 
 	// Address is the DNS name or IP address assigned to the load balancer
 	// +optional
@@ -415,8 +415,10 @@ type CreatedListener struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=lbc
-// +kubebuilder:printcolumn:name="LoadBalancer-ID",type="string",JSONPath=".status.loadBalancerId"
+// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
+// +kubebuilder:printcolumn:name="LoadBalancer-Id",type="string",JSONPath=".status.loadBalancerId"
 // +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.address"
+// +kubebuilder:printcolumn:name="Zone",type="string",JSONPath=".spec.zoneId"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // LoadBalancerConfig is the Schema for the loadbalancerconfigs API

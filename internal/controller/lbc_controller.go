@@ -45,7 +45,7 @@ func NewLoadBalancerConfigReconciler(
 	lbcUseCase usecase.LoadBalancerConfigUseCase,
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
-	lbcUtils lbc.LBCUtils,
+	lbcUtils lbc.LoadBalancerConfigUtils,
 ) *LoadBalancerConfigReconciler {
 	return &LoadBalancerConfigReconciler{
 		Client:           client,
@@ -64,7 +64,7 @@ type LoadBalancerConfigReconciler struct {
 	lbcUseCase       usecase.LoadBalancerConfigUseCase
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
-	lbcUtils         lbc.LBCUtils
+	lbcUtils         lbc.LoadBalancerConfigUtils
 
 	initDone atomic.Bool
 }

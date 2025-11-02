@@ -270,8 +270,8 @@ func main() {
 	}
 
 	if !disableLoadBalancerConfigController {
-		lbcUtils := lbc.NewLBCUtils(consts.LBCFinalizer)
-		lbcUseCase := lbc_uc.NewLBCUseCase(
+		lbcUtils := lbc.NewLoadBalancerConfigUtils(consts.LBCFinalizer)
+		lbcUseCase := lbc_uc.NewLoadBalancerConfigUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
 		reconciler := controller.NewLoadBalancerConfigReconciler(
@@ -289,8 +289,8 @@ func main() {
 	}
 
 	if !disableNodeSecurityGroupController {
-		nsgUtils := nsg.NewNSGUtils(consts.NSGFinalizer)
-		nsgUseCase := nsg_uc.NewNSGUseCase(
+		nsgUtils := nsg.NewNodeSecurityGroupUtils(consts.NSGFinalizer)
+		nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
 		reconciler := controller.NewNodeSecurityGroupReconciler(

@@ -290,7 +290,7 @@ var _ = BeforeSuite(func() {
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	lbcUseCase := lbc_uc.NewLBCUseCase(
+	lbcUseCase := lbc_uc.NewLoadBalancerConfigUseCase(
 		mockConfig,
 		k8sRepo,
 		vngcloudRepo,
@@ -301,12 +301,12 @@ var _ = BeforeSuite(func() {
 		lbcUseCase,
 		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
-		lbc.NewLBCUtils(consts.LBCFinalizer),
+		lbc.NewLoadBalancerConfigUtils(consts.LBCFinalizer),
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	nsgUseCase := nsg_uc.NewNSGUseCase(
+	nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
 		mockConfig,
 		k8sRepo,
 		vngcloudRepo,
@@ -317,7 +317,7 @@ var _ = BeforeSuite(func() {
 		nsgUseCase,
 		k8sManager.GetEventRecorderFor("nsg-controller"),
 		finalizerManager,
-		nsg.NewNSGUtils(consts.NSGFinalizer),
+		nsg.NewNodeSecurityGroupUtils(consts.NSGFinalizer),
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

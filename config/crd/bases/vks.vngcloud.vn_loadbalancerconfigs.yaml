@@ -17,11 +17,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.type
+      name: Type
+      type: string
     - jsonPath: .status.loadBalancerId
-      name: LoadBalancer-ID
+      name: LoadBalancer-Id
       type: string
     - jsonPath: .status.address
       name: Address
+      type: string
+    - jsonPath: .spec.zoneId
+      name: Zone
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -284,18 +290,6 @@ spec:
               loadBalancerId:
                 description: LoadBalancerId is the actual ID of the load balancer
                   in VNG Cloud
-                type: string
-              message:
-                description: Message provides human-readable details about the current
-                  state
-                type: string
-              observedGeneration:
-                description: ObservedGeneration reflects the generation of the most
-                  recently observed spec
-                format: int64
-                type: integer
-              reason:
-                description: Reason provides a brief reason for the current state
                 type: string
             type: object
         required:

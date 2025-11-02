@@ -26,7 +26,7 @@ type nsgUseCase struct {
 	vngcloudRepo repository.VngCloudRepository
 }
 
-func NewNSGUseCase(
+func NewNodeSecurityGroupUseCase(
 	cfg *config.Config,
 	k8sRepo repository.K8sRepository,
 	vngcloudRepo repository.VngCloudRepository,
