@@ -21,8 +21,8 @@ import (
 
 func TestNewLBCUseCase(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -32,8 +32,8 @@ func TestNewLBCUseCase(t *testing.T) {
 
 func TestLBCUseCase_Init(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -43,8 +43,8 @@ func TestLBCUseCase_Init(t *testing.T) {
 
 func TestLBCUseCase_Delete(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -61,8 +61,8 @@ func TestLBCUseCase_Delete(t *testing.T) {
 
 func TestLBCUseCase_Ensure_LBCNotFound(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -101,8 +101,8 @@ func TestLBCUseCase_Ensure_Success(t *testing.T) {
 			DefaultTimeoutConnection:  5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -175,8 +175,8 @@ func TestLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 			DefaultTimeoutConnection:  5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	uc := NewLBCUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
@@ -240,8 +240,8 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_ExistingLBID(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -290,8 +290,8 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_Migration(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -332,8 +332,8 @@ func TestDefaultModelDeployTask_DeployLoadBalancer_Migration(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployPackageId_NoPackageUpdate(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -360,8 +360,8 @@ func TestDefaultModelDeployTask_DeployPackageId_NoPackageUpdate(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployPackageId_NeedResize(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -401,8 +401,8 @@ func TestDefaultModelDeployTask_DeployPackageId_NeedResize(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployPackageId_EmptyPackageID(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -429,8 +429,8 @@ func TestDefaultModelDeployTask_DeployPackageId_EmptyPackageID(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployPackageId_NilLoadBalancer(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{

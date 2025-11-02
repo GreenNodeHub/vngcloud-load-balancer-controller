@@ -25,8 +25,8 @@ func TestDefaultModelDeployTask_DeployListeners_Success(t *testing.T) {
 			DefaultTimeoutConnection: 5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -114,8 +114,8 @@ func TestDefaultModelDeployTask_DeployListener_CreateNew(t *testing.T) {
 			DefaultTimeoutConnection: 5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	listenerSpec := v1alpha1.Listener{
 		Name:              "new-listener",
@@ -182,8 +182,8 @@ func TestDefaultModelDeployTask_DeployListener_UpdateExisting(t *testing.T) {
 			DefaultTimeoutConnection: 5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	listenerSpec := v1alpha1.Listener{
 		Name:              "existing-listener",
@@ -250,8 +250,8 @@ func TestDefaultModelDeployTask_DeployListener_UpdateExisting(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployListener_ProtocolMismatch(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	listenerSpec := v1alpha1.Listener{
 		Name:         "existing-listener",
@@ -295,8 +295,8 @@ func TestDefaultModelDeployTask_DeployListener_NoUpdate(t *testing.T) {
 			DefaultTimeoutConnection: 5000,
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	listenerSpec := v1alpha1.Listener{
 		Name:              "existing-listener",
@@ -445,8 +445,8 @@ func TestDefaultModelDeployTask_BuildCreateListenerRequest(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployDeleteRedundantListeners(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedListeners: []v1alpha1.CreatedListener{
@@ -498,8 +498,8 @@ func TestDefaultModelDeployTask_DeployDeleteRedundantListeners(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployDeleteRedundantListeners_ListenerNotFound(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedListeners: []v1alpha1.CreatedListener{

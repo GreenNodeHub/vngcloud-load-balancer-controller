@@ -26,8 +26,8 @@ func TestDefaultModelDeployTask_DeployPools_Success(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	lbc := &v1alpha1.LoadBalancerConfig{
 		Spec: v1alpha1.LoadBalancerConfigSpec{
@@ -93,8 +93,8 @@ func TestDefaultModelDeployTask_DeployPool_CreateNew(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	pool := &v1alpha1.Pool{
 		Name:     "new-pool",
@@ -149,8 +149,8 @@ func TestDefaultModelDeployTask_DeployPool_UpdateExisting(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	pool := &v1alpha1.Pool{
 		Name:      "existing-pool",
@@ -248,8 +248,8 @@ func TestDefaultModelDeployTask_DeployPool_UpdateMembers(t *testing.T) {
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
 		},
 	}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	pool := &v1alpha1.Pool{
 		Name:     "existing-pool",
@@ -504,8 +504,8 @@ func TestDefaultModelDeployTask_CheckIfPoolMemberExist(t *testing.T) {
 
 func TestDefaultModelDeployTask_DeployDeleteRedundantPools(t *testing.T) {
 	cfg := &config.Config{}
-	mockK8sRepo := repository.NewMockIK8sRepository(t)
-	mockVngcloudRepo := repository.NewMockIVngCloudRepository(t)
+	mockK8sRepo := repository.NewMockK8sRepository(t)
+	mockVngcloudRepo := repository.NewMockVngCloudRepository(t)
 
 	status := v1alpha1.LoadBalancerConfigStatus{
 		CreatedPools: []v1alpha1.CreatedPool{
