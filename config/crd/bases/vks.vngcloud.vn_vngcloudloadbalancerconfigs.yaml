@@ -11,6 +11,8 @@ spec:
     kind: VngcloudLoadBalancerConfig
     listKind: VngcloudLoadBalancerConfigList
     plural: vngcloudloadbalancerconfigs
+    shortNames:
+    - vlbc
     singular: vngcloudloadbalancerconfig
   scope: Namespaced
   versions:

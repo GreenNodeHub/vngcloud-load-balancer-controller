@@ -414,6 +414,7 @@ type CreatedListener struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=vlbc
 
 // VngcloudLoadBalancerConfig is the Schema for the vngcloudloadbalancerconfigs API
 type VngcloudLoadBalancerConfig struct {
