@@ -12,6 +12,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	v20 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	v10 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -631,6 +632,80 @@ func (_c *MockIVngCloudRepository_CreateSecurityGroup_Call) RunAndReturn(run fun
 	return _c
 }
 
+// CreateSecurityGroupRule provides a mock function for the type MockIVngCloudRepository
+func (_mock *MockIVngCloudRepository) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts v20.ICreateSecgroupRuleRequest) (*entity.SecgroupRule, error) {
+	ret := _mock.Called(ctx, secgroupID, opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateSecurityGroupRule")
+	}
+
+	var r0 *entity.SecgroupRule
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, v20.ICreateSecgroupRuleRequest) (*entity.SecgroupRule, error)); ok {
+		return returnFunc(ctx, secgroupID, opts)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, v20.ICreateSecgroupRuleRequest) *entity.SecgroupRule); ok {
+		r0 = returnFunc(ctx, secgroupID, opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.SecgroupRule)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, v20.ICreateSecgroupRuleRequest) error); ok {
+		r1 = returnFunc(ctx, secgroupID, opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIVngCloudRepository_CreateSecurityGroupRule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateSecurityGroupRule'
+type MockIVngCloudRepository_CreateSecurityGroupRule_Call struct {
+	*mock.Call
+}
+
+// CreateSecurityGroupRule is a helper method to define mock.On call
+//   - ctx context.Context
+//   - secgroupID string
+//   - opts v20.ICreateSecgroupRuleRequest
+func (_e *MockIVngCloudRepository_Expecter) CreateSecurityGroupRule(ctx interface{}, secgroupID interface{}, opts interface{}) *MockIVngCloudRepository_CreateSecurityGroupRule_Call {
+	return &MockIVngCloudRepository_CreateSecurityGroupRule_Call{Call: _e.mock.On("CreateSecurityGroupRule", ctx, secgroupID, opts)}
+}
+
+func (_c *MockIVngCloudRepository_CreateSecurityGroupRule_Call) Run(run func(ctx context.Context, secgroupID string, opts v20.ICreateSecgroupRuleRequest)) *MockIVngCloudRepository_CreateSecurityGroupRule_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 v20.ICreateSecgroupRuleRequest
+		if args[2] != nil {
+			arg2 = args[2].(v20.ICreateSecgroupRuleRequest)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_CreateSecurityGroupRule_Call) Return(secgroupRule *entity.SecgroupRule, err error) *MockIVngCloudRepository_CreateSecurityGroupRule_Call {
+	_c.Call.Return(secgroupRule, err)
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_CreateSecurityGroupRule_Call) RunAndReturn(run func(ctx context.Context, secgroupID string, opts v20.ICreateSecgroupRuleRequest) (*entity.SecgroupRule, error)) *MockIVngCloudRepository_CreateSecurityGroupRule_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateTags provides a mock function for the type MockIVngCloudRepository
 func (_mock *MockIVngCloudRepository) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	ret := _mock.Called(ctx, resourceID, tags)
@@ -1243,6 +1318,69 @@ func (_c *MockIVngCloudRepository_DeleteSecurityGroup_Call) RunAndReturn(run fun
 	return _c
 }
 
+// DeleteSecurityGroupRule provides a mock function for the type MockIVngCloudRepository
+func (_mock *MockIVngCloudRepository) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
+	ret := _mock.Called(ctx, secgroupID, ruleID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSecurityGroupRule")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, secgroupID, ruleID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIVngCloudRepository_DeleteSecurityGroupRule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSecurityGroupRule'
+type MockIVngCloudRepository_DeleteSecurityGroupRule_Call struct {
+	*mock.Call
+}
+
+// DeleteSecurityGroupRule is a helper method to define mock.On call
+//   - ctx context.Context
+//   - secgroupID string
+//   - ruleID string
+func (_e *MockIVngCloudRepository_Expecter) DeleteSecurityGroupRule(ctx interface{}, secgroupID interface{}, ruleID interface{}) *MockIVngCloudRepository_DeleteSecurityGroupRule_Call {
+	return &MockIVngCloudRepository_DeleteSecurityGroupRule_Call{Call: _e.mock.On("DeleteSecurityGroupRule", ctx, secgroupID, ruleID)}
+}
+
+func (_c *MockIVngCloudRepository_DeleteSecurityGroupRule_Call) Run(run func(ctx context.Context, secgroupID string, ruleID string)) *MockIVngCloudRepository_DeleteSecurityGroupRule_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_DeleteSecurityGroupRule_Call) Return(err error) *MockIVngCloudRepository_DeleteSecurityGroupRule_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_DeleteSecurityGroupRule_Call) RunAndReturn(run func(ctx context.Context, secgroupID string, ruleID string) error) *MockIVngCloudRepository_DeleteSecurityGroupRule_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCertificateByID provides a mock function for the type MockIVngCloudRepository
 func (_mock *MockIVngCloudRepository) GetCertificateByID(ctx context.Context, certID string) (*entity.Certificate, error) {
 	ret := _mock.Called(ctx, certID)
@@ -1795,6 +1933,74 @@ func (_c *MockIVngCloudRepository_GetSecurityGroup_Call) Return(secgroup *entity
 }
 
 func (_c *MockIVngCloudRepository_GetSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, secgroupID string) (*entity.Secgroup, error)) *MockIVngCloudRepository_GetSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetServerByID provides a mock function for the type MockIVngCloudRepository
+func (_mock *MockIVngCloudRepository) GetServerByID(ctx context.Context, serverID string) (*entity.Server, error) {
+	ret := _mock.Called(ctx, serverID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetServerByID")
+	}
+
+	var r0 *entity.Server
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*entity.Server, error)); ok {
+		return returnFunc(ctx, serverID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *entity.Server); ok {
+		r0 = returnFunc(ctx, serverID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.Server)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, serverID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIVngCloudRepository_GetServerByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetServerByID'
+type MockIVngCloudRepository_GetServerByID_Call struct {
+	*mock.Call
+}
+
+// GetServerByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - serverID string
+func (_e *MockIVngCloudRepository_Expecter) GetServerByID(ctx interface{}, serverID interface{}) *MockIVngCloudRepository_GetServerByID_Call {
+	return &MockIVngCloudRepository_GetServerByID_Call{Call: _e.mock.On("GetServerByID", ctx, serverID)}
+}
+
+func (_c *MockIVngCloudRepository_GetServerByID_Call) Run(run func(ctx context.Context, serverID string)) *MockIVngCloudRepository_GetServerByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_GetServerByID_Call) Return(server *entity.Server, err error) *MockIVngCloudRepository_GetServerByID_Call {
+	_c.Call.Return(server, err)
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_GetServerByID_Call) RunAndReturn(run func(ctx context.Context, serverID string) (*entity.Server, error)) *MockIVngCloudRepository_GetServerByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2639,6 +2845,74 @@ func (_c *MockIVngCloudRepository_ListPool_Call) Return(listPools *entity.ListPo
 }
 
 func (_c *MockIVngCloudRepository_ListPool_Call) RunAndReturn(run func(ctx context.Context, lbID string) (*entity.ListPools, error)) *MockIVngCloudRepository_ListPool_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListSecurityGroupRules provides a mock function for the type MockIVngCloudRepository
+func (_mock *MockIVngCloudRepository) ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entity.ListSecgroupRules, error) {
+	ret := _mock.Called(ctx, secgroupID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListSecurityGroupRules")
+	}
+
+	var r0 *entity.ListSecgroupRules
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*entity.ListSecgroupRules, error)); ok {
+		return returnFunc(ctx, secgroupID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *entity.ListSecgroupRules); ok {
+		r0 = returnFunc(ctx, secgroupID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListSecgroupRules)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, secgroupID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIVngCloudRepository_ListSecurityGroupRules_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSecurityGroupRules'
+type MockIVngCloudRepository_ListSecurityGroupRules_Call struct {
+	*mock.Call
+}
+
+// ListSecurityGroupRules is a helper method to define mock.On call
+//   - ctx context.Context
+//   - secgroupID string
+func (_e *MockIVngCloudRepository_Expecter) ListSecurityGroupRules(ctx interface{}, secgroupID interface{}) *MockIVngCloudRepository_ListSecurityGroupRules_Call {
+	return &MockIVngCloudRepository_ListSecurityGroupRules_Call{Call: _e.mock.On("ListSecurityGroupRules", ctx, secgroupID)}
+}
+
+func (_c *MockIVngCloudRepository_ListSecurityGroupRules_Call) Run(run func(ctx context.Context, secgroupID string)) *MockIVngCloudRepository_ListSecurityGroupRules_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_ListSecurityGroupRules_Call) Return(listSecgroupRules *entity.ListSecgroupRules, err error) *MockIVngCloudRepository_ListSecurityGroupRules_Call {
+	_c.Call.Return(listSecgroupRules, err)
+	return _c
+}
+
+func (_c *MockIVngCloudRepository_ListSecurityGroupRules_Call) RunAndReturn(run func(ctx context.Context, secgroupID string) (*entity.ListSecgroupRules, error)) *MockIVngCloudRepository_ListSecurityGroupRules_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3819,6 +4093,78 @@ func (_m *MockIK8sRepository) EXPECT() *MockIK8sRepository_Expecter {
 	return &MockIK8sRepository_Expecter{mock: &_m.Mock}
 }
 
+// CreateNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, nsg, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, nsg)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateNodeSecurityGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup, ...client.CreateOption) error); ok {
+		r0 = returnFunc(ctx, nsg, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_CreateNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateNodeSecurityGroup'
+type MockIK8sRepository_CreateNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// CreateNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsg *v1alpha1.NodeSecurityGroup
+//   - opts ...client.CreateOption
+func (_e *MockIK8sRepository_Expecter) CreateNodeSecurityGroup(ctx interface{}, nsg interface{}, opts ...interface{}) *MockIK8sRepository_CreateNodeSecurityGroup_Call {
+	return &MockIK8sRepository_CreateNodeSecurityGroup_Call{Call: _e.mock.On("CreateNodeSecurityGroup",
+		append([]interface{}{ctx, nsg}, opts...)...)}
+}
+
+func (_c *MockIK8sRepository_CreateNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption)) *MockIK8sRepository_CreateNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.NodeSecurityGroup
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.NodeSecurityGroup)
+		}
+		var arg2 []client.CreateOption
+		var variadicArgs []client.CreateOption
+		if len(args) > 2 {
+			variadicArgs = args[2].([]client.CreateOption)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_CreateNodeSecurityGroup_Call) Return(err error) *MockIK8sRepository_CreateNodeSecurityGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_CreateNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error) *MockIK8sRepository_CreateNodeSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateVLBC provides a mock function for the type MockIK8sRepository
 func (_mock *MockIK8sRepository) CreateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.CreateOption) error {
 	var tmpRet mock.Arguments
@@ -3891,6 +4237,63 @@ func (_c *MockIK8sRepository_CreateVLBC_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// DeleteNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {
+	ret := _mock.Called(ctx, nsg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeSecurityGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup) error); ok {
+		r0 = returnFunc(ctx, nsg)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_DeleteNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeSecurityGroup'
+type MockIK8sRepository_DeleteNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsg *v1alpha1.NodeSecurityGroup
+func (_e *MockIK8sRepository_Expecter) DeleteNodeSecurityGroup(ctx interface{}, nsg interface{}) *MockIK8sRepository_DeleteNodeSecurityGroup_Call {
+	return &MockIK8sRepository_DeleteNodeSecurityGroup_Call{Call: _e.mock.On("DeleteNodeSecurityGroup", ctx, nsg)}
+}
+
+func (_c *MockIK8sRepository_DeleteNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup)) *MockIK8sRepository_DeleteNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.NodeSecurityGroup
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.NodeSecurityGroup)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_DeleteNodeSecurityGroup_Call) Return(err error) *MockIK8sRepository_DeleteNodeSecurityGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_DeleteNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error) *MockIK8sRepository_DeleteNodeSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteVLBC provides a mock function for the type MockIK8sRepository
 func (_mock *MockIK8sRepository) DeleteVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig) error {
 	ret := _mock.Called(ctx, vlbc)
@@ -3944,6 +4347,74 @@ func (_c *MockIK8sRepository_DeleteVLBC_Call) Return(err error) *MockIK8sReposit
 }
 
 func (_c *MockIK8sRepository_DeleteVLBC_Call) RunAndReturn(run func(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig) error) *MockIK8sRepository_DeleteVLBC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) GetNodeSecurityGroup(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error) {
+	ret := _mock.Called(ctx, n)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodeSecurityGroup")
+	}
+
+	var r0 *v1alpha1.NodeSecurityGroup
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error)); ok {
+		return returnFunc(ctx, n)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v1alpha1.NodeSecurityGroup); ok {
+		r0 = returnFunc(ctx, n)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1alpha1.NodeSecurityGroup)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.NamespacedName) error); ok {
+		r1 = returnFunc(ctx, n)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockIK8sRepository_GetNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodeSecurityGroup'
+type MockIK8sRepository_GetNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// GetNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - n types.NamespacedName
+func (_e *MockIK8sRepository_Expecter) GetNodeSecurityGroup(ctx interface{}, n interface{}) *MockIK8sRepository_GetNodeSecurityGroup_Call {
+	return &MockIK8sRepository_GetNodeSecurityGroup_Call{Call: _e.mock.On("GetNodeSecurityGroup", ctx, n)}
+}
+
+func (_c *MockIK8sRepository_GetNodeSecurityGroup_Call) Run(run func(ctx context.Context, n types.NamespacedName)) *MockIK8sRepository_GetNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.NamespacedName
+		if args[1] != nil {
+			arg1 = args[1].(types.NamespacedName)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_GetNodeSecurityGroup_Call) Return(nodeSecurityGroup *v1alpha1.NodeSecurityGroup, err error) *MockIK8sRepository_GetNodeSecurityGroup_Call {
+	_c.Call.Return(nodeSecurityGroup, err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_GetNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error)) *MockIK8sRepository_GetNodeSecurityGroup_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4156,6 +4627,78 @@ func (_c *MockIK8sRepository_ListNode_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// ListNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha1.NodeSecurityGroupList, opts ...client.ListOption) error {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, list, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, list)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNodeSecurityGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroupList, ...client.ListOption) error); ok {
+		r0 = returnFunc(ctx, list, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_ListNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNodeSecurityGroup'
+type MockIK8sRepository_ListNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// ListNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - list *v1alpha1.NodeSecurityGroupList
+//   - opts ...client.ListOption
+func (_e *MockIK8sRepository_Expecter) ListNodeSecurityGroup(ctx interface{}, list interface{}, opts ...interface{}) *MockIK8sRepository_ListNodeSecurityGroup_Call {
+	return &MockIK8sRepository_ListNodeSecurityGroup_Call{Call: _e.mock.On("ListNodeSecurityGroup",
+		append([]interface{}{ctx, list}, opts...)...)}
+}
+
+func (_c *MockIK8sRepository_ListNodeSecurityGroup_Call) Run(run func(ctx context.Context, list *v1alpha1.NodeSecurityGroupList, opts ...client.ListOption)) *MockIK8sRepository_ListNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.NodeSecurityGroupList
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.NodeSecurityGroupList)
+		}
+		var arg2 []client.ListOption
+		var variadicArgs []client.ListOption
+		if len(args) > 2 {
+			variadicArgs = args[2].([]client.ListOption)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_ListNodeSecurityGroup_Call) Return(err error) *MockIK8sRepository_ListNodeSecurityGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_ListNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, list *v1alpha1.NodeSecurityGroupList, opts ...client.ListOption) error) *MockIK8sRepository_ListNodeSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListVLBC provides a mock function for the type MockIK8sRepository
 func (_mock *MockIK8sRepository) ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error {
 	var tmpRet mock.Arguments
@@ -4228,6 +4771,69 @@ func (_c *MockIK8sRepository_ListVLBC_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// PatchMutateStatusNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error {
+	ret := _mock.Called(ctx, nsg, mutateFunc)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchMutateStatusNodeSecurityGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error); ok {
+		r0 = returnFunc(ctx, nsg, mutateFunc)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchMutateStatusNodeSecurityGroup'
+type MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// PatchMutateStatusNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsg *v1alpha1.NodeSecurityGroup
+//   - mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)
+func (_e *MockIK8sRepository_Expecter) PatchMutateStatusNodeSecurityGroup(ctx interface{}, nsg interface{}, mutateFunc interface{}) *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+	return &MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call{Call: _e.mock.On("PatchMutateStatusNodeSecurityGroup", ctx, nsg, mutateFunc)}
+}
+
+func (_c *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup))) *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.NodeSecurityGroup
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.NodeSecurityGroup)
+		}
+		var arg2 func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)
+		if args[2] != nil {
+			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup))
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Return(err error) *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error) *MockIK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PatchMutateStatusVLBC provides a mock function for the type MockIK8sRepository
 func (_mock *MockIK8sRepository) PatchMutateStatusVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig)) error {
 	ret := _mock.Called(ctx, vlbc, mutateFunc)
@@ -4287,6 +4893,84 @@ func (_c *MockIK8sRepository_PatchMutateStatusVLBC_Call) Return(err error) *Mock
 }
 
 func (_c *MockIK8sRepository_PatchMutateStatusVLBC_Call) RunAndReturn(run func(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig)) error) *MockIK8sRepository_PatchMutateStatusVLBC_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PatchNodeSecurityGroup provides a mock function for the type MockIK8sRepository
+func (_mock *MockIK8sRepository) PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error {
+	var tmpRet mock.Arguments
+	if len(opts) > 0 {
+		tmpRet = _mock.Called(ctx, nsg, patch, opts)
+	} else {
+		tmpRet = _mock.Called(ctx, nsg, patch)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchNodeSecurityGroup")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup, client.Patch, ...client.PatchOption) error); ok {
+		r0 = returnFunc(ctx, nsg, patch, opts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockIK8sRepository_PatchNodeSecurityGroup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchNodeSecurityGroup'
+type MockIK8sRepository_PatchNodeSecurityGroup_Call struct {
+	*mock.Call
+}
+
+// PatchNodeSecurityGroup is a helper method to define mock.On call
+//   - ctx context.Context
+//   - nsg *v1alpha1.NodeSecurityGroup
+//   - patch client.Patch
+//   - opts ...client.PatchOption
+func (_e *MockIK8sRepository_Expecter) PatchNodeSecurityGroup(ctx interface{}, nsg interface{}, patch interface{}, opts ...interface{}) *MockIK8sRepository_PatchNodeSecurityGroup_Call {
+	return &MockIK8sRepository_PatchNodeSecurityGroup_Call{Call: _e.mock.On("PatchNodeSecurityGroup",
+		append([]interface{}{ctx, nsg, patch}, opts...)...)}
+}
+
+func (_c *MockIK8sRepository_PatchNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption)) *MockIK8sRepository_PatchNodeSecurityGroup_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.NodeSecurityGroup
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.NodeSecurityGroup)
+		}
+		var arg2 client.Patch
+		if args[2] != nil {
+			arg2 = args[2].(client.Patch)
+		}
+		var arg3 []client.PatchOption
+		var variadicArgs []client.PatchOption
+		if len(args) > 3 {
+			variadicArgs = args[3].([]client.PatchOption)
+		}
+		arg3 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockIK8sRepository_PatchNodeSecurityGroup_Call) Return(err error) *MockIK8sRepository_PatchNodeSecurityGroup_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockIK8sRepository_PatchNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error) *MockIK8sRepository_PatchNodeSecurityGroup_Call {
 	_c.Call.Return(run)
 	return _c
 }

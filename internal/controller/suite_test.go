@@ -47,11 +47,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/mocks"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
@@ -69,6 +71,7 @@ var (
 	cancel                context.CancelFunc
 	mockServiceReconciler *core.ServiceReconciler
 	mockVLBCReconciler    *VngcloudLoadBalancerConfigReconciler
+	mockNSGReconciler     *NodeSecurityGroupReconciler
 	vngcloudRepo          *mocks.MockProvider
 	cniDetector           *utils.MockCniDetector
 
@@ -272,7 +275,7 @@ var _ = BeforeSuite(func() {
 
 	annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 	cniDetector = new(utils.MockCniDetector)
-	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.UnknownCNI, nil)
+	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
 	serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
 	serviceUseCase := service_uc.NewServiceUseCase(
@@ -302,6 +305,22 @@ var _ = BeforeSuite(func() {
 		vlbc.NewVLBCUtils(consts.VLBCFinalizer),
 	)
 	err = mockVLBCReconciler.SetupWithManager(ctx, k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	nsgUseCase := nsg_uc.NewNSGUseCase(
+		mockConfig,
+		k8sRepo,
+		vngcloudRepo,
+	)
+	mockNSGReconciler = NewNodeSecurityGroupReconciler(
+		k8sManager.GetClient(),
+		k8sManager.GetScheme(),
+		nsgUseCase,
+		k8sManager.GetEventRecorderFor("nsg-controller"),
+		finalizerManager,
+		nsg.NewNSGUtils(consts.NSGFinalizer),
+	)
+	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

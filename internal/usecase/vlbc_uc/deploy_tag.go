@@ -38,6 +38,8 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 			t.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
 			vksClusterTags = t.joinVKSTag(vksClusterTags, *t.vlbConfig.Spec.ClusterId)
 			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
+		} else {
+			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
 		}
 	}
 

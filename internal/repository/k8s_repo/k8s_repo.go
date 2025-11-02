@@ -11,6 +11,7 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 )
 
@@ -120,4 +121,43 @@ func (r *k8sRepository) patchMutateStatusObject(
 
 func (r *k8sRepository) ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error {
 	return r.client.List(ctx, list, opts...)
+}
+
+// NodeSecurityGroup methods would go here
+
+func (r *k8sRepository) GetNodeSecurityGroup(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error) {
+	nsg := &v1alpha1.NodeSecurityGroup{}
+	err := r.client.Get(ctx, n, nsg)
+	return nsg, err
+}
+
+func (r *k8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha1.NodeSecurityGroupList, opts ...client.ListOption) error {
+	return r.client.List(ctx, list, opts...)
+}
+
+func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("Creating NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
+	return r.client.Create(ctx, nsg, opts...)
+}
+
+func (r *k8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {
+	return r.client.Delete(ctx, nsg)
+}
+
+func (r *k8sRepository) PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("%s Patching NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
+	return r.client.Patch(ctx, nsg, patch, opts...)
+}
+
+func (r *k8sRepository) PatchMutateStatusNodeSecurityGroup(
+	ctx context.Context,
+	nsg *v1alpha1.NodeSecurityGroup,
+	mutate func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup),
+) error {
+	return r.patchMutateStatusObject(ctx, nsg, func(ctx context.Context, obj client.Object) {
+		// type-assert so you can use strongly typed fields
+		mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
+	})
 }

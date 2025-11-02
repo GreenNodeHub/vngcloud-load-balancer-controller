@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -51,7 +53,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -175,7 +177,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      string(domain.TargetTypeInstance),
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
@@ -227,7 +229,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
 					},
 				},
@@ -279,7 +281,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
 					},
 				},
@@ -383,7 +385,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "https", // different from port name
 					},
 				},
@@ -457,17 +459,9 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Return(tt.resolvePodEndpoints, nil)
 			}
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
 				nameHelper:       realNameHelper,
 				endpointResolver: mockEndpointResolver,
@@ -489,7 +483,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					assert.Equal(t, expectedPool.Protocol, actualPool.Protocol)
 					assert.ElementsMatch(t, expectedPool.Members, actualPool.Members)
 					// For real name helper, verify full generated pool name matches expected format
-					expectedPoolName := realNameHelper.GenL4PoolName(tt.service.Spec.Ports[i], "TODO")
+					expectedPoolName := realNameHelper.GenL4PoolName(tt.service.Spec.Ports[i], string(expectedPool.Protocol))
 					assert.Equal(t, expectedPoolName, actualPool.Name)
 				}
 
@@ -534,7 +528,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "instance",
+					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -549,20 +543,14 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 			},
 		}
 
-		// Create VLBC config
-		vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-			Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-				TargetNodeLabels: map[string]string{},
-			},
-		}
-
 		// Create the task
+		logger := logrus.New().WithField("test", "build_pool")
 		task := &defaultModelBuildTask{
 			service:          service,
-			vlbConfig:        vlbc,
 			annotationParser: mockAnnotationParser,
 			nameHelper:       realNameHelper,
 			endpointResolver: mockEndpointResolver,
+			logger:           logger,
 		}
 
 		// Call the function
@@ -612,20 +600,14 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 			},
 		}
 
-		// Create VLBC config
-		vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-			Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-				TargetNodeLabels: map[string]string{},
-			},
-		}
-
 		// Create the task
+		logger := logrus.New().WithField("test", "build_pool")
 		task := &defaultModelBuildTask{
 			service:          service,
-			vlbConfig:        vlbc,
 			annotationParser: mockAnnotationParser,
 			nameHelper:       realNameHelper,
 			endpointResolver: mockEndpointResolver,
+			logger:           logger,
 		}
 
 		// Call the function
@@ -651,7 +633,7 @@ func TestGetTargetType(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 			},
-			expectedTarget: "instance",
+			expectedTarget: string(domain.TargetTypeInstance),
 		},
 		{
 			name: "Instance target type annotation",
@@ -660,11 +642,11 @@ func TestGetTargetType(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "instance",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 			},
-			expectedTarget: "instance",
+			expectedTarget: string(domain.TargetTypeInstance),
 		},
 		{
 			name: "IP target type annotation",
@@ -690,7 +672,7 @@ func TestGetTargetType(t *testing.T) {
 					},
 				},
 			},
-			expectedTarget: "instance",
+			expectedTarget: string(domain.TargetTypeInstance),
 		},
 	}
 
@@ -700,9 +682,11 @@ func TestGetTargetType(t *testing.T) {
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -791,18 +775,12 @@ func TestBuildHealthcheckPort(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -890,18 +868,12 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -963,18 +935,12 @@ func TestBuildIdleTimeoutClient(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -1036,18 +1002,12 @@ func TestBuildIdleTimeoutMember(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -1109,18 +1069,12 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -1182,18 +1136,12 @@ func TestBuildInboundCIDRs(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function
@@ -1281,18 +1229,12 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 			// Create mocks
 			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
 
-			// Create VLBC config
-			vlbc := &v1alpha1.VngcloudLoadBalancerConfig{
-				Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{
-					TargetNodeLabels: map[string]string{},
-				},
-			}
-
 			// Create the task
+			logger := logrus.New().WithField("test", "build_pool")
 			task := &defaultModelBuildTask{
 				service:          tt.service,
-				vlbConfig:        vlbc,
 				annotationParser: mockAnnotationParser,
+				logger:           logger,
 			}
 
 			// Call the function

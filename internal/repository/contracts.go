@@ -7,6 +7,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,10 +39,15 @@ type IVngCloudRepository interface {
 	DeleteSecurityGroup(ctx context.Context, secgroupID string) error
 	CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error)
 
+	CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error)
+	DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error
+	ListSecurityGroupRules(ctx context.Context, secgroupID string) (*entityv2.ListSecgroupRules, error)
+
 	// Subnet
 	GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error)
 
 	// Server
+	GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error)
 	GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkId, subnetID, subnetCIDR string, err error)
 	WaitForServerActive(ctx context.Context, serverID string) error
 	ListServerBySecgroupID(ctx context.Context, secgroupID string) (*entityv2.ListServers, error)
@@ -109,4 +115,11 @@ type IK8sRepository interface {
 	UpdateVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, opts ...client.UpdateOption) error
 	PatchMutateStatusVLBC(ctx context.Context, vlbc *v1alpha1.VngcloudLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudLoadBalancerConfig)) error
 	ListVLBC(ctx context.Context, list *v1alpha1.VngcloudLoadBalancerConfigList, opts ...client.ListOption) error
+
+	GetNodeSecurityGroup(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error)
+	ListNodeSecurityGroup(ctx context.Context, list *v1alpha1.NodeSecurityGroupList, opts ...client.ListOption) error
+	CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error
+	DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error
+	PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error
+	PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error
 }

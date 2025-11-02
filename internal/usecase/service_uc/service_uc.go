@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,9 +29,6 @@ type serviceUseCase struct {
 	serviceUtils     service.ServiceUtils
 	cniDetector      utils.CniDetector
 	endpointResolver utils.EndpointResolver
-	// k8sClient        client.Client
-
-	cniMode utils.CNIType
 
 	clusterId         string
 	defaultNetworkId  string
@@ -104,12 +100,12 @@ func (uc *serviceUseCase) Init(ctx context.Context) error {
 	}
 
 	// init cni mode
-	uc.cniMode, err = uc.cniDetector.DetectCNIType(ctx)
+	cniMode, err := uc.cniDetector.DetectCNIType(ctx)
 	if err != nil {
 		logger.Errorf("failed to detect CNI type: %v", err)
 		return err
 	}
-	logger.Infof("Detected CNI type: %s", uc.cniMode)
+	logger.Infof("Detected CNI type: %s", cniMode)
 	return nil
 }
 
@@ -161,6 +157,27 @@ func (uc *serviceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 			return err
 		}
 	}
+
+	// get all NSGs created by this service by using label selector
+	// and delete them
+	secgroupList := &v1alpha1.NodeSecurityGroupList{}
+	err = uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
+		consts.LabelOwnerResourceName: svc.GetName(),
+		consts.LabelOwnerResourceType: svc.Kind,
+	})
+	if err != nil {
+		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
+		return err
+	}
+
+	// delete all NSGs found
+	for _, secgroup := range secgroupList.Items {
+		err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
+		if client.IgnoreNotFound(err) != nil {
+			logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -173,42 +190,18 @@ func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	}
 
 	logger := contexts.NewContext(ctx).Log()
-	vlbConfigName := utils.GenerateLBConfigName("svc", svc.GetName())
-	vlbc, err := uc.k8sRepo.GetVLBC(ctx, types.NamespacedName{Name: vlbConfigName, Namespace: svc.GetNamespace()})
-	if client.IgnoreNotFound(err) != nil {
-		logger.Error(err, "failed to get VLBC")
-		return err
-	}
-	isCreated := true
-	oldVLBConfig := vlbc.DeepCopy()
-	if err != nil && client.IgnoreNotFound(err) == nil {
-		isCreated = false
-		vlbc = nil
-	} else {
-		// check if have isIgnore annotation
-		var isIgnore bool
-		uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, svc.Annotations)
-		if isIgnore {
-			logger.Info("Service has ignore load balancer config annotation, skip.")
-			return nil
-		}
-
-		// save old vlbc for patching later
-		oldVLBConfig = vlbc.DeepCopy()
-	}
 
 	task := &defaultModelBuildTask{
 		clusterId:        uc.clusterId,
 		annotationParser: uc.annotationParser,
 		serviceUtils:     uc.serviceUtils,
+		cniDetector:      uc.cniDetector,
 
 		logger:           logger,
 		service:          svc,
-		vlbConfig:        vlbc,
 		vngcloudRepo:     uc.vngcloudRepo,
 		k8sRepo:          uc.k8sRepo,
 		nameHelper:       utils.NewNameHelper(uc.clusterId, "service", svc.GetNamespace(), svc.GetName()),
-		cniMode:          uc.cniMode,
 		endpointResolver: uc.endpointResolver,
 
 		defaultZone:       uc.defaultZone,
@@ -217,23 +210,5 @@ func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 		defaultSubnetCIDR: uc.defaultSubnetCIDR,
 	}
 
-	if err := task.run(ctx); err != nil {
-		return err
-	}
-
-	if !isCreated {
-		err = uc.k8sRepo.CreateVLBC(ctx, task.vlbConfig)
-		if err != nil {
-			logger.Errorf("failed to create VLBC: %v", err)
-			return err
-		}
-	} else {
-		err = uc.k8sRepo.PatchVLBC(ctx, task.vlbConfig, client.MergeFrom(oldVLBConfig))
-		if err != nil {
-			logger.Errorf("failed to patch VLBC: %v", err)
-			return err
-		}
-	}
-
-	return nil
+	return task.run(ctx)
 }

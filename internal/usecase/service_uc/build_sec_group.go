@@ -9,14 +9,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
-// buildIsAutoCreateSecGroup return
+// buildIsAutoCreateSecGroup returns
 // - isAutoCreateSecurityGroup: if annotationn not exist, return true
 // - secgroupIds: if annotation exist, return the list of secgroup ids
 func (t *defaultModelBuildTask) buildIsAutoCreateSecGroup(_ context.Context) (isAutoCreateSecurityGroup bool, secgroupIds []string) {
@@ -30,17 +30,17 @@ func (t *defaultModelBuildTask) buildIsAutoCreateSecGroup(_ context.Context) (is
 
 // buildDefaultSecurityGroupRule builds default security group rules
 // based on the service ports and resolved member addresses.
-func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Context, subnetCidr string) ([]v1alpha1.SecurityGroupRule, error) {
-	secgroupRules := make([]v1alpha1.SecurityGroupRule, 0)
+func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Context, subnetCidr string, targetNodeLabels map[string]string) ([]v1alpha1.NodeSecurityGroupRule, error) {
+	secgroupRules := make([]v1alpha1.NodeSecurityGroupRule, 0)
 	resolveOpts := []utils.EndpointResolveOption{
-		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(t.vlbConfig.Spec.TargetNodeLabels))),
+		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(targetNodeLabels))),
 	}
 
 	for _, port := range t.service.Spec.Ports {
 		// nodePort if target type is instance, targetPort if target type is ip
 		var membersAddr []utils.EndpointAddress
 		var err error
-		if t.getTargetType(ctx) == "instance" {
+		if t.getTargetType(ctx) == domain.TargetTypeInstance {
 			membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
@@ -50,7 +50,11 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 			// if cniMode is cilium native routing:
 			// - port: is all pod ports
 			// - CIDR: is all subnet CIDRs (lb->node or lb->node(not have pod)->node(have pod))
-			if t.cniMode == utils.CiliumNativeRouting {
+			cniMode, err := t.cniDetector.DetectCNIType(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect CNI type: %v", err)
+			}
+			if cniMode == utils.CiliumNativeRouting {
 				podPorts, err := t.endpointResolver.GetListTargetPort(ctx, utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)))
 				if err != nil {
 					return nil, err
@@ -61,12 +65,14 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 				}
 				for _, podPort := range podPorts {
 					for _, cidr := range allSubnetCidrs {
-						secgroupRules = append(secgroupRules, v1alpha1.SecurityGroupRule{
+						secgroupRules = append(secgroupRules, v1alpha1.NodeSecurityGroupRule{
 							Protocol:    t.coreProtocolToSecgroupProtocol(port.Protocol),
 							FromPort:    int32(podPort),
 							ToPort:      int32(podPort),
 							CIDR:        cidr,
-							Description: ptr.To("Allow other node access pod's port"), // TODO: improve description
+							Description: "Allow other node access pod's port - Cilium native", // TODO: improve description
+							Direction:   networkv2.SecgroupRuleDirectionIngress,
+							EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 						})
 					}
 				}
@@ -81,48 +87,87 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 
 		// if user set health check port:
 		if healthCheckPort := t.buildHealthcheckPort(ctx); healthCheckPort != nil {
-			secgroupRules = append(secgroupRules, v1alpha1.SecurityGroupRule{
-				Protocol: t.coreProtocolToSecgroupProtocol(port.Protocol),
-				FromPort: int32(*healthCheckPort),
-				ToPort:   int32(*healthCheckPort),
-				CIDR:     subnetCidr,
+			secgroupRules = append(secgroupRules, v1alpha1.NodeSecurityGroupRule{
+				Protocol:    t.coreProtocolToSecgroupProtocol(port.Protocol),
+				FromPort:    int32(*healthCheckPort),
+				ToPort:      int32(*healthCheckPort),
+				CIDR:        subnetCidr,
+				Description: "Allow user custom health check port",
+				Direction:   networkv2.SecgroupRuleDirectionIngress,
+				EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 			})
 		}
 
 		// build secgroup rules from pool members
 		for _, member := range membersAddr {
 			// allow from subnet CIDR (subnet of load balancer) to node
-			secgroupRules = append(secgroupRules, v1alpha1.SecurityGroupRule{
-				Protocol: t.coreProtocolToSecgroupProtocol(port.Protocol),
-				FromPort: int32(member.Port),
-				ToPort:   int32(member.Port),
-				CIDR:     subnetCidr,
+			secgroupRules = append(secgroupRules, v1alpha1.NodeSecurityGroupRule{
+				Protocol:    t.coreProtocolToSecgroupProtocol(port.Protocol),
+				FromPort:    int32(member.Port),
+				ToPort:      int32(member.Port),
+				CIDR:        subnetCidr,
+				Description: fmt.Sprintf("Allow load balancer access to port %d", member.Port), // TODO: improve description
+				Direction:   networkv2.SecgroupRuleDirectionIngress,
+				EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 			})
 		}
 	}
 
 	secgroupRules = t.ensureSecgroupPING_UDP(ctx, secgroupRules)
+	secgroupRules = t.ensureDefaultEngressSecgroupRule(ctx, secgroupRules)
 	secgroupRules = t.ensureUniqueSecgroupRules(secgroupRules)
 	return secgroupRules, nil
+}
+
+// ensureDefaultEngressSecgroupRule ensures default egress rule to allow all outbound traffic
+func (t *defaultModelBuildTask) ensureDefaultEngressSecgroupRule(
+	_ context.Context,
+	rules []v1alpha1.NodeSecurityGroupRule,
+) []v1alpha1.NodeSecurityGroupRule {
+	newRules := make([]v1alpha1.NodeSecurityGroupRule, len(rules))
+	copy(newRules, rules)
+
+	newRules = append(newRules, v1alpha1.NodeSecurityGroupRule{
+		Protocol:    networkv2.SecgroupRuleProtocolAll,
+		FromPort:    0,
+		ToPort:      65535,
+		CIDR:        "0.0.0.0/0",
+		Direction:   networkv2.SecgroupRuleDirectionEgress,
+		Description: "Default egress security group rule for IPv4",
+		EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
+	})
+	newRules = append(newRules, v1alpha1.NodeSecurityGroupRule{
+		Protocol:    networkv2.SecgroupRuleProtocolAll,
+		FromPort:    0,
+		ToPort:      65535,
+		CIDR:        "::/0",
+		Direction:   networkv2.SecgroupRuleDirectionEgress,
+		Description: "Default egress security group rule for IPv6",
+		EtherType:   networkv2.SecgroupRuleEtherTypeIPv6,
+	})
+
+	return newRules
 }
 
 // ensureSecgroupPING_UDP ensures that for every UDP rule,
 // there is also a corresponding ICMP rule to allow ping.
 func (t *defaultModelBuildTask) ensureSecgroupPING_UDP(
 	_ context.Context,
-	rules []v1alpha1.SecurityGroupRule,
-) []v1alpha1.SecurityGroupRule {
-	newRules := make([]v1alpha1.SecurityGroupRule, len(rules))
+	rules []v1alpha1.NodeSecurityGroupRule,
+) []v1alpha1.NodeSecurityGroupRule {
+	newRules := make([]v1alpha1.NodeSecurityGroupRule, len(rules))
 	copy(newRules, rules)
 
 	for _, rule := range rules {
 		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
-			newRules = append(newRules, v1alpha1.SecurityGroupRule{
+			newRules = append(newRules, v1alpha1.NodeSecurityGroupRule{
 				Protocol:    networkv2.SecgroupRuleProtocolICMP,
 				FromPort:    rule.FromPort,
 				ToPort:      rule.ToPort,
 				CIDR:        rule.CIDR,
-				Description: ptr.To("Auto added ICMP rule for UDP"),
+				Description: "Allow ICMP for health check UDP port",
+				Direction:   rule.Direction,
+				EtherType:   rule.EtherType,
 			})
 		}
 	}
@@ -132,12 +177,18 @@ func (t *defaultModelBuildTask) ensureSecgroupPING_UDP(
 
 // ensureUniqueSecgroupRules removes duplicate security group rules
 // based on Protocol, FromPort, ToPort, and CIDR.
-func (t *defaultModelBuildTask) ensureUniqueSecgroupRules(rules []v1alpha1.SecurityGroupRule) []v1alpha1.SecurityGroupRule {
+func (t *defaultModelBuildTask) ensureUniqueSecgroupRules(rules []v1alpha1.NodeSecurityGroupRule) []v1alpha1.NodeSecurityGroupRule {
 	unique := make(map[string]bool)
-	result := make([]v1alpha1.SecurityGroupRule, 0, len(rules))
+	result := make([]v1alpha1.NodeSecurityGroupRule, 0, len(rules))
 
 	for _, rule := range rules {
-		key := fmt.Sprintf("%s-%d-%d-%s", rule.Protocol, rule.FromPort, rule.ToPort, rule.CIDR)
+		key := fmt.Sprintf("%s-%d-%d-%s-%s-%s",
+			rule.Protocol,
+			rule.FromPort,
+			rule.ToPort,
+			rule.CIDR,
+			rule.Direction,
+			rule.EtherType)
 		if !unique[key] {
 			unique[key] = true
 			result = append(result, rule)

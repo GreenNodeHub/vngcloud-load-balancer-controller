@@ -3,13 +3,15 @@ package service_uc
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -23,20 +25,24 @@ type defaultModelBuildTask struct {
 	// vpcID            string
 	annotationParser annotations.Parser
 	serviceUtils     service.ServiceUtils
+	cniDetector      utils.CniDetector
 
 	logger           *logrus.Entry
 	service          *corev1.Service
-	vlbConfig        *v1alpha1.VngcloudLoadBalancerConfig
 	vngcloudRepo     repository.IVngCloudRepository
 	k8sRepo          repository.IK8sRepository
 	nameHelper       utils.NameHelper
-	cniMode          utils.CNIType
 	endpointResolver utils.EndpointResolver
 
+	// this is the default zone, networkId, subnetId, subnetCIDR
 	defaultZone       common.Zone
 	defaultNetworkId  string
 	defaultSubnetId   string
 	defaultSubnetCIDR string
+
+	// this is the current vlb config
+	subnetId   string
+	subnetCidr string
 }
 
 func (t *defaultModelBuildTask) run(ctx context.Context) error {
@@ -46,37 +52,73 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		}
 		return nil
 	}
-	err := t.buildModel(ctx)
-	return err
+	if err := t.buildModel(ctx); err != nil {
+		return err
+	}
+	if err := t.buildNodeSecurityGroup(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
-	if t.vlbConfig == nil {
-		// build default VLBC
-		t.vlbConfig = &v1alpha1.VngcloudLoadBalancerConfig{
+	// list VLBC by label selector
+	vlbcList := &v1alpha1.VngcloudLoadBalancerConfigList{}
+	err := t.k8sRepo.ListVLBC(ctx, vlbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
+		consts.LabelOwnerResourceName: t.service.Name,
+		consts.LabelOwnerResourceType: t.service.Kind,
+	})
+	if err != nil {
+		t.logger.Errorf("failed to list VLBC: %v", err)
+		return err
+	}
+	if len(vlbcList.Items) > 1 {
+		t.logger.Errorf("found multiple VLBC for service %s/%s", t.service.Namespace, t.service.Name)
+		return errors.New("found multiple VLBC for service " + t.service.Namespace + "/" + t.service.Name)
+	}
+	vlbConfig := &v1alpha1.VngcloudLoadBalancerConfig{}
+	isCreated := false
+	oldVLBConfig := vlbConfig.DeepCopy()
+	if len(vlbcList.Items) == 1 {
+		vlbConfig = &vlbcList.Items[0]
+		isCreated = true
+		oldVLBConfig = vlbConfig.DeepCopy()
+	} else {
+		vlbConfig = &v1alpha1.VngcloudLoadBalancerConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      utils.GenerateLBConfigName("svc", t.service.Name),
 				Namespace: t.service.Namespace,
 			},
 			Spec: v1alpha1.VngcloudLoadBalancerConfigSpec{},
 		}
+		isCreated = false
 	}
 
-	_, _, subnetId, subnetCIDR, err := t.buildSubnetAndZone(ctx)
+	// check if have isIgnore annotation
+	var isIgnore bool
+	t.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, t.service.Annotations)
+	if isIgnore {
+		t.logger.Info("Service has ignore load balancer config annotation, skip.")
+		return nil
+	}
+
+	_, _, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
 	if err != nil {
 		return err
 	}
+	t.subnetId = subnetId
+	t.subnetCidr = subnetCidr
 
-	if t.vlbConfig.Labels == nil {
-		t.vlbConfig.Labels = make(map[string]string)
+	if vlbConfig.Labels == nil {
+		vlbConfig.Labels = make(map[string]string)
 	}
-	t.vlbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
-	t.vlbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
-	t.vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
-	t.vlbConfig.Spec.SubnetID = subnetId
+	vlbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
+	vlbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
+	vlbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
+	vlbConfig.Spec.SubnetID = subnetId
 
 	// should not set owner reference because sometimes user want to keep VLBC after service is deleted
-	// t.vlbConfig.OwnerReferences = []metav1.OwnerReference{
+	// vlbConfig.OwnerReferences = []metav1.OwnerReference{
 	// 	{
 	// 		APIVersion: t.service.APIVersion,
 	// 		Kind:       t.service.Kind,
@@ -87,35 +129,114 @@ func (t *defaultModelBuildTask) buildModel(ctx context.Context) error {
 	// }
 
 	if t.clusterId != "" {
-		t.vlbConfig.Spec.ClusterId = &t.clusterId
+		vlbConfig.Spec.ClusterId = &t.clusterId
 	}
-	t.vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
-	t.vlbConfig.Spec.PackageID = t.buildPackageId(ctx)
-	t.vlbConfig.Spec.Scheme = t.buildScheme(ctx)
-	t.vlbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
-	t.vlbConfig.Spec.Tags = t.buildTags(ctx)
-	t.vlbConfig.Spec.TargetNodeLabels = t.buildTargetNodeLabels(ctx)
-	t.vlbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
-	t.vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+	vlbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
+	vlbConfig.Spec.PackageID = t.buildPackageId(ctx)
+	vlbConfig.Spec.Scheme = t.buildScheme(ctx)
+	vlbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
+	vlbConfig.Spec.Tags = t.buildTags(ctx)
+	vlbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
+	vlbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
 
-	if pools, listeners, err := t.buildPoolsAndListeners(ctx, t.vlbConfig.Spec.TargetNodeLabels); err != nil {
+	targetNodeLabels := t.buildTargetNodeLabels(ctx)
+	if pools, listeners, err := t.buildPoolsAndListeners(ctx, targetNodeLabels); err != nil {
 		return err
 	} else {
-		t.vlbConfig.Spec.Pools = pools
-		t.vlbConfig.Spec.Listeners = listeners
+		vlbConfig.Spec.Pools = pools
+		vlbConfig.Spec.Listeners = listeners
 	}
-	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
-		t.vlbConfig.Spec.AutoManageSecurityGroupRules = nil
-		t.vlbConfig.Spec.AttachSecurityGroupsToNodes = secgroupIds
+
+	// create or update VLBC
+	if !isCreated {
+		err = t.k8sRepo.CreateVLBC(ctx, vlbConfig)
+		if err != nil {
+			t.logger.Errorf("failed to create VLBC: %v", err)
+			return err
+		}
 	} else {
-		secgroupRules, err := t.buildDefaultSecurityGroupRule(ctx, subnetCIDR)
+		err = t.k8sRepo.PatchVLBC(ctx, vlbConfig, client.MergeFrom(oldVLBConfig))
+		if err != nil {
+			t.logger.Errorf("failed to patch VLBC: %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) error {
+	// list NodeSecurityGroup by label selector
+	nsgList := &v1alpha1.NodeSecurityGroupList{}
+	err := t.k8sRepo.ListNodeSecurityGroup(ctx, nsgList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
+		consts.LabelOwnerResourceName: t.service.Name,
+		consts.LabelOwnerResourceType: t.service.Kind,
+	})
+	if err != nil {
+		return err
+	}
+	if len(nsgList.Items) > 1 {
+		t.logger.Errorf("found multiple NodeSecurityGroup for service %s/%s", t.service.Namespace, t.service.Name)
+		return errors.New("found multiple NodeSecurityGroup for service " + t.service.Namespace + "/" + t.service.Name)
+	}
+	nsg := &v1alpha1.NodeSecurityGroup{}
+	isCreated := false
+	oldNSG := nsg.DeepCopy()
+	if len(nsgList.Items) == 1 {
+		nsg = &nsgList.Items[0]
+		isCreated = true
+		oldNSG = nsg.DeepCopy()
+	} else {
+		nsg = &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      t.nameHelper.GetLoadBalancerDefaultName(),
+				Namespace: t.service.Namespace,
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{},
+		}
+		isCreated = false
+	}
+
+	if nsg.Labels == nil {
+		nsg.Labels = make(map[string]string)
+	}
+	nsg.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
+	nsg.Labels[consts.LabelOwnerResourceType] = t.service.Kind
+
+	targetNodeLabels := t.buildTargetNodeLabels(ctx)
+	nsg.Spec.SelectNodeLabels = targetNodeLabels
+
+	// TODO: update nsg.Spec based on annotations
+	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
+		nsg.Spec.ManagedSecurityGroup = nil
+		nsg.Spec.AttachSecurityGroups = secgroupIds
+	} else {
+		secgroupRules, err := t.buildDefaultSecurityGroupRule(ctx, t.subnetCidr, targetNodeLabels)
 		if err != nil {
 			return err
 		}
-		t.vlbConfig.Spec.AutoManageSecurityGroupRules = secgroupRules
-		t.vlbConfig.Spec.AttachSecurityGroupsToNodes = nil
+		nsg.Spec.ManagedSecurityGroup = &v1alpha1.ManagedSecurityGroup{
+			Rules:       secgroupRules,
+			Name:        t.nameHelper.GetLoadBalancerDefaultName(),
+			Description: ptr.To("Automatically created using VNGCLOUD LoadBalancer Controller"),
+		}
+		nsg.Spec.AttachSecurityGroups = nil
 	}
 
+	// create or update NodeSecurityGroup
+	if !isCreated {
+		err = t.k8sRepo.CreateNodeSecurityGroup(ctx, nsg)
+		if err != nil {
+			t.logger.Errorf("failed to create NodeSecurityGroup: %v", err)
+			return err
+		}
+	} else {
+		err = t.k8sRepo.PatchNodeSecurityGroup(ctx, nsg, client.MergeFrom(oldNSG))
+		if err != nil {
+			t.logger.Errorf("failed to patch NodeSecurityGroup: %v", err)
+			return err
+		}
+	}
 	return nil
 }
 

@@ -55,11 +55,13 @@ import (
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vlbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vlbc"
@@ -287,10 +289,19 @@ func main() {
 	}
 
 	if !disableNodeSecurityGroupController {
-		if err := (&controller.NodeSecurityGroupReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
+		nsgUtils := nsg.NewNSGUtils(consts.NSGFinalizer)
+		nsgUseCase := nsg_uc.NewNSGUseCase(
+			conf, k8sRepo, vngcloudRepo,
+		)
+		reconciler := controller.NewNodeSecurityGroupReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			nsgUseCase,
+			mgr.GetEventRecorderFor("node-security-group-controller"),
+			finalizerManager,
+			nsgUtils,
+		)
+		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")
 			os.Exit(1)
 		}

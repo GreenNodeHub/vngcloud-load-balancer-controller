@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -338,14 +337,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// +optional
 	Tags map[string]string `json:"tags,omitempty"`
 
-	// SecurityGroups are the security groups for the load balancer
-	// +optional
-	SecurityGroups []string `json:"securityGroups,omitempty"`
-
-	// TargetNodeLabels are labels for targeting specific nodes
-	// +optional
-	TargetNodeLabels map[string]string `json:"targetNodeLabels,omitempty"`
-
 	// IsPOC indicates if this is a proof of concept deployment
 	// +optional
 	IsPoc *bool `json:"isPoc,omitempty"`
@@ -361,36 +352,6 @@ type VngcloudLoadBalancerConfigSpec struct {
 	// Pools defines the array of pools for the load balancer
 	// +optional
 	Pools []Pool `json:"pools,omitempty"`
-
-	// AttachSecurityGroupsToNodes contains security groups to attach to nodes (filter by TargetNodeLabels)
-	// +optional
-	AttachSecurityGroupsToNodes []string `json:"attachSecurityGroupsToNodes,omitempty"`
-
-	// AutoManageSecurityGroupRules defines security group rules to be auto-managed by the controller attached to nodes (filter by TargetNodeLabels)
-	// +optional
-	AutoManageSecurityGroupRules []SecurityGroupRule `json:"autoManageSecurityGroupRules,omitempty"`
-}
-
-type SecurityGroupRule struct {
-	// Protocol is the protocol for the security group rule
-	// +required
-	Protocol networkv2.SecgroupRuleProtocol `json:"protocol"`
-
-	// FromPort is the starting port for the rule
-	// +required
-	FromPort int32 `json:"fromPort"`
-
-	// ToPort is the ending port for the rule
-	// +required
-	ToPort int32 `json:"toPort"`
-
-	// CIDR is the CIDR block for the rule
-	// +required
-	CIDR string `json:"cidr"`
-
-	// Description is an optional description for the rule
-	// +optional
-	Description *string `json:"description,omitempty"`
 }
 
 // VngcloudLoadBalancerConfigStatus defines the observed state of VngcloudLoadBalancerConfig.

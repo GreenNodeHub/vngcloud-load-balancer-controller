@@ -11,6 +11,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -40,7 +41,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		// nodePort if target type is instance, targetPort if target type is ip
 		var membersAddr []utils.EndpointAddress
 		var err error
-		if t.getTargetType(ctx) == "instance" {
+		if t.getTargetType(ctx) == domain.TargetTypeInstance {
 			membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
@@ -112,14 +113,14 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	return allPools, allListeners, nil
 }
 
-func (t *defaultModelBuildTask) getTargetType(_ context.Context) string {
+func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetType {
 	// TODO: store somewhere to avoid parsing again and again
 	var option string
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, t.service.Annotations)
-	if option == "ip" || option == "instance" {
-		return option
+	if option == string(domain.TargetTypeIP) || option == string(domain.TargetTypeInstance) {
+		return domain.TargetType(option)
 	}
-	return "instance"
+	return domain.TargetTypeInstance
 }
 
 func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
@@ -223,7 +224,7 @@ func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []st
 	return option
 }
 
-func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(ctx context.Context, pPoolProtocol corev1.Protocol) loadbalancerv2.HealthCheckProtocol {
+func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(_ context.Context, pPoolProtocol corev1.Protocol) loadbalancerv2.HealthCheckProtocol {
 	switch pPoolProtocol {
 	case corev1.ProtocolUDP:
 		return loadbalancerv2.HealthCheckProtocolPINGUDP

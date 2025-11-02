@@ -85,7 +85,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
-			Skip("Skip test")
+			// Skip("Skip test")
 			By("Reconciling the created resource")
 			controllerReconciler := &VngcloudLoadBalancerConfigReconciler{
 				Client: k8sClient,
@@ -103,7 +103,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 	Context("When create service with specific annotation", func() {
 		It("created load balancer shoud have specific attribute", func() {
-			Skip("Skip test")
+			// Skip("Skip test")
 			type stepType struct {
 				name          string
 				updateObjects func() []client.Object
@@ -626,9 +626,12 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 								// check pool
 								pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-								Expect(err).ShouldNot(HaveOccurred())
-								Expect(pools).ShouldNot(BeNil())
-								Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+								Eventually(func() bool {
+									pools, err = vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+									Expect(err).ShouldNot(HaveOccurred())
+									Expect(pools).ShouldNot(BeNil())
+									return len(pools.Items) == 1 && pools.Items[0].Name == "vks-k8s-000000-default-test-serv-75a17-TCP-81"
+								}, time.Second*10, interval).Should(Equal(true))
 								for _, pool := range pools.Items {
 									Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
 									Expect(pool.Description).Should(Equal("????????"))
@@ -998,6 +1001,7 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 	Context("When update tags and secgroups annotations", func() {
 		It("load balancer and server should do expect behavior", func() {
+			// Skip("Skip test")
 			// add 2 foo security group
 			bigbangSec, err := vngcloudRepo.CreateSecurityGroup(ctx, "bigbang", "the best security group")
 			Expect(err).ShouldNot(HaveOccurred())
@@ -1029,9 +1033,9 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 			}{
 				{
 					preTest: func() {
-						// mockServiceReconciler.cniMode = utils.CiliumNativeRouting
-						// mockEndpointResolver := utils.NewMockEndpointResolver(t)
-						// mockServiceReconciler.endpointResolver = mockEndpointResolver
+						// Clear existing expectations and set new one
+						cniDetector.ExpectedCalls = nil
+						cniDetector.Calls = nil
 						cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 					},
 					name: "create with default annotations of cilium native routing",
@@ -1088,9 +1092,12 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 						tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
-						Expect((tags.Items)).Should(HaveLen(1))
-						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
-						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
+						Eventually(func() bool {
+							tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(tags).ShouldNot(BeNil())
+							return len(tags.Items) == 1 && tags.Items[0].Key == consts.VKS_TAG_KEY && tags.Items[0].Value == mockConfig.Cluster.ClusterID
+						}, time.Second*10, interval).Should(Equal(true))
 
 						// check secgroups
 						secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -1109,22 +1116,28 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 						// check secgroup rule
 						rules, err := vngcloudRepo.ListSecurityGroupRules(ctx, secgroupID)
-						Expect(err).ShouldNot(HaveOccurred())
-						Expect(rules).ShouldNot(BeNil())
-						Expect((rules.Items)).Should(HaveLen(7)) // 1 nodeport + 3 x 2 (2 pod ports x 3 subnets (4 nodes in 3 subnets))
-						expectPortRangeMax := []int{80, 80, 80, 8080, 8080, 8080, 31000}
+						Eventually(func() []*entity.SecgroupRule {
+							rules, err = vngcloudRepo.ListSecurityGroupRules(ctx, secgroupID)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(rules).ShouldNot(BeNil())
+							return rules.Items
+						}, time.Second*10, interval).Should(HaveLen(9)) // 1 nodeport + 3 x 2 (2 pod ports x 3 subnets (4 nodes in 3 subnets)) + 2 engress default allow all
+						expectPortRangeMax := []int{80, 80, 80, 8080, 8080, 8080, 31000, 65535, 65535}
+						expectPortRangeMin := []int{80, 80, 80, 8080, 8080, 8080, 31000, 0, 0}
 						expectCIDRs := []string{
 							mocks.MockSubnetCIDR, mocks.MockSubnetCIDR, mocks.MockSubnetCIDR,
 							mocks.MockSubnetCIDR_1b_1, mocks.MockSubnetCIDR_1b_1,
 							mocks.MockSubnetCIDR_1b_2, mocks.MockSubnetCIDR_1b_2,
+							"::/0", "0.0.0.0/0",
 						}
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
 							expectPortRangeMax = removeFisrt(expectPortRangeMax, rule.PortRangeMax)
-							Expect(rule.PortRangeMin).Should(Equal(rule.PortRangeMax))
-							Expect(rule.Direction).Should(Equal("ingress"))
-							Expect(rule.EtherType).Should(Equal("IPv4"))
-							Expect(rule.Protocol).Should(Equal("tcp"))
+							Expect(rule.PortRangeMin).Should(BeElementOf(expectPortRangeMin))
+							expectPortRangeMin = removeFisrt(expectPortRangeMin, rule.PortRangeMin)
+							Expect(rule.Direction).Should(BeElementOf([]string{"ingress", "egress"}))
+							Expect(rule.EtherType).Should(BeElementOf([]string{"IPv4", "IPv6"}))
+							Expect(rule.Protocol).Should(BeElementOf([]string{"tcp", "any"}))
 							Expect(rule.RemoteIPPrefix).Should(BeElementOf(expectCIDRs))
 							expectCIDRs = removeFisrt(expectCIDRs, rule.RemoteIPPrefix)
 						}
@@ -1199,21 +1212,25 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 
 								// check secgroup rule
 								rules, err := vngcloudRepo.ListSecurityGroupRules(ctx, secgroupID)
-								Expect(err).ShouldNot(HaveOccurred())
-								Expect(rules).ShouldNot(BeNil())
-								Expect((rules.Items)).Should(HaveLen(4)) // 1 nodeport + 3 x 1 (1 pod port x 3 subnets (4 nodes in 3 subnets))
-								expectPortRangeMax := []int{80, 80, 80, 31000}
+								Eventually(func() []*entity.SecgroupRule {
+									rules, err = vngcloudRepo.ListSecurityGroupRules(ctx, secgroupID)
+									Expect(err).ShouldNot(HaveOccurred())
+									Expect(rules).ShouldNot(BeNil())
+									return rules.Items
+								}, time.Second*10, interval).Should(HaveLen(6)) // 1 nodeport + 3 x 1 (1 pod port x 3 subnets (4 nodes in 3 subnets)) + 2 engress default allow all
+								expectPortRangeMax := []int{80, 80, 80, 31000, 65535, 65535}
 								expectCIDRs := []string{
 									mocks.MockSubnetCIDR, mocks.MockSubnetCIDR,
 									mocks.MockSubnetCIDR_1b_1, mocks.MockSubnetCIDR_1b_2,
+									"::/0", "0.0.0.0/0",
 								}
 								for _, rule := range rules.Items {
 									Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
 									expectPortRangeMax = removeFisrt(expectPortRangeMax, rule.PortRangeMax)
-									Expect(rule.PortRangeMin).Should(Equal(rule.PortRangeMax))
-									Expect(rule.Direction).Should(Equal("ingress"))
-									Expect(rule.EtherType).Should(Equal("IPv4"))
-									Expect(rule.Protocol).Should(Equal("tcp"))
+									// Expect(rule.PortRangeMin).Should(Equal(rule.PortRangeMax))
+									Expect(rule.Direction).Should(BeElementOf([]string{"ingress", "egress"}))
+									Expect(rule.EtherType).Should(BeElementOf([]string{"IPv4", "IPv6"}))
+									Expect(rule.Protocol).Should(BeElementOf([]string{"tcp", "any"}))
 									Expect(rule.RemoteIPPrefix).Should(BeElementOf(expectCIDRs))
 									expectCIDRs = removeFisrt(expectCIDRs, rule.RemoteIPPrefix)
 								}
@@ -1330,11 +1347,27 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 							},
 						},
 					},
-					postTest: func() {},
+					postTest: func() {
+						// ensure no server have secgroup after delete service
+						Eventually(func() bool {
+							server, err := vngcloudRepo.ListServerBySecgroupID(ctx, bigbangSec.Id)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(server).ShouldNot(BeNil())
+							if len(server.Items) != 0 {
+								return false
+							}
+							server, err = vngcloudRepo.ListServerBySecgroupID(ctx, blackpinkSec.Id)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(server).ShouldNot(BeNil())
+							return len(server.Items) == 0
+						}, time.Second*10, interval).Should(Equal(true))
+					},
 				},
 				{
 					preTest: func() {
-						// mockServiceReconciler.cniMode = utils.CalicoOverlay
+						// Clear existing expectations and set new one
+						cniDetector.ExpectedCalls = nil
+						cniDetector.Calls = nil
 						cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CalicoOverlay, nil)
 					},
 					name: "create with default annotations of calico overlay",
@@ -1415,16 +1448,16 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 						rules, err := vngcloudRepo.ListSecurityGroupRules(ctx, secgroupID)
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(rules).ShouldNot(BeNil())
-						Expect((rules.Items)).Should(HaveLen(1))
-						expectPortRangeMax := []int{30000} // calico overlay should only have nodeport
+						Expect((rules.Items)).Should(HaveLen(3))
+						expectPortRangeMax := []int{30000, 65535, 65535} // calico overlay should only have nodeport
 						for _, rule := range rules.Items {
 							Expect(rule.PortRangeMax).Should(BeElementOf(expectPortRangeMax))
 							expectPortRangeMax = removeFisrt(expectPortRangeMax, rule.PortRangeMax)
-							Expect(rule.PortRangeMin).Should(Equal(rule.PortRangeMax))
-							Expect(rule.Direction).Should(Equal("ingress"))
-							Expect(rule.EtherType).Should(Equal("IPv4"))
-							Expect(rule.Protocol).Should(Equal("tcp"))
-							Expect(rule.RemoteIPPrefix).Should(Equal(mocks.MockSubnetCIDR))
+							// Expect(rule.PortRangeMin).Should(Equal(rule.PortRangeMax))
+							Expect(rule.Direction).Should(BeElementOf([]string{"ingress", "egress"}))
+							Expect(rule.EtherType).Should(BeElementOf([]string{"IPv4", "IPv6"}))
+							Expect(rule.Protocol).Should(BeElementOf([]string{"tcp", "any"}))
+							Expect(rule.RemoteIPPrefix).Should(BeElementOf([]string{mocks.MockSubnetCIDR, "0.0.0.0/0", "::/0"}))
 						}
 
 						// check server have secgroup
@@ -1539,7 +1572,21 @@ var _ = Describe("VngcloudLoadBalancerConfig Controller", func() {
 							},
 						},
 					},
-					postTest: func() {},
+					postTest: func() {
+						// ensure no server have secgroup after delete service
+						Eventually(func() bool {
+							server, err := vngcloudRepo.ListServerBySecgroupID(ctx, bigbangSec.Id)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(server).ShouldNot(BeNil())
+							if len(server.Items) != 0 {
+								return false
+							}
+							server, err = vngcloudRepo.ListServerBySecgroupID(ctx, blackpinkSec.Id)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(server).ShouldNot(BeNil())
+							return len(server.Items) == 0
+						}, time.Second*10, interval).Should(Equal(true))
+					},
 				},
 			}
 

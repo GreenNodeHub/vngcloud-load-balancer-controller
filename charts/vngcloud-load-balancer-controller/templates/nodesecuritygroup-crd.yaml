@@ -12,6 +12,8 @@ spec:
     kind: NodeSecurityGroup
     listKind: NodeSecurityGroupList
     plural: nodesecuritygroups
+    shortNames:
+    - nsg
     singular: nodesecuritygroup
   scope: Namespaced
   versions:
@@ -40,10 +42,70 @@ spec:
           spec:
             description: spec defines the desired state of NodeSecurityGroup
             properties:
-              foo:
-                description: foo is an example field of NodeSecurityGroup. Edit nodesecuritygroup_types.go
-                  to remove/update
-                type: string
+              attachSecurityGroups:
+                description: AttachSecurityGroups is a list of existing security group
+                  IDs to attach to the nodes
+                items:
+                  type: string
+                type: array
+              managedSecurityGroup:
+                description: ManagedSecurityGroup defines a security group to be created
+                  and managed
+                properties:
+                  description:
+                    description: Description of the security group
+                    type: string
+                  name:
+                    description: Name is the name of the security group
+                    type: string
+                  rules:
+                    description: Rules is the list of security group rules
+                    items:
+                      description: NodeSecurityGroupRule defines a security group rule
+                        for NodeSecurityGroup
+                      properties:
+                        cidr:
+                          description: CIDR is the CIDR block for the rule
+                          type: string
+                        description:
+                          description: Description is an optional description for the
+                            rule
+                          type: string
+                        direction:
+                          description: Direction is the direction of the rule (ingress
+                            or egress)
+                          type: string
+                        etherType:
+                          description: EtherType is the ethertype of the rule (IPv4
+                            or IPv6)
+                          type: string
+                        fromPort:
+                          description: FromPort is the starting port for the rule
+                          format: int32
+                          type: integer
+                        protocol:
+                          description: Protocol is the protocol for the security group
+                            rule
+                          type: string
+                        toPort:
+                          description: ToPort is the ending port for the rule
+                          format: int32
+                          type: integer
+                      required:
+                      - cidr
+                      - fromPort
+                      - protocol
+                      - toPort
+                      type: object
+                    type: array
+                required:
+                - name
+                type: object
+              selectNodeLabels:
+                additionalProperties:
+                  type: string
+                description: SelectNodeLabels is a map of labels to select nodes
+                type: object
             type: object
           status:
             description: status defines the observed state of NodeSecurityGroup
@@ -116,6 +178,60 @@ spec:
                 type: array
                 x-kubernetes-list-map-keys:
                 - type
+                x-kubernetes-list-type: map
+              managedSecurityGroup:
+                description: ManagedSecurityGroup contains the status of the managed
+                  security group
+                properties:
+                  error:
+                    description: Error contains the error message when ensuring the
+                      managed security group
+                    type: string
+                  id:
+                    description: Id is the id of the managed security group
+                    type: string
+                type: object
+              selectedNodes:
+                description: SelectedNodes is the list of nodes that match the node
+                  selector
+                items:
+                  description: NodeInfo contains information about a selected node
+                  properties:
+                    name:
+                      description: Name is the name of the node
+                      type: string
+                    serverID:
+                      description: ServerID is the VNG Cloud server ID of the node
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              serverSecurityGroups:
+                description: ServerSecurityGroups tracks the security group attachment
+                  status for each server
+                items:
+                  description: ServerSecurityGroupStatus tracks the security group attachment
+                    status for a specific server
+                  properties:
+                    attachedSecurityGroupIDs:
+                      description: AttachedSecurityGroupIDs is the list of security
+                        group IDs successfully attached to this server
+                      items:
+                        type: string
+                      type: array
+                    error:
+                      description: Error contains the error message if attachment failed
+                      type: string
+                    serverID:
+                      description: ServerID is the VNG Cloud server ID
+                      type: string
+                  required:
+                  - serverID
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - serverID
                 x-kubernetes-list-type: map
             type: object
         required:

@@ -15,4 +15,5 @@ const (
 	ReadyIcon   = "👍"
 	SuccessIcon = "✅"
 	ErrorIcon   = "❌"
+	DebugIcon   = "🔰"
 )

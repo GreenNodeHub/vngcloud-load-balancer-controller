@@ -100,7 +100,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	ctx = contexts.NewContext(ctx).SetLogName("s/" + req.Namespace + "/" + req.Name).GetContext()
+	ctx = contexts.NewContext(ctx).SetLogName("svc/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()

@@ -22,6 +22,7 @@ var WhitelistedAnnotations = map[string]struct{}{
 }
 
 const (
+	// TODO: duplicate with below
 	LABEL_NODE_EXCLUDE_LOADBALANCER = "node.kubernetes.io/exclude-from-external-load-balancers"
 
 	// ServiceFinalizer = "service.vngcloud.vn/resources"
@@ -30,6 +31,7 @@ const (
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
 	GLBFinalizer     = "glb.vngcloud.vn/resources"
 	VLBCFinalizer    = "vlbc.vngcloud.vn/resources" // TODO: plan this finalizer name
+	NSGFinalizer     = "nsg.vngcloud.vn/resources"
 
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"

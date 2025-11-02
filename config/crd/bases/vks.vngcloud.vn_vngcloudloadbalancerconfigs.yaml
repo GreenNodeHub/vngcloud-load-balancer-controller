@@ -40,44 +40,6 @@ spec:
           spec:
             description: spec defines the desired state of VngcloudLoadBalancerConfig
             properties:
-              attachSecurityGroupsToNodes:
-                description: AttachSecurityGroupsToNodes contains security groups
-                  to attach to nodes (filter by TargetNodeLabels)
-                items:
-                  type: string
-                type: array
-              autoManageSecurityGroupRules:
-                description: AutoManageSecurityGroupRules defines security group rules
-                  to be auto-managed by the controller attached to nodes (filter by
-                  TargetNodeLabels)
-                items:
-                  properties:
-                    cidr:
-                      description: CIDR is the CIDR block for the rule
-                      type: string
-                    description:
-                      description: Description is an optional description for the
-                        rule
-                      type: string
-                    fromPort:
-                      description: FromPort is the starting port for the rule
-                      format: int32
-                      type: integer
-                    protocol:
-                      description: Protocol is the protocol for the security group
-                        rule
-                      type: string
-                    toPort:
-                      description: ToPort is the ending port for the rule
-                      format: int32
-                      type: integer
-                  required:
-                  - cidr
-                  - fromPort
-                  - protocol
-                  - toPort
-                  type: object
-                type: array
               clusterId:
                 description: ClusterId is the ID of the cluster where the load balancer
                   will be deployed. It helps in organizing resources.
@@ -249,11 +211,6 @@ spec:
                 - Internal
                 - Internet
                 type: string
-              securityGroups:
-                description: SecurityGroups are the security groups for the load balancer
-                items:
-                  type: string
-                type: array
               subnetID:
                 description: SubnetID is the subnet ID for the load balancer
                 type: string
@@ -261,11 +218,6 @@ spec:
                 additionalProperties:
                   type: string
                 description: Tags are key-value pairs for load balancer tagging
-                type: object
-              targetNodeLabels:
-                additionalProperties:
-                  type: string
-                description: TargetNodeLabels are labels for targeting specific nodes
                 type: object
               type:
                 description: Type defines the type of load balancer (network or application)
