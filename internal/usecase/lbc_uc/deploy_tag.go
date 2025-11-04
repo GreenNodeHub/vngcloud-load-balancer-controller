@@ -31,19 +31,14 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		createdTags[k] = v
 	}
 
-	if t.lbConfig.Spec.ClusterId != nil && *t.lbConfig.Spec.ClusterId != "" {
-		// ensure have cluster ids tag
-		vksClusterTags := currentTags[consts.VKS_TAG_KEY]
-		if !strings.Contains(vksClusterTags, *t.lbConfig.Spec.ClusterId) {
-			t.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
-			vksClusterTags = t.joinVKSTag(vksClusterTags, *t.lbConfig.Spec.ClusterId)
-			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
-		} else {
-			ensuredTags[consts.VKS_TAG_KEY] = vksClusterTags
-		}
+	needUpdate, ensuredTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
+	if !needUpdate {
+		return nil
 	}
 
-	if err := t.updateTag(ctx, lbId, currentTags, createdTags, ensuredTags); err != nil {
+	t.logger.Infof("Updating tags for load balancer %s: %v", lbId, ensuredTags)
+	err = t.vngcloudRepo.CreateTags(ctx, lbId, ensuredTags)
+	if err != nil {
 		return err
 	}
 
@@ -52,11 +47,24 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 	})
 }
 
-func (r *defaultModelDeployTask) updateTag(ctx context.Context, lbId string, currentTags, oldTags, newTags map[string]string) error {
+func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTags, newTags map[string]string) (bool, map[string]string) {
 	r.logger.Debug("EnsureTags: ")
 	r.logger.Debugf("   - oldTags:   %v", oldTags)
 	r.logger.Debugf("   - curTags:   %v", currentTags)
 	r.logger.Debugf("   - newTags:   %v", newTags)
+
+	// ensure vks_cluster_ids tag
+	if r.lbConfig.Spec.ClusterId != nil && *r.lbConfig.Spec.ClusterId != "" {
+		// ensure have cluster ids tag
+		vksClusterTags := currentTags[consts.VKS_TAG_KEY]
+		if !strings.Contains(vksClusterTags, *r.lbConfig.Spec.ClusterId) {
+			r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
+			vksClusterTags = r.joinVKSTag(vksClusterTags, *r.lbConfig.Spec.ClusterId)
+			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+		} else {
+			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+		}
+	}
 
 	// merge tags
 	mergeTags := make(map[string]string)
@@ -101,15 +109,10 @@ func (r *defaultModelDeployTask) updateTag(ctx context.Context, lbId string, cur
 
 	if !isNeedUpdate {
 		r.logger.Debug("No need update tags")
-		return nil
+		return false, nil
 	}
 
-	r.logger.Infof("Need update tags: (%v) -> (%v)", currentTags, mergeTags)
-	if err := r.vngcloudRepo.CreateTags(ctx, lbId, mergeTags); err != nil {
-		r.logger.Errorf("Failed to update tags: %v", err)
-		return err
-	}
-	return nil
+	return true, mergeTags
 }
 
 func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {

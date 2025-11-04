@@ -16,6 +16,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
@@ -272,10 +273,60 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 		request = request.WithPoc(*t.lbConfig.Spec.IsPoc)
 	}
 
-	// TODO: add more fields
-	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
-	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
-	// WithTags(ptags ...string) ICreateLoadBalancerRequest
+	// if have pool, create first pool, but in L7, only create default pool in this step
+	defaultPoolRequest, defaultListenerRequest := func() (loadbalancerv2.ICreatePoolRequest, loadbalancerv2.ICreateListenerRequest) {
+		if len(t.lbConfig.Spec.Pools) == 0 {
+			return nil, nil
+		}
+		poolSpec := t.lbConfig.Spec.Pools[0]
+		// if L7, only create default pool
+		if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
+			isFoundDefaultPool := false
+			for _, p := range t.lbConfig.Spec.Pools {
+				if p.Name == consts.DEFAULT_NAME_DEFAULT_POOL {
+					poolSpec = p
+					isFoundDefaultPool = true
+					break
+				}
+			}
+			if !isFoundDefaultPool {
+				return nil, nil
+			}
+		}
+
+		// Both listener and pool properties must be required (non null) or both are not required (null); <nil> map[]},
+		// if have listener, create first listener
+		if len(t.lbConfig.Spec.Listeners) == 0 {
+			return nil, nil
+		}
+
+		listenerSpec := t.lbConfig.Spec.Listeners[0]
+		listenerRequest := t.buildCreateListenerRequest(ctx, "", listenerSpec, map[string]string{})
+		// TODO: if L7, set certificate for listener
+
+		poolRequest := t.buildCreatePoolRequest(ctx, "", &poolSpec)
+
+		return poolRequest, listenerRequest
+	}()
+
+	if defaultPoolRequest != nil && defaultListenerRequest != nil {
+		request = request.WithListener(defaultListenerRequest).WithPool(defaultPoolRequest)
+	}
+
+	// if have tags, add tags
+	ensuredTags := make(map[string]string)
+	if t.lbConfig.Spec.Tags != nil {
+		ensuredTags = t.lbConfig.Spec.Tags
+	}
+
+	_, newTags := t.buildTag(ctx, map[string]string{}, map[string]string{}, ensuredTags)
+	if len(newTags) > 0 {
+		tags := make([]string, 0)
+		for k, v := range newTags {
+			tags = append(tags, k, v)
+		}
+		request = request.WithTags(tags...)
+	}
 
 	return request, nil
 }
@@ -324,26 +375,24 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		*t.lbConfig.Spec.BackendSubnetId,
 	).WithZoneId(t.lbConfig.Spec.ZoneId)
 
-	// if t.lbConfig.Spec.Scheme != nil {
-	// 	request = request.WithScheme(*t.lbConfig.Spec.Scheme)
-	// }
-
-	// if t.lbConfig.Spec.EnableAutoscale != nil {
-	// 	request = request.WithAutoScalable(*t.lbConfig.Spec.EnableAutoscale)
-	// }
-
-	// if t.lbConfig.Spec.Type != "" {
-	// 	request = request.WithType(t.lbConfig.Spec.Type)
-	// }
-
-	// if t.lbConfig.Spec.IsPoc != nil {
-	// 	request = request.WithPoc(*t.lbConfig.Spec.IsPoc)
-	// }
-
-	// TODO: add more fields
+	// TODO: add more fields (ignore listener and pool for now becasue have to create inter.ListenerRequest and inter.CreatePoolRequest)
 	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
 	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
-	// WithTags(ptags ...string) ICreateLoadBalancerRequest
+
+	// if have tags, add tags
+	ensuredTags := make(map[string]string)
+	if t.lbConfig.Spec.Tags != nil {
+		ensuredTags = t.lbConfig.Spec.Tags
+	}
+
+	_, newTags := t.buildTag(ctx, map[string]string{}, map[string]string{}, ensuredTags)
+	if len(newTags) > 0 {
+		tags := make([]string, 0)
+		for k, v := range newTags {
+			tags = append(tags, k, v)
+		}
+		request = request.WithTags(tags...)
+	}
 
 	return request, nil
 }
