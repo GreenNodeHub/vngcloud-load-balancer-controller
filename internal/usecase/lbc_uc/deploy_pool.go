@@ -56,7 +56,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			return "", err
 		}
-		return _pool.UUID, nil
+		return _pool.UUID, t.updateStatusCreatedPool(ctx, _pool.UUID)
 	}
 
 	// get health monitor info
@@ -125,7 +125,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			return "", err
 		}
 	}
-	return currentPool.UUID, nil
+	return currentPool.UUID, t.updateStatusCreatedPool(ctx, currentPool.UUID)
 }
 
 // create CreatePoolRequest depend on default config and pool value
@@ -386,4 +386,20 @@ func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context,
 		}
 	}
 	return nil
+}
+
+// add the poolId to status.CreatedPools
+func (t *defaultModelDeployTask) updateStatusCreatedPool(ctx context.Context, poolId string) error {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		// check if already in status
+		for _, createdPool := range obj.Status.CreatedPools {
+			if createdPool.Id == poolId {
+				return
+			}
+		}
+		// add new poolId
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{
+			Id: poolId,
+		})
+	})
 }

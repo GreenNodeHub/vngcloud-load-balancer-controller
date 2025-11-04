@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -32,7 +33,7 @@ const (
 )
 
 var _ = Describe("Service Controller", func() {
-	BeforeEach(func() {
+	AfterEach(func() {
 		// Ensure clean state before each test
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
@@ -177,6 +178,54 @@ var _ = Describe("Service Controller", func() {
 				}
 				return len(secgroups.Items)
 			}, timeout*4, interval).Should(Equal(1))
+
+			// Cleanup
+			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, endpoint)).Should(Succeed())
+		})
+	})
+
+	Context("When creating a DNS LoadBalancer service with TCP and UDP on same port", func() {
+		It("should fail with error due to duplicate port (VNGCloud limitation)", func() {
+			serviceName := "test-dns-service"
+			namespace := "default"
+
+			// Create DNS endpoint first
+			endpoint := newDNSEndpointResource(serviceName, namespace)
+			Expect(k8sClient.Create(ctx, endpoint)).Should(Succeed())
+
+			// Create DNS service with both TCP and UDP on port 53
+			service := newDNSServiceResource(serviceName, namespace)
+			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+
+			// Wait for LBC to be created
+			var lbcList *v1alpha1.LoadBalancerConfigList
+			Eventually(func() int {
+				list, err := getLBCListForService(serviceName, namespace)
+				if err != nil {
+					return -1
+				}
+				lbcList = list
+				return len(list.Items)
+			}, timeout*2, interval).Should(Equal(1))
+
+			lbc := &lbcList.Items[0]
+
+			// Verify LBC spec has 2 listeners (TCP and UDP) - created by service controller
+			Expect(lbc.Spec.Listeners).Should(HaveLen(2))
+			Expect(lbc.Spec.Pools).Should(HaveLen(2))
+
+			// Wait for LBC status to show error about duplicate port
+			Eventually(func() bool {
+				lbc := &v1alpha1.LoadBalancerConfig{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: lbcList.Items[0].Name, Namespace: namespace}, lbc)
+				if err != nil {
+					return false
+				}
+
+				// Check if there's an error condition or the LoadBalancerId is NOT set (deployment failed)
+				return lbc.Status.LoadBalancerId == nil || *lbc.Status.LoadBalancerId == ""
+			}, timeout*4, interval).Should(BeTrue(), "LBC should fail to deploy due to duplicate port")
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())

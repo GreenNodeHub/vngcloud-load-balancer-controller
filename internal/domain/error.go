@@ -13,6 +13,7 @@ var (
 	ErrorNotFound                            = errors.New("heheh not found")
 	ErrorLoadBalancerStatusError             = errors.New("load balancer status is error")
 	ErrorNoImplementationSpecificConfigFound = fmt.Errorf("no implementation specific config found")
+	ErrorStatusNotUpdated                    = fmt.Errorf("status not updated") // when the status of CRD is not updated as expected
 )
 
 const (

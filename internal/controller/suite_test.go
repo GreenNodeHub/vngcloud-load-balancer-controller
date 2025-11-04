@@ -84,6 +84,7 @@ var (
 		}{IsRunRemote: false, ClusterID: mockClusterID},
 		LoadBalancerOpts: config.LoadBalancerOpts{
 			DefaultL4PackageName: "NLB_Small",
+			DefaultScheme:        "Internet",
 			DefaultPoolAlgorithm: "ROUND_ROBIN",
 
 			DefaultTimeoutClient:     50,

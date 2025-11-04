@@ -1101,9 +1101,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 
 						// check secgroups
 						secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
-						Expect(err).ShouldNot(HaveOccurred())
-						Expect(secgroups).ShouldNot(BeNil())
-						Expect((secgroups.Items)).Should(HaveLen(3))
+						Eventually(func() bool {
+							secgroups, err = vngcloudRepo.ListSecurityGroups(ctx)
+							Expect(err).ShouldNot(HaveOccurred())
+							Expect(secgroups).ShouldNot(BeNil())
+							return len(secgroups.Items) == 3
+						}, time.Second*10, interval).Should(Equal(true))
 						expectName := []string{"vks-k8s-000000-default-test-servi-4d0e7", bigbangSec.Name, blackpinkSec.Name}
 						secgroupID := ""
 						for _, secgroup := range secgroups.Items {

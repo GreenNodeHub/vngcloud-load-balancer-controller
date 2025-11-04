@@ -91,9 +91,9 @@ type NodeInfo struct {
 	// +required
 	Name string `json:"name"`
 
-	// ServerID is the VNG Cloud server ID of the node
+	// ServerId is the VNG Cloud server ID of the node
 	// +optional
-	ServerID string `json:"serverID,omitempty"`
+	ServerId string `json:"serverId,omitempty"`
 }
 
 // AttachedSecurityGroup contains information about an attached security group
@@ -105,13 +105,13 @@ type AttachedSecurityGroup struct {
 
 // ServerSecurityGroupStatus tracks the security group attachment status for a specific server
 type ServerSecurityGroupStatus struct {
-	// ServerID is the VNG Cloud server ID
+	// ServerId is the VNG Cloud server ID
 	// +required
-	ServerID string `json:"serverID"`
+	ServerId string `json:"serverId"`
 
-	// AttachedSecurityGroupIDs is the list of security group IDs successfully attached to this server
+	// AttachedSecurityGroupIds is the list of security group IDs successfully attached to this server
 	// +optional
-	AttachedSecurityGroupIDs []string `json:"attachedSecurityGroupIDs,omitempty"`
+	AttachedSecurityGroupIds []string `json:"attachedSecurityGroupIds,omitempty"`
 
 	// Error contains the error message if attachment failed
 	// +optional
@@ -145,7 +145,7 @@ type NodeSecurityGroupStatus struct {
 	// ServerSecurityGroups tracks the security group attachment status for each server
 	// +optional
 	// +listType=map
-	// +listMapKey=serverID
+	// +listMapKey=serverId
 	ServerSecurityGroups []ServerSecurityGroupStatus `json:"serverSecurityGroups,omitempty"`
 
 	// conditions represent the current state of the NodeSecurityGroup resource.

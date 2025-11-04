@@ -57,7 +57,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
 			return "", err
 		}
-		return _lis.UUID, nil
+		return _lis.UUID, t.updateStatusCreatedListener(ctx, _lis.UUID)
 		// TODO: Why I need it?
 		// // need to update to current builder, avoid mismatch data later
 		// t.AddCloneListenerBuilder(listenerBuilder)
@@ -145,7 +145,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	// 	}
 	// }
 
-	return currentListener.UUID, nil
+	return currentListener.UUID, t.updateStatusCreatedListener(ctx, currentListener.UUID)
 }
 
 func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, mapPoolNameToID map[string]string) loadbalancerv2.ICreateListenerRequest {
@@ -412,4 +412,19 @@ func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Cont
 	// 	}
 	// }
 	return nil
+}
+
+// add listener to status.CreatedListeners if not exist
+func (t *defaultModelDeployTask) updateStatusCreatedListener(ctx context.Context, listenerId string) error {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		// check if already exist
+		for _, listener := range obj.Status.CreatedListeners {
+			if listener.Id == listenerId {
+				return
+			}
+		}
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{
+			Id: listenerId,
+		})
+	})
 }

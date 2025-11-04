@@ -48,8 +48,8 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 		return client.IgnoreNotFound(err)
 	}
 
-	managedSecgroupID, err := uc.ensureMagagedSecurityGroup(ctx, nsgObject)
-	uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, managedSecgroupID, err)
+	managedSecgroupId, err := uc.ensureManagedSecurityGroup(ctx, nsgObject)
+	uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, managedSecgroupId, err)
 	if err != nil {
 		return err
 	}
@@ -58,14 +58,14 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	needAttachSecgroupIds := make([]string, 0)
 	needAttachSecgroupIds = append(needAttachSecgroupIds, nsgObject.Spec.AttachSecurityGroups...)
 
-	if managedSecgroupID != "" {
-		needAttachSecgroupIds = append(needAttachSecgroupIds, managedSecgroupID)
+	if managedSecgroupId != "" {
+		needAttachSecgroupIds = append(needAttachSecgroupIds, managedSecgroupId)
 	}
 
 	// collect old server IDs
 	oldServerSelector := make([]string, 0)
 	for _, nodeInfo := range nsgObject.Status.SelectedNodes {
-		oldServerSelector = append(oldServerSelector, nodeInfo.ServerID)
+		oldServerSelector = append(oldServerSelector, nodeInfo.ServerId)
 	}
 
 	// collect new server IDs
@@ -78,10 +78,10 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	// patch status.selectedNodes
 	err = uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
 		nodeInfos := make([]v1alpha1.NodeInfo, len(newServerSelector))
-		for i, serverID := range newServerSelector {
+		for i, serverId := range newServerSelector {
 			nodeInfos[i] = v1alpha1.NodeInfo{
-				Name:     serverID, // TODO: get node name from serverID
-				ServerID: serverID,
+				Name:     serverId, // TODO: get node name from serverId
+				ServerId: serverId,
 			}
 		}
 		obj.Status.SelectedNodes = nodeInfos
@@ -91,7 +91,7 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	}
 
 	// resolve changes
-	removeServerIDs, notChangeServerIDs, addServerIDs := resolveStringArrayChange(
+	removeServerIDs, notChangeServerIDs, addServerIDs := resolveStringArrayChange(ctx,
 		oldServerSelector,
 		newServerSelector,
 	)
@@ -100,49 +100,49 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 
 	errorsList := make([]error, 0)
 	// detach security groups from removed servers
-	for _, serverID := range removeServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverID, []string{})
+	for _, serverId := range removeServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, []string{})
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverID, err, []string{})
+		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, []string{})
 		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverID, " error: ", _err)
+			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
 	}
 
 	// update security groups for not changed servers
-	for _, serverID := range notChangeServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverID, needAttachSecgroupIds)
+	for _, serverId := range notChangeServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverID, err, needAttachSecgroupIds)
+		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
 		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverID, " error: ", _err)
+			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
 	}
 
 	// attach security groups to added servers
-	for _, serverID := range addServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverID, needAttachSecgroupIds)
+	for _, serverId := range addServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverID, err, needAttachSecgroupIds)
+		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
 		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverID, " error: ", _err)
+			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
 	}
 
 	// try delete managed security group if not in use and not attached to any server
-	if managedSecgroupID == "" {
-		if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
-			err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
-			if err != nil {
-				uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
-				return err
-			}
+	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
+		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
+		if err != nil {
+			uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
+			return err
+		}
+		if isDeleted {
 			// patch status
 			uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, "", nil)
 		}
@@ -159,9 +159,9 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	return nil
 }
 
-// ensureMagagedSecurityGroup ensures that the managed security group is created and updated according to the NSG spec
+// ensureManagedSecurityGroup ensures that the managed security group is created and updated according to the NSG spec
 // returns the managed security group ID
-func (uc *nsgUseCase) ensureMagagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) (string, error) {
+func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) (string, error) {
 	if nsgObject.Spec.ManagedSecurityGroup == nil {
 		return "", nil
 	}
@@ -334,9 +334,12 @@ func (uc *nsgUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 		return client.IgnoreNotFound(err)
 	}
 
+	// detach security groups from all selected servers
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("Detach security groups: %v", nsgObject.Status.ServerSecurityGroups)
 	errorsList := make([]error, 0)
 	for _, server_secgroup := range nsgObject.Status.ServerSecurityGroups {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, server_secgroup.ServerID, []string{})
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, server_secgroup.ServerId, []string{})
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
@@ -351,7 +354,7 @@ func (uc *nsgUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 
 	// try delete managed security group if not used by any server
 	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
-		err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
+		_, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
 		if err != nil {
 			return err
 		}
@@ -360,22 +363,22 @@ func (uc *nsgUseCase) Delete(ctx context.Context, req ctrl.Request) error {
 }
 
 // deleteManagedSecurityGroupIfUnused deletes the managed security group if it is not attached to any server
-func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, secgroupID string) error {
+// and returns isDeleted and error
+func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, secgroupID string) (bool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("Delete managed security group %s if unused", secgroupID)
 
 	// check if secgroup is exists
 	if _, err := uc.vngcloudRepo.GetSecurityGroup(ctx, secgroupID); err != nil {
 		if domain.IsSecurityGroupNotFound(err) {
 			logger.Infof("Security group %s not found, skip delete", secgroupID)
-			return nil
+			return true, nil
 		}
-		return err
+		return false, err
 	}
 
 	serverList, err := uc.vngcloudRepo.ListServerBySecgroupID(ctx, secgroupID)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	length := 0
@@ -385,13 +388,20 @@ func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, se
 		length = len(serverList.Items)
 	}
 
-	if length == 0 {
-		err := uc.vngcloudRepo.DeleteSecurityGroup(ctx, secgroupID)
-		if err != nil {
-			return err
+	if length > 0 {
+		serverIds := make([]string, 0)
+		for _, server := range serverList.Items {
+			serverIds = append(serverIds, server.Uuid)
 		}
+		logger.Infof("Security group %s is still attached to servers: %v. Skip delete.", secgroupID, serverIds)
+		return false, nil
 	}
-	return nil
+
+	err = uc.vngcloudRepo.DeleteSecurityGroup(ctx, secgroupID)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // ensure secgroup for instance, get the current secgroups of instance,
@@ -412,8 +422,8 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 
 	oldSecgroupIds := make([]string, 0)
 	for _, server_secgroup := range nsgObject.Status.ServerSecurityGroups {
-		if server_secgroup.ServerID == instanceID {
-			oldSecgroupIds = append(oldSecgroupIds, server_secgroup.AttachedSecurityGroupIDs...)
+		if server_secgroup.ServerId == instanceID {
+			oldSecgroupIds = append(oldSecgroupIds, server_secgroup.AttachedSecurityGroupIds...)
 			break
 		}
 	}
@@ -442,57 +452,48 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 	return nil
 }
 
+// toErrorPtr converts an error to a string pointer, returns nil if error is nil
+func toErrorPtr(err error) *string {
+	if err == nil {
+		return nil
+	}
+	errMsg := err.Error()
+	return &errMsg
+}
+
 // update the status.serverSecurityGroups of nsgObject for a specific server
 func (m *nsgUseCase) ensureStatusNodeSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, serverId string, err error, attachedSecgroupIds []string) error {
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
 		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-			// create a copy of current server security groups
-			newServerSecurityGroups := make([]v1alpha1.ServerSecurityGroupStatus, len(obj.Status.ServerSecurityGroups))
-			copy(newServerSecurityGroups, obj.Status.ServerSecurityGroups)
+			// Create the new status for this server
+			newStatus := v1alpha1.ServerSecurityGroupStatus{
+				ServerId:                 serverId,
+				AttachedSecurityGroupIds: attachedSecgroupIds,
+				Error:                    toErrorPtr(err),
+			}
 
-			// find and update or create the status of this server to status.serverSecurityGroups
-			found := false
-			for i, serverSecgroup := range newServerSecurityGroups {
-				if serverSecgroup.ServerID == serverId {
-					found = true
-					newServerSecurityGroups[i].AttachedSecurityGroupIDs = attachedSecgroupIds
-					if err != nil {
-						errMsg := err.Error()
-						newServerSecurityGroups[i].Error = &errMsg
-					} else {
-						newServerSecurityGroups[i].Error = nil
-					}
-					break
+			// Find and update the existing status, or append if not found
+			for i, serverSecgroup := range obj.Status.ServerSecurityGroups {
+				if serverSecgroup.ServerId == serverId {
+					obj.Status.ServerSecurityGroups[i] = newStatus
+					return
 				}
 			}
-			if !found {
-				newStatus := v1alpha1.ServerSecurityGroupStatus{
-					ServerID:                 serverId,
-					AttachedSecurityGroupIDs: attachedSecgroupIds,
-				}
-				if err != nil {
-					errMsg := err.Error()
-					newStatus.Error = &errMsg
-				}
-				newServerSecurityGroups = append(newServerSecurityGroups, newStatus)
-			}
-			obj.Status.ServerSecurityGroups = newServerSecurityGroups
+
+			// Server not found in status, append new entry
+			obj.Status.ServerSecurityGroups = append(obj.Status.ServerSecurityGroups, newStatus)
 		})
 }
 
 func (m *nsgUseCase) ensureStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID string, err error) error {
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
 		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-			obj.Status.ManagedSecurityGroup.Id = &secgroupID
 			if secgroupID == "" {
 				obj.Status.ManagedSecurityGroup.Id = nil
-			}
-			if err != nil {
-				errMsg := err.Error()
-				obj.Status.ManagedSecurityGroup.Error = &errMsg
 			} else {
-				obj.Status.ManagedSecurityGroup.Error = nil
+				obj.Status.ManagedSecurityGroup.Id = &secgroupID
 			}
+			obj.Status.ManagedSecurityGroup.Error = toErrorPtr(err)
 		})
 }
 
@@ -532,7 +533,7 @@ func mergeStringArray(ctx context.Context, current, remove, add []string) ([]str
 // this function is used to reolve the update the change of array of strings
 // eg: old [1,2,3], new [2,3,4]
 // => remove [1], notchange [2,3], add [4]
-func resolveStringArrayChange(oldArr, newArr []string) (removeArr, notChangeArr, addArr []string) {
+func resolveStringArrayChange(ctx context.Context, oldArr, newArr []string) (removeArr, notChangeArr, addArr []string) {
 	removeMap := make(map[string]bool)
 	newMap := make(map[string]bool)
 
@@ -556,6 +557,10 @@ func resolveStringArrayChange(oldArr, newArr []string) (removeArr, notChangeArr,
 	for item := range removeMap {
 		removeArr = append(removeArr, item)
 	}
+
+	logger := contexts.NewContext(ctx).Log()
+	logger.Debugf("- old array: %v, new array: %v", oldArr, newArr)
+	logger.Debugf("- remove %v, not change %v, add %v", removeArr, notChangeArr, addArr)
 
 	return removeArr, notChangeArr, addArr
 }

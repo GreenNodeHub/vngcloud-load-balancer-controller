@@ -286,9 +286,20 @@ func (m *MockProvider) subnetToZone(subnetID string) string {
 }
 
 func (m *MockProvider) ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error) {
-	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request list load balancer packages in zone %s", domain.RequestIcon, zone)
-	return nil, domain.ErrorNotImplemented
+	return &entityv2.ListLoadBalancerPackages{
+		Items: []*entityv2.LoadBalancerPackage{
+			{
+				UUID: DEFAULT_L7_PACKAGE_ID,
+				Name: "ALB_Small",
+				Type: string(loadbalancerv2.LoadBalancerTypeLayer4),
+			},
+			{
+				UUID: DEFAULT_L4_PACKAGE_ID,
+				Name: "NLB_Small",
+				Type: string(loadbalancerv2.LoadBalancerTypeLayer4),
+			},
+		},
+	}, nil
 }
 
 func (m *MockProvider) GetServerNetworkInfo(ctx context.Context, serverID string) (zoneID common.Zone, networkID, subnetID, subnetCIDR string, err error) {

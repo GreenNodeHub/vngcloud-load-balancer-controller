@@ -25,10 +25,23 @@ type defaultModelDeployTask struct {
 }
 
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
+	// LAYER 1: Validate the LoadBalancerConfig itself (internal consistency)
+	// This runs before we even get the load balancer ID
+	if err := t.validateSelf(ctx); err != nil {
+		return err
+	}
+
 	lbId, err := t.deployLoadBalancer(ctx)
 	if err != nil {
 		return err
 	}
+
+	// LAYER 2: Validate across LoadBalancerConfigs sharing the same load balancer
+	// This runs after we have the load balancer ID
+	if err := t.validateCrossLBCs(ctx, lbId); err != nil {
+		return err
+	}
+
 	mapPoolNameToID, err := t.deployPools(ctx, lbId)
 	if err != nil {
 		return err

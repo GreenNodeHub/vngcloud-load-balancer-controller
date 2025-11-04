@@ -321,3 +321,79 @@ func newEndpointResource(name, namespace string) *corev1.Endpoints {
 		},
 	}
 }
+
+func newDNSServiceResource(name, namespace string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Service",
+			APIVersion: "v1",
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeLoadBalancer,
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "dns-tcp",
+					Port:     53,
+					Protocol: corev1.ProtocolTCP,
+					NodePort: 30053,
+				},
+				{
+					Name:     "dns-udp",
+					Port:     53,
+					Protocol: corev1.ProtocolUDP,
+					NodePort: 30054,
+				},
+			},
+			Selector: map[string]string{
+				"app": "dns",
+			},
+		},
+	}
+}
+
+func newDNSEndpointResource(name, namespace string) *corev1.Endpoints {
+	return &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Endpoints",
+			APIVersion: "v1",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Addresses: []corev1.EndpointAddress{
+					{
+						IP:       "172.172.172.1",
+						Hostname: "dns-pod",
+						NodeName: ptr.To("mock-node-1"),
+						TargetRef: &corev1.ObjectReference{
+							Kind:      "Pod",
+							Namespace: namespace,
+							Name:      "dns-pod-1",
+						},
+					},
+				},
+				Ports: []corev1.EndpointPort{
+					{
+						Name:        "dns-tcp",
+						Port:        53,
+						Protocol:    corev1.ProtocolTCP,
+						AppProtocol: ptr.To("dns"),
+					},
+					{
+						Name:        "dns-udp",
+						Port:        53,
+						Protocol:    corev1.ProtocolUDP,
+						AppProtocol: ptr.To("dns"),
+					},
+				},
+			},
+		},
+	}
+}

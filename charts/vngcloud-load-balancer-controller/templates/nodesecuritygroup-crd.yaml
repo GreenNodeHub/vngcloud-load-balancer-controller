@@ -200,8 +200,8 @@ spec:
                     name:
                       description: Name is the name of the node
                       type: string
-                    serverID:
-                      description: ServerID is the VNG Cloud server ID of the node
+                    serverId:
+                      description: ServerId is the VNG Cloud server ID of the node
                       type: string
                   required:
                   - name
@@ -214,8 +214,8 @@ spec:
                   description: ServerSecurityGroupStatus tracks the security group attachment
                     status for a specific server
                   properties:
-                    attachedSecurityGroupIDs:
-                      description: AttachedSecurityGroupIDs is the list of security
+                    attachedSecurityGroupIds:
+                      description: AttachedSecurityGroupIds is the list of security
                         group IDs successfully attached to this server
                       items:
                         type: string
@@ -223,15 +223,15 @@ spec:
                     error:
                       description: Error contains the error message if attachment failed
                       type: string
-                    serverID:
-                      description: ServerID is the VNG Cloud server ID
+                    serverId:
+                      description: ServerId is the VNG Cloud server ID
                       type: string
                   required:
-                  - serverID
+                  - serverId
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
-                - serverID
+                - serverId
                 x-kubernetes-list-type: map
             type: object
         required:
