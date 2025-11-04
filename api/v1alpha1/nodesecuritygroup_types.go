@@ -96,13 +96,6 @@ type NodeInfo struct {
 	ServerId string `json:"serverId,omitempty"`
 }
 
-// AttachedSecurityGroup contains information about an attached security group
-type AttachedSecurityGroup struct {
-	// ID is the security group ID
-	// +required
-	ID string `json:"id"`
-}
-
 // ServerSecurityGroupStatus tracks the security group attachment status for a specific server
 type ServerSecurityGroupStatus struct {
 	// ServerId is the VNG Cloud server ID

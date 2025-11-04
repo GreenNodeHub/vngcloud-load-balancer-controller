@@ -8,6 +8,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -129,4 +130,20 @@ func (m *vngCloudRepository) ListLoadBalancerPackageByZone(ctx context.Context, 
 		return nil, sdkErr.GetError()
 	}
 	return packages, nil
+}
+
+func (m *vngCloudRepository) CreateInterLoadBalancer(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
+	if m.superClient == nil {
+		return nil, domain.ErrorSuperClientNotInitialized
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request create INTERVPC load balancer.", domain.RequestIcon)
+	newLB, sdkErr := m.superClient.VLBGateway().Internal().LoadBalancerService().
+		CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - CreateInterLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return newLB, nil
 }

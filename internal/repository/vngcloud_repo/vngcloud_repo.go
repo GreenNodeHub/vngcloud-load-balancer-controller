@@ -36,6 +36,9 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 		return nil, err
 	}
 
+	vngcloudRepo.userAgent = fmt.Sprintf("vngcloud-loadbalancer-controller/%s (ChartVersion/%s)", version.Version, vngcloudRepo.cfg.ChartVersion)
+
+	// setup VNGCloud SDK client
 	sdkConfig := client.NewSdkConfigure().
 		// WithZoneId(getValueOfEnv("VNGCLOUD_ZONE_ID")).
 		// WithVLBEndpoint(getValueOfEnv("URL_VLB_ENDPOINT")).
@@ -46,12 +49,22 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 		WithIamEndpoint(vngcloudRepo.cfg.Global.IdentityURL).
 		WithVServerEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vserver-gateway").
 		WithVLBEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vlb-gateway").
-		WithGLBEndpoint("https://glb.console.vngcloud.vn/glb-controller/")
+		WithGLBEndpoint("https://glb.console.vngcloud.vn/glb-controller/").
+		WithUserAgent(vngcloudRepo.userAgent)
+	vngcloudRepo.client = client.NewClient(ctx).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
 
-	vngcloudRepo.client = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
-	vngcloudRepo.userAgent = fmt.Sprintf("vngcloud-loadbalancer-controller/%s (ChartVersion/%s)", version.Version, vngcloudRepo.cfg.ChartVersion)
-	// TODO init network info provider
-
+	// setup super client to manage INTERVPC load balancer
+	if vngcloudRepo.cfg.Global.SuperClientID != "" && vngcloudRepo.cfg.Global.SuperClientSecret != "" {
+		superSdkConfig := client.NewSdkConfigure().
+			WithProjectId(vngcloudRepo.projectId).
+			WithClientId(vngcloudRepo.cfg.Global.SuperClientID).
+			WithClientSecret(vngcloudRepo.cfg.Global.SuperClientSecret).
+			WithIamEndpoint(vngcloudRepo.cfg.Global.IdentityURL).
+			WithVServerEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vserver-gateway").
+			WithVLBEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vlb-gateway").
+			WithUserAgent(vngcloudRepo.userAgent)
+		vngcloudRepo.superClient = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(superSdkConfig)
+	}
 	return vngcloudRepo, nil
 }
 
@@ -60,6 +73,10 @@ type vngCloudRepository struct {
 	client    client.IClient
 	userAgent string
 	projectId string
+	userId    int
+
+	// client to manage INTERVPC load balancer
+	superClient client.IClient
 
 	// zoneID     common.Zone
 	// netID      string
@@ -76,8 +93,9 @@ type vngCloudRepository struct {
 }
 
 func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataService metadata.IMetadata) error {
-	if m.cfg != nil && m.cfg.Global.ProjectID != "" {
+	if m.cfg != nil && m.cfg.Global.ProjectID != "" && m.cfg.Global.UserID != 0 {
 		m.projectId = m.cfg.Global.ProjectID
+		m.userId = m.cfg.Global.UserID
 		return nil
 	}
 
@@ -109,5 +127,10 @@ func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 	// llog.V(5).Infof("[INFO] - setupProjectId: the portal information is %+v", portalResp)
 	logger.Infof("[INFO] - setupProjectId: the portal information is %+v", portalResp)
 	m.projectId = portalResp.ProjectID
+	m.userId = portalResp.UserID
 	return nil
+}
+
+func (m *vngCloudRepository) GetUserId() int {
+	return m.userId
 }

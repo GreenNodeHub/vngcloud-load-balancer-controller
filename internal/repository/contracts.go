@@ -6,6 +6,7 @@ import (
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -15,6 +16,9 @@ import (
 )
 
 type VngCloudRepository interface {
+	// Metadata
+	GetUserId() int
+
 	// Load Balancer
 	ListLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListLoadBalancers, error)
 	GetLoadBalancerByID(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
@@ -23,6 +27,7 @@ type VngCloudRepository interface {
 	DeleteLoadBalancer(ctx context.Context, lbID string) error
 	ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error
 	WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error)
+	CreateInterLoadBalancer(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error)
 
 	// Load Balancer Package
 	ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error)

@@ -2,6 +2,7 @@ package service_uc
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -147,6 +148,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
 	lbConfig.Spec.PackageId = t.buildPackageId(ctx)
 	lbConfig.Spec.Scheme = t.buildScheme(ctx)
+	lbConfig.Spec.BackendSubnetId = t.buildBackendSubnetId(ctx)
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
@@ -265,16 +267,28 @@ func (t *defaultModelBuildTask) buildPackageId(_ context.Context) *string {
 func (t *defaultModelBuildTask) buildScheme(_ context.Context) *v2.LoadBalancerScheme {
 	var option string
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixScheme, &option, t.service.Annotations)
-	switch option {
-	case "internal":
+	switch strings.ToLower(option) {
+	case strings.ToLower(string(v2.InternalLoadBalancerScheme)):
 		value := v2.InternalLoadBalancerScheme
 		return &value
-	case "internet":
+	case strings.ToLower(string(v2.InternetLoadBalancerScheme)):
 		value := v2.InternetLoadBalancerScheme
+		return &value
+	case strings.ToLower(string(v2.InterVpcLoadBalancerScheme)):
+		value := v2.InterVpcLoadBalancerScheme
 		return &value
 	default:
 		return nil
 	}
+}
+
+func (t *defaultModelBuildTask) buildBackendSubnetId(_ context.Context) *string {
+	var option string
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.service.Annotations)
+	if option == "" {
+		return nil
+	}
+	return &option
 }
 
 // buildSubnetAndZone tries to get subnet and zone from annotations.

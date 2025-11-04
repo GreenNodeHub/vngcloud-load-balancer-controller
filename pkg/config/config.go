@@ -29,8 +29,13 @@ type AuthOpts struct {
 	VServerURL   string `gcfg:"vserver-url" mapstructure:"vserverURL" name:"vserver-url"`
 	ClientID     string `gcfg:"client-id" mapstructure:"clientID" name:"client-id"`
 	ClientSecret string `gcfg:"client-secret" mapstructure:"clientSecret" name:"client-secret"`
-	// it should help in dev mode, pass the projectID directly
+	// it should help in dev mode, pass the projectID and userID directly
 	ProjectID string `gcfg:"project-id" mapstructure:"projectID" name:"project-id"`
+	UserID    int    `gcfg:"user-id" mapstructure:"userID" name:"user-id"`
+
+	// for super client to manage INTERVPC load balancer (optional)
+	SuperClientID     string `gcfg:"super-client-id" mapstructure:"superClientID" name:"super-client-id"`
+	SuperClientSecret string `gcfg:"super-client-secret" mapstructure:"superClientSecret" name:"super-client-secret"`
 }
 
 type LoadBalancerOpts struct {

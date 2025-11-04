@@ -36,6 +36,9 @@ const (
 	// for l4 only
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
 
+	// for l4 inter-vpc only
+	SuffixBackendSubnetID = "backend-subnet-id"
+
 	// for l7 only
 	SuffixEnableStickySession          = "enable-sticky-session"
 	SuffixEnableTLSEncryption          = "enable-tls-encryption"

@@ -11,6 +11,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	v20 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -258,6 +259,74 @@ func (_c *MockVngCloudRepository_CreateGlobalPool_Call) Return(globalPool *entit
 }
 
 func (_c *MockVngCloudRepository_CreateGlobalPool_Call) RunAndReturn(run func(ctx context.Context, glbID string, opt v1.ICreateGlobalPoolRequest) (*entity.GlobalPool, error)) *MockVngCloudRepository_CreateGlobalPool_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateInterLoadBalancer provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) CreateInterLoadBalancer(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest) (*entity.LoadBalancer, error) {
+	ret := _mock.Called(ctx, lbOptions)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInterLoadBalancer")
+	}
+
+	var r0 *entity.LoadBalancer
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, inter.ICreateLoadBalancerRequest) (*entity.LoadBalancer, error)); ok {
+		return returnFunc(ctx, lbOptions)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, inter.ICreateLoadBalancerRequest) *entity.LoadBalancer); ok {
+		r0 = returnFunc(ctx, lbOptions)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.LoadBalancer)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, inter.ICreateLoadBalancerRequest) error); ok {
+		r1 = returnFunc(ctx, lbOptions)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockVngCloudRepository_CreateInterLoadBalancer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInterLoadBalancer'
+type MockVngCloudRepository_CreateInterLoadBalancer_Call struct {
+	*mock.Call
+}
+
+// CreateInterLoadBalancer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - lbOptions inter.ICreateLoadBalancerRequest
+func (_e *MockVngCloudRepository_Expecter) CreateInterLoadBalancer(ctx interface{}, lbOptions interface{}) *MockVngCloudRepository_CreateInterLoadBalancer_Call {
+	return &MockVngCloudRepository_CreateInterLoadBalancer_Call{Call: _e.mock.On("CreateInterLoadBalancer", ctx, lbOptions)}
+}
+
+func (_c *MockVngCloudRepository_CreateInterLoadBalancer_Call) Run(run func(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest)) *MockVngCloudRepository_CreateInterLoadBalancer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 inter.ICreateLoadBalancerRequest
+		if args[1] != nil {
+			arg1 = args[1].(inter.ICreateLoadBalancerRequest)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_CreateInterLoadBalancer_Call) Return(loadBalancer *entity.LoadBalancer, err error) *MockVngCloudRepository_CreateInterLoadBalancer_Call {
+	_c.Call.Return(loadBalancer, err)
+	return _c
+}
+
+func (_c *MockVngCloudRepository_CreateInterLoadBalancer_Call) RunAndReturn(run func(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest) (*entity.LoadBalancer, error)) *MockVngCloudRepository_CreateInterLoadBalancer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2159,6 +2228,50 @@ func (_c *MockVngCloudRepository_GetSubnetByID_Call) Return(subnet *entity.Subne
 }
 
 func (_c *MockVngCloudRepository_GetSubnetByID_Call) RunAndReturn(run func(ctx context.Context, networkID string, subnetID string) (*entity.Subnet, error)) *MockVngCloudRepository_GetSubnetByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUserId provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) GetUserId() int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserId")
+	}
+
+	var r0 int
+	if returnFunc, ok := ret.Get(0).(func() int); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	return r0
+}
+
+// MockVngCloudRepository_GetUserId_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserId'
+type MockVngCloudRepository_GetUserId_Call struct {
+	*mock.Call
+}
+
+// GetUserId is a helper method to define mock.On call
+func (_e *MockVngCloudRepository_Expecter) GetUserId() *MockVngCloudRepository_GetUserId_Call {
+	return &MockVngCloudRepository_GetUserId_Call{Call: _e.mock.On("GetUserId")}
+}
+
+func (_c *MockVngCloudRepository_GetUserId_Call) Run(run func()) *MockVngCloudRepository_GetUserId_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetUserId_Call) Return(n int) *MockVngCloudRepository_GetUserId_Call {
+	_c.Call.Return(n)
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetUserId_Call) RunAndReturn(run func() int) *MockVngCloudRepository_GetUserId_Call {
 	_c.Call.Return(run)
 	return _c
 }

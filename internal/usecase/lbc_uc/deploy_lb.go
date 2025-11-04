@@ -2,11 +2,14 @@ package lbc_uc
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -80,7 +83,7 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
 	// if already an exist lb
 	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
-		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
+		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
 			return t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
 		} else {
 			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
@@ -108,20 +111,37 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 }
 
 func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string, error) {
-	createRequest, err := t.buildCreateLoadBalancerRequest(ctx)
-	if err != nil {
-		return "", err
-	}
-	lbEntity, err := t.vngcloudRepo.CreateLoadBalancer(ctx, createRequest)
-	if err != nil {
-		return "", err
-	}
-	if lbEntity == nil || lbEntity.UUID == "" {
-		return "", errors.New("load balancer not have UUID after create, need to retry")
+	var lbEntity *entity.LoadBalancer
+	var err error
+	// check if lb scheme is intervpc, need super client
+	if t.lbConfig.Spec.Scheme != nil && *t.lbConfig.Spec.Scheme == loadbalancerv2.InterVpcLoadBalancerScheme {
+		createRequest, err := t.buildCreateInterVpcLoadBalancerRequest(ctx)
+		if err != nil {
+			return "", err
+		}
+		lbEntity, err = t.vngcloudRepo.CreateInterLoadBalancer(ctx, createRequest)
+		if err != nil {
+			return "", err
+		}
+		if lbEntity == nil || lbEntity.UUID == "" {
+			return "", errors.New("load balancer not have UUID after create, need to retry")
+		}
+	} else {
+		createRequest, err := t.buildCreateLoadBalancerRequest(ctx)
+		if err != nil {
+			return "", err
+		}
+		lbEntity, err = t.vngcloudRepo.CreateLoadBalancer(ctx, createRequest)
+		if err != nil {
+			return "", err
+		}
+		if lbEntity == nil || lbEntity.UUID == "" {
+			return "", errors.New("load balancer not have UUID after create, need to retry")
+		}
 	}
 
 	// wait for loadbalancer active, if lb is error, delete it and return error
-	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
+	if _, err = t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
 		if err == domain.ErrorLoadBalancerStatusError {
 			if err := t.vngcloudRepo.DeleteLoadBalancer(ctx, lbEntity.UUID); err != nil {
 				t.logger.Error("Failed to delete loadbalancer: ", err)
@@ -226,7 +246,7 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 			}
 		}
 		if packageId == "" {
-			return nil, errors.Errorf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId)
+			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
 		}
 	}
 
@@ -260,4 +280,70 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 	return request, nil
 }
 
-// func  (t *defaultModelDeployTask)
+func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx context.Context) (inter.ICreateLoadBalancerRequest, error) {
+	// check if userId is provided
+	userId := t.cfg.Global.UserID
+	if userId == 0 {
+		// try to get from vngcloudRepo
+		if userId = t.vngcloudRepo.GetUserId(); userId == 0 {
+			return nil, errs.NewNoNeedRequeue("userId is required, cannot get from config or vngcloud repository")
+		}
+	}
+
+	// build backendSubnetId
+	if t.lbConfig.Spec.BackendSubnetId == nil || *t.lbConfig.Spec.BackendSubnetId == "" {
+		return nil, errs.NewNoNeedRequeue("backendSubnetId is required for InterVpc load balancer")
+	}
+
+	// build packageId
+	packageId := ""
+	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
+		packageId = *t.lbConfig.Spec.PackageId
+	} else {
+		// use default package from config, get default package id from name and zone
+		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.lbConfig.Spec.ZoneId)
+		if err != nil {
+			return nil, err
+		}
+		for _, pkg := range listPackages.Items {
+			if pkg.Name == t.cfg.LoadBalancerOpts.DefaultL4PackageName {
+				packageId = pkg.UUID
+				break
+			}
+		}
+		if packageId == "" {
+			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
+		}
+	}
+
+	request := inter.NewCreateLoadBalancerRequest(
+		strconv.Itoa(userId),
+		t.lbConfig.Spec.LoadBalancerName,
+		packageId,
+		t.lbConfig.Spec.SubnetId,
+		*t.lbConfig.Spec.BackendSubnetId,
+	).WithZoneId(t.lbConfig.Spec.ZoneId)
+
+	// if t.lbConfig.Spec.Scheme != nil {
+	// 	request = request.WithScheme(*t.lbConfig.Spec.Scheme)
+	// }
+
+	// if t.lbConfig.Spec.EnableAutoscale != nil {
+	// 	request = request.WithAutoScalable(*t.lbConfig.Spec.EnableAutoscale)
+	// }
+
+	// if t.lbConfig.Spec.Type != "" {
+	// 	request = request.WithType(t.lbConfig.Spec.Type)
+	// }
+
+	// if t.lbConfig.Spec.IsPoc != nil {
+	// 	request = request.WithPoc(*t.lbConfig.Spec.IsPoc)
+	// }
+
+	// TODO: add more fields
+	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
+	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
+	// WithTags(ptags ...string) ICreateLoadBalancerRequest
+
+	return request, nil
+}

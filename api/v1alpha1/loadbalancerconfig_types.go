@@ -40,7 +40,6 @@ import (
 // type L7Rule struct {
 // 	// CompareType is how to compare the rule value
 // 	// +required
-// 	// +kubebuilder:validation:Enum=CONTAINS;STARTS_WITH;ENDS_WITH;REGEX;EQUAL_TO
 // 	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
 
 // 	// RuleValue is the value to compare against
@@ -49,7 +48,6 @@ import (
 
 // 	// RuleType is the type of rule
 // 	// +required
-// 	// +kubebuilder:validation:Enum=HOST_NAME;PATH
 // 	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
 // }
 
@@ -69,7 +67,6 @@ import (
 
 // 	// Action defines the action to take
 // 	// +required
-// 	// +kubebuilder:validation:Enum=REDIRECT_TO_POOL;REDIRECT_TO_URL;REJECT
 // 	Action loadbalancerv2.PolicyAction `json:"action"`
 
 // 	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
@@ -78,7 +75,6 @@ import (
 
 // 	// RedirectHttpCode is the HTTP code to use for redirect
 // 	// +optional
-// 	// +kubebuilder:validation:Enum=301;302;303;307;308
 // 	RedirectHttpCode *int32 `json:"redirectHttpCode,omitempty"`
 
 // 	// KeepQueryString determines if query string should be kept on redirect
@@ -103,7 +99,6 @@ type Pool struct {
 
 	// Protocol is the protocol for the pool
 	// +required
-	// +kubebuilder:validation:Enum=TCP;UDP;HTTP;PROXY
 	Protocol loadbalancerv2.PoolProtocol `json:"protocol"`
 
 	// Description is an optional description for the pool
@@ -112,7 +107,6 @@ type Pool struct {
 
 	// Algorithm is the load balancing algorithm for the pool
 	// +optional
-	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
 	Algorithm *loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
 
 	// // Stickiness enables sticky sessions for the pool
@@ -213,7 +207,6 @@ type Listener struct {
 
 	// Protocol is the protocol for the listener
 	// +required
-	// +kubebuilder:validation:Enum=TCP;UDP;HTTP;HTTPS
 	Protocol loadbalancerv2.ListenerProtocol `json:"protocol"`
 
 	// ProtocolPort is the port number for the listener
@@ -300,7 +293,6 @@ type LoadBalancerConfigSpec struct {
 
 	// Type defines the type of load balancer (network or application)
 	// +required
-	// +kubebuilder:validation:Enum=Layer 4;Layer 7
 	Type loadbalancerv2.LoadBalancerType `json:"type"`
 
 	// ClusterId is the ID of the cluster where the load balancer will be deployed. It helps in organizing resources.
@@ -316,6 +308,10 @@ type LoadBalancerConfigSpec struct {
 	// +required
 	SubnetId string `json:"subnetId,omitempty"`
 
+	// BackendSubnetId is the backend subnet id for the load balancer (for INTERVPC scheme)
+	// +optional
+	BackendSubnetId *string `json:"backendSubnetId,omitempty"`
+
 	// ZoneId must be the zone where the load balancer will be created
 	// +required
 	ZoneId common.Zone `json:"zoneId,omitempty"`
@@ -326,7 +322,7 @@ type LoadBalancerConfigSpec struct {
 
 	// Scheme defines if the load balancer is internal or external
 	// +optional
-	// +kubebuilder:validation:Enum=Internal;Internet
+	// +kubebuilder:validation:Enum=Internal;Internet;InterVPC
 	Scheme *loadbalancerv2.LoadBalancerScheme `json:"scheme,omitempty"`
 
 	// LoadBalancerId is managed by the controller

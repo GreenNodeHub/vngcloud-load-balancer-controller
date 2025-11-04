@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -98,6 +99,7 @@ type wrapSubnet struct {
 type MockProvider struct {
 	// securityGroups []*objects.Secgroup
 	projectID string
+	userID    int
 	netID     string
 	netCIDR   string
 
@@ -246,6 +248,10 @@ func (m *MockProvider) Init(_ []string) error {
 
 func (m *MockProvider) GetProjectID() string {
 	return m.projectID
+}
+
+func (m *MockProvider) GetUserId() int {
+	return m.userID
 }
 
 func (m *MockProvider) GetNetworkID() string {
@@ -924,6 +930,12 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 	}
 
 	return resultLb, err
+}
+
+func (m *MockProvider) CreateInterLoadBalancer(ctx context.Context, lbOptions inter.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Error("not implemented yet", "CreateInterLoadBalancer")
+	return nil, domain.ErrorNotImplemented
 }
 
 // --------------------------- Listener ---------------------------

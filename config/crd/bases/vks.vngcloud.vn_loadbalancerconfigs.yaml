@@ -58,6 +58,10 @@ spec:
           spec:
             description: spec defines the desired state of LoadBalancerConfig
             properties:
+              backendSubnetId:
+                description: BackendSubnetId is the backend subnet id for the load
+                  balancer (for INTERVPC scheme)
+                type: string
               clusterId:
                 description: ClusterId is the ID of the cluster where the load balancer
                   will be deployed. It helps in organizing resources.
@@ -90,11 +94,6 @@ spec:
                       type: string
                     protocol:
                       description: Protocol is the protocol for the listener
-                      enum:
-                      - TCP
-                      - UDP
-                      - HTTP
-                      - HTTPS
                       type: string
                     protocolPort:
                       description: ProtocolPort is the port number for the listener
@@ -140,10 +139,6 @@ spec:
                     algorithm:
                       description: Algorithm is the load balancing algorithm for the
                         pool
-                      enum:
-                      - ROUND_ROBIN
-                      - LEAST_CONNECTIONS
-                      - SOURCE_IP
                       type: string
                     description:
                       description: Description is an optional description for the
@@ -212,11 +207,6 @@ spec:
                       type: string
                     protocol:
                       description: Protocol is the protocol for the pool
-                      enum:
-                      - TCP
-                      - UDP
-                      - HTTP
-                      - PROXY
                       type: string
                   required:
                   - name
@@ -228,6 +218,7 @@ spec:
                 enum:
                 - Internal
                 - Internet
+                - InterVPC
                 type: string
               subnetId:
                 description: SubnetId is the subnet id for the load balancer
@@ -239,9 +230,6 @@ spec:
                 type: object
               type:
                 description: Type defines the type of load balancer (network or application)
-                enum:
-                - Layer 4
-                - Layer 7
                 type: string
               zoneId:
                 description: ZoneId must be the zone where the load balancer will
