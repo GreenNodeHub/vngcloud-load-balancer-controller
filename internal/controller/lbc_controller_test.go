@@ -69,6 +69,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 						Type:             "Layer 4",
 						LoadBalancerName: "TODO",
 						SubnetId:         "TODO",
+						ZoneId:           "TODO",
 					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
