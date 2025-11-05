@@ -82,6 +82,7 @@ var (
 		LoadBalancerOpts: config.LoadBalancerOpts{
 			DefaultL4PackageName: "NLB_Small",
 			DefaultPoolAlgorithm: "ROUND_ROBIN",
+			DefaultScheme:        "Internal",
 
 			DefaultTimeoutClient:     50,
 			DefaultTimeoutConnection: 5,
@@ -142,6 +143,58 @@ var (
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.2"},
 				{Type: corev1.NodeHostName, Address: "mock-node-2"},
+			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
+		},
+	}
+
+	mockNode3 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-3",
+			Labels: map[string]string{
+				"nodeName":  "mock-node-3",
+				"nodeGroup": "mock-node-group-b",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000003",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.3"},
+				{Type: corev1.NodeHostName, Address: "mock-node-3"},
+			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+			},
+		},
+	}
+
+	mockNode4 = &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Node",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "mock-node-4",
+			Labels: map[string]string{
+				"nodeName":  "mock-node-4",
+				"nodeGroup": "mock-node-group-b",
+			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000004",
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: "10.0.0.4"},
+				{Type: corev1.NodeHostName, Address: "mock-node-4"},
 			},
 			Conditions: []corev1.NodeCondition{
 				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
@@ -282,6 +335,10 @@ var _ = BeforeSuite(func() {
 	err = k8sClient.Create(ctx, mockNode1)
 	Expect(err).ToNot(HaveOccurred())
 	err = k8sClient.Create(ctx, mockNode2)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, mockNode3)
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, mockNode4)
 	Expect(err).ToNot(HaveOccurred())
 })
 

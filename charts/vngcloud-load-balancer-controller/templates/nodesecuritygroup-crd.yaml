@@ -179,6 +179,14 @@ spec:
                 x-kubernetes-list-map-keys:
                 - type
                 x-kubernetes-list-type: map
+              lastReconcileMessage:
+                description: LastReconcileMessage contains a message from the last reconciliation
+                type: string
+              lastReconcileTime:
+                description: LastReconcileTime is the timestamp of the last reconciliation
+                  attempt
+                format: date-time
+                type: string
               managedSecurityGroup:
                 description: ManagedSecurityGroup contains the status of the managed
                   security group
@@ -191,6 +199,11 @@ spec:
                     description: Id is the id of the managed security group
                     type: string
                 type: object
+              observedGeneration:
+                description: ObservedGeneration is the generation of the resource that
+                  was most recently observed by the controller
+                format: int64
+                type: integer
               selectedNodes:
                 description: SelectedNodes is the list of nodes that match the node
                   selector

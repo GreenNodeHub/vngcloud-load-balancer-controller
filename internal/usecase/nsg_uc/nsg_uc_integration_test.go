@@ -254,6 +254,98 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("should continue updating status with DeletionTimestamp and finalizer", func(t *testing.T) {
+		testNSG := &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-nsg-6",
+				Namespace:  "default",
+				Finalizers: []string{"nsg.vngcloud.vn/resources"},
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{
+				SelectNodeLabels: map[string]string{"test": "true"},
+			},
+		}
+		err := k8sClient.Create(ctx, testNSG)
+		require.NoError(t, err)
+		defer k8sClient.Delete(ctx, testNSG)
+
+		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
+
+		// Add first 50 servers before deletion
+		for i := 1; i <= 50; i++ {
+			serverID := fmt.Sprintf("server-%d", i)
+			secgroups := []string{fmt.Sprintf("sg-%d", i)}
+
+			err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
+			require.NoError(t, err)
+
+			// Get fresh copy for next iteration
+			err = k8sClient.Get(ctx, nsName, testNSG)
+			require.NoError(t, err)
+		}
+
+		// Verify first 50 servers added
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.ServerSecurityGroups, 50)
+
+		// Mark object for deletion (this sets DeletionTimestamp)
+		err = k8sClient.Delete(ctx, testNSG)
+		require.NoError(t, err)
+
+		// Get fresh copy with DeletionTimestamp
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		require.NotNil(t, testNSG.DeletionTimestamp, "DeletionTimestamp should be set")
+		t.Logf("✓ Object has DeletionTimestamp: %v", testNSG.DeletionTimestamp)
+
+		// Continue adding servers even with DeletionTimestamp (simulating cleanup phase)
+		for i := 51; i <= 150; i++ {
+			serverID := fmt.Sprintf("server-%d", i)
+			secgroups := []string{fmt.Sprintf("sg-%d", i)}
+
+			err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
+			require.NoError(t, err)
+
+			// Get fresh copy for next iteration
+			err = k8sClient.Get(ctx, nsName, testNSG)
+			require.NoError(t, err)
+
+			// Verify count increments correctly
+			assert.Len(t, testNSG.Status.ServerSecurityGroups, i,
+				"After adding server %d (with DeletionTimestamp), expected %d servers", i, i)
+		}
+
+		// Final verification - all 150 servers should be present even with DeletionTimestamp
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.ServerSecurityGroups, 150)
+		require.NotNil(t, testNSG.DeletionTimestamp, "DeletionTimestamp should still be set")
+
+		// Verify each server is present with correct data
+		serverMap := make(map[string]v1alpha1.ServerSecurityGroupStatus)
+		for _, status := range testNSG.Status.ServerSecurityGroups {
+			serverMap[status.ServerId] = status
+		}
+
+		for i := 1; i <= 150; i++ {
+			serverID := fmt.Sprintf("server-%d", i)
+			status, exists := serverMap[serverID]
+			assert.True(t, exists, "Server %s should exist (even with DeletionTimestamp)", serverID)
+			if exists {
+				assert.Equal(t, []string{fmt.Sprintf("sg-%d", i)}, status.AttachedSecurityGroupIds)
+				assert.Nil(t, status.Error)
+			}
+		}
+
+		t.Logf("✓ Successfully updated status 150 times with DeletionTimestamp set")
+
+		// Remove finalizer to allow actual deletion
+		testNSG.Finalizers = []string{}
+		err = k8sClient.Update(ctx, testNSG)
+		require.NoError(t, err)
+	})
 }
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.

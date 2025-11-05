@@ -275,10 +275,24 @@ spec:
                   type: string
                 description: CreatedTags is the map of tags created on the load balancer
                 type: object
+              lastReconcileMessage:
+                description: LastReconcileMessage contains a message from the last
+                  reconciliation
+                type: string
+              lastReconcileTime:
+                description: LastReconcileTime is the timestamp of the last reconciliation
+                  attempt
+                format: date-time
+                type: string
               loadBalancerId:
                 description: LoadBalancerId is the actual ID of the load balancer
                   in VNG Cloud
                 type: string
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed spec
+                format: int64
+                type: integer
             type: object
         required:
         - spec

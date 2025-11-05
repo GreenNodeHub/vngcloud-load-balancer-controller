@@ -3,10 +3,12 @@ package lbc_uc
 import (
 	"context"
 
+	"github.com/anngdinh/operator-helper/contexts"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/anngdinh/operator-helper/contexts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -40,6 +42,31 @@ func (uc *lbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 		return client.IgnoreNotFound(err)
 	}
 
+	// Perform the actual reconciliation
+	err = uc.ensure(ctx, lbConfig)
+
+	// Update reconciliation tracking fields
+	now := metav1.Now()
+	message := "Successfully reconciled"
+	if err != nil {
+		message = err.Error()
+	}
+
+	// !IMPORTANT!: The tests will fail without this
+	statusErr := uc.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		obj.Status.ObservedGeneration = &lbConfig.Generation
+		obj.Status.LastReconcileTime = &now
+		obj.Status.LastReconcileMessage = message
+	})
+	if statusErr != nil {
+		logger := contexts.NewContext(ctx).Log()
+		logger.Warnf("Failed to update reconciliation tracking fields: %v", statusErr)
+	}
+
+	return err
+}
+
+func (uc *lbcUseCase) ensure(ctx context.Context, lbConfig *v1alpha1.LoadBalancerConfig) error {
 	logger := contexts.NewContext(ctx).Log()
 	task := &defaultModelDeployTask{
 		logger:       logger,

@@ -9,6 +9,7 @@ import (
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,6 +48,32 @@ func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
+
+	// Perform the actual reconciliation
+	err = uc.ensure(ctx, nsgObject)
+
+	// Update reconciliation tracking fields
+	now := metav1.Now()
+	message := "Successfully reconciled"
+	if err != nil {
+		message = err.Error()
+	}
+
+	// !IMPORTANT!: The tests will fail without this
+	statusErr := uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+		obj.Status.ObservedGeneration = obj.Generation
+		obj.Status.LastReconcileTime = &now
+		obj.Status.LastReconcileMessage = message
+	})
+	if statusErr != nil {
+		logger := contexts.NewContext(ctx).Log()
+		logger.Warnf("Failed to update reconciliation tracking fields: %v", statusErr)
+	}
+
+	return err
+}
+
+func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) error {
 
 	managedSecgroupId, err := uc.ensureManagedSecurityGroup(ctx, nsgObject)
 	uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, managedSecgroupId, err)

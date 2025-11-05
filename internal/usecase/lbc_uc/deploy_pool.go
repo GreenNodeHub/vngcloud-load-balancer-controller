@@ -114,6 +114,17 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		// }
 	} else // normal pool
 	if !t.comparePoolMembers(ctx, pool.Members, currentPoolMembers) {
+		currentPoolString := make([]string, 0)
+		for _, m := range currentPoolMembers.Items {
+			currentPoolString = append(currentPoolString, fmt.Sprintf("%s:%d", m.Address, m.ProtocolPort))
+		}
+		desiredPoolString := make([]string, 0)
+		for _, m := range pool.Members {
+			desiredPoolString = append(desiredPoolString, fmt.Sprintf("%s:%d", m.IP, m.Port))
+		}
+		t.logger.Debugf("Current pool members: %+v", currentPoolString)
+		t.logger.Debugf("Desired pool members: %+v", desiredPoolString)
+
 		err := t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID,
 			t.buildPoolMemberUpdateRequest(ctx, lbId, currentPool.UUID, pool))
 		if err != nil {

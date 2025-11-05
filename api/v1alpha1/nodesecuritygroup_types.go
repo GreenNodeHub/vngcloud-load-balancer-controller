@@ -141,6 +141,18 @@ type NodeSecurityGroupStatus struct {
 	// +listMapKey=serverId
 	ServerSecurityGroups []ServerSecurityGroupStatus `json:"serverSecurityGroups,omitempty"`
 
+	// ObservedGeneration is the generation of the resource that was most recently observed by the controller
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// LastReconcileTime is the timestamp of the last reconciliation attempt
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
+
+	// LastReconcileMessage contains a message from the last reconciliation
+	// +optional
+	LastReconcileMessage string `json:"lastReconcileMessage,omitempty"`
+
 	// conditions represent the current state of the NodeSecurityGroup resource.
 	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
 	//

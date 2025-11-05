@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
 // ============================================================================
@@ -37,8 +38,8 @@ func (t *defaultModelDeployTask) validateSelfListenerPorts(ctx context.Context) 
 	for _, listener := range t.lbConfig.Spec.Listeners {
 		if existingProtocol, exists := portToProtocolMap[listener.ProtocolPort]; exists {
 			// Found duplicate port - return error
-			return fmt.Errorf("duplicate listener port %d in LoadBalancerConfig %s/%s: cannot have both %s and %s listeners on the same port (VNGCloud limitation)",
-				listener.ProtocolPort, t.lbConfig.Namespace, t.lbConfig.Name, existingProtocol, listener.Protocol)
+			return errs.NewNoNeedRequeue(fmt.Sprintf("duplicate listener port %d in LoadBalancerConfig %s/%s: cannot have both %s and %s listeners on the same port (VNGCloud limitation)",
+				listener.ProtocolPort, t.lbConfig.Namespace, t.lbConfig.Name, existingProtocol, listener.Protocol))
 		}
 		portToProtocolMap[listener.ProtocolPort] = string(listener.Protocol)
 	}

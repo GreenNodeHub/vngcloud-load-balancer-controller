@@ -30,7 +30,7 @@ func expectNoLoadBalancers() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no load balancers")
+	}, timeout, interval).Should(Equal(0), "Expected no load balancers")
 }
 
 func expectNoSecurityGroups() {
@@ -47,7 +47,7 @@ func expectNoSecurityGroups() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no security groups")
+	}, timeout, interval).Should(Equal(0), "Expected no security groups")
 }
 
 func expectNoServices() {
@@ -73,7 +73,7 @@ func expectNoServices() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no services in any namespace")
+	}, timeout, interval).Should(Equal(0), "Expected no services in any namespace")
 }
 
 func expectNoLBCs() {
@@ -91,7 +91,7 @@ func expectNoLBCs() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no LBCs in any namespace")
+	}, timeout, interval).Should(Equal(0), "Expected no LBCs in any namespace")
 }
 
 func expectNoNSGs() {
@@ -109,7 +109,7 @@ func expectNoNSGs() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no NSGs in any namespace")
+	}, timeout, interval).Should(Equal(0), "Expected no NSGs in any namespace")
 }
 
 func expectNoEndpoints() {
@@ -135,7 +135,7 @@ func expectNoEndpoints() {
 			}
 		}
 		return count
-	}, timeout*4, interval).Should(Equal(0), "Expected no endpoints in any namespace")
+	}, timeout, interval).Should(Equal(0), "Expected no endpoints in any namespace")
 }
 
 // ============================================================================
@@ -246,7 +246,7 @@ func waitForLoadBalancerId(lbcName, namespace string) (string, error) {
 			return loadbalancerId != ""
 		}
 		return false
-	}, timeout*2, interval).Should(BeTrue())
+	}, timeout, interval).Should(BeTrue())
 
 	if !success {
 		return "", nil

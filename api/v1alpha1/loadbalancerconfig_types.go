@@ -355,17 +355,17 @@ type LoadBalancerConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// // ObservedGeneration reflects the generation of the most recently observed spec
-	// // +optional
-	// ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// ObservedGeneration reflects the generation of the most recently observed spec
+	// +optional
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 
-	// // Message provides human-readable details about the current state
-	// // +optional
-	// Message *string `json:"message,omitempty"`
+	// LastReconcileTime is the timestamp of the last reconciliation attempt
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
 
-	// // Reason provides a brief reason for the current state
-	// // +optional
-	// Reason *string `json:"reason,omitempty"`
+	// LastReconcileMessage contains a message from the last reconciliation
+	// +optional
+	LastReconcileMessage string `json:"lastReconcileMessage,omitempty"`
 
 	// Address is the DNS name or IP address assigned to the load balancer
 	// +optional

@@ -2,10 +2,14 @@ package k8s_repo
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"os"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -113,6 +117,17 @@ func (r *k8sRepository) patchMutateStatusObject(
 
 		// mutate the fetched object (not the input)
 		mutate(ctx, objGet)
+
+		diff := cmp.Diff(oldObject, objGet,
+			// Ignore metadata and spec fields - we only care about Status changes
+			cmpopts.IgnoreTypes(metav1.ObjectMeta{}, metav1.TypeMeta{}),
+			cmpopts.IgnoreFields(v1alpha1.LoadBalancerConfig{}, "Spec"),
+			cmpopts.IgnoreFields(v1alpha1.NodeSecurityGroup{}, "Spec"),
+		)
+		if diff != "" {
+			// Print directly to stderr for clean, unescaped formatting
+			fmt.Fprintf(os.Stderr, "\n%s  status diff (before mutation -> after mutation):\n%s\n", domain.DebugIcon, diff)
+		}
 
 		// patch only status, with optimistic lock
 		return r.client.Status().Patch(ctx, objGet,
