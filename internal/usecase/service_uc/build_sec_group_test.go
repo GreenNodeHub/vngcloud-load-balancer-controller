@@ -241,7 +241,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "ip",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -680,7 +680,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "ip",
+					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 				},
 			},
 			Spec: corev1.ServiceSpec{

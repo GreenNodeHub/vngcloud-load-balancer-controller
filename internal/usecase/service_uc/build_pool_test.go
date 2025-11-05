@@ -115,7 +115,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "ip",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -333,7 +333,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          "ip",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeIP),
 						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
 					},
 				},
@@ -585,7 +585,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "ip",
+					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -655,11 +655,11 @@ func TestGetTargetType(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "ip",
+						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 			},
-			expectedTarget: "ip",
+			expectedTarget: string(domain.TargetTypeIP),
 		},
 		{
 			name: "Invalid target type annotation - should default to instance",
@@ -693,7 +693,7 @@ func TestGetTargetType(t *testing.T) {
 			result := task.getTargetType(context.Background())
 
 			// Assert
-			assert.Equal(t, tt.expectedTarget, result)
+			assert.Equal(t, tt.expectedTarget, string(result))
 		})
 	}
 }
