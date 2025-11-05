@@ -38,12 +38,12 @@ func (_m *MockServiceUseCase) EXPECT() *MockServiceUseCase_Expecter {
 	return &MockServiceUseCase_Expecter{mock: &_m.Mock}
 }
 
-// Delete provides a mock function for the type MockServiceUseCase
-func (_mock *MockServiceUseCase) Delete(ctx context.Context, req controllerruntime.Request) error {
+// DeleteServiceUseCase provides a mock function for the type MockServiceUseCase
+func (_mock *MockServiceUseCase) DeleteServiceUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Delete")
+		panic("no return value specified for DeleteServiceUseCase")
 	}
 
 	var r0 error
@@ -55,19 +55,19 @@ func (_mock *MockServiceUseCase) Delete(ctx context.Context, req controllerrunti
 	return r0
 }
 
-// MockServiceUseCase_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
-type MockServiceUseCase_Delete_Call struct {
+// MockServiceUseCase_DeleteServiceUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteServiceUseCase'
+type MockServiceUseCase_DeleteServiceUseCase_Call struct {
 	*mock.Call
 }
 
-// Delete is a helper method to define mock.On call
+// DeleteServiceUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockServiceUseCase_Expecter) Delete(ctx interface{}, req interface{}) *MockServiceUseCase_Delete_Call {
-	return &MockServiceUseCase_Delete_Call{Call: _e.mock.On("Delete", ctx, req)}
+func (_e *MockServiceUseCase_Expecter) DeleteServiceUseCase(ctx interface{}, req interface{}) *MockServiceUseCase_DeleteServiceUseCase_Call {
+	return &MockServiceUseCase_DeleteServiceUseCase_Call{Call: _e.mock.On("DeleteServiceUseCase", ctx, req)}
 }
 
-func (_c *MockServiceUseCase_Delete_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockServiceUseCase_Delete_Call {
+func (_c *MockServiceUseCase_DeleteServiceUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockServiceUseCase_DeleteServiceUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -85,22 +85,22 @@ func (_c *MockServiceUseCase_Delete_Call) Run(run func(ctx context.Context, req 
 	return _c
 }
 
-func (_c *MockServiceUseCase_Delete_Call) Return(err error) *MockServiceUseCase_Delete_Call {
+func (_c *MockServiceUseCase_DeleteServiceUseCase_Call) Return(err error) *MockServiceUseCase_DeleteServiceUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockServiceUseCase_Delete_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockServiceUseCase_Delete_Call {
+func (_c *MockServiceUseCase_DeleteServiceUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockServiceUseCase_DeleteServiceUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Ensure provides a mock function for the type MockServiceUseCase
-func (_mock *MockServiceUseCase) Ensure(ctx context.Context, req controllerruntime.Request) error {
+// EnsureServiceUseCase provides a mock function for the type MockServiceUseCase
+func (_mock *MockServiceUseCase) EnsureServiceUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Ensure")
+		panic("no return value specified for EnsureServiceUseCase")
 	}
 
 	var r0 error
@@ -112,19 +112,19 @@ func (_mock *MockServiceUseCase) Ensure(ctx context.Context, req controllerrunti
 	return r0
 }
 
-// MockServiceUseCase_Ensure_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ensure'
-type MockServiceUseCase_Ensure_Call struct {
+// MockServiceUseCase_EnsureServiceUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureServiceUseCase'
+type MockServiceUseCase_EnsureServiceUseCase_Call struct {
 	*mock.Call
 }
 
-// Ensure is a helper method to define mock.On call
+// EnsureServiceUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockServiceUseCase_Expecter) Ensure(ctx interface{}, req interface{}) *MockServiceUseCase_Ensure_Call {
-	return &MockServiceUseCase_Ensure_Call{Call: _e.mock.On("Ensure", ctx, req)}
+func (_e *MockServiceUseCase_Expecter) EnsureServiceUseCase(ctx interface{}, req interface{}) *MockServiceUseCase_EnsureServiceUseCase_Call {
+	return &MockServiceUseCase_EnsureServiceUseCase_Call{Call: _e.mock.On("EnsureServiceUseCase", ctx, req)}
 }
 
-func (_c *MockServiceUseCase_Ensure_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockServiceUseCase_Ensure_Call {
+func (_c *MockServiceUseCase_EnsureServiceUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockServiceUseCase_EnsureServiceUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -142,22 +142,22 @@ func (_c *MockServiceUseCase_Ensure_Call) Run(run func(ctx context.Context, req 
 	return _c
 }
 
-func (_c *MockServiceUseCase_Ensure_Call) Return(err error) *MockServiceUseCase_Ensure_Call {
+func (_c *MockServiceUseCase_EnsureServiceUseCase_Call) Return(err error) *MockServiceUseCase_EnsureServiceUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockServiceUseCase_Ensure_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockServiceUseCase_Ensure_Call {
+func (_c *MockServiceUseCase_EnsureServiceUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockServiceUseCase_EnsureServiceUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Init provides a mock function for the type MockServiceUseCase
-func (_mock *MockServiceUseCase) Init(ctx context.Context) error {
+// InitServiceUseCase provides a mock function for the type MockServiceUseCase
+func (_mock *MockServiceUseCase) InitServiceUseCase(ctx context.Context) error {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Init")
+		panic("no return value specified for InitServiceUseCase")
 	}
 
 	var r0 error
@@ -169,18 +169,18 @@ func (_mock *MockServiceUseCase) Init(ctx context.Context) error {
 	return r0
 }
 
-// MockServiceUseCase_Init_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Init'
-type MockServiceUseCase_Init_Call struct {
+// MockServiceUseCase_InitServiceUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitServiceUseCase'
+type MockServiceUseCase_InitServiceUseCase_Call struct {
 	*mock.Call
 }
 
-// Init is a helper method to define mock.On call
+// InitServiceUseCase is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockServiceUseCase_Expecter) Init(ctx interface{}) *MockServiceUseCase_Init_Call {
-	return &MockServiceUseCase_Init_Call{Call: _e.mock.On("Init", ctx)}
+func (_e *MockServiceUseCase_Expecter) InitServiceUseCase(ctx interface{}) *MockServiceUseCase_InitServiceUseCase_Call {
+	return &MockServiceUseCase_InitServiceUseCase_Call{Call: _e.mock.On("InitServiceUseCase", ctx)}
 }
 
-func (_c *MockServiceUseCase_Init_Call) Run(run func(ctx context.Context)) *MockServiceUseCase_Init_Call {
+func (_c *MockServiceUseCase_InitServiceUseCase_Call) Run(run func(ctx context.Context)) *MockServiceUseCase_InitServiceUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -193,12 +193,12 @@ func (_c *MockServiceUseCase_Init_Call) Run(run func(ctx context.Context)) *Mock
 	return _c
 }
 
-func (_c *MockServiceUseCase_Init_Call) Return(err error) *MockServiceUseCase_Init_Call {
+func (_c *MockServiceUseCase_InitServiceUseCase_Call) Return(err error) *MockServiceUseCase_InitServiceUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockServiceUseCase_Init_Call) RunAndReturn(run func(ctx context.Context) error) *MockServiceUseCase_Init_Call {
+func (_c *MockServiceUseCase_InitServiceUseCase_Call) RunAndReturn(run func(ctx context.Context) error) *MockServiceUseCase_InitServiceUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -230,12 +230,12 @@ func (_m *MockLoadBalancerConfigUseCase) EXPECT() *MockLoadBalancerConfigUseCase
 	return &MockLoadBalancerConfigUseCase_Expecter{mock: &_m.Mock}
 }
 
-// Delete provides a mock function for the type MockLoadBalancerConfigUseCase
-func (_mock *MockLoadBalancerConfigUseCase) Delete(ctx context.Context, req controllerruntime.Request) error {
+// DeleteLoadBalancerConfigUseCase provides a mock function for the type MockLoadBalancerConfigUseCase
+func (_mock *MockLoadBalancerConfigUseCase) DeleteLoadBalancerConfigUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Delete")
+		panic("no return value specified for DeleteLoadBalancerConfigUseCase")
 	}
 
 	var r0 error
@@ -247,19 +247,19 @@ func (_mock *MockLoadBalancerConfigUseCase) Delete(ctx context.Context, req cont
 	return r0
 }
 
-// MockLoadBalancerConfigUseCase_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
-type MockLoadBalancerConfigUseCase_Delete_Call struct {
+// MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteLoadBalancerConfigUseCase'
+type MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call struct {
 	*mock.Call
 }
 
-// Delete is a helper method to define mock.On call
+// DeleteLoadBalancerConfigUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockLoadBalancerConfigUseCase_Expecter) Delete(ctx interface{}, req interface{}) *MockLoadBalancerConfigUseCase_Delete_Call {
-	return &MockLoadBalancerConfigUseCase_Delete_Call{Call: _e.mock.On("Delete", ctx, req)}
+func (_e *MockLoadBalancerConfigUseCase_Expecter) DeleteLoadBalancerConfigUseCase(ctx interface{}, req interface{}) *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call {
+	return &MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call{Call: _e.mock.On("DeleteLoadBalancerConfigUseCase", ctx, req)}
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Delete_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockLoadBalancerConfigUseCase_Delete_Call {
+func (_c *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -277,22 +277,22 @@ func (_c *MockLoadBalancerConfigUseCase_Delete_Call) Run(run func(ctx context.Co
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Delete_Call) Return(err error) *MockLoadBalancerConfigUseCase_Delete_Call {
+func (_c *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call) Return(err error) *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Delete_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockLoadBalancerConfigUseCase_Delete_Call {
+func (_c *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockLoadBalancerConfigUseCase_DeleteLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Ensure provides a mock function for the type MockLoadBalancerConfigUseCase
-func (_mock *MockLoadBalancerConfigUseCase) Ensure(ctx context.Context, req controllerruntime.Request) error {
+// EnsureLoadBalancerConfigUseCase provides a mock function for the type MockLoadBalancerConfigUseCase
+func (_mock *MockLoadBalancerConfigUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Ensure")
+		panic("no return value specified for EnsureLoadBalancerConfigUseCase")
 	}
 
 	var r0 error
@@ -304,19 +304,19 @@ func (_mock *MockLoadBalancerConfigUseCase) Ensure(ctx context.Context, req cont
 	return r0
 }
 
-// MockLoadBalancerConfigUseCase_Ensure_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ensure'
-type MockLoadBalancerConfigUseCase_Ensure_Call struct {
+// MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureLoadBalancerConfigUseCase'
+type MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call struct {
 	*mock.Call
 }
 
-// Ensure is a helper method to define mock.On call
+// EnsureLoadBalancerConfigUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockLoadBalancerConfigUseCase_Expecter) Ensure(ctx interface{}, req interface{}) *MockLoadBalancerConfigUseCase_Ensure_Call {
-	return &MockLoadBalancerConfigUseCase_Ensure_Call{Call: _e.mock.On("Ensure", ctx, req)}
+func (_e *MockLoadBalancerConfigUseCase_Expecter) EnsureLoadBalancerConfigUseCase(ctx interface{}, req interface{}) *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call {
+	return &MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call{Call: _e.mock.On("EnsureLoadBalancerConfigUseCase", ctx, req)}
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Ensure_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockLoadBalancerConfigUseCase_Ensure_Call {
+func (_c *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -334,22 +334,22 @@ func (_c *MockLoadBalancerConfigUseCase_Ensure_Call) Run(run func(ctx context.Co
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Ensure_Call) Return(err error) *MockLoadBalancerConfigUseCase_Ensure_Call {
+func (_c *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call) Return(err error) *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Ensure_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockLoadBalancerConfigUseCase_Ensure_Call {
+func (_c *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockLoadBalancerConfigUseCase_EnsureLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Init provides a mock function for the type MockLoadBalancerConfigUseCase
-func (_mock *MockLoadBalancerConfigUseCase) Init(ctx context.Context) error {
+// InitLoadBalancerConfigUseCase provides a mock function for the type MockLoadBalancerConfigUseCase
+func (_mock *MockLoadBalancerConfigUseCase) InitLoadBalancerConfigUseCase(ctx context.Context) error {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Init")
+		panic("no return value specified for InitLoadBalancerConfigUseCase")
 	}
 
 	var r0 error
@@ -361,18 +361,18 @@ func (_mock *MockLoadBalancerConfigUseCase) Init(ctx context.Context) error {
 	return r0
 }
 
-// MockLoadBalancerConfigUseCase_Init_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Init'
-type MockLoadBalancerConfigUseCase_Init_Call struct {
+// MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitLoadBalancerConfigUseCase'
+type MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call struct {
 	*mock.Call
 }
 
-// Init is a helper method to define mock.On call
+// InitLoadBalancerConfigUseCase is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockLoadBalancerConfigUseCase_Expecter) Init(ctx interface{}) *MockLoadBalancerConfigUseCase_Init_Call {
-	return &MockLoadBalancerConfigUseCase_Init_Call{Call: _e.mock.On("Init", ctx)}
+func (_e *MockLoadBalancerConfigUseCase_Expecter) InitLoadBalancerConfigUseCase(ctx interface{}) *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call {
+	return &MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call{Call: _e.mock.On("InitLoadBalancerConfigUseCase", ctx)}
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Init_Call) Run(run func(ctx context.Context)) *MockLoadBalancerConfigUseCase_Init_Call {
+func (_c *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call) Run(run func(ctx context.Context)) *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -385,12 +385,12 @@ func (_c *MockLoadBalancerConfigUseCase_Init_Call) Run(run func(ctx context.Cont
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Init_Call) Return(err error) *MockLoadBalancerConfigUseCase_Init_Call {
+func (_c *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call) Return(err error) *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockLoadBalancerConfigUseCase_Init_Call) RunAndReturn(run func(ctx context.Context) error) *MockLoadBalancerConfigUseCase_Init_Call {
+func (_c *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call) RunAndReturn(run func(ctx context.Context) error) *MockLoadBalancerConfigUseCase_InitLoadBalancerConfigUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -422,12 +422,12 @@ func (_m *MockNodeSecurityGroupUseCase) EXPECT() *MockNodeSecurityGroupUseCase_E
 	return &MockNodeSecurityGroupUseCase_Expecter{mock: &_m.Mock}
 }
 
-// Delete provides a mock function for the type MockNodeSecurityGroupUseCase
-func (_mock *MockNodeSecurityGroupUseCase) Delete(ctx context.Context, req controllerruntime.Request) error {
+// DeleteNodeSecurityGroupUseCase provides a mock function for the type MockNodeSecurityGroupUseCase
+func (_mock *MockNodeSecurityGroupUseCase) DeleteNodeSecurityGroupUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Delete")
+		panic("no return value specified for DeleteNodeSecurityGroupUseCase")
 	}
 
 	var r0 error
@@ -439,19 +439,19 @@ func (_mock *MockNodeSecurityGroupUseCase) Delete(ctx context.Context, req contr
 	return r0
 }
 
-// MockNodeSecurityGroupUseCase_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
-type MockNodeSecurityGroupUseCase_Delete_Call struct {
+// MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeSecurityGroupUseCase'
+type MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call struct {
 	*mock.Call
 }
 
-// Delete is a helper method to define mock.On call
+// DeleteNodeSecurityGroupUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockNodeSecurityGroupUseCase_Expecter) Delete(ctx interface{}, req interface{}) *MockNodeSecurityGroupUseCase_Delete_Call {
-	return &MockNodeSecurityGroupUseCase_Delete_Call{Call: _e.mock.On("Delete", ctx, req)}
+func (_e *MockNodeSecurityGroupUseCase_Expecter) DeleteNodeSecurityGroupUseCase(ctx interface{}, req interface{}) *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call {
+	return &MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call{Call: _e.mock.On("DeleteNodeSecurityGroupUseCase", ctx, req)}
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Delete_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockNodeSecurityGroupUseCase_Delete_Call {
+func (_c *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -469,22 +469,22 @@ func (_c *MockNodeSecurityGroupUseCase_Delete_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Delete_Call) Return(err error) *MockNodeSecurityGroupUseCase_Delete_Call {
+func (_c *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call) Return(err error) *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Delete_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockNodeSecurityGroupUseCase_Delete_Call {
+func (_c *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockNodeSecurityGroupUseCase_DeleteNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Ensure provides a mock function for the type MockNodeSecurityGroupUseCase
-func (_mock *MockNodeSecurityGroupUseCase) Ensure(ctx context.Context, req controllerruntime.Request) error {
+// EnsureNodeSecurityGroupUseCase provides a mock function for the type MockNodeSecurityGroupUseCase
+func (_mock *MockNodeSecurityGroupUseCase) EnsureNodeSecurityGroupUseCase(ctx context.Context, req controllerruntime.Request) error {
 	ret := _mock.Called(ctx, req)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Ensure")
+		panic("no return value specified for EnsureNodeSecurityGroupUseCase")
 	}
 
 	var r0 error
@@ -496,19 +496,19 @@ func (_mock *MockNodeSecurityGroupUseCase) Ensure(ctx context.Context, req contr
 	return r0
 }
 
-// MockNodeSecurityGroupUseCase_Ensure_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ensure'
-type MockNodeSecurityGroupUseCase_Ensure_Call struct {
+// MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnsureNodeSecurityGroupUseCase'
+type MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call struct {
 	*mock.Call
 }
 
-// Ensure is a helper method to define mock.On call
+// EnsureNodeSecurityGroupUseCase is a helper method to define mock.On call
 //   - ctx context.Context
 //   - req controllerruntime.Request
-func (_e *MockNodeSecurityGroupUseCase_Expecter) Ensure(ctx interface{}, req interface{}) *MockNodeSecurityGroupUseCase_Ensure_Call {
-	return &MockNodeSecurityGroupUseCase_Ensure_Call{Call: _e.mock.On("Ensure", ctx, req)}
+func (_e *MockNodeSecurityGroupUseCase_Expecter) EnsureNodeSecurityGroupUseCase(ctx interface{}, req interface{}) *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call {
+	return &MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call{Call: _e.mock.On("EnsureNodeSecurityGroupUseCase", ctx, req)}
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Ensure_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockNodeSecurityGroupUseCase_Ensure_Call {
+func (_c *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call) Run(run func(ctx context.Context, req controllerruntime.Request)) *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -526,22 +526,22 @@ func (_c *MockNodeSecurityGroupUseCase_Ensure_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Ensure_Call) Return(err error) *MockNodeSecurityGroupUseCase_Ensure_Call {
+func (_c *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call) Return(err error) *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Ensure_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockNodeSecurityGroupUseCase_Ensure_Call {
+func (_c *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call) RunAndReturn(run func(ctx context.Context, req controllerruntime.Request) error) *MockNodeSecurityGroupUseCase_EnsureNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Init provides a mock function for the type MockNodeSecurityGroupUseCase
-func (_mock *MockNodeSecurityGroupUseCase) Init(ctx context.Context) error {
+// InitNodeSecurityGroupUseCase provides a mock function for the type MockNodeSecurityGroupUseCase
+func (_mock *MockNodeSecurityGroupUseCase) InitNodeSecurityGroupUseCase(ctx context.Context) error {
 	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
-		panic("no return value specified for Init")
+		panic("no return value specified for InitNodeSecurityGroupUseCase")
 	}
 
 	var r0 error
@@ -553,18 +553,18 @@ func (_mock *MockNodeSecurityGroupUseCase) Init(ctx context.Context) error {
 	return r0
 }
 
-// MockNodeSecurityGroupUseCase_Init_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Init'
-type MockNodeSecurityGroupUseCase_Init_Call struct {
+// MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitNodeSecurityGroupUseCase'
+type MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call struct {
 	*mock.Call
 }
 
-// Init is a helper method to define mock.On call
+// InitNodeSecurityGroupUseCase is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockNodeSecurityGroupUseCase_Expecter) Init(ctx interface{}) *MockNodeSecurityGroupUseCase_Init_Call {
-	return &MockNodeSecurityGroupUseCase_Init_Call{Call: _e.mock.On("Init", ctx)}
+func (_e *MockNodeSecurityGroupUseCase_Expecter) InitNodeSecurityGroupUseCase(ctx interface{}) *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call {
+	return &MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call{Call: _e.mock.On("InitNodeSecurityGroupUseCase", ctx)}
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Init_Call) Run(run func(ctx context.Context)) *MockNodeSecurityGroupUseCase_Init_Call {
+func (_c *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call) Run(run func(ctx context.Context)) *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -577,12 +577,12 @@ func (_c *MockNodeSecurityGroupUseCase_Init_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Init_Call) Return(err error) *MockNodeSecurityGroupUseCase_Init_Call {
+func (_c *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call) Return(err error) *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockNodeSecurityGroupUseCase_Init_Call) RunAndReturn(run func(ctx context.Context) error) *MockNodeSecurityGroupUseCase_Init_Call {
+func (_c *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call) RunAndReturn(run func(ctx context.Context) error) *MockNodeSecurityGroupUseCase_InitNodeSecurityGroupUseCase_Call {
 	_c.Call.Return(run)
 	return _c
 }

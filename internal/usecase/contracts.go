@@ -7,19 +7,19 @@ import (
 )
 
 type ServiceUseCase interface {
-	Init(ctx context.Context) error
-	Ensure(ctx context.Context, req ctrl.Request) error
-	Delete(ctx context.Context, req ctrl.Request) error
+	InitServiceUseCase(ctx context.Context) error
+	EnsureServiceUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteServiceUseCase(ctx context.Context, req ctrl.Request) error
 }
 
 type LoadBalancerConfigUseCase interface {
-	Init(ctx context.Context) error
-	Ensure(ctx context.Context, req ctrl.Request) error
-	Delete(ctx context.Context, req ctrl.Request) error
+	InitLoadBalancerConfigUseCase(ctx context.Context) error
+	EnsureLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
 }
 
 type NodeSecurityGroupUseCase interface {
-	Init(ctx context.Context) error
-	Ensure(ctx context.Context, req ctrl.Request) error
-	Delete(ctx context.Context, req ctrl.Request) error
+	InitNodeSecurityGroupUseCase(ctx context.Context) error
+	EnsureNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error
 }

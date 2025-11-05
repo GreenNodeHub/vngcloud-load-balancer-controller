@@ -37,7 +37,7 @@ func TestLBCUseCase_Init(t *testing.T) {
 
 	uc := NewLoadBalancerConfigUseCase(cfg, mockK8sRepo, mockVngcloudRepo)
 
-	err := uc.Init(context.Background())
+	err := uc.InitLoadBalancerConfigUseCase(context.Background())
 	assert.NoError(t, err)
 }
 
@@ -55,7 +55,7 @@ func TestLBCUseCase_Delete(t *testing.T) {
 		},
 	}
 
-	err := uc.Delete(context.Background(), req)
+	err := uc.DeleteLoadBalancerConfigUseCase(context.Background(), req)
 	assert.NoError(t, err)
 }
 
@@ -83,7 +83,7 @@ func TestLBCUseCase_Ensure_LBCNotFound(t *testing.T) {
 		GetLoadBalancerConfig(mock.Anything, req.NamespacedName).
 		Return(nil, notFoundErr)
 
-	err := uc.Ensure(context.Background(), req)
+	err := uc.EnsureLoadBalancerConfigUseCase(context.Background(), req)
 	assert.NoError(t, err) // Should ignore NotFound errors
 }
 
@@ -157,7 +157,7 @@ func TestLBCUseCase_Ensure_Success(t *testing.T) {
 		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
-	err := uc.Ensure(context.Background(), req)
+	err := uc.EnsureLoadBalancerConfigUseCase(context.Background(), req)
 	assert.NoError(t, err)
 }
 
@@ -226,7 +226,7 @@ func TestLBCUseCase_Ensure_LoadBalancerByName(t *testing.T) {
 		PatchMutateStatusLoadBalancerConfig(mock.Anything, lbc, mock.AnythingOfType("func(context.Context, *v1alpha1.LoadBalancerConfig)")).
 		Return(nil)
 
-	err := uc.Ensure(context.Background(), req)
+	err := uc.EnsureLoadBalancerConfigUseCase(context.Background(), req)
 	assert.NoError(t, err)
 }
 

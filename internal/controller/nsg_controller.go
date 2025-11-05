@@ -138,7 +138,7 @@ func (r *NodeSecurityGroupReconciler) reconcileEnsure(ctx context.Context, req c
 	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.NSGFinalizer); err != nil {
 		return err
 	}
-	return r.nsgUseCase.Ensure(ctx, req)
+	return r.nsgUseCase.EnsureNodeSecurityGroupUseCase(ctx, req)
 }
 
 func (r *NodeSecurityGroupReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -148,7 +148,7 @@ func (r *NodeSecurityGroupReconciler) reconcileDelete(ctx context.Context, req c
 		return nil
 	}
 
-	if err := r.nsgUseCase.Delete(ctx, req); err != nil {
+	if err := r.nsgUseCase.DeleteNodeSecurityGroupUseCase(ctx, req); err != nil {
 		return err
 	}
 
@@ -164,7 +164,7 @@ func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr 
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
 
-		if err := r.nsgUseCase.Init(ctx); err != nil {
+		if err := r.nsgUseCase.InitNodeSecurityGroupUseCase(ctx); err != nil {
 			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}

@@ -39,11 +39,11 @@ func NewNodeSecurityGroupUseCase(
 	}
 }
 
-func (uc *nsgUseCase) Init(ctx context.Context) error {
+func (uc *nsgUseCase) InitNodeSecurityGroupUseCase(ctx context.Context) error {
 	return nil
 }
 
-func (uc *nsgUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *nsgUseCase) EnsureNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error {
 	nsgObject, err := uc.k8sRepo.GetNodeSecurityGroup(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
@@ -355,7 +355,7 @@ func (uc *nsgUseCase) listNodeBySelector(ctx context.Context, selector map[strin
 	return nodes, nil
 }
 
-func (uc *nsgUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+func (uc *nsgUseCase) DeleteNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error {
 	nsgObject, err := uc.k8sRepo.GetNodeSecurityGroup(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)

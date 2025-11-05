@@ -55,7 +55,7 @@ func NewServiceUseCase(
 	}
 }
 
-func (uc *serviceUseCase) Init(ctx context.Context) error {
+func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 	logger := contexts.NewContext(ctx).Log()
 
 	nodes := &corev1.NodeList{}
@@ -104,7 +104,7 @@ func (uc *serviceUseCase) Init(ctx context.Context) error {
 	return nil
 }
 
-func (uc *serviceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *serviceUseCase) EnsureServiceUseCase(ctx context.Context, req ctrl.Request) error {
 	err := uc.ensure(ctx, req)
 	// some errors should not requeue
 	if err != nil {
@@ -117,7 +117,7 @@ func (uc *serviceUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
 	return err
 }
 
-func (uc *serviceUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Request) error {
 	svc, err := uc.k8sRepo.GetService(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)

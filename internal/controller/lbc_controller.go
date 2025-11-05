@@ -138,7 +138,7 @@ func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req 
 	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
 		return err
 	}
-	return r.lbcUseCase.Ensure(ctx, req)
+	return r.lbcUseCase.EnsureLoadBalancerConfigUseCase(ctx, req)
 }
 
 func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -148,7 +148,7 @@ func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req 
 		return nil
 	}
 
-	if err := r.lbcUseCase.Delete(ctx, req); err != nil {
+	if err := r.lbcUseCase.DeleteLoadBalancerConfigUseCase(ctx, req); err != nil {
 		return err
 	}
 
@@ -164,7 +164,7 @@ func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
 
-		if err := r.lbcUseCase.Init(ctx); err != nil {
+		if err := r.lbcUseCase.InitLoadBalancerConfigUseCase(ctx); err != nil {
 			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}

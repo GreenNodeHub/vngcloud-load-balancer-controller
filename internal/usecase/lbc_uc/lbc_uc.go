@@ -32,11 +32,11 @@ func NewLoadBalancerConfigUseCase(
 	}
 }
 
-func (uc *lbcUseCase) Init(ctx context.Context) error {
+func (uc *lbcUseCase) InitLoadBalancerConfigUseCase(ctx context.Context) error {
 	return nil
 }
 
-func (uc *lbcUseCase) Ensure(ctx context.Context, req ctrl.Request) error {
+func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error {
 	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
@@ -83,7 +83,7 @@ func (uc *lbcUseCase) ensure(ctx context.Context, lbConfig *v1alpha1.LoadBalance
 	return nil
 }
 
-func (uc *lbcUseCase) Delete(ctx context.Context, req ctrl.Request) error {
+func (uc *lbcUseCase) DeleteLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error {
 	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)

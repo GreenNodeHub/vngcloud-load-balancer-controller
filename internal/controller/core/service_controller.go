@@ -150,7 +150,7 @@ func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Reques
 	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
 		return err
 	}
-	return r.serviceUseCase.Ensure(ctx, req)
+	return r.serviceUseCase.EnsureServiceUseCase(ctx, req)
 }
 
 func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -160,7 +160,7 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return nil
 	}
 
-	if err := r.serviceUseCase.Delete(ctx, req); err != nil {
+	if err := r.serviceUseCase.DeleteServiceUseCase(ctx, req); err != nil {
 		return err
 	}
 
@@ -176,7 +176,7 @@ func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
 
-		if err := r.serviceUseCase.Init(ctx); err != nil {
+		if err := r.serviceUseCase.InitServiceUseCase(ctx); err != nil {
 			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}
