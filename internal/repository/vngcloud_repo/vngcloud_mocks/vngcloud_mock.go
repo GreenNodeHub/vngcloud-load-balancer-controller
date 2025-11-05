@@ -438,6 +438,8 @@ func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) 
 }
 
 func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request delete security group %s", domain.RequestIcon, secgroupID)
 	// valid secgroupID
 	servers, err := m.ListServerBySecgroupID(ctx, secgroupID)
 	if err != nil {
