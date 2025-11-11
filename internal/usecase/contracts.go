@@ -23,3 +23,9 @@ type NodeSecurityGroupUseCase interface {
 	EnsureNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error
 	DeleteNodeSecurityGroupUseCase(ctx context.Context, req ctrl.Request) error
 }
+
+type IngressUseCase interface {
+	InitIngressUseCase(ctx context.Context) error
+	EnsureIngressUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteIngressUseCase(ctx context.Context, req ctrl.Request) error
+}

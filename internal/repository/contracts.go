@@ -9,10 +9,12 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
 type VngCloudRepository interface {
@@ -130,4 +132,9 @@ type K8sRepository interface {
 	DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error
 	PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error
 	PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error
+
+	GetIngress(ctx context.Context, n types.NamespacedName) (*networkingv1.Ingress, error)
+	UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error
+
+	GetSecret(ctx context.Context, n types.NamespacedName) (*corev1.Secret, error)
 }

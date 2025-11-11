@@ -66,6 +66,18 @@ spec:
                 description: ClusterId is the ID of the cluster where the load balancer
                   will be deployed. It helps in organizing resources.
                 type: string
+              createCertificates:
+                description: CreateCertificates defines certificates to be created
+                items:
+                  properties:
+                    secretName:
+                      description: SecretName is the name of the Kubernetes secret containing
+                        the certificate
+                      type: string
+                  required:
+                  - secretName
+                  type: object
+                type: array
               enableAutoscale:
                 description: EnableAutoscale enables autoscaling for the load balancer
                 type: boolean
@@ -81,15 +93,136 @@ spec:
                     allowedCidrs:
                       description: AllowedCidrs defines the allowed CIDR blocks
                       type: string
+                    certificateAuthorities:
+                      description: CertificateAuthorities is a list of certificate authorities
+                        for mutual TLS (for L7)
+                      items:
+                        description: ListenerCertificate defines a certificate associated
+                          with a listener, can be referenced by ID, name, or secret
+                          name. Must provide at least one.
+                        properties:
+                          id:
+                            description: Id is the ID of the certificate
+                            type: string
+                          name:
+                            description: Name is the name of the certificate
+                            type: string
+                          secretName:
+                            description: SecretName is the name of the Kubernetes secret
+                              containing the certificate
+                            type: string
+                        type: object
+                      type: array
+                    certificateDefault:
+                      description: CertificateDefault is the default certificate for
+                        the listener (for L7)
+                      properties:
+                        id:
+                          description: Id is the ID of the certificate
+                          type: string
+                        name:
+                          description: Name is the name of the certificate
+                          type: string
+                        secretName:
+                          description: SecretName is the name of the Kubernetes secret
+                            containing the certificate
+                          type: string
+                      type: object
+                    clientCertificateId:
+                      description: ClientCertificateId is the client certificate Id
+                        for mutual TLS
+                      type: string
                     defaultPoolName:
                       description: DefaultPoolName is the name of the default pool
                       type: string
                     description:
                       description: Description is an optional description for the listener
                       type: string
+                    insertHeaders:
+                      description: InsertHeaders defines headers to insert into requests
+                      items:
+                        description: InsertHeader defines a header to be inserted in
+                          requests
+                        properties:
+                          headerName:
+                            description: HeaderName is the name of the header to insert
+                            type: string
+                          headerValue:
+                            description: HeaderValue is the value of the header to insert
+                            type: string
+                        required:
+                        - headerName
+                        - headerValue
+                        type: object
+                      type: array
                     name:
                       description: Name is the name of the listener
                       type: string
+                    policies:
+                      description: Policies is the list of policies for this listener
+                        (for L7)
+                      items:
+                        description: Policy defines a policy configuration for application
+                          load balancer listeners
+                        properties:
+                          action:
+                            description: Action defines the action to take
+                            type: string
+                          description:
+                            description: Description is an optional description for
+                              the policy
+                            type: string
+                          keepQueryString:
+                            description: KeepQueryString determines if query string
+                              should be kept on redirect
+                            type: boolean
+                          l7Rules:
+                            description: L7Rules is the list of L7 rules for this policy
+                            items:
+                              description: L7Rule defines a Layer 7 rule for policies
+                              properties:
+                                compareType:
+                                  description: CompareType is how to compare the rule
+                                    value
+                                  type: string
+                                ruleType:
+                                  description: RuleType is the type of rule
+                                  type: string
+                                ruleValue:
+                                  description: RuleValue is the value to compare against
+                                  type: string
+                              required:
+                              - compareType
+                              - ruleType
+                              - ruleValue
+                              type: object
+                            type: array
+                          name:
+                            description: Name is the name of the policy
+                            type: string
+                          position:
+                            description: Position is the position/priority of the policy
+                            format: int32
+                            minimum: 1
+                            type: integer
+                          redirectHttpCode:
+                            description: RedirectHttpCode is the HTTP code to use for
+                              redirect
+                            format: int32
+                            type: integer
+                          redirectPoolName:
+                            description: RedirectPoolName is the name of the pool to
+                              redirect to
+                            type: string
+                          redirectUrl:
+                            description: RedirectUrl is the URL to redirect to (for
+                              REDIRECT_TO_URL action)
+                            type: string
+                        required:
+                        - action
+                        - name
+                        type: object
+                      type: array
                     protocol:
                       description: Protocol is the protocol for the listener
                       type: string
@@ -144,16 +277,36 @@ spec:
                       description: HealthMonitor defines the health monitor configuration
                         for the pool
                       properties:
+                        domainName:
+                          description: DomainName is the hostname sent in the HTTP Host
+                            header
+                          type: string
+                        healthCheckMethod:
+                          description: HealthCheckMethod specifies how the health check
+                            request is made (e.g., GET, TCP)
+                          type: string
+                        healthCheckPath:
+                          description: HealthCheckPath is the path used for HTTP health
+                            checks
+                          type: string
                         healthyThreshold:
                           description: HealthyThreshold is the number of consecutive
                             successful checks before marking healthy
                           type: integer
+                        httpVersion:
+                          description: HttpVersion defines which HTTP version to use
+                            for HTTP-based health checks
+                          type: string
                         interval:
                           description: Interval is the time in seconds between each
                             health check
                           type: integer
                         protocol:
                           description: Protocol is the protocol used for health checks
+                          type: string
+                        successCode:
+                          description: SuccessCode specifies which HTTP codes indicate
+                            a healthy response
                           type: string
                         timeout:
                           description: Timeout is the maximum time in seconds to wait
@@ -204,6 +357,12 @@ spec:
                     protocol:
                       description: Protocol is the protocol for the pool
                       type: string
+                    stickiness:
+                      description: Stickiness enables sticky sessions for the pool
+                      type: boolean
+                    tlsEncryption:
+                      description: TLSEncryption enables TLS encryption for the pool
+                      type: boolean
                   required:
                   - name
                   - protocol
@@ -244,6 +403,31 @@ spec:
                 description: Address is the DNS name or IP address assigned to the load
                   balancer
                 type: string
+              createdCertificates:
+                description: CreatedCertificates is the list of created certificate
+                  IDs
+                items:
+                  properties:
+                    certificateName:
+                      description: CertificateName is the name of the created certificate
+                      type: string
+                    id:
+                      description: Id is the ID of the created certificate
+                      type: string
+                    resourceVersion:
+                      description: ResourceVersion is the resource version of the secret
+                        at creation time
+                      type: string
+                    secretName:
+                      description: SecretName is the name of the Kubernetes secret for
+                        the certificate
+                      type: string
+                  required:
+                  - id
+                  - resourceVersion
+                  - secretName
+                  type: object
+                type: array
               createdListeners:
                 description: CreatedListeners is the list of created listener IDs
                 items:

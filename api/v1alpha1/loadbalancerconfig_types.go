@@ -25,71 +25,71 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// // InsertHeader defines a header to be inserted in requests
-// type InsertHeader struct {
-// 	// HeaderName is the name of the header to insert
-// 	// +required
-// 	HeaderName string `json:"headerName"`
+// InsertHeader defines a header to be inserted in requests
+type InsertHeader struct {
+	// HeaderName is the name of the header to insert
+	// +required
+	HeaderName string `json:"headerName"`
 
-// 	// HeaderValue is the value of the header to insert
-// 	// +required
-// 	HeaderValue string `json:"headerValue"`
-// }
+	// HeaderValue is the value of the header to insert
+	// +required
+	HeaderValue string `json:"headerValue"`
+}
 
-// // L7Rule defines a Layer 7 rule for policies
-// type L7Rule struct {
-// 	// CompareType is how to compare the rule value
-// 	// +required
-// 	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
+// L7Rule defines a Layer 7 rule for policies
+type L7Rule struct {
+	// CompareType is how to compare the rule value
+	// +required
+	CompareType loadbalancerv2.PolicyCompareType `json:"compareType"`
 
-// 	// RuleValue is the value to compare against
-// 	// +required
-// 	RuleValue string `json:"ruleValue"`
+	// RuleValue is the value to compare against
+	// +required
+	RuleValue string `json:"ruleValue"`
 
-// 	// RuleType is the type of rule
-// 	// +required
-// 	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
-// }
+	// RuleType is the type of rule
+	// +required
+	RuleType loadbalancerv2.PolicyRuleType `json:"ruleType"`
+}
 
-// // Policy defines a policy configuration for application load balancer listeners
-// type Policy struct {
-// 	// Name is the name of the policy
-// 	// +required
-// 	Name string `json:"name"`
+// Policy defines a policy configuration for application load balancer listeners
+type Policy struct {
+	// Name is the name of the policy
+	// +required
+	Name string `json:"name"`
 
-// 	// Description is an optional description for the policy
-// 	// +optional
-// 	Description *string `json:"description,omitempty"`
+	// Description is an optional description for the policy
+	// +optional
+	Description *string `json:"description,omitempty"`
 
-// 	// RedirectPoolName is the name of the pool to redirect to
-// 	// +optional
-// 	RedirectPoolName *string `json:"redirectPoolName,omitempty"`
+	// RedirectPoolName is the name of the pool to redirect to
+	// +optional
+	RedirectPoolName *string `json:"redirectPoolName,omitempty"`
 
-// 	// Action defines the action to take
-// 	// +required
-// 	Action loadbalancerv2.PolicyAction `json:"action"`
+	// Action defines the action to take
+	// +required
+	Action loadbalancerv2.PolicyAction `json:"action"`
 
-// 	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
-// 	// +optional
-// 	RedirectUrl *string `json:"redirectUrl,omitempty"`
+	// RedirectUrl is the URL to redirect to (for REDIRECT_TO_URL action)
+	// +optional
+	RedirectUrl *string `json:"redirectUrl,omitempty"`
 
-// 	// RedirectHttpCode is the HTTP code to use for redirect
-// 	// +optional
-// 	RedirectHttpCode *int32 `json:"redirectHttpCode,omitempty"`
+	// RedirectHttpCode is the HTTP code to use for redirect
+	// +optional
+	RedirectHttpCode *int32 `json:"redirectHttpCode,omitempty"`
 
-// 	// KeepQueryString determines if query string should be kept on redirect
-// 	// +optional
-// 	KeepQueryString *bool `json:"keepQueryString,omitempty"`
+	// KeepQueryString determines if query string should be kept on redirect
+	// +optional
+	KeepQueryString *bool `json:"keepQueryString,omitempty"`
 
-// 	// Position is the position/priority of the policy
-// 	// +optional
-// 	// +kubebuilder:validation:Minimum=1
-// 	Position int32 `json:"position,omitempty"`
+	// Position is the position/priority of the policy
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	Position *int32 `json:"position,omitempty"`
 
-// 	// L7Rules is the list of L7 rules for this policy
-// 	// +optional
-// 	L7Rules []L7Rule `json:"l7Rules,omitempty"`
-// }
+	// L7Rules is the list of L7 rules for this policy
+	// +optional
+	L7Rules []L7Rule `json:"l7Rules,omitempty"`
+}
 
 // Pool defines a pool configuration for the load balancer
 type Pool struct {
@@ -109,13 +109,13 @@ type Pool struct {
 	// +optional
 	Algorithm *loadbalancerv2.PoolAlgorithm `json:"algorithm,omitempty"`
 
-	// // Stickiness enables sticky sessions for the pool
-	// // +optional
-	// Stickiness *bool `json:"stickiness,omitempty"`
+	// Stickiness enables sticky sessions for the pool
+	// +optional
+	Stickiness *bool `json:"stickiness,omitempty"`
 
-	// // TLSEncryption enables TLS encryption for the pool
-	// // +optional
-	// TLSEncryption *bool `json:"tlsEncryption,omitempty"`
+	// TLSEncryption enables TLS encryption for the pool
+	// +optional
+	TLSEncryption *bool `json:"tlsEncryption,omitempty"`
 
 	// HealthMonitor defines the health monitor configuration for the pool
 	// +optional
@@ -147,25 +147,25 @@ type PoolHealthMonitor struct {
 	// +optional
 	Timeout *int `json:"timeout"`
 
-	// // HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
-	// // +optional
-	// HealthCheckMethod *loadbalancerv2.HealthCheckMethod `json:"healthCheckMethod,omitempty"`
+	// HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
+	// +optional
+	HealthCheckMethod *loadbalancerv2.HealthCheckMethod `json:"healthCheckMethod,omitempty"`
 
-	// // HttpVersion defines which HTTP version to use for HTTP-based health checks
-	// // +optional
-	// HttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"httpVersion,omitempty"`
+	// HttpVersion defines which HTTP version to use for HTTP-based health checks
+	// +optional
+	HttpVersion *loadbalancerv2.HealthCheckHttpVersion `json:"httpVersion,omitempty"`
 
-	// // HealthCheckPath is the path used for HTTP health checks
-	// // +optional
-	// HealthCheckPath *string `json:"healthCheckPath,omitempty"`
+	// HealthCheckPath is the path used for HTTP health checks
+	// +optional
+	HealthCheckPath *string `json:"healthCheckPath,omitempty"`
 
-	// // DomainName is the hostname sent in the HTTP Host header
-	// // +optional
-	// DomainName *string `json:"domainName,omitempty"`
+	// DomainName is the hostname sent in the HTTP Host header
+	// +optional
+	DomainName *string `json:"domainName,omitempty"`
 
-	// // SuccessCode specifies which HTTP codes indicate a healthy response
-	// // +optional
-	// SuccessCode *string `json:"successCode,omitempty"`
+	// SuccessCode specifies which HTTP codes indicate a healthy response
+	// +optional
+	SuccessCode *string `json:"successCode,omitempty"`
 }
 
 // PoolMember defines a member of a load balancer pool
@@ -235,53 +235,44 @@ type Listener struct {
 	// +optional
 	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
 
-	// // Headers is a list of headers to forward
-	// // +optional
-	// Headers []string `json:"headers,omitempty"`
+	// InsertHeaders defines headers to insert into requests
+	// +optional
+	InsertHeaders []InsertHeader `json:"insertHeaders,omitempty"`
 
-	// // InsertHeaders defines headers to insert into requests
-	// // +optional
-	// InsertHeaders []InsertHeader `json:"insertHeaders,omitempty"`
-
-	// // CertificateAuthorities is a list of certificate authority IDs
-	// // +optional
-	// CertificateAuthorities []string `json:"certificateAuthorities,omitempty"`
-
-	// // DefaultCertificateAuthority is the default certificate authority
-	// // +optional
-	// DefaultCertificateAuthority *string `json:"defaultCertificateAuthority,omitempty"`
-
-	// // ClientCertificateAuthentication defines client certificate authentication settings
-	// // +optional
-	// ClientCertificateAuthentication *string `json:"clientCertificateAuthentication,omitempty"`
-
-	// // Policies is the list of policies for this listener (for application load balancers)
-	// // +optional
-	// Policies []Policy `json:"policies,omitempty"`
+	// Policies is the list of policies for this listener (for L7)
+	// +optional
+	Policies []Policy `json:"policies,omitempty"`
 
 	// // AutoReorderPolicies enables automatic reordering of policies
 	// // +optional
 	// AutoReorderPolicies *bool `json:"autoReorderPolicies,omitempty"`
 
-	// // EnableStickySession enables sticky sessions for application load balancers
-	// // +optional
-	// EnableStickySession *bool `json:"enableStickySession,omitempty"`
+	// CertificateDefault is the default certificate for the listener (for L7)
+	// +optional
+	CertificateDefault *ListenerCertificate `json:"certificateDefault,omitempty"`
 
-	// // EnableTLSEncryption enables TLS encryption for application load balancers
-	// // +optional
-	// EnableTLSEncryption *bool `json:"enableTLSEncryption,omitempty"`
+	// CertificateAuthorities is a list of certificate authorities for mutual TLS (for L7)
+	// +optional
+	CertificateAuthorities []ListenerCertificate `json:"certificateAuthorities,omitempty"`
 
-	// // CertificateIDs are the SSL certificate IDs for HTTPS listeners
-	// // +optional
-	// CertificateIDs []string `json:"certificateIDs,omitempty"`
+	// ClientCertificateId is the client certificate Id for mutual TLS
+	// +optional
+	ClientCertificateId *string `json:"clientCertificateId,omitempty"`
+}
 
-	// // ClientCertificateID is the client certificate ID for mutual TLS
-	// // +optional
-	// ClientCertificateID *string `json:"clientCertificateID,omitempty"`
+// ListenerCertificate defines a certificate associated with a listener, can be referenced by ID, name, or secret name. Must provide at least one.
+type ListenerCertificate struct {
+	// Id is the ID of the certificate
+	// +optional
+	Id *string `json:"id,omitempty"`
 
-	// // ImplementationSpecificParams are implementation-specific parameters
-	// // +optional
-	// ImplementationSpecificParams map[string]string `json:"implementationSpecificParams,omitempty"`
+	// Name is the name of the certificate
+	// +optional
+	Name *string `json:"name,omitempty"`
+
+	// SecretName is the name of the Kubernetes secret containing the certificate
+	// +optional
+	SecretName *string `json:"secretName,omitempty"`
 }
 
 // LoadBalancerConfigSpec defines the desired state of LoadBalancerConfig
@@ -348,6 +339,16 @@ type LoadBalancerConfigSpec struct {
 	// Pools defines the array of pools for the load balancer
 	// +optional
 	Pools []Pool `json:"pools,omitempty"`
+
+	// CreateCertificates defines certificates to be created
+	// +optional
+	CreateCertificates []CreateCertificate `json:"createCertificates,omitempty"`
+}
+
+type CreateCertificate struct {
+	// SecretName is the name of the Kubernetes secret containing the certificate
+	// +required
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // LoadBalancerConfigStatus defines the observed state of LoadBalancerConfig.
@@ -391,6 +392,10 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	CreatedListeners []CreatedListener `json:"createdListeners,omitempty"`
 
+	// CreatedCertificates is the list of created certificate IDs
+	// +optional
+	CreatedCertificates []CreatedCertificate `json:"createdCertificates,omitempty"`
+
 	// // ManageDFPMembers indicates if the controller should manage DFP members
 	// // +optional
 	// ManageDFPMembers *bool `json:"manageDFPMembers,omitempty"`
@@ -406,6 +411,24 @@ type CreatedListener struct {
 	// Id is the ID of the created listener
 	// +required
 	Id string `json:"id,omitempty"`
+}
+
+type CreatedCertificate struct {
+	// SecretName is the name of the Kubernetes secret for the certificate
+	// +required
+	SecretName string `json:"secretName,omitempty"`
+
+	// ResourceVersion is the resource version of the secret at creation time
+	// +required
+	ResourceVersion string `json:"resourceVersion,omitempty"`
+
+	// Id is the ID of the created certificate
+	// +required
+	Id string `json:"id,omitempty"`
+
+	// CertificateName is the name of the created certificate
+	// +optional
+	CertificateName *string `json:"certificateName,omitempty"`
 }
 
 // +kubebuilder:object:root=true

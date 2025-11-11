@@ -25,77 +25,20 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		return nil, nil, nil
 	}
 
-	resolveOpts := []utils.EndpointResolveOption{
-		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(targetNodeLabels))),
-	}
-	defaultPoolAlgorithm := t.buildPoolAlgorithm(ctx)
-	defaultHealthcheckPort := t.buildHealthcheckPort(ctx)
 	defaultIdleTimeoutClient := t.buildIdleTimeoutClient(ctx)
 	defaultIdleTimeoutMember := t.buildIdleTimeoutMember(ctx)
 	defaultIdleTimeoutConnection := t.buildIdleTimeoutConnection(ctx)
 	defaultAllowedCidrs := t.buildInboundCIDRs(ctx)
-	defaultEnableProxyProtocol := t.buildEnableProxyProtocol(ctx)
 
 	// Build pool and listener
 	for _, port := range ports {
-		// nodePort if target type is instance, targetPort if target type is ip
-		var membersAddr []utils.EndpointAddress
-		var err error
-		if t.getTargetType(ctx) == domain.TargetTypeInstance {
-			membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
-				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
-			if err != nil {
-				t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-				return nil, nil, err
-			}
-		} else {
-			membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
-				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
-			if err != nil {
-				t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-				return nil, nil, err
-			}
+		newPool, err := t.buildPool(ctx, port, targetNodeLabels)
+		if err != nil {
+			t.logger.Errorf("failed to build pool for port %d: %v", port.Port, err)
+			return nil, nil, err
 		}
 
-		// build pool members
-		poolMembers := make([]v1alpha1.PoolMember, 0)
-		for _, member := range membersAddr {
-			poolMember := v1alpha1.PoolMember{
-				IP:          member.IP,
-				Port:        member.Port,
-				MonitorPort: member.Port, // default monitor port = member port, can be override by annotation
-				Name:        member.Name,
-			}
-			if defaultHealthcheckPort != nil {
-				poolMember.MonitorPort = *defaultHealthcheckPort
-			}
-			poolMembers = append(poolMembers, poolMember)
-		}
-
-		// build healthcheck
-		healthMonitor := v1alpha1.PoolHealthMonitor{
-			Protocol:           t.buildPoolHealthCheckProtocol(ctx, port.Protocol),
-			HealthyThreshold:   t.buildPoolHealthyThresholdCount(ctx),
-			UnhealthyThreshold: t.buildPoolUnhealthyThresholdCount(ctx),
-			Interval:           t.buildPoolHealthcheckIntervalSeconds(ctx),
-			Timeout:            t.buildPoolHealthcheckTimeoutSeconds(ctx),
-		}
-
-		newPool := v1alpha1.Pool{
-			Name:          t.nameHelper.GenL4PoolName(port, string(port.Protocol)),
-			Protocol:      loadbalancerv2.PoolProtocol(port.Protocol),
-			Members:       poolMembers,
-			Algorithm:     defaultPoolAlgorithm,
-			HealthMonitor: healthMonitor,
-		}
-		for _, name := range defaultEnableProxyProtocol {
-			if (name == "*" || name == port.Name) && port.Protocol == corev1.ProtocolTCP {
-				newPool.Protocol = loadbalancerv2.PoolProtocolProxy
-				newPool.Name = t.nameHelper.GenL4PoolName(port, string(loadbalancerv2.PoolProtocolProxy))
-				break
-			}
-		}
-		allPools = append(allPools, newPool)
+		allPools = append(allPools, *newPool)
 
 		newListener := v1alpha1.Listener{
 			Name:              t.nameHelper.GenL4ListenerName(port),
@@ -111,6 +54,87 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	}
 
 	return allPools, allListeners, nil
+}
+
+func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.ServicePort, targetNodeLabels map[string]string) (*v1alpha1.Pool, error) {
+	resolveOpts := []utils.EndpointResolveOption{
+		utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(targetNodeLabels))),
+	}
+	defaultHealthcheckPort := t.buildHealthcheckPort(ctx)
+
+	// nodePort if target type is instance, targetPort if target type is ip
+	var membersAddr []utils.EndpointAddress
+	var err error
+	if t.getTargetType(ctx) == domain.TargetTypeInstance {
+		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
+			utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+		if err != nil {
+			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
+			return nil, err
+		}
+	} else {
+		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
+			utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+		if err != nil {
+			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
+			return nil, err
+		}
+	}
+
+	// build pool members
+	poolMembers := make([]v1alpha1.PoolMember, 0)
+	for _, member := range membersAddr {
+		poolMember := v1alpha1.PoolMember{
+			IP:          member.IP,
+			Port:        member.Port,
+			MonitorPort: member.Port, // default monitor port = member port, can be override by annotation
+			Name:        member.Name,
+		}
+		if defaultHealthcheckPort != nil {
+			poolMember.MonitorPort = *defaultHealthcheckPort
+		}
+		poolMembers = append(poolMembers, poolMember)
+	}
+
+	// build healthcheck
+	healthMonitor := v1alpha1.PoolHealthMonitor{
+		Protocol:           t.buildPoolHealthCheckProtocol(ctx, port.Protocol),
+		HealthyThreshold:   t.buildPoolHealthyThresholdCount(ctx),
+		UnhealthyThreshold: t.buildPoolUnhealthyThresholdCount(ctx),
+		Interval:           t.buildPoolHealthcheckIntervalSeconds(ctx),
+		Timeout:            t.buildPoolHealthcheckTimeoutSeconds(ctx),
+		HealthCheckMethod:  nil,
+		HealthCheckPath:    nil,
+		SuccessCode:        nil,
+		HttpVersion:        nil,
+		DomainName:         nil,
+	}
+	// L4 support healthcheck TCP, HTTP and HTTP
+	if healthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTP ||
+		healthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTPs {
+
+		healthMonitor.HealthCheckMethod = t.buildAnnotationHealthcheckHttpMethod(ctx)
+		healthMonitor.HealthCheckPath = t.buildAnnotationHealthcheckPath(ctx)
+		healthMonitor.SuccessCode = t.buildAnnotationSuccessCodes(ctx)
+		healthMonitor.HttpVersion = t.buildAnnotationHealthcheckHttpVersion(ctx)
+		healthMonitor.DomainName = t.buildAnnotationHealthcheckHttpDomainName(ctx)
+	}
+
+	newPool := v1alpha1.Pool{
+		Name:          t.nameHelper.GenL4PoolName(port, string(port.Protocol)),
+		Protocol:      loadbalancerv2.PoolProtocol(port.Protocol),
+		Members:       poolMembers,
+		Algorithm:     t.buildPoolAlgorithm(ctx),
+		HealthMonitor: healthMonitor,
+	}
+	for _, name := range t.buildEnableProxyProtocol(ctx) {
+		if (name == "*" || name == port.Name) && port.Protocol == corev1.ProtocolTCP {
+			newPool.Protocol = loadbalancerv2.PoolProtocolProxy
+			newPool.Name = t.nameHelper.GenL4PoolName(port, string(loadbalancerv2.PoolProtocolProxy))
+			break
+		}
+	}
+	return &newPool, nil
 }
 
 func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetType {

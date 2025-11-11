@@ -406,6 +406,63 @@ func (_m *MockNameHelper) EXPECT() *MockNameHelper_Expecter {
 	return &MockNameHelper_Expecter{mock: &_m.Mock}
 }
 
+// GenCertName provides a mock function for the type MockNameHelper
+func (_mock *MockNameHelper) GenCertName(secretName string, resourceVersion string) string {
+	ret := _mock.Called(secretName, resourceVersion)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenCertName")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = returnFunc(secretName, resourceVersion)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockNameHelper_GenCertName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenCertName'
+type MockNameHelper_GenCertName_Call struct {
+	*mock.Call
+}
+
+// GenCertName is a helper method to define mock.On call
+//   - secretName string
+//   - resourceVersion string
+func (_e *MockNameHelper_Expecter) GenCertName(secretName interface{}, resourceVersion interface{}) *MockNameHelper_GenCertName_Call {
+	return &MockNameHelper_GenCertName_Call{Call: _e.mock.On("GenCertName", secretName, resourceVersion)}
+}
+
+func (_c *MockNameHelper_GenCertName_Call) Run(run func(secretName string, resourceVersion string)) *MockNameHelper_GenCertName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNameHelper_GenCertName_Call) Return(s string) *MockNameHelper_GenCertName_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockNameHelper_GenCertName_Call) RunAndReturn(run func(secretName string, resourceVersion string) string) *MockNameHelper_GenCertName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GenL4ListenerName provides a mock function for the type MockNameHelper
 func (_mock *MockNameHelper) GenL4ListenerName(pPort v1.ServicePort) string {
 	ret := _mock.Called(pPort)
@@ -510,6 +567,126 @@ func (_c *MockNameHelper_GenL4PoolName_Call) Return(s string) *MockNameHelper_Ge
 }
 
 func (_c *MockNameHelper_GenL4PoolName_Call) RunAndReturn(run func(pPort v1.ServicePort, realProtocol string) string) *MockNameHelper_GenL4PoolName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GenL7PolicyName provides a mock function for the type MockNameHelper
+func (_mock *MockNameHelper) GenL7PolicyName(mode bool, ruleIndex int, pathIndex int) string {
+	ret := _mock.Called(mode, ruleIndex, pathIndex)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenL7PolicyName")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(bool, int, int) string); ok {
+		r0 = returnFunc(mode, ruleIndex, pathIndex)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockNameHelper_GenL7PolicyName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenL7PolicyName'
+type MockNameHelper_GenL7PolicyName_Call struct {
+	*mock.Call
+}
+
+// GenL7PolicyName is a helper method to define mock.On call
+//   - mode bool
+//   - ruleIndex int
+//   - pathIndex int
+func (_e *MockNameHelper_Expecter) GenL7PolicyName(mode interface{}, ruleIndex interface{}, pathIndex interface{}) *MockNameHelper_GenL7PolicyName_Call {
+	return &MockNameHelper_GenL7PolicyName_Call{Call: _e.mock.On("GenL7PolicyName", mode, ruleIndex, pathIndex)}
+}
+
+func (_c *MockNameHelper_GenL7PolicyName_Call) Run(run func(mode bool, ruleIndex int, pathIndex int)) *MockNameHelper_GenL7PolicyName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 bool
+		if args[0] != nil {
+			arg0 = args[0].(bool)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNameHelper_GenL7PolicyName_Call) Return(s string) *MockNameHelper_GenL7PolicyName_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockNameHelper_GenL7PolicyName_Call) RunAndReturn(run func(mode bool, ruleIndex int, pathIndex int) string) *MockNameHelper_GenL7PolicyName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GenL7PoolName provides a mock function for the type MockNameHelper
+func (_mock *MockNameHelper) GenL7PoolName(serviceName string, port int) string {
+	ret := _mock.Called(serviceName, port)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GenL7PoolName")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(string, int) string); ok {
+		r0 = returnFunc(serviceName, port)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// MockNameHelper_GenL7PoolName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenL7PoolName'
+type MockNameHelper_GenL7PoolName_Call struct {
+	*mock.Call
+}
+
+// GenL7PoolName is a helper method to define mock.On call
+//   - serviceName string
+//   - port int
+func (_e *MockNameHelper_Expecter) GenL7PoolName(serviceName interface{}, port interface{}) *MockNameHelper_GenL7PoolName_Call {
+	return &MockNameHelper_GenL7PoolName_Call{Call: _e.mock.On("GenL7PoolName", serviceName, port)}
+}
+
+func (_c *MockNameHelper_GenL7PoolName_Call) Run(run func(serviceName string, port int)) *MockNameHelper_GenL7PoolName_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNameHelper_GenL7PoolName_Call) Return(s string) *MockNameHelper_GenL7PoolName_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *MockNameHelper_GenL7PoolName_Call) RunAndReturn(run func(serviceName string, port int) string) *MockNameHelper_GenL7PoolName_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -15,7 +15,8 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	v20 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	v10 "k8s.io/api/core/v1"
+	v11 "k8s.io/api/core/v1"
+	v10 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -4532,6 +4533,74 @@ func (_c *MockK8sRepository_DeleteNodeSecurityGroup_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetIngress provides a mock function for the type MockK8sRepository
+func (_mock *MockK8sRepository) GetIngress(ctx context.Context, n types.NamespacedName) (*v10.Ingress, error) {
+	ret := _mock.Called(ctx, n)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIngress")
+	}
+
+	var r0 *v10.Ingress
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v10.Ingress, error)); ok {
+		return returnFunc(ctx, n)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v10.Ingress); ok {
+		r0 = returnFunc(ctx, n)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v10.Ingress)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.NamespacedName) error); ok {
+		r1 = returnFunc(ctx, n)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockK8sRepository_GetIngress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIngress'
+type MockK8sRepository_GetIngress_Call struct {
+	*mock.Call
+}
+
+// GetIngress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - n types.NamespacedName
+func (_e *MockK8sRepository_Expecter) GetIngress(ctx interface{}, n interface{}) *MockK8sRepository_GetIngress_Call {
+	return &MockK8sRepository_GetIngress_Call{Call: _e.mock.On("GetIngress", ctx, n)}
+}
+
+func (_c *MockK8sRepository_GetIngress_Call) Run(run func(ctx context.Context, n types.NamespacedName)) *MockK8sRepository_GetIngress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.NamespacedName
+		if args[1] != nil {
+			arg1 = args[1].(types.NamespacedName)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8sRepository_GetIngress_Call) Return(ingress *v10.Ingress, err error) *MockK8sRepository_GetIngress_Call {
+	_c.Call.Return(ingress, err)
+	return _c
+}
+
+func (_c *MockK8sRepository_GetIngress_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v10.Ingress, error)) *MockK8sRepository_GetIngress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLoadBalancerConfig provides a mock function for the type MockK8sRepository
 func (_mock *MockK8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.LoadBalancerConfig, error) {
 	ret := _mock.Called(ctx, n)
@@ -4668,24 +4737,92 @@ func (_c *MockK8sRepository_GetNodeSecurityGroup_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// GetSecret provides a mock function for the type MockK8sRepository
+func (_mock *MockK8sRepository) GetSecret(ctx context.Context, n types.NamespacedName) (*v11.Secret, error) {
+	ret := _mock.Called(ctx, n)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSecret")
+	}
+
+	var r0 *v11.Secret
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v11.Secret, error)); ok {
+		return returnFunc(ctx, n)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v11.Secret); ok {
+		r0 = returnFunc(ctx, n)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v11.Secret)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.NamespacedName) error); ok {
+		r1 = returnFunc(ctx, n)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockK8sRepository_GetSecret_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSecret'
+type MockK8sRepository_GetSecret_Call struct {
+	*mock.Call
+}
+
+// GetSecret is a helper method to define mock.On call
+//   - ctx context.Context
+//   - n types.NamespacedName
+func (_e *MockK8sRepository_Expecter) GetSecret(ctx interface{}, n interface{}) *MockK8sRepository_GetSecret_Call {
+	return &MockK8sRepository_GetSecret_Call{Call: _e.mock.On("GetSecret", ctx, n)}
+}
+
+func (_c *MockK8sRepository_GetSecret_Call) Run(run func(ctx context.Context, n types.NamespacedName)) *MockK8sRepository_GetSecret_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.NamespacedName
+		if args[1] != nil {
+			arg1 = args[1].(types.NamespacedName)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8sRepository_GetSecret_Call) Return(secret *v11.Secret, err error) *MockK8sRepository_GetSecret_Call {
+	_c.Call.Return(secret, err)
+	return _c
+}
+
+func (_c *MockK8sRepository_GetSecret_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v11.Secret, error)) *MockK8sRepository_GetSecret_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetService provides a mock function for the type MockK8sRepository
-func (_mock *MockK8sRepository) GetService(ctx context.Context, n types.NamespacedName) (*v10.Service, error) {
+func (_mock *MockK8sRepository) GetService(ctx context.Context, n types.NamespacedName) (*v11.Service, error) {
 	ret := _mock.Called(ctx, n)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetService")
 	}
 
-	var r0 *v10.Service
+	var r0 *v11.Service
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v10.Service, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v11.Service, error)); ok {
 		return returnFunc(ctx, n)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v10.Service); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v11.Service); ok {
 		r0 = returnFunc(ctx, n)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v10.Service)
+			r0 = ret.Get(0).(*v11.Service)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, types.NamespacedName) error); ok {
@@ -4726,12 +4863,12 @@ func (_c *MockK8sRepository_GetService_Call) Run(run func(ctx context.Context, n
 	return _c
 }
 
-func (_c *MockK8sRepository_GetService_Call) Return(service *v10.Service, err error) *MockK8sRepository_GetService_Call {
+func (_c *MockK8sRepository_GetService_Call) Return(service *v11.Service, err error) *MockK8sRepository_GetService_Call {
 	_c.Call.Return(service, err)
 	return _c
 }
 
-func (_c *MockK8sRepository_GetService_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v10.Service, error)) *MockK8sRepository_GetService_Call {
+func (_c *MockK8sRepository_GetService_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v11.Service, error)) *MockK8sRepository_GetService_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4809,7 +4946,7 @@ func (_c *MockK8sRepository_ListLoadBalancerConfig_Call) RunAndReturn(run func(c
 }
 
 // ListNode provides a mock function for the type MockK8sRepository
-func (_mock *MockK8sRepository) ListNode(ctx context.Context, list *v10.NodeList, opts ...client.ListOption) error {
+func (_mock *MockK8sRepository) ListNode(ctx context.Context, list *v11.NodeList, opts ...client.ListOption) error {
 	var tmpRet mock.Arguments
 	if len(opts) > 0 {
 		tmpRet = _mock.Called(ctx, list, opts)
@@ -4823,7 +4960,7 @@ func (_mock *MockK8sRepository) ListNode(ctx context.Context, list *v10.NodeList
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v10.NodeList, ...client.ListOption) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v11.NodeList, ...client.ListOption) error); ok {
 		r0 = returnFunc(ctx, list, opts...)
 	} else {
 		r0 = ret.Error(0)
@@ -4838,22 +4975,22 @@ type MockK8sRepository_ListNode_Call struct {
 
 // ListNode is a helper method to define mock.On call
 //   - ctx context.Context
-//   - list *v10.NodeList
+//   - list *v11.NodeList
 //   - opts ...client.ListOption
 func (_e *MockK8sRepository_Expecter) ListNode(ctx interface{}, list interface{}, opts ...interface{}) *MockK8sRepository_ListNode_Call {
 	return &MockK8sRepository_ListNode_Call{Call: _e.mock.On("ListNode",
 		append([]interface{}{ctx, list}, opts...)...)}
 }
 
-func (_c *MockK8sRepository_ListNode_Call) Run(run func(ctx context.Context, list *v10.NodeList, opts ...client.ListOption)) *MockK8sRepository_ListNode_Call {
+func (_c *MockK8sRepository_ListNode_Call) Run(run func(ctx context.Context, list *v11.NodeList, opts ...client.ListOption)) *MockK8sRepository_ListNode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *v10.NodeList
+		var arg1 *v11.NodeList
 		if args[1] != nil {
-			arg1 = args[1].(*v10.NodeList)
+			arg1 = args[1].(*v11.NodeList)
 		}
 		var arg2 []client.ListOption
 		var variadicArgs []client.ListOption
@@ -4875,7 +5012,7 @@ func (_c *MockK8sRepository_ListNode_Call) Return(err error) *MockK8sRepository_
 	return _c
 }
 
-func (_c *MockK8sRepository_ListNode_Call) RunAndReturn(run func(ctx context.Context, list *v10.NodeList, opts ...client.ListOption) error) *MockK8sRepository_ListNode_Call {
+func (_c *MockK8sRepository_ListNode_Call) RunAndReturn(run func(ctx context.Context, list *v11.NodeList, opts ...client.ListOption) error) *MockK8sRepository_ListNode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -5230,6 +5367,69 @@ func (_c *MockK8sRepository_PatchNodeSecurityGroup_Call) Return(err error) *Mock
 }
 
 func (_c *MockK8sRepository_PatchNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error) *MockK8sRepository_PatchNodeSecurityGroup_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateIngressStatusAddress provides a mock function for the type MockK8sRepository
+func (_mock *MockK8sRepository) UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error {
+	ret := _mock.Called(ctx, n, address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateIngressStatusAddress")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName, string) error); ok {
+		r0 = returnFunc(ctx, n, address)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockK8sRepository_UpdateIngressStatusAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateIngressStatusAddress'
+type MockK8sRepository_UpdateIngressStatusAddress_Call struct {
+	*mock.Call
+}
+
+// UpdateIngressStatusAddress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - n types.NamespacedName
+//   - address string
+func (_e *MockK8sRepository_Expecter) UpdateIngressStatusAddress(ctx interface{}, n interface{}, address interface{}) *MockK8sRepository_UpdateIngressStatusAddress_Call {
+	return &MockK8sRepository_UpdateIngressStatusAddress_Call{Call: _e.mock.On("UpdateIngressStatusAddress", ctx, n, address)}
+}
+
+func (_c *MockK8sRepository_UpdateIngressStatusAddress_Call) Run(run func(ctx context.Context, n types.NamespacedName, address string)) *MockK8sRepository_UpdateIngressStatusAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.NamespacedName
+		if args[1] != nil {
+			arg1 = args[1].(types.NamespacedName)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8sRepository_UpdateIngressStatusAddress_Call) Return(err error) *MockK8sRepository_UpdateIngressStatusAddress_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockK8sRepository_UpdateIngressStatusAddress_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName, address string) error) *MockK8sRepository_UpdateIngressStatusAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

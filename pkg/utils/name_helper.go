@@ -24,10 +24,12 @@ type NameHelper interface {
 	// return the generated name of the load balancer
 	GetLoadBalancerDefaultName() string
 	GenerateHash() string
-	ValidateName(newName string) string
 
 	GenL4PoolName(pPort corev1.ServicePort, realProtocol string) string
 	GenL4ListenerName(pPort corev1.ServicePort) string
+
+	GenL7PoolName(serviceName string, port int) string
+	GenL7PolicyName(mode bool, ruleIndex, pathIndex int) string
 }
 
 var _ NameHelper = &nameHelper{}
@@ -48,22 +50,13 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 		TrimString(l.resourceNamespace, 10),
 		TrimString(l.resourceName, 10),
 		hash)
-	return l.ValidateName(name)
+	return ValidateName(name)
 }
 
 func (l *nameHelper) GenerateHash() string {
 	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
 	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
-}
-
-func (l *nameHelper) ValidateName(newName string) string {
-	for _, char := range newName {
-		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '-' && char != '.' {
-			newName = strings.ReplaceAll(newName, string(char), "-")
-		}
-	}
-	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
 }
 
 // genL4PoolName generates the name of the pool.
@@ -77,7 +70,7 @@ func (t *nameHelper) GenL4PoolName(pPort corev1.ServicePort, realProtocol string
 		hash,
 		TrimString(realProtocol, 3),
 		pPort.Port)
-	return t.ValidateName(name)
+	return ValidateName(name)
 }
 
 // genL4ListenerName generates the name of the listener.
@@ -91,7 +84,7 @@ func (t *nameHelper) GenL4ListenerName(pPort corev1.ServicePort) string {
 		hash,
 		TrimString(string(pPort.Protocol), 3),
 		pPort.Port)
-	return t.ValidateName(name)
+	return ValidateName(name)
 }
 
 func GenerateLBConfigName(prefix, baseName string) string {
@@ -107,4 +100,33 @@ func GenerateLBConfigName(prefix, baseName string) string {
 	}
 	short := baseName[:cutLen]
 	return fmt.Sprintf("%s-%s-%s", prefix, short, hash)
+}
+
+// genL7PoolName generates the name of the L7 pool.
+func (t *nameHelper) GenL7PoolName(serviceName string, port int) string {
+	hash := t.GenerateHash()
+	name := fmt.Sprintf("%s_%s_%s_%d",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		hash,
+		TrimString(fmt.Sprintf("%s-%s", t.resourceNamespace, serviceName), 35),
+		port)
+	return ValidateName(name)
+}
+
+// genL7PolicyName generates the name of the L7 policy.
+func (t *nameHelper) GenL7PolicyName(mode bool, ruleIndex, pathIndex int) string {
+	hash := t.GenerateHash()
+	name := fmt.Sprintf("%s_%s_%t_r%d_p%d",
+		consts.DEFAULT_LB_PREFIX_NAME,
+		hash, mode, ruleIndex, pathIndex)
+	return ValidateName(name)
+}
+
+func ValidateName(newName string) string {
+	for _, char := range newName {
+		if !unicode.IsLetter(char) && !unicode.IsDigit(char) && char != '-' && char != '.' {
+			newName = strings.ReplaceAll(newName, string(char), "-")
+		}
+	}
+	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
 }

@@ -18,18 +18,79 @@ package networking
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
+	"time"
 
+	"github.com/anngdinh/operator-helper/contexts"
+	k8s_helper "github.com/anngdinh/operator-helper/k8s"
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	networking "k8s.io/api/networking/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking/eventhandlers"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 )
+
+const (
+	controllerName = "ingress"
+)
+
+func NewIngressReconciler(
+	ingressUseCase usecase.IngressUseCase,
+	client client.Client,
+	scheme *runtime.Scheme,
+	finalizerManager k8s_helper.FinalizerManager,
+	eventRecorder record.EventRecorder,
+	ingressUtils ingress.IngressUtils,
+) *IngressReconciler {
+	referenceIndexer := ingress.NewDefaultReferenceIndexer()
+	return &IngressReconciler{
+		k8sClient:        client,
+		Scheme:           scheme,
+		ingressUseCase:   ingressUseCase,
+		finalizerManager: finalizerManager,
+		eventRecorder:    eventRecorder,
+		ingressUtils:     ingressUtils,
+		referenceIndexer: referenceIndexer,
+	}
+}
 
 // IngressReconciler reconciles a Ingress object
 type IngressReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	k8sClient        client.Client
+	Scheme           *runtime.Scheme
+	ingressUseCase   usecase.IngressUseCase
+	finalizerManager k8s_helper.FinalizerManager
+
+	referenceIndexer ingress.ReferenceIndexer
+	secretsManager   k8s.SecretsManager
+	ingressUtils     ingress.IngressUtils
+	eventRecorder    record.EventRecorder
+	logger           logr.Logger
+
+	// TODO
+	// reconcileCounters *metricsutil.ReconcileCounters
+	// metricsCollector  lbcmetrics.MetricCollector
+
+	maxConcurrentReconciles int
+
+	initDone atomic.Bool
 }
 
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
@@ -46,17 +107,167 @@ type IngressReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	if !r.initDone.Load() {
+		ctrl.Log.Info("Init not done yet, requeueing...")
+		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
+	}
 
-	// TODO(user): your logic here
+	ctx = contexts.NewContext(ctx).SetLogName("ing/" + req.Namespace + "/" + req.Name).GetContext()
+	logger := contexts.NewContext(ctx).Log()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+	defer cancel()
 
-	return ctrl.Result{}, nil
+	return errs.HandleReconcileError(r.reconcile(ctx, req), logger)
+}
+
+func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
+	ing := &networkingv1.Ingress{}
+	err := r.k8sClient.Get(ctx, req.NamespacedName, ing)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	logger := contexts.NewContext(ctx).Log()
+	key := fmt.Sprintf("%s/%s", ing.Namespace, ing.Name)
+
+	if !r.ingressUtils.IsIngressSupported(ing) {
+		// in case the ingress have finalizer but is no longer supported, we still need to call delete to clean up
+		// case the ingress type is changed from LoadBalancer to ClusterIP/NodePort/Headless
+		if r.ingressUtils.IsIngressPendingFinalization(ing) {
+			err := r.reconcileDelete(ctx, req, ing)
+			if err != nil {
+				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
+				r.eventRecorder.Event(ing, corev1.EventTypeWarning, "FailedDelete", err.Error())
+				return err
+			}
+			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
+			r.eventRecorder.Event(ing, corev1.EventTypeNormal, "Deleted", key)
+			return nil
+		}
+		return nil
+	}
+
+	err = r.reconcileEnsure(ctx, req, ing)
+	if err != nil {
+		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
+		r.eventRecorder.Event(ing, corev1.EventTypeWarning, "FailedEnsure", err.Error())
+		return err
+	}
+	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
+	r.eventRecorder.Event(ing, corev1.EventTypeNormal, "Ensured", key)
+	return nil
+}
+
+func (r *IngressReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
+		return err
+	}
+	return r.ingressUseCase.EnsureIngressUseCase(ctx, req)
+}
+
+func (r *IngressReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
+	logger := contexts.NewContext(ctx).Log()
+	if !k8s_helper.HasFinalizer(obj, consts.IngressFinalizer) {
+		logger.Warn("Finalizer is not found, return.")
+		return nil
+	}
+
+	if err := r.ingressUseCase.DeleteIngressUseCase(ctx, req); err != nil {
+		return err
+	}
+
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingv1.Ingress{}).
-		Named("networking-ingress").
-		Complete(r)
+func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, clientSet *kubernetes.Clientset) error {
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		log := ctrl.Log.WithName("init")
+		log.Info("Running initialization...")
+
+		if err := r.ingressUseCase.InitIngressUseCase(ctx); err != nil {
+			log.Error(err, "Fatal: initialization failed")
+			return err // returning error causes manager to stop => pod crash
+		}
+
+		log.Info("Initialization complete")
+		r.initDone.Store(true)
+		return nil
+	})); err != nil {
+		return err
+	}
+
+	c, err := controller.New(controllerName, mgr, controller.Options{
+		MaxConcurrentReconciles: r.maxConcurrentReconciles,
+		Reconciler:              r,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := r.setupIndexes(ctx, mgr.GetFieldIndexer()); err != nil {
+		return err
+	}
+	if err := r.setupWatches(ctx, c, mgr, clientSet); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *IngressReconciler) setupIndexes(ctx context.Context, fieldIndexer client.FieldIndexer) error {
+	if err := fieldIndexer.IndexField(ctx, &networking.Ingress{}, ingress.IndexKeyServiceRefName,
+		func(obj client.Object) []string {
+			return r.referenceIndexer.BuildServiceRefIndexes(context.Background(), obj.(*networking.Ingress))
+		},
+	); err != nil {
+		return err
+	}
+	if err := fieldIndexer.IndexField(ctx, &networking.Ingress{}, ingress.IndexKeySecretRefName,
+		func(obj client.Object) []string {
+			return r.referenceIndexer.BuildSecretRefIndexes(context.Background(), obj.(*networking.Ingress))
+		},
+	); err != nil {
+		return err
+	}
+	if err := fieldIndexer.IndexField(ctx, &corev1.Service{}, ingress.IndexKeySecretRefName,
+		func(obj client.Object) []string {
+			return r.referenceIndexer.BuildSecretRefIndexes(context.Background(), obj.(*corev1.Service))
+		},
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *IngressReconciler) setupWatches(_ context.Context, c controller.Controller, mgr ctrl.Manager, clientSet *kubernetes.Clientset) error {
+	ingEventChan := make(chan event.TypedGenericEvent[*networking.Ingress])
+	svcEventChan := make(chan event.TypedGenericEvent[*corev1.Service])
+	secretEventsChan := make(chan event.TypedGenericEvent[*corev1.Secret])
+	ingEventHandler := eventhandlers.NewEnqueueRequestsForIngressEvent(r.eventRecorder,
+		r.ingressUtils,
+		r.logger.WithName("eventHandlers").WithName("ingress"))
+	svcEventHandler := eventhandlers.NewEnqueueRequestsForServiceEvent(ingEventChan, r.k8sClient, r.eventRecorder,
+		r.logger.WithName("eventHandlers").WithName("service"))
+	secretEventHandler := eventhandlers.NewEnqueueRequestsForSecretEvent(ingEventChan, svcEventChan, r.k8sClient, r.eventRecorder,
+		r.logger.WithName("eventHandlers").WithName("secret"))
+	if err := c.Watch(source.Channel(ingEventChan, ingEventHandler)); err != nil {
+		return err
+	}
+	if err := c.Watch(source.Channel(svcEventChan, svcEventHandler)); err != nil {
+		return err
+	}
+	if err := c.Watch(source.Kind(mgr.GetCache(), &networking.Ingress{}, ingEventHandler)); err != nil {
+		return err
+	}
+	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}, svcEventHandler)); err != nil {
+		return err
+	}
+	if err := c.Watch(source.Channel(secretEventsChan, secretEventHandler)); err != nil {
+		return err
+	}
+	r.secretsManager = k8s.NewSecretsManager(clientSet, secretEventsChan, ctrl.Log.WithName("secrets-manager"))
+	return nil
 }

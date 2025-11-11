@@ -50,10 +50,10 @@ func NewServiceReconciler(
 	serviceUtils service.ServiceUtils,
 ) *ServiceReconciler {
 	return &ServiceReconciler{
-		Client:           client,
+		k8sClient:        client,
 		Scheme:           scheme,
 		serviceUseCase:   serviceUseCase,
-		FinalizerManager: finalizerManager,
+		finalizerManager: finalizerManager,
 		eventRecorder:    eventRecorder,
 		serviceUtils:     serviceUtils,
 	}
@@ -61,10 +61,10 @@ func NewServiceReconciler(
 
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
-	client.Client
+	k8sClient        client.Client
 	Scheme           *runtime.Scheme
 	serviceUseCase   usecase.ServiceUseCase
-	FinalizerManager k8s.FinalizerManager
+	finalizerManager k8s.FinalizerManager
 
 	serviceUtils  service.ServiceUtils
 	eventRecorder record.EventRecorder
@@ -110,7 +110,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
 	svc := &corev1.Service{}
-	err := r.Client.Get(ctx, req.NamespacedName, svc)
+	err := r.k8sClient.Get(ctx, req.NamespacedName, svc)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -147,7 +147,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 }
 
 func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
 		return err
 	}
 	return r.serviceUseCase.EnsureServiceUseCase(ctx, req)
@@ -164,7 +164,7 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return err
 	}
 
-	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
 		return err
 	}
 	return nil
@@ -190,9 +190,9 @@ func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 
 	svcEventHandler := eventhandlers.NewEnqueueRequestForServiceEvent(r.eventRecorder,
 		r.serviceUtils, r.logger.WithName("eventHandlers").WithName("service"))
-	endpointEventHandler := eventhandlers.NewEnqueueRequestForEndpointEvent(r.Client,
+	endpointEventHandler := eventhandlers.NewEnqueueRequestForEndpointEvent(r.k8sClient,
 		r.logger.WithName("eventHandlers").WithName("endpoint"))
-	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.Client,
+	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.k8sClient,
 		r.logger.WithName("eventHandlers").WithName("node"))
 
 	return ctrl.NewControllerManagedBy(mgr).

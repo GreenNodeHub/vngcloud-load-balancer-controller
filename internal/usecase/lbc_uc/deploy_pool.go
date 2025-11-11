@@ -140,7 +140,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 }
 
 // create CreatePoolRequest depend on default config and pool value
-func (t *defaultModelDeployTask) buildCreatePoolRequest(ctx context.Context, lbId string, pool *v1alpha1.Pool) loadbalancerv2.ICreatePoolRequest {
+func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId string, pool *v1alpha1.Pool) loadbalancerv2.ICreatePoolRequest {
 	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
 	for _, member := range pool.Members {
 		convertMembers = append(convertMembers,
@@ -157,6 +157,12 @@ func (t *defaultModelDeployTask) buildCreatePoolRequest(ctx context.Context, lbI
 		UnhealthyThreshold:  t.cfg.LoadBalancerOpts.DefaultUnhealthyThreshold,
 		Interval:            t.cfg.LoadBalancerOpts.DefaultInterval,
 		Timeout:             t.cfg.LoadBalancerOpts.DefaultTimeout,
+
+		HealthCheckMethod: pool.HealthMonitor.HealthCheckMethod,
+		HealthCheckPath:   pool.HealthMonitor.HealthCheckPath,
+		SuccessCode:       pool.HealthMonitor.SuccessCode,
+		HttpVersion:       pool.HealthMonitor.HttpVersion,
+		DomainName:        pool.HealthMonitor.DomainName,
 	}
 	if pool.HealthMonitor.HealthyThreshold != nil {
 		healthMonitor.HealthyThreshold = *pool.HealthMonitor.HealthyThreshold
@@ -188,7 +194,7 @@ func (t *defaultModelDeployTask) buildCreatePoolRequest(ctx context.Context, lbI
 }
 
 // return UpdateRequest and messages
-func (t *defaultModelDeployTask) buildPoolUpdateRequest(ctx context.Context, lbID string, pool *v1alpha1.Pool, current *entityv2.Pool) (*loadbalancerv2.UpdatePoolRequest, []string) {
+func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, pool *v1alpha1.Pool, current *entityv2.Pool) (*loadbalancerv2.UpdatePoolRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
 
@@ -230,16 +236,16 @@ func (t *defaultModelDeployTask) buildPoolUpdateRequest(ctx context.Context, lbI
 		updateOptions.Stickiness = &current.Stickiness
 		updateOptions.TLSEncryption = &current.TLSEncryption
 
-		// TODO
-		// if pool.HealthMonitor.
-		// if !new.IsL4 && current.Stickiness != new.Stickiness {
-		// 	message = append(message, fmt.Sprintf("stickiness (%t -> %t)", current.Stickiness, new.Stickiness))
-		// 	isNeedUpdate = true
-		// }
-		// if !new.IsL4 && current.TLSEncryption != new.TLSEncryption {
-		// 	message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", current.TLSEncryption, new.TLSEncryption))
-		// 	isNeedUpdate = true
-		// }
+		if pool.Stickiness != nil && *pool.Stickiness != current.Stickiness {
+			message = append(message, fmt.Sprintf("stickiness (%t -> %t)", current.Stickiness, *pool.Stickiness))
+			updateOptions.Stickiness = ptr.To(*pool.Stickiness)
+			isNeedUpdate = true
+		}
+		if pool.TLSEncryption != nil && *pool.TLSEncryption != current.TLSEncryption {
+			message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", current.TLSEncryption, *pool.TLSEncryption))
+			updateOptions.TLSEncryption = ptr.To(*pool.TLSEncryption)
+			isNeedUpdate = true
+		}
 	}
 	if pool.Algorithm != nil && *pool.Algorithm != "" && *pool.Algorithm != loadbalancerv2.PoolAlgorithm(current.LoadBalanceMethod) {
 		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.LoadBalanceMethod, *pool.Algorithm))
@@ -268,34 +274,65 @@ func (t *defaultModelDeployTask) buildPoolUpdateRequest(ctx context.Context, lbI
 		isNeedUpdate = true
 	}
 
-	// TODO
-	// if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
-	// 	new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
-	// 	// domain may return nil
-	// 	if current.HealthMonitor.HealthCheckPath == nil || *current.HealthMonitor.HealthCheckPath != *new.HealthMonitor.HealthCheckPath ||
-	// 		current.HealthMonitor.DomainName == nil || *current.HealthMonitor.DomainName != *new.HealthMonitor.DomainName ||
-	// 		current.HealthMonitor.HttpVersion == nil || *current.HealthMonitor.HttpVersion != *new.HealthMonitor.HttpVersion ||
-	// 		current.HealthMonitor.HealthCheckMethod == nil || *current.HealthMonitor.HealthCheckMethod != *new.HealthMonitor.HealthCheckMethod ||
-	// 		current.HealthMonitor.SuccessCode == nil || *current.HealthMonitor.SuccessCode != *new.HealthMonitor.SuccessCode {
-	// 		isNeedUpdate = true
-	// 	}
-	// } else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP &&
-	// 	new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP {
+	// compare HTTP health check options
+	if string(pool.HealthMonitor.Protocol) != current.HealthMonitor.HealthCheckProtocol {
+		message = append(message, fmt.Sprintf("health check protocol (%s -> %s)", current.HealthMonitor.HealthCheckProtocol, pool.HealthMonitor.Protocol))
+		updateOptions.HealthMonitor.WithHealthCheckProtocol(pool.HealthMonitor.Protocol)
+		isNeedUpdate = true
+	}
+	// switch from (HTTP, HTTPS) --> (HTTP, HTTPS)
+	if (current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTP) || current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTPs)) &&
+		(pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTP || pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTPs) {
 
-	// 	healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolHTTP
-	// 	healthMonitor.HealthCheckPath = current.HealthMonitor.HealthCheckPath
-	// 	healthMonitor.DomainName = current.HealthMonitor.DomainName
-	// 	healthMonitor.HttpVersion = current.HealthMonitor.HttpVersion
-	// 	healthMonitor.HealthCheckMethod = current.HealthMonitor.HealthCheckMethod
-	// } else if current.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolTCP &&
-	// 	new.HealthMonitor.HealthCheckProtocol == loadbalancerv2.HealthCheckProtocolHTTP {
+		if pool.HealthMonitor.HealthCheckMethod != nil && (current.HealthMonitor.HealthCheckMethod == nil || string(*pool.HealthMonitor.HealthCheckMethod) != *current.HealthMonitor.HealthCheckMethod) {
+			message = append(message, fmt.Sprintf("health check method (%v -> %v)", current.HealthMonitor.HealthCheckMethod, *pool.HealthMonitor.HealthCheckMethod))
+			updateOptions.HealthMonitor.WithHealthCheckMethod(pool.HealthMonitor.HealthCheckMethod)
+			isNeedUpdate = true
+		}
+		if pool.HealthMonitor.HealthCheckPath != nil && (current.HealthMonitor.HealthCheckPath == nil || *pool.HealthMonitor.HealthCheckPath != *current.HealthMonitor.HealthCheckPath) {
+			message = append(message, fmt.Sprintf("health check path (%v -> %v)", current.HealthMonitor.HealthCheckPath, *pool.HealthMonitor.HealthCheckPath))
+			updateOptions.HealthMonitor.WithHealthCheckPath(pool.HealthMonitor.HealthCheckPath)
+			isNeedUpdate = true
+		}
+		if pool.HealthMonitor.SuccessCode != nil && (current.HealthMonitor.SuccessCode == nil || *pool.HealthMonitor.SuccessCode != *current.HealthMonitor.SuccessCode) {
+			message = append(message, fmt.Sprintf("success code (%v -> %v)", current.HealthMonitor.SuccessCode, *pool.HealthMonitor.SuccessCode))
+			updateOptions.HealthMonitor.WithSuccessCode(pool.HealthMonitor.SuccessCode)
+			isNeedUpdate = true
+		}
+		if pool.HealthMonitor.HttpVersion != nil && (current.HealthMonitor.HttpVersion == nil || string(*pool.HealthMonitor.HttpVersion) != *current.HealthMonitor.HttpVersion) {
+			message = append(message, fmt.Sprintf("http version (%v -> %v)", current.HealthMonitor.HttpVersion, *pool.HealthMonitor.HttpVersion))
+			updateOptions.HealthMonitor.WithHttpVersion(pool.HealthMonitor.HttpVersion)
+			isNeedUpdate = true
+		}
+		if pool.HealthMonitor.DomainName != nil && (current.HealthMonitor.DomainName == nil || *pool.HealthMonitor.DomainName != *current.HealthMonitor.DomainName) {
+			message = append(message, fmt.Sprintf("domain name (%v -> %v)", current.HealthMonitor.DomainName, *pool.HealthMonitor.DomainName))
+			updateOptions.HealthMonitor.WithDomainName(pool.HealthMonitor.DomainName)
+			isNeedUpdate = true
+		}
+	} else // switch from (HTTP, HTTPS) --> (TCP)
+	if (current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTP) || current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTPs)) &&
+		pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolTCP {
 
-	// 	healthMonitor.HealthCheckProtocol = loadbalancerv2.HealthCheckProtocolTCP
-	// 	healthMonitor.HealthCheckPath = nil
-	// 	healthMonitor.DomainName = nil
-	// 	healthMonitor.HttpVersion = nil
-	// 	healthMonitor.HealthCheckMethod = nil
-	// }
+		updateOptions.HealthMonitor.WithHealthCheckMethod(nil)
+		updateOptions.HealthMonitor.WithHealthCheckPath(nil)
+		updateOptions.HealthMonitor.WithSuccessCode(nil)
+		updateOptions.HealthMonitor.WithHttpVersion(nil)
+		updateOptions.HealthMonitor.WithDomainName(nil)
+		message = append(message, "health check options (http -> tcp)")
+		isNeedUpdate = true
+
+	} else // switch from (TCP) --> (HTTP, HTTPS)
+	if current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolTCP) &&
+		(pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTP || pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTPs) {
+
+		updateOptions.HealthMonitor.WithHealthCheckMethod(pool.HealthMonitor.HealthCheckMethod)
+		updateOptions.HealthMonitor.WithHealthCheckPath(pool.HealthMonitor.HealthCheckPath)
+		updateOptions.HealthMonitor.WithSuccessCode(pool.HealthMonitor.SuccessCode)
+		updateOptions.HealthMonitor.WithHttpVersion(pool.HealthMonitor.HttpVersion)
+		updateOptions.HealthMonitor.WithDomainName(pool.HealthMonitor.DomainName)
+		message = append(message, "health check options (tcp -> http)")
+		isNeedUpdate = true
+	}
 
 	if !isNeedUpdate {
 		return nil, nil
@@ -303,7 +340,7 @@ func (t *defaultModelDeployTask) buildPoolUpdateRequest(ctx context.Context, lbI
 	return updateOptions, message
 }
 
-func (t *defaultModelDeployTask) comparePoolMembers(ctx context.Context, poolMembers []v1alpha1.PoolMember, current *entityv2.ListMembers) bool {
+func (t *defaultModelDeployTask) comparePoolMembers(_ context.Context, poolMembers []v1alpha1.PoolMember, current *entityv2.ListMembers) bool {
 	if len(poolMembers) != len(current.Items) {
 		return false
 	}
@@ -332,7 +369,7 @@ func (t *defaultModelDeployTask) checkIfPoolMemberExist(current *entityv2.ListMe
 	return false
 }
 
-func (t *defaultModelDeployTask) buildPoolMemberUpdateRequest(ctx context.Context, lbID, poolId string, pool *v1alpha1.Pool) loadbalancerv2.IUpdatePoolMembersRequest {
+func (t *defaultModelDeployTask) buildPoolMemberUpdateRequest(_ context.Context, lbID, poolId string, pool *v1alpha1.Pool) loadbalancerv2.IUpdatePoolMembersRequest {
 	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
 	for _, member := range pool.Members {
 		convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IP, member.Port, member.MonitorPort))

@@ -35,7 +35,12 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 
-	lbId, err := t.deployLoadBalancer(ctx)
+	createdCerts, err := t.deployCerts(ctx)
+	if err != nil {
+		return err
+	}
+
+	lbId, err := t.deployLoadBalancer(ctx, createdCerts)
 	if err != nil {
 		return err
 	}
@@ -50,7 +55,7 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	mapListenerPortToID, err := t.deployListeners(ctx, lbId, mapPoolNameToID)
+	mapListenerPortToID, err := t.deployListeners(ctx, lbId, mapPoolNameToID, createdCerts)
 	if err != nil {
 		return err
 	}
@@ -60,6 +65,10 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 	err = t.deployDeleteRedundantPools(ctx, lbId, t.lbConfig.Status)
+	if err != nil {
+		return err
+	}
+	err = t.deployDeleteRedundantCerts(ctx)
 	if err != nil {
 		return err
 	}
@@ -78,10 +87,11 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 				Id: poolId,
 			})
 		}
+		obj.Status.CreatedCertificates = createdCerts
 	})
 }
 
-func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
+func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
 	// if already an exist lb
 	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
 		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
@@ -108,10 +118,10 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 		}
 	}
 
-	return t.createLoadBalancer(ctx)
+	return t.createLoadBalancer(ctx, createdCerts)
 }
 
-func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string, error) {
+func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
 	var lbEntity *entity.LoadBalancer
 	var err error
 	// check if lb scheme is intervpc, need super client
@@ -128,7 +138,7 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string
 			return "", errors.New("load balancer not have UUID after create, need to retry")
 		}
 	} else {
-		createRequest, err := t.buildCreateLoadBalancerRequest(ctx)
+		createRequest, err := t.buildCreateLoadBalancerRequest(ctx, createdCerts)
 		if err != nil {
 			return "", err
 		}
@@ -230,7 +240,7 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	return nil
 }
 
-func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context) (loadbalancerv2.ICreateLoadBalancerRequest, error) {
+func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateLoadBalancerRequest, error) {
 	packageId := ""
 	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
 		packageId = *t.lbConfig.Spec.PackageId
@@ -274,9 +284,9 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 	}
 
 	// if have pool, create first pool, but in L7, only create default pool in this step
-	defaultPoolRequest, defaultListenerRequest := func() (loadbalancerv2.ICreatePoolRequest, loadbalancerv2.ICreateListenerRequest) {
+	defaultPoolRequest, defaultListenerRequest, err := func() (loadbalancerv2.ICreatePoolRequest, loadbalancerv2.ICreateListenerRequest, error) {
 		if len(t.lbConfig.Spec.Pools) == 0 {
-			return nil, nil
+			return nil, nil, nil
 		}
 		poolSpec := t.lbConfig.Spec.Pools[0]
 		// if L7, only create default pool
@@ -290,24 +300,29 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 				}
 			}
 			if !isFoundDefaultPool {
-				return nil, nil
+				return nil, nil, nil
 			}
 		}
 
 		// Both listener and pool properties must be required (non null) or both are not required (null); <nil> map[]},
 		// if have listener, create first listener
 		if len(t.lbConfig.Spec.Listeners) == 0 {
-			return nil, nil
+			return nil, nil, nil
 		}
 
 		listenerSpec := t.lbConfig.Spec.Listeners[0]
-		listenerRequest := t.buildCreateListenerRequest(ctx, "", listenerSpec, map[string]string{})
-		// TODO: if L7, set certificate for listener
+		listenerRequest, err := t.buildCreateListenerRequest(ctx, "", listenerSpec, map[string]string{}, createdCerts)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		poolRequest := t.buildCreatePoolRequest(ctx, "", &poolSpec)
 
-		return poolRequest, listenerRequest
+		return poolRequest, listenerRequest, nil
 	}()
+	if err != nil {
+		return nil, err
+	}
 
 	if defaultPoolRequest != nil && defaultListenerRequest != nil {
 		request = request.WithListener(defaultListenerRequest).WithPool(defaultPoolRequest)

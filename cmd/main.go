@@ -29,6 +29,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/anngdinh/operator-helper/k8s"
@@ -53,14 +54,17 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
@@ -88,6 +92,7 @@ func main() {
 	var enableHTTP2 bool
 	var devMode bool
 	var disableServiceController bool
+	var disableIngressController bool
 	var disableLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
 	var tlsOpts []func(*tls.Config)
@@ -105,6 +110,8 @@ func main() {
 		"If set, log will be printed in different format, easier to debug")
 	flag.BoolVar(&disableServiceController, "disable-service-controller", false,
 		"If set, the service controller will be disabled")
+	flag.BoolVar(&disableIngressController, "disable-ingress-controller", false,
+		"If set, the ingress controller will be disabled")
 	flag.BoolVar(&disableLoadBalancerConfigController, "disable-load-balancer-config-controller", false,
 		"If set, the LoadBalancerConfig controller will be disabled")
 	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
@@ -265,6 +272,33 @@ func main() {
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Service")
+			os.Exit(1)
+		}
+	}
+
+	if !disableIngressController {
+		clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
+		if err != nil {
+			setupLog.Error(err, "unable to obtain clientSet")
+			os.Exit(1)
+		}
+
+		annotationParser := annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
+		cniDetector := utils.NewDetector(mgr.GetClient())
+		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
+		ingressUtils := ingress.NewIngressUtils(consts.IngressFinalizer)
+		ingressUseCase := ingress_uc.NewIngressUseCase(
+			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, ingressUtils, cniDetector, endpointResolver)
+		reconciler := networkingcontroller.NewIngressReconciler(
+			ingressUseCase,
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			finalizerManager,
+			mgr.GetEventRecorderFor("ingress-controller"),
+			ingressUtils,
+		)
+		if err = reconciler.SetupWithManager(ctx, mgr, clientSet); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Ingress")
 			os.Exit(1)
 		}
 	}

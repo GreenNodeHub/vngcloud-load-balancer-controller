@@ -6,15 +6,16 @@ import (
 	"net"
 	"os"
 
+	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
@@ -225,4 +226,42 @@ func (r *k8sRepository) PatchMutateStatusNodeSecurityGroup(
 		// type-assert so you can use strongly typed fields
 		mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
 	})
+}
+
+// ------------------- ingress ------------------
+
+func (r *k8sRepository) GetIngress(ctx context.Context, n types.NamespacedName) (*networkingv1.Ingress, error) {
+	ing := &networkingv1.Ingress{}
+	err := r.client.Get(ctx, n, ing)
+	return ing, err
+}
+
+func (r *k8sRepository) UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error {
+	if address == "" {
+		return nil
+	}
+
+	// Update the ingress status with the new address
+	ing := &networkingv1.Ingress{}
+	err := r.client.Get(ctx, n, ing)
+	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	objectOld := ing.DeepCopy()
+
+	addr := net.ParseIP(address)
+	if addr != nil {
+		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address + ".nip.io"}}
+	} else {
+		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
+	}
+	return r.client.Status().Patch(ctx, ing, client.MergeFrom(objectOld))
+}
+
+// ------------------- secret ------------------
+
+func (r *k8sRepository) GetSecret(ctx context.Context, n types.NamespacedName) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	err := r.client.Get(ctx, n, secret)
+	return secret, err
 }
