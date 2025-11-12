@@ -60,11 +60,11 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 
-	err = t.deployDeleteRedundantListeners(ctx, lbId, newCreatedListeners, t.lbConfig.Status)
+	err = t.deleteRedundantListeners(ctx, lbId, newCreatedListeners)
 	if err != nil {
 		return err
 	}
-	err = t.deployDeleteRedundantPools(ctx, lbId, t.lbConfig.Status)
+	err = t.deleteRedundantPools(ctx, lbId, newCreatedPools)
 	if err != nil {
 		return err
 	}
@@ -240,14 +240,26 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 		if err != nil {
 			return nil, err
 		}
-		for _, pkg := range listPackages.Items {
-			if pkg.Name == t.cfg.LoadBalancerOpts.DefaultL4PackageName {
-				packageId = pkg.UUID
-				break
+		if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 && t.cfg.LoadBalancerOpts.DefaultL4PackageName != "" {
+			for _, pkg := range listPackages.Items {
+				if pkg.Name == t.cfg.LoadBalancerOpts.DefaultL4PackageName {
+					packageId = pkg.UUID
+					break
+				}
 			}
-		}
-		if packageId == "" {
-			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
+			if packageId == "" {
+				return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
+			}
+		} else if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 && t.cfg.LoadBalancerOpts.DefaultL7PackageName != "" {
+			for _, pkg := range listPackages.Items {
+				if pkg.Name == t.cfg.LoadBalancerOpts.DefaultL7PackageName {
+					packageId = pkg.UUID
+					break
+				}
+			}
+			if packageId == "" {
+				return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL7PackageName, t.lbConfig.Spec.ZoneId))
+			}
 		}
 	}
 

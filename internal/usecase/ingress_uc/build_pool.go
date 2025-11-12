@@ -22,6 +22,16 @@ import (
 
 func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targetNodeLabels map[string]string) ([]v1alpha1.Pool, []v1alpha1.Listener, error) {
 	allPools := make([]v1alpha1.Pool, 0)
+	appendPool := func(newPool v1alpha1.Pool) {
+		// check if pool name already exist
+		for _, existingPool := range allPools {
+			if existingPool.Name == newPool.Name {
+				return
+			}
+		}
+		allPools = append(allPools, newPool)
+	}
+
 	allListeners := make([]v1alpha1.Listener, 0)
 
 	// build default backend pool
@@ -35,7 +45,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 			return nil, nil, err
 		}
 		defaultPool.Name = consts.DEFAULT_NAME_DEFAULT_POOL
-		allPools = append(allPools, *defaultPool)
+		appendPool(*defaultPool)
 	}
 
 	// build listener http
@@ -95,7 +105,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 				if err != nil {
 					return nil, nil, err
 				}
-				allPools = append(allPools, *newPool)
+				appendPool(*newPool)
 
 				// set policy refer to pool name
 				newPolicy.RedirectPoolName = &newPool.Name

@@ -52,7 +52,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to create listener: ", err)
 			return nil, err
 		}
-		if err := t.statusAddListener(ctx, _lis.UUID, _lis.ProtocolPort); err != nil {
+		if err := t.statusAddListener(ctx, _lis.UUID, int(listenerSpec.ProtocolPort)); err != nil {
 			return nil, err
 		}
 
@@ -66,8 +66,6 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		}
 	}
 
-	// if mismatch listener protocol, return error => user must delete listener in portal
-	// TODO: should we do it automatically?
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
 		t.logger.Error("Listener protocol mismatch: ", currentListener.Protocol, listenerSpec.Protocol)
 		return nil, errors.New("listener port " + string(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
@@ -89,13 +87,6 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			return nil, err
 		}
 
-		// TODO: why I need this?
-		// // need to update to current builder, avoid mismatch data later
-		// listenerInPortal.DefaultPoolId = &updateOptions.DefaultPoolId
-		// listenerInPortal.ReferPoolName = ""
-		// if p := t.GetPoolBuilderByID(updateOptions.DefaultPoolId); p != nil { // in ensurePool, should update to the latest information
-		// 	listenerInPortal.ReferPoolName = p.GetName()
-		// }
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
 			return nil, err
@@ -111,7 +102,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	}
 
 	// ensure policy
-	createdPolicies, err := t.deployPolicies(ctx, lbId, currentListener.UUID, listenerSpec.Policies, newCreatedPools)
+	createdPolicies, err := t.deployPolicies(ctx, lbId, currentListener.UUID, int(listenerSpec.ProtocolPort), listenerSpec.Policies, newCreatedPools)
 	if err != nil {
 		return nil, err
 	}
@@ -218,10 +209,16 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		TimeoutMember:               currentListener.TimeoutMember,
 		TimeoutConnection:           currentListener.TimeoutConnection,
 		DefaultPoolId:               currentListener.DefaultPoolId,
-		DefaultCertificateAuthority: currentListener.DefaultCertificateAuthority,
-		CertificateAuthorities:      &currentListener.CertificateAuthorities,
 		InsertHeaders:               &currentListener.InsertHeaders,
-		ClientCertificate:           currentListener.ClientCertificateAuthentication,
+		DefaultCertificateAuthority: nil,
+		CertificateAuthorities:      nil,
+		ClientCertificate:           nil,
+	}
+
+	if listenerSpec.Protocol == loadbalancerv2.ListenerProtocolHTTPS {
+		updateOptions.DefaultCertificateAuthority = currentListener.DefaultCertificateAuthority
+		updateOptions.CertificateAuthorities = &currentListener.CertificateAuthorities
+		updateOptions.ClientCertificate = currentListener.ClientCertificateAuthentication
 	}
 
 	if listenerSpec.AllowedCidrs != nil && *listenerSpec.AllowedCidrs != "" && currentListener.AllowedCidrs != *listenerSpec.AllowedCidrs {
@@ -248,8 +245,9 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		isNeedUpdate = true
 	}
 
-	// TODO: should update to no default pool if user set empty string
-	if listenerSpec.DefaultPoolName != nil && *listenerSpec.DefaultPoolName != currentListener.DefaultPoolName {
+	// default pool can empty
+	defaultPoolId := ""
+	if listenerSpec.DefaultPoolName != nil && *listenerSpec.DefaultPoolName != "" {
 		findCreatedPoolByName := func(name string) *v1alpha1.CreatedPool {
 			for _, p := range newCreatedPools {
 				if p.Name == name {
@@ -260,12 +258,13 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		}
 		createdPool := findCreatedPoolByName(*listenerSpec.DefaultPoolName)
 		if createdPool != nil {
-			message = append(message, fmt.Sprintf("default pool (%s -> %s)", currentListener.DefaultPoolName, *listenerSpec.DefaultPoolName))
-			updateOptions.WithDefaultPoolId(createdPool.Id)
-			isNeedUpdate = true
-		} else {
-			t.logger.Warnf("Default pool name %s not found in created pools", *listenerSpec.DefaultPoolName)
+			defaultPoolId = createdPool.Id
 		}
+	}
+	if defaultPoolId != currentListener.DefaultPoolId {
+		message = append(message, fmt.Sprintf("default pool (%s -> %s)", currentListener.DefaultPoolId, defaultPoolId))
+		updateOptions.WithDefaultPoolId(defaultPoolId)
+		isNeedUpdate = true
 	}
 
 	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
@@ -344,118 +343,6 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		return nil, nil, nil
 	}
 	return updateOptions, message, nil
-}
-
-// delete redundant listeners
-// newCreatedListeners is the listeners that are still in use
-func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener, status v1alpha1.LoadBalancerConfigStatus) error {
-	// delete candidates include all created listeners
-	deleteCandidates := make([]string, 0)
-	for _, listener := range status.CreatedListeners {
-		deleteCandidates = append(deleteCandidates, listener.Id)
-	}
-
-	currentListeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
-	if err != nil {
-		return err
-	}
-
-	isListenerExist := func(listenerId string) bool {
-		for _, l := range currentListeners.Items {
-			if l.UUID == listenerId {
-				return true
-			}
-		}
-		return false
-	}
-
-	isListenerInUse := func(listenerId string) bool {
-		for _, listener := range newCreatedListeners {
-			if listener.Id == listenerId {
-				return true
-			}
-		}
-		return false
-	}
-
-	// delete redundant listeners
-	for _, candidateId := range deleteCandidates {
-		if isListenerInUse(candidateId) {
-			continue
-		}
-		if !isListenerExist(candidateId) {
-			t.logger.Warnf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
-			continue
-		}
-
-		t.logger.Infof("Deleting redundant listener %s", candidateId)
-		err := t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId)
-		if err != nil {
-			t.logger.Error("Failed to delete listener: ", err)
-			return err
-		}
-		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return err
-		}
-
-		// TODO
-		// // delete whole listener if new not used and can delete whole
-		// if newListener == nil && r.CanDeleteWholeListener(oldListener) {
-		// 	if err := r.provider.DeleteListener(r.context, r.GetLoadBalancerID(), oldListener.GetID()); err != nil {
-		// 		r.logger.Error("Failed to delete listener: ", err)
-		// 		return err
-		// 	}
-		// 	if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
-		// 		r.logger.Error("Failed to wait for loadbalancer active: ", err)
-		// 		return err
-		// 	}
-		// }
-
-		// TODO
-		// // delete redundant policy
-		// if err := r.deleteRedundantPolicies(oldListener, currentListener, newListener); err != nil {
-		// 	return err
-		// }
-	}
-
-	// TODO
-	// // reorder policies if needed
-	// if newBuilder.AutoReorderPolicies() {
-	// 	for _, listener := range r.GetListenerBuilders() {
-	// 		if listener.IsDeleted() {
-	// 			continue
-	// 		}
-	// 		// get policies to update
-	// 		policies, err := r.provider.ListPolicyOfListener(r.context, r.loadBalancerID, listener.GetID())
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		listener.policyBuilders = make([]*policyBuilderType, 0)
-	// 		for _, policy := range policies.Items {
-	// 			policyBuilder, err := r.buildPolicy(policy)
-	// 			if err != nil {
-	// 				return err
-	// 			}
-	// 			listener.policyBuilders = append(listener.policyBuilders, policyBuilder)
-	// 		}
-
-	// 		// check if need reorder policies
-	// 		isNeeded, policyIDs := listener.NeedReorder()
-	// 		if !isNeeded {
-	// 			continue
-	// 		}
-	// 		if err := r.provider.ReorderPolicies(r.context, r.GetLoadBalancerID(), listener.GetID(), policyIDs); err != nil {
-	// 			r.logger.Error("Failed to reorder policies: ", err)
-	// 			return err
-	// 		}
-	// 		if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
-	// 			r.logger.Error("Failed to wait for loadbalancer active: ", err)
-	// 			return err
-	// 		}
-	// 	}
-	// }
-	return nil
 }
 
 // compare listener headers, if they are the same then return true

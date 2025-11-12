@@ -1,8 +1,16 @@
 package lbc_uc
 
-import "context"
+import (
+	"context"
 
-func (t *defaultModelDeleteTask) deleteRedundantListeners(ctx context.Context, lbId string) error {
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+)
+
+// delete redundant listeners
+// newCreatedListeners is the listeners that are still in use
+func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
 	for _, listener := range t.lbConfig.Status.CreatedListeners {
@@ -23,6 +31,15 @@ func (t *defaultModelDeleteTask) deleteRedundantListeners(ctx context.Context, l
 		return false
 	}
 
+	isListenerInUse := func(listenerId string) bool {
+		for _, listener := range newCreatedListeners {
+			if listener.Id == listenerId {
+				return true
+			}
+		}
+		return false
+	}
+
 	// delete redundant listeners
 	for _, candidateId := range deleteCandidates {
 		if !isListenerExist(candidateId) {
@@ -30,35 +47,33 @@ func (t *defaultModelDeleteTask) deleteRedundantListeners(ctx context.Context, l
 			continue
 		}
 
-		t.logger.Infof("Deleting redundant listener %s", candidateId)
-		err := t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId)
+		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, candidateId)
 		if err != nil {
-			t.logger.Error("Failed to delete listener: ", err)
-			return err
-		}
-		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
 			return err
 		}
 
-		// TODO
-		// // delete whole listener if new not used and can delete whole
-		// if newListener == nil && r.CanDeleteWholeListener(oldListener) {
-		// 	if err := r.provider.DeleteListener(r.context, r.GetLoadBalancerID(), oldListener.GetID()); err != nil {
-		// 		r.logger.Error("Failed to delete listener: ", err)
-		// 		return err
-		// 	}
-		// 	if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
-		// 		r.logger.Error("Failed to wait for loadbalancer active: ", err)
-		// 		return err
-		// 	}
-		// }
-
-		// TODO
-		// // delete redundant policy
-		// if err := r.deleteRedundantPolicies(oldListener, currentListener, newListener); err != nil {
-		// 	return err
-		// }
+		if !isListenerInUse(candidateId) && canDeleteWhole {
+			if err := t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId); err != nil {
+				t.logger.Error("Failed to delete listener: ", err)
+				return err
+			}
+			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+				t.logger.Error("Failed to wait for loadbalancer active: ", err)
+				return err
+			}
+		} else {
+			// delete redundant policy
+			newCreatedPolicies := []v1alpha1.CreatedPolicy{}
+			for _, l := range newCreatedListeners {
+				if l.Id == candidateId {
+					newCreatedPolicies = l.CreatedPolicies
+					break
+				}
+			}
+			if err := t.deployDeleteRedundantPolicies(ctx, lbId, candidateId, newCreatedPolicies); err != nil {
+				return err
+			}
+		}
 	}
 
 	// TODO
@@ -100,8 +115,44 @@ func (t *defaultModelDeleteTask) deleteRedundantListeners(ctx context.Context, l
 	return nil
 }
 
-// func (t *defaultModelDeleteTask)
+// canDeleteWholeListener checks if we can delete the whole listener
+// conditions:
+// - all current policies must exist in old policies
+func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbId, listenerId string) (bool, error) {
+	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
+		t.logger.Debugf("Can delete whole listener %s, because it is layer4 listener.", listenerId)
+		return true, nil
+	}
 
-// func (t *defaultModelDeleteTask)
+	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listenerId)
+	if err != nil {
+		t.logger.Errorf("Failed to list policies of listener %s: %v", listenerId, err)
+		return false, err
+	}
 
-// func (t *defaultModelDeleteTask)
+	createdPolicies := []v1alpha1.CreatedPolicy{}
+	for _, l := range t.lbConfig.Status.CreatedListeners {
+		if l.Id == listenerId {
+			createdPolicies = l.CreatedPolicies
+			break
+		}
+	}
+
+	// check if all current policies exist in created policies (created by me)
+	for _, currentPolicy := range currentPolicies.Items {
+		found := false
+		for _, createdPolicy := range createdPolicies {
+			if createdPolicy.Id == currentPolicy.UUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.logger.Debugf("Can't delete whole listener, found policy not created by me: %s", currentPolicy.Name)
+			return false, nil
+		}
+	}
+
+	t.logger.Debugf("Can delete whole listener %s.", listenerId)
+	return true, nil
+}

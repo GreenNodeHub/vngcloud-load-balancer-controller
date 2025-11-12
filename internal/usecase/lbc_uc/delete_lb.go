@@ -3,24 +3,13 @@ package lbc_uc
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 )
 
-type defaultModelDeleteTask struct {
-	logger       *logrus.Entry
-	cfg          *config.Config
-	vngcloudRepo repository.VngCloudRepository
-	k8sRepo      repository.K8sRepository
-	lbConfig     *v1alpha1.LoadBalancerConfig
-}
-
-func (t *defaultModelDeleteTask) delete(ctx context.Context) error {
+func (t *defaultModelDeployTask) delete(ctx context.Context) error {
 	// if status.lbId is empty, skip
 	if t.lbConfig.Status.LoadBalancerId == nil || *t.lbConfig.Status.LoadBalancerId == "" {
 		t.logger.Infof("LBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
@@ -36,7 +25,7 @@ func (t *defaultModelDeleteTask) delete(ctx context.Context) error {
 	return nil
 }
 
-func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId string) error {
+func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId string) error {
 	// check if load balancer is exists
 	if _, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId); err != nil {
 		if domain.IsLoadBalancerNotFound(err) {
@@ -57,12 +46,12 @@ func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId st
 		}
 	} else {
 		// delete redundant listeners
-		if err := t.deleteRedundantListeners(ctx, lbId); err != nil {
+		if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedListener{}); err != nil {
 			return err
 		}
 
 		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
-		if err := t.deleteRedundantPools(ctx, lbId); err != nil {
+		if err := t.deleteRedundantPools(ctx, lbId, []v1alpha1.CreatedPool{}); err != nil {
 			return err
 		}
 
@@ -86,7 +75,7 @@ func (t *defaultModelDeleteTask) deleteLoadBalancer(ctx context.Context, lbId st
 // check if can delete whole loadbalancer
 // oldBuilder and currentBuilder should be the same listeners' name, pool's name
 // if can delete whole loadbalancer, delete loadbalancer and return
-func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context, lbId string) (bool, error) {
+func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context, lbId string) (bool, error) {
 	// get current listeners and pools from vngcloud
 	listeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
 	if err != nil {
@@ -182,7 +171,7 @@ func (t *defaultModelDeleteTask) canDeleteWholeLoadBalancer(ctx context.Context,
 	return true, nil
 }
 
-func (t *defaultModelDeleteTask) isLoadBalancerEmpty(ctx context.Context, lbId string) (bool, error) {
+func (t *defaultModelDeployTask) isLoadBalancerEmpty(ctx context.Context, lbId string) (bool, error) {
 	listeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
 	if err != nil {
 		return false, err

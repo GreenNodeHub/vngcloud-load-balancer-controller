@@ -88,6 +88,7 @@ type Policy struct {
 
 	// L7Rules is the list of L7 rules for this policy
 	// +optional
+	// +listType=atomic
 	L7Rules []L7Rule `json:"l7Rules,omitempty"`
 }
 
@@ -123,6 +124,7 @@ type Pool struct {
 
 	// Members is the list of members in the pool
 	// +optional
+	// +listType=atomic
 	Members []PoolMember `json:"members,omitempty"`
 }
 
@@ -237,10 +239,13 @@ type Listener struct {
 
 	// InsertHeaders defines headers to insert into requests
 	// +optional
+	// +listType=atomic
 	InsertHeaders []InsertHeader `json:"insertHeaders,omitempty"`
 
 	// Policies is the list of policies for this listener (for L7)
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Policies []Policy `json:"policies,omitempty"`
 
 	// // AutoReorderPolicies enables automatic reordering of policies
@@ -253,6 +258,7 @@ type Listener struct {
 
 	// CertificateAuthorities is a list of certificate authorities for mutual TLS (for L7)
 	// +optional
+	// +listType=atomic
 	CertificateAuthorities []ListenerCertificate `json:"certificateAuthorities,omitempty"`
 
 	// ClientCertificateId is the client certificate Id for mutual TLS
@@ -334,14 +340,20 @@ type LoadBalancerConfigSpec struct {
 
 	// Listeners defines the array of listeners for the load balancer
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Listeners []Listener `json:"listeners,omitempty"`
 
 	// Pools defines the array of pools for the load balancer
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Pools []Pool `json:"pools,omitempty"`
 
 	// CreateCertificates defines certificates to be created
 	// +optional
+	// +listType=map
+	// +listMapKey=secretName
 	CreateCertificates []CreateCertificate `json:"createCertificates,omitempty"`
 }
 
@@ -386,14 +398,20 @@ type LoadBalancerConfigStatus struct {
 
 	// CreatedListeners is the list of created listener IDs
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	CreatedPools []CreatedPool `json:"createdPools,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
 	// +optional
+	// +listType=map
+	// +listMapKey=id
 	CreatedListeners []CreatedListener `json:"createdListeners,omitempty"`
 
 	// CreatedCertificates is the list of created certificate IDs
 	// +optional
+	// +listType=map
+	// +listMapKey=id
 	CreatedCertificates []CreatedCertificate `json:"createdCertificates,omitempty"`
 
 	// // ManageDFPMembers indicates if the controller should manage DFP members
@@ -409,6 +427,11 @@ type CreatedPool struct {
 	// Name is the name of the created pool
 	// +required
 	Name string `json:"name,omitempty"`
+
+	// CreatedMembers is the list of created member IDs
+	// +optional
+	// +listType=atomic
+	CreatedMembers []PoolMember `json:"createdMembers,omitempty"`
 }
 
 type CreatedListener struct {
@@ -422,6 +445,8 @@ type CreatedListener struct {
 
 	// CreatedPolicies is the list of created policy IDs
 	// +optional
+	// +listType=map
+	// +listMapKey=id
 	CreatedPolicies []CreatedPolicy `json:"createdPolicies,omitempty"`
 }
 

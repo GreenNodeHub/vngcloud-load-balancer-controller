@@ -90,7 +90,7 @@ func (uc *lbcUseCase) DeleteLoadBalancerConfigUseCase(ctx context.Context, req c
 	}
 
 	logger := contexts.NewContext(ctx).Log()
-	task := &defaultModelDeleteTask{
+	task := &defaultModelDeployTask{
 		logger:       logger,
 		cfg:          uc.cfg,
 		lbConfig:     lbConfig,

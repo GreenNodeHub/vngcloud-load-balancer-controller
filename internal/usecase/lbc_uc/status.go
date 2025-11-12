@@ -19,11 +19,12 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 	})
 }
 
-func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId, policyId string) error {
+func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId string, port int, policyId string) error {
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
 		// check if already exist
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id == listenerId {
+				obj.Status.CreatedListeners[i].Port = port
 				// check if policy already exist
 				for j := range obj.Status.CreatedListeners[i].CreatedPolicies {
 					if obj.Status.CreatedListeners[i].CreatedPolicies[j].Id == policyId {
@@ -34,7 +35,7 @@ func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId
 				return
 			}
 		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{Id: listenerId})
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{Id: listenerId, Port: port, CreatedPolicies: []v1alpha1.CreatedPolicy{{Id: policyId}}})
 	})
 }
 
@@ -48,5 +49,19 @@ func (t *defaultModelDeployTask) statusAddPool(ctx context.Context, poolId strin
 			}
 		}
 		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{Id: poolId, Name: name})
+	})
+}
+
+func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId string, name string, members []v1alpha1.PoolMember) error {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		// check if already exist
+		for i := range obj.Status.CreatedPools {
+			if obj.Status.CreatedPools[i].Id == poolId {
+				obj.Status.CreatedPools[i].Name = name
+				obj.Status.CreatedPools[i].CreatedMembers = members
+				return
+			}
+		}
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{Id: poolId, Name: name, CreatedMembers: members})
 	})
 }

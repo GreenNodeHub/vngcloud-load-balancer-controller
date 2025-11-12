@@ -40,6 +40,7 @@ type AuthOpts struct {
 
 type LoadBalancerOpts struct {
 	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"`
+	DefaultL7PackageName string `gcfg:"default-l7-package-name" mapstructure:"defaultL7PackageName" name:"default-l7-package-name"`
 	DefaultScheme        string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
 
 	// Pool defaults

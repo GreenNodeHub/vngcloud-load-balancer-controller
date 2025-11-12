@@ -12,7 +12,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-func (t *defaultModelDeployTask) deployPolicies(ctx context.Context, lbId, listenerId string, policiesSpec []v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool) ([]v1alpha1.CreatedPolicy, error) {
+func (t *defaultModelDeployTask) deployPolicies(ctx context.Context, lbId, listenerId string, listenerPort int, policiesSpec []v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool) ([]v1alpha1.CreatedPolicy, error) {
 	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listenerId)
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func (t *defaultModelDeployTask) deployPolicies(ctx context.Context, lbId, liste
 
 	createdPolicies := make([]v1alpha1.CreatedPolicy, 0, len(policiesSpec))
 	for _, policySpec := range policiesSpec {
-		createdPolicy, err := t.deployPolicy(ctx, lbId, listenerId, policySpec, newCreatedPools, currentPolicies)
+		createdPolicy, err := t.deployPolicy(ctx, lbId, listenerId, listenerPort, policySpec, newCreatedPools, currentPolicies)
 		if err != nil {
 			return nil, err
 		}
@@ -29,7 +29,7 @@ func (t *defaultModelDeployTask) deployPolicies(ctx context.Context, lbId, liste
 	return createdPolicies, nil
 }
 
-func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listenerId string, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool, currentPolicies *entityv2.ListPolicies) (*v1alpha1.CreatedPolicy, error) {
+func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listenerId string, listenerPort int, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool, currentPolicies *entityv2.ListPolicies) (*v1alpha1.CreatedPolicy, error) {
 	searchPolicyByName := func(name string) *entityv2.Policy {
 		for _, p := range currentPolicies.Items {
 			if p.Name == name {
@@ -49,7 +49,7 @@ func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listene
 		if err != nil {
 			return nil, err
 		}
-		if err := t.statusAddPolicy(ctx, listenerId, newPolicy.UUID); err != nil {
+		if err := t.statusAddPolicy(ctx, listenerId, listenerPort, newPolicy.UUID); err != nil {
 			return nil, err
 		}
 
@@ -262,5 +262,72 @@ func (t *defaultModelDeployTask) compareL7Rules(rulesSpec []v1alpha1.L7Rule, cur
 		}
 	}
 
+	return nil
+}
+
+func (t *defaultModelDeployTask) deployDeleteRedundantPolicies(ctx context.Context, lbId, listenerId string, newCreatedPolicies []v1alpha1.CreatedPolicy) error {
+	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
+		return nil
+	}
+
+	createdPolicies := []v1alpha1.CreatedPolicy{}
+	for _, l := range t.lbConfig.Status.CreatedListeners {
+		if l.Id == listenerId {
+			createdPolicies = l.CreatedPolicies
+			break
+		}
+	}
+
+	if len(createdPolicies) == 0 {
+		return nil
+	}
+
+	// delete candidates include all created listeners
+	deleteCandidates := make([]string, 0)
+	for _, policy := range createdPolicies {
+		deleteCandidates = append(deleteCandidates, policy.Id)
+	}
+
+	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listenerId)
+	if err != nil {
+		return err
+	}
+
+	isPolicyExist := func(id string) bool {
+		for _, l := range currentPolicies.Items {
+			if l.UUID == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	isPolicyInUse := func(id string) bool {
+		for _, policy := range newCreatedPolicies {
+			if policy.Id == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	// delete redundant policies
+	for _, candidateId := range deleteCandidates {
+		if isPolicyInUse(candidateId) {
+			continue
+		}
+		if !isPolicyExist(candidateId) {
+			continue
+		}
+
+		if err := t.vngcloudRepo.DeletePolicy(ctx, lbId, listenerId, candidateId); err != nil {
+			t.logger.Error("Failed to delete policy: ", err)
+			return err
+		}
+		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+			t.logger.Error("Failed to wait for loadbalancer active: ", err)
+			return err
+		}
+	}
 	return nil
 }
