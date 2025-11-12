@@ -45,6 +45,8 @@ import (
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
@@ -70,8 +72,8 @@ var (
 	ctx                   context.Context
 	cancel                context.CancelFunc
 	mockServiceReconciler *core.ServiceReconciler
-	mockLBCReconciler     *LoadBalancerConfigReconciler
-	mockNSGReconciler     *NodeSecurityGroupReconciler
+	mockLBCReconciler     *lbc_controller.LoadBalancerConfigReconciler
+	mockNSGReconciler     *nsg_controller.NodeSecurityGroupReconciler
 	vngcloudRepo          *vngcloud_mocks.MockProvider
 	cniDetector           *utils.MockCniDetector
 
@@ -296,7 +298,7 @@ var _ = BeforeSuite(func() {
 		k8sRepo,
 		vngcloudRepo,
 	)
-	mockLBCReconciler = NewLoadBalancerConfigReconciler(
+	mockLBCReconciler = lbc_controller.NewLoadBalancerConfigReconciler(
 		k8sManager.GetClient(),
 		k8sManager.GetScheme(),
 		lbcUseCase,
@@ -312,7 +314,7 @@ var _ = BeforeSuite(func() {
 		k8sRepo,
 		vngcloudRepo,
 	)
-	mockNSGReconciler = NewNodeSecurityGroupReconciler(
+	mockNSGReconciler = nsg_controller.NewNodeSecurityGroupReconciler(
 		k8sManager.GetClient(),
 		k8sManager.GetScheme(),
 		nsgUseCase,

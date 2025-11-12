@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package lbc_controller
 
 import (
 	"context"
@@ -32,63 +32,64 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 )
 
-func NewNodeSecurityGroupReconciler(
+func NewLoadBalancerConfigReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
-	nsgUseCase usecase.NodeSecurityGroupUseCase,
+	lbcUseCase usecase.LoadBalancerConfigUseCase,
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
-	nsgUtils nsg.NodeSecurityGroupUtils,
-) *NodeSecurityGroupReconciler {
-	return &NodeSecurityGroupReconciler{
+	lbcUtils lbc.LoadBalancerConfigUtils,
+) *LoadBalancerConfigReconciler {
+	return &LoadBalancerConfigReconciler{
 		Client:           client,
 		Scheme:           scheme,
-		nsgUseCase:       nsgUseCase,
+		lbcUseCase:       lbcUseCase,
 		eventRecorder:    eventRecorder,
 		finalizerManager: finalizerManager,
-		nsgUtils:         nsgUtils,
+		lbcUtils:         lbcUtils,
 	}
 }
 
-// NodeSecurityGroupReconciler reconciles a NodeSecurityGroup object
-type NodeSecurityGroupReconciler struct {
+// LoadBalancerConfigReconciler reconciles a LoadBalancerConfig object
+type LoadBalancerConfigReconciler struct {
 	client.Client
 	Scheme           *runtime.Scheme
-	nsgUseCase       usecase.NodeSecurityGroupUseCase
+	lbcUseCase       usecase.LoadBalancerConfigUseCase
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
-	nsgUtils         nsg.NodeSecurityGroupUtils
+	lbcUtils         lbc.LoadBalancerConfigUtils
 
 	initDone atomic.Bool
 }
 
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=nodesecuritygroups,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=nodesecuritygroups/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=nodesecuritygroups/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the NodeSecurityGroup object against the actual cluster state, and then
+// the LoadBalancerConfig object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
-func (r *NodeSecurityGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *LoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	ctx = contexts.NewContext(ctx).SetLogName("nsg/" + req.Namespace + "/" + req.Name).GetContext()
+	ctx = contexts.NewContext(ctx).SetLogName("lbc/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
@@ -96,8 +97,8 @@ func (r *NodeSecurityGroupReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return errs.HandleReconcileError(r.reconcile(ctx, req), logger)
 }
 
-func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
-	object := &v1alpha1.NodeSecurityGroup{}
+func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
+	object := &v1alpha1.LoadBalancerConfig{}
 	err := r.Client.Get(ctx, req.NamespacedName, object)
 	if err != nil {
 		return client.IgnoreNotFound(err)
@@ -106,10 +107,10 @@ func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Re
 	logger := contexts.NewContext(ctx).Log()
 	key := fmt.Sprintf("%s/%s", object.Namespace, object.Name)
 
-	if !r.nsgUtils.IsSupported(object) {
+	if !r.lbcUtils.IsSupported(object) {
 		// in case the service have finalizer but is no longer supported, we still need to call delete to clean up
 		// case the service type is changed from LoadBalancer to ClusterIP/NodePort/Headless
-		if r.nsgUtils.IsPendingFinalization(object) {
+		if r.lbcUtils.IsPendingFinalization(object) {
 			err := r.reconcileDelete(ctx, req, object)
 			if err != nil {
 				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
@@ -134,37 +135,37 @@ func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Re
 	return nil
 }
 
-func (r *NodeSecurityGroupReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.NSGFinalizer); err != nil {
+func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
 		return err
 	}
-	return r.nsgUseCase.EnsureNodeSecurityGroupUseCase(ctx, req)
+	return r.lbcUseCase.EnsureLoadBalancerConfigUseCase(ctx, req)
 }
 
-func (r *NodeSecurityGroupReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
+func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s.HasFinalizer(obj, consts.NSGFinalizer) {
+	if !k8s.HasFinalizer(obj, consts.LBCFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
 
-	if err := r.nsgUseCase.DeleteNodeSecurityGroupUseCase(ctx, req); err != nil {
+	if err := r.lbcUseCase.DeleteLoadBalancerConfigUseCase(ctx, req); err != nil {
 		return err
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.NSGFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
 		return err
 	}
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
 
-		if err := r.nsgUseCase.InitNodeSecurityGroupUseCase(ctx); err != nil {
+		if err := r.lbcUseCase.InitLoadBalancerConfigUseCase(ctx); err != nil {
 			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}
@@ -176,8 +177,11 @@ func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr 
 		return err
 	}
 
+	lbcEventHandler := eventhandlers.NewEnqueueRequestForLbcEvent(r.eventRecorder,
+		r.lbcUtils)
+
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.NodeSecurityGroup{}).
-		Named("nodesecuritygroup").
+		Watches(&v1alpha1.LoadBalancerConfig{}, lbcEventHandler).
+		Named("loadbalancerconfig").
 		Complete(r)
 }

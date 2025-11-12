@@ -54,7 +54,9 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
@@ -308,7 +310,7 @@ func main() {
 		lbcUseCase := lbc_uc.NewLoadBalancerConfigUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
-		reconciler := controller.NewLoadBalancerConfigReconciler(
+		reconciler := lbc_controller.NewLoadBalancerConfigReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			lbcUseCase,
@@ -327,7 +329,7 @@ func main() {
 		nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
-		reconciler := controller.NewNodeSecurityGroupReconciler(
+		reconciler := nsg_controller.NewNodeSecurityGroupReconciler(
 			mgr.GetClient(),
 			mgr.GetScheme(),
 			nsgUseCase,
