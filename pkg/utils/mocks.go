@@ -406,63 +406,6 @@ func (_m *MockNameHelper) EXPECT() *MockNameHelper_Expecter {
 	return &MockNameHelper_Expecter{mock: &_m.Mock}
 }
 
-// GenCertName provides a mock function for the type MockNameHelper
-func (_mock *MockNameHelper) GenCertName(secretName string, resourceVersion string) string {
-	ret := _mock.Called(secretName, resourceVersion)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GenCertName")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
-		r0 = returnFunc(secretName, resourceVersion)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockNameHelper_GenCertName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GenCertName'
-type MockNameHelper_GenCertName_Call struct {
-	*mock.Call
-}
-
-// GenCertName is a helper method to define mock.On call
-//   - secretName string
-//   - resourceVersion string
-func (_e *MockNameHelper_Expecter) GenCertName(secretName interface{}, resourceVersion interface{}) *MockNameHelper_GenCertName_Call {
-	return &MockNameHelper_GenCertName_Call{Call: _e.mock.On("GenCertName", secretName, resourceVersion)}
-}
-
-func (_c *MockNameHelper_GenCertName_Call) Run(run func(secretName string, resourceVersion string)) *MockNameHelper_GenCertName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockNameHelper_GenCertName_Call) Return(s string) *MockNameHelper_GenCertName_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockNameHelper_GenCertName_Call) RunAndReturn(run func(secretName string, resourceVersion string) string) *MockNameHelper_GenCertName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GenL4ListenerName provides a mock function for the type MockNameHelper
 func (_mock *MockNameHelper) GenL4ListenerName(pPort v1.ServicePort) string {
 	ret := _mock.Called(pPort)
@@ -775,57 +718,6 @@ func (_c *MockNameHelper_GetLoadBalancerDefaultName_Call) Return(s string) *Mock
 }
 
 func (_c *MockNameHelper_GetLoadBalancerDefaultName_Call) RunAndReturn(run func() string) *MockNameHelper_GetLoadBalancerDefaultName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ValidateName provides a mock function for the type MockNameHelper
-func (_mock *MockNameHelper) ValidateName(newName string) string {
-	ret := _mock.Called(newName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ValidateName")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(newName)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockNameHelper_ValidateName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidateName'
-type MockNameHelper_ValidateName_Call struct {
-	*mock.Call
-}
-
-// ValidateName is a helper method to define mock.On call
-//   - newName string
-func (_e *MockNameHelper_Expecter) ValidateName(newName interface{}) *MockNameHelper_ValidateName_Call {
-	return &MockNameHelper_ValidateName_Call{Call: _e.mock.On("ValidateName", newName)}
-}
-
-func (_c *MockNameHelper_ValidateName_Call) Run(run func(newName string)) *MockNameHelper_ValidateName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockNameHelper_ValidateName_Call) Return(s string) *MockNameHelper_ValidateName_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockNameHelper_ValidateName_Call) RunAndReturn(run func(newName string) string) *MockNameHelper_ValidateName_Call {
 	_c.Call.Return(run)
 	return _c
 }

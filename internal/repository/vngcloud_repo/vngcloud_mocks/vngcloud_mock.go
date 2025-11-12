@@ -942,11 +942,17 @@ func (m *MockProvider) CreateInterLoadBalancer(ctx context.Context, lbOptions in
 
 // --------------------------- Listener ---------------------------
 
-//	func (m *MockProvider) GetListenerByName(ctx context.Context, lbID, name string) (*objects.Listener, error) {
-//		logger.Error("not implemented yet", "GetListenerByName")
-//		return nil, domain.ErrorNotImplemented
-//	}
-//
+func (m *MockProvider) GetListenerById(ctx context.Context, lbID, listenerID string) (*entityv2.Listener, error) {
+	logger := contexts.NewContext(ctx).Log()
+	for _, l := range m.listeners {
+		if l.lbID == lbID && l.GetId() == listenerID {
+			return clone.Clone(l.Listener).(*entityv2.Listener), nil
+		}
+	}
+	logger.Errorf("[ERROR] - GetListenerById: listener not found")
+	return nil, domain.ErrorNotFound
+}
+
 //	func (m *MockProvider) GetListenerByPort(ctx context.Context, lbID string, port int) (*objects.Listener, error) {
 //		logger.Error("not implemented yet", "GetListenerByPort")
 //		return nil, domain.ErrorNotImplemented

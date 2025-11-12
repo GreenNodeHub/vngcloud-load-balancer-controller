@@ -74,6 +74,7 @@ type VngCloudRepository interface {
 	// Listener
 	CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error)
 	ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error)
+	GetListenerById(ctx context.Context, lbID, listenerID string) (*entityv2.Listener, error)
 	DeleteListener(ctx context.Context, lbID, listenerID string) error
 	UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error
 

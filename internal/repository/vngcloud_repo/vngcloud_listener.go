@@ -52,3 +52,15 @@ func (m *vngCloudRepository) UpdateListener(ctx context.Context, lbID, listenerI
 	}
 	return nil
 }
+
+func (m *vngCloudRepository) GetListenerById(ctx context.Context, lbID, listenerID string) (*entityv2.Listener, error) {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Request get listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
+	opt := loadbalancerv2.NewGetListenerByIdRequest(lbID, listenerID)
+	listener, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetListenerById(opt.AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetListenerById: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return listener, nil
+}

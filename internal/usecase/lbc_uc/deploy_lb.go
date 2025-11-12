@@ -51,16 +51,16 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 
-	mapPoolNameToID, err := t.deployPools(ctx, lbId)
+	newCreatedPools, err := t.deployPools(ctx, lbId)
 	if err != nil {
 		return err
 	}
-	mapListenerPortToID, err := t.deployListeners(ctx, lbId, mapPoolNameToID, createdCerts)
+	newCreatedListeners, err := t.deployListeners(ctx, lbId, newCreatedPools, createdCerts)
 	if err != nil {
 		return err
 	}
 
-	err = t.deployDeleteRedundantListeners(ctx, lbId, mapListenerPortToID, t.lbConfig.Status)
+	err = t.deployDeleteRedundantListeners(ctx, lbId, newCreatedListeners, t.lbConfig.Status)
 	if err != nil {
 		return err
 	}
@@ -75,18 +75,8 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 
 	// update status
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.CreatedListeners = make([]v1alpha1.CreatedListener, 0)
-		for _, listenerId := range mapListenerPortToID {
-			obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{
-				Id: listenerId,
-			})
-		}
-		obj.Status.CreatedPools = make([]v1alpha1.CreatedPool, 0)
-		for _, poolId := range mapPoolNameToID {
-			obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{
-				Id: poolId,
-			})
-		}
+		obj.Status.CreatedListeners = newCreatedListeners
+		obj.Status.CreatedPools = newCreatedPools
 		obj.Status.CreatedCertificates = createdCerts
 	})
 }
@@ -311,7 +301,7 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 		}
 
 		listenerSpec := t.lbConfig.Spec.Listeners[0]
-		listenerRequest, err := t.buildCreateListenerRequest(ctx, "", listenerSpec, map[string]string{}, createdCerts)
+		listenerRequest, err := t.buildCreateListenerRequest(ctx, "", listenerSpec, []v1alpha1.CreatedPool{}, createdCerts)
 		if err != nil {
 			return nil, nil, err
 		}

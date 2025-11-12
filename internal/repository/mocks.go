@@ -1655,6 +1655,80 @@ func (_c *MockVngCloudRepository_GetGlobalLoadBalancerByName_Call) RunAndReturn(
 	return _c
 }
 
+// GetListenerById provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) GetListenerById(ctx context.Context, lbID string, listenerID string) (*entity.Listener, error) {
+	ret := _mock.Called(ctx, lbID, listenerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetListenerById")
+	}
+
+	var r0 *entity.Listener
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (*entity.Listener, error)); ok {
+		return returnFunc(ctx, lbID, listenerID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) *entity.Listener); ok {
+		r0 = returnFunc(ctx, lbID, listenerID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.Listener)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, lbID, listenerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockVngCloudRepository_GetListenerById_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetListenerById'
+type MockVngCloudRepository_GetListenerById_Call struct {
+	*mock.Call
+}
+
+// GetListenerById is a helper method to define mock.On call
+//   - ctx context.Context
+//   - lbID string
+//   - listenerID string
+func (_e *MockVngCloudRepository_Expecter) GetListenerById(ctx interface{}, lbID interface{}, listenerID interface{}) *MockVngCloudRepository_GetListenerById_Call {
+	return &MockVngCloudRepository_GetListenerById_Call{Call: _e.mock.On("GetListenerById", ctx, lbID, listenerID)}
+}
+
+func (_c *MockVngCloudRepository_GetListenerById_Call) Run(run func(ctx context.Context, lbID string, listenerID string)) *MockVngCloudRepository_GetListenerById_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetListenerById_Call) Return(listener *entity.Listener, err error) *MockVngCloudRepository_GetListenerById_Call {
+	_c.Call.Return(listener, err)
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetListenerById_Call) RunAndReturn(run func(ctx context.Context, lbID string, listenerID string) (*entity.Listener, error)) *MockVngCloudRepository_GetListenerById_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLoadBalancerByID provides a mock function for the type MockVngCloudRepository
 func (_mock *MockVngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID string) (*entity.LoadBalancer, error) {
 	ret := _mock.Called(ctx, lbID)

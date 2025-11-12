@@ -17,24 +17,24 @@ import (
 // oldPools are in Status
 // newPools are in Spec
 // ensure them to portal. Don't delete old pool becasue some listener is using them
-func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (map[string]string, error) {
+func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) ([]v1alpha1.CreatedPool, error) {
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {
 		return nil, err
 	}
 
-	mapPoolNameToID := make(map[string]string)
+	createdPools := make([]v1alpha1.CreatedPool, 0)
 	for _, pool := range t.lbConfig.Spec.Pools {
-		if poolId, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
+		if createdPool, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
 			return nil, err
 		} else {
-			mapPoolNameToID[pool.Name] = poolId
+			createdPools = append(createdPools, *createdPool)
 		}
 	}
-	return mapPoolNameToID, nil
+	return createdPools, nil
 }
 
-func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, pool *v1alpha1.Pool, currentPools *entityv2.ListPools) (string, error) {
+func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, pool *v1alpha1.Pool, currentPools *entityv2.ListPools) (*v1alpha1.CreatedPool, error) {
 	searchPoolByName := func(name string) *entityv2.Pool {
 		for _, p := range currentPools.Items {
 			if p.Name == name {
@@ -51,18 +51,25 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			t.buildCreatePoolRequest(ctx, lbId, pool),
 		)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
+		if err := t.statusAddPool(ctx, _pool.UUID, pool.Name); err != nil {
+			return nil, err
+		}
+
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			return "", err
+			return nil, err
 		}
-		return _pool.UUID, t.updateStatusCreatedPool(ctx, _pool.UUID)
+		return &v1alpha1.CreatedPool{
+			Id:   _pool.UUID,
+			Name: pool.Name,
+		}, nil
 	}
 
 	// get health monitor info
 	healthMonitor, err := t.vngcloudRepo.GetPoolHealthMonitorById(ctx, lbId, currentPool.UUID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get health monitor for pool %s: %v", currentPool.UUID, err)
+		return nil, fmt.Errorf("failed to get health monitor for pool %s: %v", currentPool.UUID, err)
 	}
 	currentPool.HealthMonitor = healthMonitor
 
@@ -73,11 +80,11 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		err := t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
 		if err != nil {
 			t.logger.Error("Failed to update pool: ", err)
-			return "", err
+			return nil, err
 		}
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return "", err
+			return nil, err
 		}
 	}
 
@@ -85,7 +92,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	currentPoolMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, currentPool.UUID)
 	if err != nil {
 		t.logger.Error("Failed to get pool members: ", err)
-		return "", err
+		return nil, err
 	}
 
 	// ensure pool members, with default pool, should merge pool members, otherwise, should update
@@ -129,14 +136,21 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			t.buildPoolMemberUpdateRequest(ctx, lbId, currentPool.UUID, pool))
 		if err != nil {
 			t.logger.Error("Failed to update pool members: ", err)
-			return "", err
+			return nil, err
 		}
+		if err := t.statusAddPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
+			return nil, err
+		}
+
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return "", err
+			return nil, err
 		}
 	}
-	return currentPool.UUID, t.updateStatusCreatedPool(ctx, currentPool.UUID)
+	return &v1alpha1.CreatedPool{
+		Id:   currentPool.UUID,
+		Name: currentPool.Name,
+	}, nil
 }
 
 // create CreatePoolRequest depend on default config and pool value
@@ -378,18 +392,13 @@ func (t *defaultModelDeployTask) buildPoolMemberUpdateRequest(_ context.Context,
 }
 
 // delete pools created not in use anymore
-// should check if pool is used by other listeners (user use) then ignore
+// should check if pool is used by other listeners or policies (user use) then ignore
 func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context, lbId string, status v1alpha1.LoadBalancerConfigStatus) error {
 	deleteCandidates := make([]string, 0)
 	for _, pool := range status.CreatedPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
 	}
 
-	currentListeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
-	if err != nil {
-		t.logger.Error("Failed to list listeners of load balancer: ", err)
-		return err
-	}
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {
 		t.logger.Error("Failed to list pools of load balancer: ", err)
@@ -404,11 +413,33 @@ func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context,
 		return false
 	}
 
-	isPoolInUse := func(poolId string) bool {
-		for _, listener := range currentListeners.Items {
-			if listener.DefaultPoolId == poolId {
-				return true
+	// find pools in use by listeners and policies
+	mapPoolInUse := make(map[string]bool)
+	currentListeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
+	if err != nil {
+		t.logger.Error("Failed to list listeners of load balancer: ", err)
+		return err
+	}
+	for _, listener := range currentListeners.Items {
+		mapPoolInUse[listener.DefaultPoolId] = true
+		if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
+			// check listener policies
+			policies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listener.UUID)
+			if err != nil {
+				t.logger.Error("Failed to list policies of listener: ", err)
+				return err
 			}
+			for _, policy := range policies.Items {
+				if policy.RedirectPoolID != "" {
+					mapPoolInUse[policy.RedirectPoolID] = true
+				}
+			}
+		}
+	}
+
+	isPoolInUse := func(poolId string) bool {
+		if _, ok := mapPoolInUse[poolId]; ok {
+			return true
 		}
 		return false
 	}
@@ -434,20 +465,4 @@ func (t *defaultModelDeployTask) deployDeleteRedundantPools(ctx context.Context,
 		}
 	}
 	return nil
-}
-
-// add the poolId to status.CreatedPools
-func (t *defaultModelDeployTask) updateStatusCreatedPool(ctx context.Context, poolId string) error {
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		// check if already in status
-		for _, createdPool := range obj.Status.CreatedPools {
-			if createdPool.Id == poolId {
-				return
-			}
-		}
-		// add new poolId
-		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{
-			Id: poolId,
-		})
-	})
 }

@@ -439,11 +439,26 @@ spec:
                 description: CreatedListeners is the list of created listener IDs
                 items:
                   properties:
+                    createdPolicies:
+                      description: CreatedPolicies is the list of created policy IDs
+                      items:
+                        properties:
+                          id:
+                            description: Id is the ID of the created policy
+                            type: string
+                        required:
+                        - id
+                        type: object
+                      type: array
                     id:
                       description: Id is the ID of the created listener
                       type: string
+                    port:
+                      description: Port is the port number of the created listener
+                      type: integer
                   required:
                   - id
+                  - port
                   type: object
                 type: array
               createdPools:
@@ -453,8 +468,12 @@ spec:
                     id:
                       description: Id is the ID of the created pool
                       type: string
+                    name:
+                      description: Name is the name of the created pool
+                      type: string
                   required:
                   - id
+                  - name
                   type: object
                 type: array
               createdTags:

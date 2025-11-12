@@ -405,10 +405,28 @@ type CreatedPool struct {
 	// Id is the ID of the created pool
 	// +required
 	Id string `json:"id,omitempty"`
+
+	// Name is the name of the created pool
+	// +required
+	Name string `json:"name,omitempty"`
 }
 
 type CreatedListener struct {
 	// Id is the ID of the created listener
+	// +required
+	Id string `json:"id,omitempty"`
+
+	// Port is the port number of the created listener
+	// +required
+	Port int `json:"port,omitempty"`
+
+	// CreatedPolicies is the list of created policy IDs
+	// +optional
+	CreatedPolicies []CreatedPolicy `json:"createdPolicies,omitempty"`
+}
+
+type CreatedPolicy struct {
+	// Id is the ID of the created policy
 	// +required
 	Id string `json:"id,omitempty"`
 }

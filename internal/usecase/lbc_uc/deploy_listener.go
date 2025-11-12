@@ -14,24 +14,24 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-func (t *defaultModelDeployTask) deployListeners(ctx context.Context, lbId string, mapPoolNameToID map[string]string, createdCerts []v1alpha1.CreatedCertificate) (map[int]string, error) {
+func (t *defaultModelDeployTask) deployListeners(ctx context.Context, lbId string, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) ([]v1alpha1.CreatedListener, error) {
 	currentListeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
 	if err != nil {
 		return nil, err
 	}
 
-	mapListenerPortToID := make(map[int]string)
+	createdListeners := make([]v1alpha1.CreatedListener, 0)
 	for _, listener := range t.lbConfig.Spec.Listeners {
-		if listenerId, err := t.deployListener(ctx, lbId, listener, currentListeners, mapPoolNameToID, createdCerts); err != nil {
+		if createdListener, err := t.deployListener(ctx, lbId, listener, currentListeners, newCreatedPools, createdCerts); err != nil {
 			return nil, err
 		} else {
-			mapListenerPortToID[int(listener.ProtocolPort)] = listenerId
+			createdListeners = append(createdListeners, *createdListener)
 		}
 	}
-	return mapListenerPortToID, nil
+	return createdListeners, nil
 }
 
-func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListeners *entityv2.ListListeners, mapPoolNameToID map[string]string, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
+func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListeners *entityv2.ListListeners, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (*v1alpha1.CreatedListener, error) {
 	searchListenerByPort := func(port int) *entityv2.Listener {
 		for _, l := range currentListeners.Items {
 			if l.ProtocolPort == port {
@@ -43,48 +43,50 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 
 	currentListener := searchListenerByPort(int(listenerSpec.ProtocolPort))
 	if currentListener == nil {
-		createRequest, err := t.buildCreateListenerRequest(ctx, lbId, listenerSpec, mapPoolNameToID, createdCerts)
+		createRequest, err := t.buildCreateListenerRequest(ctx, lbId, listenerSpec, newCreatedPools, createdCerts)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		_lis, err := t.vngcloudRepo.CreateListener(ctx, lbId, createRequest)
 		if err != nil {
 			t.logger.Error("Failed to create listener: ", err)
-			return "", err
+			return nil, err
 		}
-		// TODO: why I need this?
-		//  else {
-		// 	listenerBuilder.SetID(_lis.UUID)
-		// }
+		if err := t.statusAddListener(ctx, _lis.UUID, _lis.ProtocolPort); err != nil {
+			return nil, err
+		}
+
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return "", err
+			return nil, err
 		}
-		return _lis.UUID, t.updateStatusCreatedListener(ctx, _lis.UUID)
-		// TODO: Why I need it?
-		// // need to update to current builder, avoid mismatch data later
-		// t.AddCloneListenerBuilder(listenerBuilder)
-		// listenerInPortal = t.GetListenerBuilderByPort(listenerBuilder.ListenerProtocolPort)
+		currentListener, err = t.vngcloudRepo.GetListenerById(ctx, lbId, _lis.UUID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// if mismatch listener protocol, return error => user must delete listener in portal
 	// TODO: should we do it automatically?
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
 		t.logger.Error("Listener protocol mismatch: ", currentListener.Protocol, listenerSpec.Protocol)
-		return "", errors.New("listener port " + string(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
+		return nil, errors.New("listener port " + string(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
 	}
 
 	// update exist listener
-	updateOptions, message, err := t.buildListenerUpdateRequest(ctx, lbId, listenerSpec, currentListener, mapPoolNameToID, createdCerts)
+	updateOptions, message, err := t.buildListenerUpdateRequest(ctx, lbId, listenerSpec, currentListener, newCreatedPools, createdCerts)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if updateOptions != nil {
 		t.logger.Info("Need update listener: ", strings.Join(message, ", "))
 		err := t.vngcloudRepo.UpdateListener(ctx, lbId, currentListener.UUID, updateOptions)
 		if err != nil {
 			t.logger.Error("Failed to update listener: ", err)
-			return "", err
+			return nil, err
+		}
+		if err := t.statusAddListener(ctx, currentListener.UUID, currentListener.ProtocolPort); err != nil {
+			return nil, err
 		}
 
 		// TODO: why I need this?
@@ -96,65 +98,32 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		// }
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return "", err
+			return nil, err
 		}
 	}
 
-	// TODO
-	// // ensure policy
-	// for _, policyBuilder := range listenerBuilder.GetPolicyBuilders() {
-	// 	// set policy redirect to pool id if exists
-	// 	if policyBuilder.ReferPoolName != "" {
-	// 		referPool := r.GetPoolBuilderByName(policyBuilder.ReferPoolName)
-	// 		if referPool == nil {
-	// 			r.logger.Error("Failed to get refer pool: ", policyBuilder.ReferPoolName)
-	// 			return nil
-	// 		}
-	// 		policyBuilder.RedirectPoolID = referPool.GetID()
-	// 	}
+	// skip policy for layer4 listener
+	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
+		return &v1alpha1.CreatedListener{
+			Id:   currentListener.UUID,
+			Port: currentListener.ProtocolPort,
+		}, nil
+	}
 
-	// 	policyInPortal := listenerInPortal.GetPolicyBuilderByName(policyBuilder.GetName())
-	// 	if policyInPortal == nil {
-	// 		if _, err := r.provider.CreatePolicy(r.context, lbId, listenerInPortal.GetID(),
-	// 			policyBuilder.GetICreatePolicyRequest(lbId, listenerInPortal.GetID())); err != nil {
-	// 			r.logger.Error("Failed to create policy: ", err)
-	// 			return err
-	// 		}
-	// 		if _, err := r.provider.WaitForLBActive(r.context, lbId); err != nil {
-	// 			r.logger.Error("Failed to wait for loadbalancer active: ", err)
-	// 			return err
-	// 		}
-	// 	} else {
-	// 		policyBuilder.SetID(policyInPortal.GetID())
-	// 		updateOptions, message := policyInPortal.ComparePolicyBuilder(lbId, listenerBuilder.GetID(), policyBuilder)
-	// 		if updateOptions != nil {
-	// 			r.logger.Info("Need update policy: ", strings.Join(message, ", "))
-	// 			err := r.provider.UpdatePolicy(r.context, lbId, listenerBuilder.GetID(), policyInPortal.GetID(), updateOptions)
-	// 			if err != nil {
-	// 				r.logger.Error("Failed to update policy: ", err)
-	// 				return err
-	// 			}
+	// ensure policy
+	createdPolicies, err := t.deployPolicies(ctx, lbId, currentListener.UUID, listenerSpec.Policies, newCreatedPools)
+	if err != nil {
+		return nil, err
+	}
 
-	// 			// need to update to current builder, avoid mismatch data later
-	// 			policyInPortal.ReferPoolName = ""
-	// 			policyInPortal.RedirectPoolID = updateOptions.RedirectPoolID
-	// 			if policyInPortal.RedirectPoolID != "" {
-	// 				if p := r.GetPoolBuilderByID(updateOptions.RedirectPoolID); p != nil {
-	// 					policyInPortal.ReferPoolName = p.GetName()
-	// 				}
-	// 			}
-	// 			if _, err := r.provider.WaitForLBActive(r.context, lbId); err != nil {
-	// 				r.logger.Error("Failed to wait for loadbalancer active: ", err)
-	// 				return err
-	// 			}
-	// 		}
-	// 	}
-	// }
-
-	return currentListener.UUID, t.updateStatusCreatedListener(ctx, currentListener.UUID)
+	return &v1alpha1.CreatedListener{
+		Id:              currentListener.UUID,
+		Port:            currentListener.ProtocolPort,
+		CreatedPolicies: createdPolicies,
+	}, nil
 }
 
-func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, mapPoolNameToID map[string]string, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateListenerRequest, error) {
+func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateListenerRequest, error) {
 	createRequest := loadbalancerv2.NewCreateListenerRequest(
 		listenerSpec.Name,
 		listenerSpec.Protocol,
@@ -178,10 +147,19 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 		createRequest.WithTimeoutConnection(int(*listenerSpec.TimeoutConnection))
 	}
 	if listenerSpec.DefaultPoolName != nil {
-		if poolId, ok := mapPoolNameToID[*listenerSpec.DefaultPoolName]; ok {
-			createRequest.WithDefaultPoolId(poolId)
+		findCreatedPoolByName := func(name string) *v1alpha1.CreatedPool {
+			for _, p := range newCreatedPools {
+				if p.Name == name {
+					return &p
+				}
+			}
+			return nil
+		}
+		createdPool := findCreatedPoolByName(*listenerSpec.DefaultPoolName)
+		if createdPool != nil {
+			createRequest.WithDefaultPoolId(createdPool.Id)
 		} else {
-			t.logger.Warnf("Default pool name %s not found in mapPoolNameToID", *listenerSpec.DefaultPoolName)
+			t.logger.Warnf("Default pool name %s not found in created pools", *listenerSpec.DefaultPoolName)
 		}
 	}
 
@@ -220,12 +198,12 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 		createRequest.WithClientCertificate(listenerSpec.ClientCertificateId)
 	}
 
-	// Policy not supported yet
+	// Policy not supported create along with listener creation yet
 
 	return createRequest, nil
 }
 
-func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, mapPoolNameToID map[string]string, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.IUpdateListenerRequest, []string, error) {
+func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.IUpdateListenerRequest, []string, error) {
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &loadbalancerv2.UpdateListenerRequest{
@@ -272,12 +250,21 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 
 	// TODO: should update to no default pool if user set empty string
 	if listenerSpec.DefaultPoolName != nil && *listenerSpec.DefaultPoolName != currentListener.DefaultPoolName {
-		if poolId, ok := mapPoolNameToID[*listenerSpec.DefaultPoolName]; ok {
+		findCreatedPoolByName := func(name string) *v1alpha1.CreatedPool {
+			for _, p := range newCreatedPools {
+				if p.Name == name {
+					return &p
+				}
+			}
+			return nil
+		}
+		createdPool := findCreatedPoolByName(*listenerSpec.DefaultPoolName)
+		if createdPool != nil {
 			message = append(message, fmt.Sprintf("default pool (%s -> %s)", currentListener.DefaultPoolName, *listenerSpec.DefaultPoolName))
-			updateOptions.WithDefaultPoolId(poolId)
+			updateOptions.WithDefaultPoolId(createdPool.Id)
 			isNeedUpdate = true
 		} else {
-			t.logger.Warnf("Default pool name %s not found in mapPoolNameToID", *listenerSpec.DefaultPoolName)
+			t.logger.Warnf("Default pool name %s not found in created pools", *listenerSpec.DefaultPoolName)
 		}
 	}
 
@@ -360,8 +347,8 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 }
 
 // delete redundant listeners
-// mapListenerPortToID is the listeners that are still in use
-func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Context, lbId string, mapListenerPortToID map[int]string, status v1alpha1.LoadBalancerConfigStatus) error {
+// newCreatedListeners is the listeners that are still in use
+func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener, status v1alpha1.LoadBalancerConfigStatus) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
 	for _, listener := range status.CreatedListeners {
@@ -383,8 +370,8 @@ func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Cont
 	}
 
 	isListenerInUse := func(listenerId string) bool {
-		for _, id := range mapListenerPortToID {
-			if id == listenerId {
+		for _, listener := range newCreatedListeners {
+			if listener.Id == listenerId {
 				return true
 			}
 		}
@@ -469,21 +456,6 @@ func (t *defaultModelDeployTask) deployDeleteRedundantListeners(ctx context.Cont
 	// 	}
 	// }
 	return nil
-}
-
-// add listener to status.CreatedListeners if not exist
-func (t *defaultModelDeployTask) updateStatusCreatedListener(ctx context.Context, listenerId string) error {
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		// check if already exist
-		for _, listener := range obj.Status.CreatedListeners {
-			if listener.Id == listenerId {
-				return
-			}
-		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{
-			Id: listenerId,
-		})
-	})
 }
 
 // compare listener headers, if they are the same then return true
