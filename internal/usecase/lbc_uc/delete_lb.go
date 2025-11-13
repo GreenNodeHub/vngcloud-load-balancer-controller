@@ -76,16 +76,56 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 // oldBuilder and currentBuilder should be the same listeners' name, pool's name
 // if can delete whole loadbalancer, delete loadbalancer and return
 func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context, lbId string) (bool, error) {
-	// get current listeners and pools from vngcloud
+	// get current listeners from vngcloud
 	listeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
 	if err != nil {
 		return false, err
 	}
-	// if len(oldListeners) < len(currentListeners), can't delete whole loadbalancer
-	// because some listeners are created by other resources
-	if len(t.lbConfig.Status.CreatedListeners) < len(listeners.Items) {
-		t.logger.Infof("Can't delete whole loadbalancer, len(oldListeners) < len(currentListeners) (%d < %d)",
-			len(t.lbConfig.Status.CreatedListeners), len(listeners.Items))
+
+	// all listeners must be in .status.createdListeners
+	_canCoverListener, err := canCover(t.lbConfig.Status.CreatedListeners, listeners.Items, func(a []v1alpha1.CreatedListener, b *entityv2.Listener) (bool, error) {
+		found := false
+		createdListener := v1alpha1.CreatedListener{}
+		for _, oldL := range a {
+			if oldL.Id == b.UUID {
+				found = true
+				createdListener = oldL
+				break
+			}
+		}
+		if !found {
+			t.logger.Debugf("Cannot delete whole loadbalancer because listener %s is not in status", b.Name)
+			return false, nil
+		}
+
+		// check policies, all policies must be in .status.createdPolicies
+		currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, createdListener.Id)
+		if err != nil {
+			return false, err
+		}
+		_canCoverPolicies, err := canCover(createdListener.CreatedPolicies, currentPolicies.Items, func(a []v1alpha1.CreatedPolicy, b *entityv2.Policy) (bool, error) {
+			foundPolicy := false
+			for _, oldP := range a {
+				if oldP.Id == b.UUID {
+					foundPolicy = true
+					break
+				}
+			}
+			if !foundPolicy {
+				t.logger.Debugf("Cannot delete whole loadbalancer because policy %s is not in status", b.Name)
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return false, err
+		}
+		return _canCoverPolicies, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if !_canCoverListener {
 		return false, nil
 	}
 
@@ -93,79 +133,46 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
-	if len(t.lbConfig.Status.CreatedPools) < len(pools.Items) {
-		t.logger.Infof("Can't delete whole loadbalancer, len(oldPools) < len(currentPools) (%d < %d)",
-			len(t.lbConfig.Status.CreatedPools), len(pools.Items))
+
+	// check pools, all pools must be in .status.createdPools
+	_canCoverPool, err := canCover(t.lbConfig.Status.CreatedPools, pools.Items, func(a []v1alpha1.CreatedPool, b *entityv2.Pool) (bool, error) {
+		found := false
+		createPool := v1alpha1.CreatedPool{}
+		for _, oldP := range a {
+			if oldP.Id == b.UUID {
+				found = true
+				createPool = oldP
+				break
+			}
+		}
+		if !found {
+			t.logger.Debugf("Cannot delete whole loadbalancer because pool %s is not in status", b.Name)
+			return false, nil
+		}
+
+		// check members, all members must be in .status.createdMembers
+		currentMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, b.UUID)
+		if err != nil {
+			return false, err
+		}
+		_canCoverMembers, err := canCover(createPool.CreatedMembers, currentMembers.Items, func(a []v1alpha1.PoolMember, b *entityv2.Member) (bool, error) {
+			if !t.checkIfPoolMemberExist(a, convertMember(b)) {
+				t.logger.Debugf("Cannot delete whole loadbalancer because member %s is not in status", b.Address)
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			return false, err
+		}
+		return _canCoverMembers, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if !_canCoverPool {
 		return false, nil
 	}
-
-	searchListenerById := func(id string) *entityv2.Listener {
-		for _, l := range listeners.Items {
-			if l.UUID == id {
-				return l
-			}
-		}
-		return nil
-	}
-
-	// if listener not exists, return false
-	// TODO: why? this is old logic, need to confirm
-	for _, listener := range t.lbConfig.Status.CreatedListeners {
-		currentListener := searchListenerById(listener.Id)
-		if currentListener == nil {
-			t.logger.Infof("Can't delete whole loadbalancer, listener not exists: %s", listener.Id)
-			return false, nil
-		}
-
-		// TODO: uncomment and fix this part
-		// // if policy not exists, return false
-		// currentPolicies := currentListener.GetPolicyBuilders()
-		// oldPolicies := listener.GetOldPolicies()
-		// if len(oldPolicies) < len(currentPolicies) {
-		// 	r.logger.Infof("Can't delete whole loadbalancer, len(oldPolicies) < len(currentPolicies) (%d < %d)",
-		// 		len(oldPolicies), len(currentPolicies))
-		// 	return false
-		// }
-		// for _, policy := range oldPolicies {
-		// 	if currentPolicy := currentListener.GetPolicyBuilderByName(policy.GetName()); currentPolicy == nil {
-		// 		r.logger.Infof("Can't delete whole loadbalancer, policy not exists: %s", policy.GetName())
-		// 		return false
-		// 	}
-		// }
-	}
-
-	searchPoolById := func(id string) *entityv2.Pool {
-		for _, p := range pools.Items {
-			if p.UUID == id {
-				return p
-			}
-		}
-		return nil
-	}
-
-	// if pool not exists, return false
-	for _, pool := range t.lbConfig.Status.CreatedPools {
-		if currentPool := searchPoolById(pool.Id); currentPool == nil {
-			t.logger.Infof("Can't delete whole loadbalancer, pool not exists: %s", pool.Id)
-			return false, nil
-		}
-	}
-
-	// TODO: uncomment me
-	// // if default pool members not match, return false
-	// if defaultPool := r.GetPoolBuilderByName(consts.DEFAULT_NAME_DEFAULT_POOL); defaultPool != nil {
-	// 	currentMembers := defaultPool.Members
-	// 	oldMembers := oldBuilder.GetDefaultPoolMembers()
-	// 	if len(oldMembers) < len(currentMembers) {
-	// 		r.logger.Infof("Can't delete whole loadbalancer, len(oldDFMembers) < len(currentDFMembers) (%d < %d)",
-	// 			len(oldMembers), len(currentMembers))
-	// 		return false
-	// 	}
-	// 	if !r.comparePoolMembers(oldMembers, currentMembers, true) {
-	// 		t.logger.Infof("Can't delete whole loadbalancer, default pool members not match")
-	// 		return false
-	// 	}
-	// }
 
 	t.logger.Debug("Can delete whole loadbalancer")
 	return true, nil
@@ -188,5 +195,19 @@ func (t *defaultModelDeployTask) isLoadBalancerEmpty(ctx context.Context, lbId s
 		return false, nil
 	}
 
+	return true, nil
+}
+
+// canCover checks if all elements in smallOne are present in bigOne using the isExist function.
+func canCover[T, U any](bigOne []T, smallOne []U, isExist func([]T, U) (bool, error)) (bool, error) {
+	for _, b := range smallOne {
+		exist, err := isExist(bigOne, b)
+		if err != nil {
+			return false, err
+		}
+		if !exist {
+			return false, nil
+		}
+	}
 	return true, nil
 }

@@ -410,14 +410,18 @@ func convertMemberList(members *entityv2.ListMembers) []v1alpha1.PoolMember {
 		return result
 	}
 	for _, member := range members.Items {
-		result = append(result, v1alpha1.PoolMember{
-			Name:        member.Name,
-			IP:          member.Address,
-			Port:        member.ProtocolPort,
-			Backup:      &member.Backup,
-			Weight:      &member.Weight,
-			MonitorPort: member.MonitorPort,
-		})
+		result = append(result, *convertMember(member))
 	}
 	return result
+}
+
+func convertMember(member *entityv2.Member) *v1alpha1.PoolMember {
+	return &v1alpha1.PoolMember{
+		Name:        member.Name,
+		IP:          member.Address,
+		Port:        member.ProtocolPort,
+		Backup:      &member.Backup,
+		Weight:      &member.Weight,
+		MonitorPort: member.MonitorPort,
+	}
 }
