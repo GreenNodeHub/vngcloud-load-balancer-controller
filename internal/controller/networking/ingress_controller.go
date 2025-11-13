@@ -26,7 +26,6 @@ import (
 	k8s_helper "github.com/anngdinh/operator-helper/k8s"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	networking "k8s.io/api/networking/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -218,16 +217,16 @@ func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 }
 
 func (r *IngressReconciler) setupIndexes(ctx context.Context, fieldIndexer client.FieldIndexer) error {
-	if err := fieldIndexer.IndexField(ctx, &networking.Ingress{}, ingress.IndexKeyServiceRefName,
+	if err := fieldIndexer.IndexField(ctx, &networkingv1.Ingress{}, ingress.IndexKeyServiceRefName,
 		func(obj client.Object) []string {
-			return r.referenceIndexer.BuildServiceRefIndexes(context.Background(), obj.(*networking.Ingress))
+			return r.referenceIndexer.BuildServiceRefIndexes(context.Background(), obj.(*networkingv1.Ingress))
 		},
 	); err != nil {
 		return err
 	}
-	if err := fieldIndexer.IndexField(ctx, &networking.Ingress{}, ingress.IndexKeySecretRefName,
+	if err := fieldIndexer.IndexField(ctx, &networkingv1.Ingress{}, ingress.IndexKeySecretRefName,
 		func(obj client.Object) []string {
-			return r.referenceIndexer.BuildSecretRefIndexes(context.Background(), obj.(*networking.Ingress))
+			return r.referenceIndexer.BuildSecretRefIndexes(context.Background(), obj.(*networkingv1.Ingress))
 		},
 	); err != nil {
 		return err
@@ -243,7 +242,7 @@ func (r *IngressReconciler) setupIndexes(ctx context.Context, fieldIndexer clien
 }
 
 func (r *IngressReconciler) setupWatches(_ context.Context, c controller.Controller, mgr ctrl.Manager, clientSet *kubernetes.Clientset) error {
-	ingEventChan := make(chan event.TypedGenericEvent[*networking.Ingress])
+	ingEventChan := make(chan event.TypedGenericEvent[*networkingv1.Ingress])
 	svcEventChan := make(chan event.TypedGenericEvent[*corev1.Service])
 	secretEventsChan := make(chan event.TypedGenericEvent[*corev1.Secret])
 	ingEventHandler := eventhandlers.NewEnqueueRequestsForIngressEvent(r.eventRecorder,
@@ -259,7 +258,7 @@ func (r *IngressReconciler) setupWatches(_ context.Context, c controller.Control
 	if err := c.Watch(source.Channel(svcEventChan, svcEventHandler)); err != nil {
 		return err
 	}
-	if err := c.Watch(source.Kind(mgr.GetCache(), &networking.Ingress{}, ingEventHandler)); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &networkingv1.Ingress{}, ingEventHandler)); err != nil {
 		return err
 	}
 	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}, svcEventHandler)); err != nil {
