@@ -28,7 +28,6 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +58,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind LoadBalancerConfig")
 			err := k8sClient.Get(ctx, typeNamespacedName, vngcloudloadbalancerconfig)
-			if err != nil && errors.IsNotFound(err) {
+			if err != nil && apierrors.IsNotFound(err) {
 				resource := &v1alpha1.LoadBalancerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
@@ -159,10 +158,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address,
-								mockNode2.Status.Addresses[0].Address,
-								mockNode3.Status.Addresses[0].Address,
-								mockNode4.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -254,10 +253,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address,
-								mockNode2.Status.Addresses[0].Address,
-								mockNode3.Status.Addresses[0].Address,
-								mockNode4.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -333,7 +332,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(1)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -409,7 +408,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(1)) // number of member in pool = number of node OR number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -485,10 +484,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address,
-								mockNode2.Status.Addresses[0].Address,
-								mockNode3.Status.Addresses[0].Address,
-								mockNode4.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -567,10 +566,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							Expect(pool.Members).ShouldNot(BeNil())
 							Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 							Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-								mockNode1.Status.Addresses[0].Address,
-								mockNode2.Status.Addresses[0].Address,
-								mockNode3.Status.Addresses[0].Address,
-								mockNode4.Status.Addresses[0].Address))
+								vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+								vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 						}
 
 						// check listener
@@ -652,10 +651,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 									Expect(pool.Members).ShouldNot(BeNil())
 									Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of node or number of endpoint
 									Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-										mockNode1.Status.Addresses[0].Address,
-										mockNode2.Status.Addresses[0].Address,
-										mockNode3.Status.Addresses[0].Address,
-										mockNode4.Status.Addresses[0].Address))
+										vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+										vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+										vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+										vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 								}
 
 								// check listener
@@ -696,12 +695,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							// endpointSubset is for Deployment,... which is in use by service
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 80},
@@ -710,12 +709,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							},
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 8080},
@@ -772,10 +771,10 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(member.ProtocolPort).Should(Equal(31000))
 								Expect(member.MonitorPort).Should(Equal(31000))
 								Expect(member.Address).Should(BeElementOf(
-									mockNode1.Status.Addresses[0].Address,
-									mockNode2.Status.Addresses[0].Address,
-									mockNode3.Status.Addresses[0].Address,
-									mockNode4.Status.Addresses[0].Address))
+									vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+									vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+									vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+									vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 							}
 						}
 
@@ -1046,12 +1045,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							// endpointSubset is for Deployment,... which is in use by service
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 80},
@@ -1060,12 +1059,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							},
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 8080},
@@ -1169,12 +1168,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 									// endpointSubset is for Deployment,... which is in use by service
 									{
 										Addresses: []corev1.EndpointAddress{
-											{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-											{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+											{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+											{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 										},
 										NotReadyAddresses: []corev1.EndpointAddress{
-											{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-											{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+											{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+											{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 										},
 										Ports: []corev1.EndpointPort{
 											{Name: "http", Port: 80},
@@ -1381,12 +1380,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							// endpointSubset is for Deployment,... which is in use by service
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 80},
@@ -1395,12 +1394,12 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							},
 							{
 								Addresses: []corev1.EndpointAddress{
-									{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
 								},
 								NotReadyAddresses: []corev1.EndpointAddress{
-									{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-									{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+									{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
 								},
 								Ports: []corev1.EndpointPort{
 									{Name: "http", Port: 8080},
