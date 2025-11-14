@@ -160,7 +160,7 @@ func expectNoEndpoints() {
 // Helper functions to get resources
 // ============================================================================
 
-func getLBCListForIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList, error) {
+func listLbcByIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList, error) {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		consts.LabelOwnerResourceName: name,
@@ -169,30 +169,13 @@ func getLBCListForIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigL
 	return lbcList, err
 }
 
-// ============================================================================
-// Helper functions to wait for resources
-// ============================================================================
-
-func waitForLoadBalancerId(lbcName, namespace string) (string, error) {
-	var loadbalancerId string
-
-	success := Eventually(func() bool {
-		lbc := &v1alpha1.LoadBalancerConfig{}
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: lbcName, Namespace: namespace}, lbc)
-		if err != nil {
-			return false
-		}
-		if lbc.Status.LoadBalancerId != nil {
-			loadbalancerId = *lbc.Status.LoadBalancerId
-			return loadbalancerId != ""
-		}
-		return false
-	}, timeout, interval).Should(BeTrue())
-
-	if !success {
-		return "", nil
-	}
-	return loadbalancerId, nil
+func listNsgByIngress(name, namespace string) (*v1alpha1.NodeSecurityGroupList, error) {
+	nsgList := &v1alpha1.NodeSecurityGroupList{}
+	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
+		consts.LabelOwnerResourceName: name,
+		consts.LabelOwnerResourceType: "Ingress",
+	})
+	return nsgList, err
 }
 
 // ============================================================================

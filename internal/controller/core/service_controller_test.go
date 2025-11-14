@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -65,92 +66,89 @@ var _ = Describe("Service Controller", func() {
 			service := newServiceResource(serviceName, namespace)
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LBC to be created
-			var lbcList *v1alpha1.LoadBalancerConfigList
-			Eventually(func() int {
-				list, err := getLBCListForService(serviceName, namespace)
-				if err != nil {
-					return -1
-				}
-				lbcList = list
-				return len(list.Items)
-			}, timeout*2, interval).Should(Equal(1))
-
-			lbc := &lbcList.Items[0]
-
-			// Verify LBC spec
-			Expect(lbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
-
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
-
 			// Verify LoadBalancer was created in mock repo
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
-			Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
-			// Expect(loadbalancer.Internal).Should(BeFalse()) // TODO: fix me
-			Expect(loadbalancer.LoadBalancerSchema).Should(Equal(mockConfig.LoadBalancerOpts.DefaultScheme))
-			// Expect(loadbalancer.PackageID).Should(Equal(mockConfig.LoadBalancerOpts.DefaultL4PackageId)) // TODO: fix me
-			// Expect(loadbalancer.SubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID())) // TODO: fix me
-			Expect(loadbalancer.Type).Should(Equal(string(loadbalancerv2.LoadBalancerTypeLayer4)))
-			// Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloudRepo.GetSubnetCIDR())) // TODO: fix me
+			Eventually(func(g Gomega) {
+				lbcList, err := getLBCListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			// check pool
-			pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pools).ShouldNot(BeNil())
-			Expect((pools.Items)).Should(HaveLen(1)) // number of pool
-			for _, pool := range pools.Items {
-				Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
-				Expect(pool.Description).Should(Equal("????????"))
-				Expect(pool.Status).Should(Equal("ACTIVE"))
-				Expect(pool.LoadBalanceMethod).Should(Equal(mockConfig.LoadBalancerOpts.DefaultPoolAlgorithm))
-				Expect(pool.Protocol).Should(Equal("TCP"))
-				Expect(pool.Stickiness).Should(BeFalse())
-				Expect(pool.TLSEncryption).Should(BeFalse())
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+				loadbalancerId := *lbc.Status.LoadBalancerId
 
-				Expect(pool.HealthMonitor).ShouldNot(BeNil())
-				Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
-				Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(mockConfig.LoadBalancerOpts.DefaultHealthyThreshold))
-				Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(mockConfig.LoadBalancerOpts.DefaultUnhealthyThreshold))
-				Expect(pool.HealthMonitor.Interval).Should(Equal(mockConfig.LoadBalancerOpts.DefaultInterval))
-				Expect(pool.HealthMonitor.Timeout).Should(Equal(mockConfig.LoadBalancerOpts.DefaultTimeout))
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
+				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal(mockConfig.LoadBalancerOpts.DefaultScheme))
+				g.Expect(loadbalancer.PackageID).Should(Equal(vngcloud_mocks.MockL4PackageId))
+				g.Expect(loadbalancer.SubnetID).Should(BeElementOf(vngcloud_mocks.NodeSubnetIDs))
+				g.Expect(loadbalancer.ZoneID).Should(Equal(vngcloud_mocks.MapSubnetToZone[loadbalancer.SubnetID]))
+				g.Expect(loadbalancer.Type).Should(Equal(string(loadbalancerv2.LoadBalancerTypeLayer4)))
+				g.Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloud_mocks.MapSubnetToCIDR[loadbalancer.SubnetID]))
 
-				Expect(pool.Members).ShouldNot(BeNil())
-				Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of nodes
-				Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-					mockNode1.Status.Addresses[0].Address,
-					mockNode2.Status.Addresses[0].Address,
-					mockNode3.Status.Addresses[0].Address,
-					mockNode4.Status.Addresses[0].Address,
-				))
-			}
+				// check pool
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect((pools.Items)).Should(HaveLen(1)) // number of pool
+				for _, pool := range pools.Items {
+					g.Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
+					g.Expect(pool.LoadBalanceMethod).Should(Equal(mockConfig.LoadBalancerOpts.DefaultPoolAlgorithm))
+					g.Expect(pool.Protocol).Should(Equal("TCP"))
+					g.Expect(pool.Stickiness).Should(BeFalse())
+					g.Expect(pool.TLSEncryption).Should(BeFalse())
 
-			// check listener
-			listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(listeners).ShouldNot(BeNil())
-			Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
-			for _, listener := range listeners.Items {
-				Expect(listener.Protocol).Should(Equal("TCP"))
-				Expect(listener.ProtocolPort).Should(Equal(80))
-				Expect(listener.AllowedCidrs).Should(Equal(mockConfig.LoadBalancerOpts.DefaultAllowedCidrs))
-				Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
-				Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
-				Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
-				Expect(listener.TimeoutClient).Should(Equal(50))
-				Expect(listener.TimeoutConnection).Should(Equal(5))
-				Expect(listener.TimeoutMember).Should(Equal(50))
-			}
+					g.Expect(pool.HealthMonitor).ShouldNot(BeNil())
+					g.Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("TCP"))
+					g.Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(mockConfig.LoadBalancerOpts.DefaultHealthyThreshold))
+					g.Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(mockConfig.LoadBalancerOpts.DefaultUnhealthyThreshold))
+					g.Expect(pool.HealthMonitor.Interval).Should(Equal(mockConfig.LoadBalancerOpts.DefaultInterval))
+					g.Expect(pool.HealthMonitor.Timeout).Should(Equal(mockConfig.LoadBalancerOpts.DefaultTimeout))
 
-			// Verify Security Group was created
-			secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(secgroups).ShouldNot(BeNil())
-			Expect(len(secgroups.Items)).Should(BeNumerically(">", 0))
+					g.Expect(pool.Members).ShouldNot(BeNil())
+					g.Expect((pool.Members.Items)).Should(HaveLen(4)) // number of member in pool = number of nodes
+					g.Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+						vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+						vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+						vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+						vngcloud_mocks.MockNode4.Status.Addresses[0].Address,
+					))
+				}
+
+				// check listener
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect((listeners.Items)).Should(HaveLen(1)) // number of listener
+				for _, listener := range listeners.Items {
+					g.Expect(listener.Protocol).Should(Equal("TCP"))
+					g.Expect(listener.ProtocolPort).Should(Equal(80))
+					g.Expect(listener.AllowedCidrs).Should(Equal(mockConfig.LoadBalancerOpts.DefaultAllowedCidrs))
+					g.Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
+					g.Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
+					g.Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
+					g.Expect(listener.TimeoutClient).Should(Equal(50))
+					g.Expect(listener.TimeoutConnection).Should(Equal(5))
+					g.Expect(listener.TimeoutMember).Should(Equal(50))
+				}
+
+				// Verify Security Group was created
+				listNsg, err := getNSGListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(listNsg.Items)).Should(Equal(1))
+
+				nsg := &listNsg.Items[0]
+				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
+				g.Expect(nsg.Status.ManagedSecurityGroup.Id).ShouldNot(BeNil())
+
+				secgroupId := *nsg.Status.ManagedSecurityGroup.Id
+				secgroup, err := vngcloudRepo.GetSecurityGroup(ctx, secgroupId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(secgroup).ShouldNot(BeNil())
+				g.Expect(secgroup.Name).Should(Equal(nsg.Spec.ManagedSecurityGroup.Name))
+			}, timeout*2, interval).Should(Succeed())
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
@@ -331,84 +329,73 @@ var _ = Describe("Service Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LBC to be created
-			var lbcList *v1alpha1.LoadBalancerConfigList
-			Eventually(func() int {
-				list, err := getLBCListForService(serviceName, namespace)
-				if err != nil {
-					return -1
-				}
-				lbcList = list
-				return len(list.Items)
-			}, timeout*2, interval).Should(Equal(1))
-
-			lbc := &lbcList.Items[0]
-
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
-
 			// Verify LoadBalancer was created with correct attributes
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
-			Expect(loadbalancer.Name).Should(Equal("test-lb"))
-			Expect(loadbalancer.Internal).Should(BeTrue())
-			Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
-			Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
-			Expect(loadbalancer.SubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
-			Expect(loadbalancer.Type).Should(Equal("Layer 4"))
+			Eventually(func(g Gomega) {
+				lbcList, err := getLBCListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			// Verify pool configuration
-			pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pools).ShouldNot(BeNil())
-			Expect(pools.Items).Should(HaveLen(1))
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+				loadbalancerId := *lbc.Status.LoadBalancerId
 
-			pool := pools.Items[0]
-			Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
-			Expect(pool.Description).Should(Equal("????????"))
-			Expect(pool.Status).Should(Equal("ACTIVE"))
-			Expect(pool.LoadBalanceMethod).Should(Equal("SOURCE_IP"))
-			Expect(pool.Protocol).Should(Equal("TCP"))
-			Expect(pool.Stickiness).Should(BeFalse())
-			Expect(pool.TLSEncryption).Should(BeFalse())
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				g.Expect(loadbalancer.Name).Should(Equal("test-lb"))
+				g.Expect(loadbalancer.Internal).Should(BeTrue())
+				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
+				g.Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
+				g.Expect(loadbalancer.SubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
+				g.Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 
-			// Verify health monitor configuration
-			Expect(pool.HealthMonitor).ShouldNot(BeNil())
-			Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("PING-UDP"))
-			Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(104))
-			Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(105))
-			Expect(pool.HealthMonitor.Interval).Should(Equal(102))
-			Expect(pool.HealthMonitor.Timeout).Should(Equal(103))
+				// Verify pool configuration
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(pools.Items).Should(HaveLen(1))
 
-			// Verify pool members
-			Expect(pool.Members).ShouldNot(BeNil())
-			Expect(pool.Members.Items).Should(HaveLen(4))
-			Expect(pool.Members.Items[0].Address).Should(BeElementOf(
-				mockNode1.Status.Addresses[0].Address,
-				mockNode2.Status.Addresses[0].Address,
-				mockNode3.Status.Addresses[0].Address,
-				mockNode4.Status.Addresses[0].Address))
+				pool := pools.Items[0]
+				g.Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
+				g.Expect(pool.LoadBalanceMethod).Should(Equal("SOURCE_IP"))
+				g.Expect(pool.Protocol).Should(Equal("TCP"))
+				g.Expect(pool.Stickiness).Should(BeFalse())
+				g.Expect(pool.TLSEncryption).Should(BeFalse())
 
-			// Verify listener configuration
-			listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(listeners).ShouldNot(BeNil())
-			Expect(listeners.Items).Should(HaveLen(1))
+				// Verify health monitor configuration
+				g.Expect(pool.HealthMonitor).ShouldNot(BeNil())
+				g.Expect(pool.HealthMonitor.HealthCheckProtocol).Should(Equal("PING-UDP"))
+				g.Expect(pool.HealthMonitor.HealthyThreshold).Should(Equal(104))
+				g.Expect(pool.HealthMonitor.UnhealthyThreshold).Should(Equal(105))
+				g.Expect(pool.HealthMonitor.Interval).Should(Equal(102))
+				g.Expect(pool.HealthMonitor.Timeout).Should(Equal(103))
 
-			listener := listeners.Items[0]
-			Expect(listener.Protocol).Should(Equal("TCP"))
-			Expect(listener.ProtocolPort).Should(Equal(80))
-			Expect(listener.AllowedCidrs).Should(Equal("1.0.0.0/8"))
-			Expect(listener.DefaultPoolId).Should(Equal(pool.UUID))
-			Expect(listener.DefaultPoolName).Should(Equal(pool.Name))
-			Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
-			Expect(listener.TimeoutClient).Should(Equal(99))
-			Expect(listener.TimeoutConnection).Should(Equal(101))
-			Expect(listener.TimeoutMember).Should(Equal(100))
-			Expect(listener.Description).Should(Equal("????????"))
+				// Verify pool members
+				g.Expect(pool.Members).ShouldNot(BeNil())
+				g.Expect(pool.Members.Items).Should(HaveLen(4))
+				g.Expect(pool.Members.Items[0].Address).Should(BeElementOf(
+					vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
+
+				// Verify listener configuration
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(listeners.Items).Should(HaveLen(1))
+
+				listener := listeners.Items[0]
+				g.Expect(listener.Protocol).Should(Equal("TCP"))
+				g.Expect(listener.ProtocolPort).Should(Equal(80))
+				g.Expect(listener.AllowedCidrs).Should(Equal("1.0.0.0/8"))
+				g.Expect(listener.DefaultPoolId).Should(Equal(pool.UUID))
+				g.Expect(listener.DefaultPoolName).Should(Equal(pool.Name))
+				g.Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-95466-TCP-80"))
+				g.Expect(listener.TimeoutClient).Should(Equal(99))
+				g.Expect(listener.TimeoutConnection).Should(Equal(101))
+				g.Expect(listener.TimeoutMember).Should(Equal(100))
+			}, timeout*2, interval).Should(Succeed())
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
@@ -433,41 +420,35 @@ var _ = Describe("Service Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LBC to be created
-			var lbcList *v1alpha1.LoadBalancerConfigList
-			Eventually(func() int {
-				list, err := getLBCListForService(serviceName, namespace)
-				if err != nil {
-					return -1
-				}
-				lbcList = list
-				return len(list.Items)
-			}, timeout*2, interval).Should(Equal(1))
-
-			lbc := &lbcList.Items[0]
-
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
-
 			// Verify LoadBalancer was created
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
+			var loadbalancerUUID string
+			Eventually(func(g Gomega) {
+				lbcList, err := getLBCListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			// Verify pool configuration
-			pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pools).ShouldNot(BeNil())
-			Expect(pools.Items).Should(HaveLen(1))
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+				loadbalancerId := *lbc.Status.LoadBalancerId
 
-			pool := pools.Items[0]
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
 
-			// Verify pool members - should only contain mock-node-1
-			Expect(pool.Members).ShouldNot(BeNil())
-			Expect(pool.Members.Items).Should(HaveLen(1), "should only have 1 member matching the node label")
-			Expect(pool.Members.Items[0].Address).Should(Equal(mockNode1.Status.Addresses[0].Address))
+				// Verify pool configuration
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(pools.Items).Should(HaveLen(1))
+
+				pool := pools.Items[0]
+
+				// Verify pool members - should only contain mock-node-1
+				g.Expect(pool.Members).ShouldNot(BeNil())
+				g.Expect(pool.Members.Items).Should(HaveLen(1), "should only have 1 member matching the node label")
+				g.Expect(pool.Members.Items[0].Address).Should(Equal(vngcloud_mocks.MockNode1.Status.Addresses[0].Address))
+			}, timeout*2, interval).Should(Succeed())
 
 			// Update service annotation to use 2 labels (AND logic)
 			Eventually(func() error {
@@ -481,7 +462,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Wait for pool to be updated with 2-label filter (AND logic)
 			Eventually(func() bool {
-				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
 				if err != nil || pools == nil || len(pools.Items) == 0 {
 					return false
 				}
@@ -489,12 +470,12 @@ var _ = Describe("Service Controller", func() {
 				if pool.Members == nil || len(pool.Members.Items) != 1 {
 					return false
 				}
-				// Verify the member is now mockNode2
-				return pool.Members.Items[0].Address == mockNode2.Status.Addresses[0].Address
-			}, timeout*4, interval).Should(BeTrue(), "should have 1 member from mockNode2 matching both labels (AND logic)")
+				// Verify the member is now vngcloud_mocks.MockNode2
+				return pool.Members.Items[0].Address == vngcloud_mocks.MockNode2.Status.Addresses[0].Address
+			}, timeout*4, interval).Should(BeTrue(), "should have 1 member from vngcloud_mocks.MockNode2 matching both labels (AND logic)")
 
 			// Verify listener configuration
-			listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+			listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(listeners).ShouldNot(BeNil())
 			Expect(listeners.Items).Should(HaveLen(1))
@@ -522,37 +503,29 @@ var _ = Describe("Service Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LBC to be created
-			var lbcList *v1alpha1.LoadBalancerConfigList
-			Eventually(func() int {
-				list, err := getLBCListForService(serviceName, namespace)
-				if err != nil {
-					return -1
-				}
-				lbcList = list
-				return len(list.Items)
-			}, timeout*2, interval).Should(Equal(1))
-
-			lbc := &lbcList.Items[0]
-
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
-
 			// Verify LoadBalancer was created
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
+			Eventually(func(g Gomega) {
+				lbcList, err := getLBCListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			// Verify pool configuration - should use PROXY protocol
-			pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pools).ShouldNot(BeNil())
-			Expect(pools.Items).Should(HaveLen(1))
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+				loadbalancerId := *lbc.Status.LoadBalancerId
 
-			pool := pools.Items[0]
-			Expect(pool.Protocol).Should(Equal("PROXY"), "pool protocol should be PROXY when annotation is set")
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+
+				// Verify pool configuration - should use PROXY protocol
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(pools.Items).Should(HaveLen(1))
+
+				pool := pools.Items[0]
+				g.Expect(pool.Protocol).Should(Equal("PROXY"), "pool protocol should be PROXY when annotation is set")
+			}, timeout*2, interval).Should(Succeed())
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
@@ -590,39 +563,47 @@ var _ = Describe("Service Controller", func() {
 
 			lbc := &lbcList.Items[0]
 
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
+			// Wait for LoadBalancer ID and verify initial configuration
+			var loadbalancerUUID string
+			Eventually(func(g Gomega) {
+				// Get LBC and check for LoadBalancer ID
+				updatedLbc := &v1alpha1.LoadBalancerConfig{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: lbc.Name, Namespace: lbc.Namespace}, updatedLbc)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(updatedLbc.Status.LoadBalancerId).ShouldNot(BeNil())
 
-			// Verify LoadBalancer was created
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerId := *updatedLbc.Status.LoadBalancerId
 
-			// Verify initial pool configuration with port 80
-			pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(pools).ShouldNot(BeNil())
-			Expect(pools.Items).Should(HaveLen(1))
+				// Verify LoadBalancer was created
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
 
-			pool := pools.Items[0]
-			Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
-			Expect(pool.Protocol).Should(Equal("TCP"))
+				// Verify initial pool configuration with port 80
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(pools.Items).Should(HaveLen(1))
 
-			Expect(pool.Members).ShouldNot(BeNil())
-			Expect(pool.Members.Items).Should(HaveLen(4))
+				pool := pools.Items[0]
+				g.Expect(pool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
+				g.Expect(pool.Protocol).Should(Equal("TCP"))
 
-			// Verify initial listener configuration with port 80
-			listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(listeners).ShouldNot(BeNil())
-			Expect(listeners.Items).Should(HaveLen(1))
+				g.Expect(pool.Members).ShouldNot(BeNil())
+				g.Expect(pool.Members.Items).Should(HaveLen(4))
 
-			listener := listeners.Items[0]
-			Expect(listener.Protocol).Should(Equal("TCP"))
-			Expect(listener.ProtocolPort).Should(Equal(80))
-			Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
+				// Verify initial listener configuration with port 80
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(listeners.Items).Should(HaveLen(1))
+
+				listener := listeners.Items[0]
+				g.Expect(listener.Protocol).Should(Equal("TCP"))
+				g.Expect(listener.ProtocolPort).Should(Equal(80))
+				g.Expect(listener.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-80"))
+			}, timeout*2, interval).Should(Succeed())
 
 			// Update service port from 80 to 81
 			Eventually(func() error {
@@ -637,38 +618,36 @@ var _ = Describe("Service Controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			// Wait for pool to be updated - should have new pool with port 81
-			Eventually(func() bool {
-				pools, err = vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-				if err != nil || pools == nil {
-					return false
-				}
-				return len(pools.Items) == 1 && pools.Items[0].Name == "vks-k8s-000000-default-test-serv-75a17-TCP-81"
-			}, timeout*4, interval).Should(BeTrue(), "pool should be updated to port 81")
+			Eventually(func(g Gomega) {
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(pools.Items).Should(HaveLen(1))
+				g.Expect(pools.Items[0].Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
 
-			// Verify updated pool configuration with port 81
-			updatedPool := pools.Items[0]
-			Expect(updatedPool.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
+				// Verify updated pool configuration with port 81
+				updatedPool := pools.Items[0]
+				g.Expect(updatedPool.Members).ShouldNot(BeNil())
+				g.Expect(updatedPool.Members.Items).Should(HaveLen(4))
+				g.Expect(updatedPool.Members.Items[0].Address).Should(BeElementOf(
+					vngcloud_mocks.MockNode1.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode2.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode3.Status.Addresses[0].Address,
+					vngcloud_mocks.MockNode4.Status.Addresses[0].Address))
 
-			Expect(updatedPool.Members).ShouldNot(BeNil())
-			Expect(updatedPool.Members.Items).Should(HaveLen(4))
-			Expect(updatedPool.Members.Items[0].Address).Should(BeElementOf(
-				mockNode1.Status.Addresses[0].Address,
-				mockNode2.Status.Addresses[0].Address,
-				mockNode3.Status.Addresses[0].Address,
-				mockNode4.Status.Addresses[0].Address))
+				// Verify updated listener configuration with port 81
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(listeners.Items).Should(HaveLen(1))
 
-			// Verify updated listener configuration with port 81
-			listeners, err = vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(listeners).ShouldNot(BeNil())
-			Expect(listeners.Items).Should(HaveLen(1))
-
-			updatedListener := listeners.Items[0]
-			Expect(updatedListener.Protocol).Should(Equal("TCP"))
-			Expect(updatedListener.ProtocolPort).Should(Equal(81))
-			Expect(updatedListener.DefaultPoolId).Should(Equal(updatedPool.UUID))
-			Expect(updatedListener.DefaultPoolName).Should(Equal(updatedPool.Name))
-			Expect(updatedListener.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
+				updatedListener := listeners.Items[0]
+				g.Expect(updatedListener.Protocol).Should(Equal("TCP"))
+				g.Expect(updatedListener.ProtocolPort).Should(Equal(81))
+				g.Expect(updatedListener.DefaultPoolId).Should(Equal(updatedPool.UUID))
+				g.Expect(updatedListener.DefaultPoolName).Should(Equal(updatedPool.Name))
+				g.Expect(updatedListener.Name).Should(Equal("vks-k8s-000000-default-test-serv-75a17-TCP-81"))
+			}, timeout*4, interval).Should(Succeed())
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
@@ -715,12 +694,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -730,12 +709,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -752,29 +731,32 @@ var _ = Describe("Service Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LoadBalancer
-			var loadbalancerId string
-			Eventually(func() bool {
+			// Wait for LoadBalancer and verify initial state
+			var loadbalancerUUID string
+			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
-				if err != nil || len(lbcList.Items) == 0 {
-					return false
-				}
-				id, err := waitForLoadBalancerId(lbcList.Items[0].Name, lbcList.Items[0].Namespace)
-				if err == nil && id != "" {
-					loadbalancerId = id
-					return true
-				}
-				return false
-			}, timeout*4, interval).Should(BeTrue())
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
+				lbc := &lbcList.Items[0]
+				updatedLbc := &v1alpha1.LoadBalancerConfig{}
+				err = k8sClient.Get(ctx, client.ObjectKey{Name: lbc.Name, Namespace: lbc.Namespace}, updatedLbc)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(updatedLbc.Status.LoadBalancerId).ShouldNot(BeNil())
 
-			// Verify initial state: default VKS tag
-			tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(tags.Items).Should(HaveLen(1))
-			Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				loadbalancerId := *updatedLbc.Status.LoadBalancerId
+
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
+
+				// Verify initial state: default VKS tag
+				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(tags.Items).Should(HaveLen(1))
+				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
 			secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -829,8 +811,9 @@ var _ = Describe("Service Controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			// Verify tags updated (VKS + 2 custom)
+			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
-				tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
 			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
@@ -865,7 +848,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Verify tags updated
 			Eventually(func() bool {
-				tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
@@ -937,12 +920,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -952,12 +935,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &mockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &mockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &mockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &mockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -974,29 +957,32 @@ var _ = Describe("Service Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
-			// Wait for LoadBalancer
-			var loadbalancerId string
-			Eventually(func() bool {
+			// Wait for LoadBalancer and verify initial state
+			var loadbalancerUUID string
+			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
-				if err != nil || len(lbcList.Items) == 0 {
-					return false
-				}
-				id, err := waitForLoadBalancerId(lbcList.Items[0].Name, lbcList.Items[0].Namespace)
-				if err == nil && id != "" {
-					loadbalancerId = id
-					return true
-				}
-				return false
-			}, timeout*4, interval).Should(BeTrue())
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
 
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
+				lbc := &lbcList.Items[0]
+				updatedLbc := &v1alpha1.LoadBalancerConfig{}
+				err = k8sClient.Get(ctx, client.ObjectKey{Name: lbc.Name, Namespace: lbc.Namespace}, updatedLbc)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(updatedLbc.Status.LoadBalancerId).ShouldNot(BeNil())
 
-			// Verify initial state: default VKS tag
-			tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(tags.Items).Should(HaveLen(1))
-			Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				loadbalancerId := *updatedLbc.Status.LoadBalancerId
+
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
+
+				// Verify initial state: default VKS tag
+				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(tags.Items).Should(HaveLen(1))
+				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
 			secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -1050,8 +1036,9 @@ var _ = Describe("Service Controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			// Verify tags updated (VKS + 2 custom)
+			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
-				tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
 			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
@@ -1086,7 +1073,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Verify tags updated
 			Eventually(func() bool {
-				tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
+				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
@@ -1148,34 +1135,35 @@ var _ = Describe("Service Controller", func() {
 
 			lbc := &lbcList.Items[0]
 
-			// Wait for LoadBalancer ID in LBC status
-			loadbalancerId, err := waitForLoadBalancerId(lbc.Name, lbc.Namespace)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancerId).ShouldNot(BeEmpty())
-			lbID = loadbalancerId
+			// Wait for LoadBalancer ID and verify initial state
+			var loadbalancerUUID string
+			Eventually(func(g Gomega) {
+				updatedLbc := &v1alpha1.LoadBalancerConfig{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: lbc.Name, Namespace: lbc.Namespace}, updatedLbc)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(updatedLbc.Status.LoadBalancerId).ShouldNot(BeNil())
 
-			// Get load balancer
-			loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerId := *updatedLbc.Status.LoadBalancerId
+				lbID = loadbalancerId
 
-			// Check pool - should have 1
-			Eventually(func() int {
-				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
-				if err != nil || pools == nil {
-					return -1
-				}
-				return len(pools.Items)
-			}, timeout*2, interval).Should(Equal(1))
+				// Get load balancer
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
 
-			// Check listener - should have 1
-			Eventually(func() int {
-				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
-				if err != nil || listeners == nil {
-					return -1
-				}
-				return len(listeners.Items)
-			}, timeout*2, interval).Should(Equal(1))
+				// Check pool - should have 1
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(pools).ShouldNot(BeNil())
+				g.Expect(len(pools.Items)).Should(Equal(1))
+
+				// Check listener - should have 1
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(len(listeners.Items)).Should(Equal(1))
+			}, timeout*2, interval).Should(Succeed())
 
 			// Create second service with port 81 and same LB ID annotation
 			service2 := newServiceResource(serviceName2, namespace)
@@ -1190,7 +1178,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Check pool - should have 2
 			Eventually(func() int {
-				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
 				if err != nil || pools == nil {
 					return -1
 				}
@@ -1199,7 +1187,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Check listener - should have 2
 			Eventually(func() int {
-				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
 				if err != nil || listeners == nil {
 					return -1
 				}
@@ -1219,7 +1207,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Check pool - should have 3
 			Eventually(func() int {
-				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
+				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
 				if err != nil || pools == nil {
 					return -1
 				}
@@ -1228,7 +1216,7 @@ var _ = Describe("Service Controller", func() {
 
 			// Check listener - should have 3
 			Eventually(func() int {
-				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
 				if err != nil || listeners == nil {
 					return -1
 				}

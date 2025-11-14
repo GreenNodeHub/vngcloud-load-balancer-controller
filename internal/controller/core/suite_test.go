@@ -31,7 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -81,7 +80,7 @@ var (
 			Region      string `mapstructure:"region"`
 		}{IsRunRemote: false, ClusterID: mockClusterID},
 		LoadBalancerOpts: config.LoadBalancerOpts{
-			DefaultL4PackageName: "NLB_Small",
+			DefaultL4PackageName: vngcloud_mocks.MockL4PackageName,
 			DefaultPoolAlgorithm: "ROUND_ROBIN",
 			DefaultScheme:        "Internal",
 
@@ -95,111 +94,6 @@ var (
 			DefaultTimeout:            5,
 
 			DefaultAllowedCidrs: "0.0.0.0/0",
-		},
-	}
-
-	mockNode1 = &corev1.Node{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Node",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "mock-node-1",
-			Labels: map[string]string{
-				"nodeName":                  "mock-node-1",
-				"nodeGroup":                 "mock-node-group-a",
-				"vks.vngcloud.vn/mgmt-zone": "mock-mgmt-zone",
-			},
-		},
-		Spec: corev1.NodeSpec{
-			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000001",
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{
-				{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
-				{Type: corev1.NodeHostName, Address: "mock-node-1"},
-			},
-			Conditions: []corev1.NodeCondition{
-				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
-			},
-		},
-	}
-
-	mockNode2 = &corev1.Node{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Node",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "mock-node-2",
-			Labels: map[string]string{
-				"nodeName":  "mock-node-2",
-				"nodeGroup": "mock-node-group-a",
-			},
-		},
-		Spec: corev1.NodeSpec{
-			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000002",
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{
-				{Type: corev1.NodeInternalIP, Address: "10.0.0.2"},
-				{Type: corev1.NodeHostName, Address: "mock-node-2"},
-			},
-			Conditions: []corev1.NodeCondition{
-				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
-			},
-		},
-	}
-
-	mockNode3 = &corev1.Node{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Node",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "mock-node-3",
-			Labels: map[string]string{
-				"nodeName":  "mock-node-3",
-				"nodeGroup": "mock-node-group-b",
-			},
-		},
-		Spec: corev1.NodeSpec{
-			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000003",
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{
-				{Type: corev1.NodeInternalIP, Address: "10.0.0.3"},
-				{Type: corev1.NodeHostName, Address: "mock-node-3"},
-			},
-			Conditions: []corev1.NodeCondition{
-				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
-			},
-		},
-	}
-
-	mockNode4 = &corev1.Node{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Node",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "mock-node-4",
-			Labels: map[string]string{
-				"nodeName":  "mock-node-4",
-				"nodeGroup": "mock-node-group-b",
-			},
-		},
-		Spec: corev1.NodeSpec{
-			ProviderID: "vngcloud://ins-00000000-0000-0000-0000-000000000004",
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{
-				{Type: corev1.NodeInternalIP, Address: "10.0.0.4"},
-				{Type: corev1.NodeHostName, Address: "mock-node-4"},
-			},
-			Conditions: []corev1.NodeCondition{
-				{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
-			},
 		},
 	}
 )
@@ -333,13 +227,13 @@ var _ = BeforeSuite(func() {
 	}()
 
 	// Create mock nodes
-	err = k8sClient.Create(ctx, mockNode1)
+	err = k8sClient.Create(ctx, vngcloud_mocks.MockNode1)
 	Expect(err).ToNot(HaveOccurred())
-	err = k8sClient.Create(ctx, mockNode2)
+	err = k8sClient.Create(ctx, vngcloud_mocks.MockNode2)
 	Expect(err).ToNot(HaveOccurred())
-	err = k8sClient.Create(ctx, mockNode3)
+	err = k8sClient.Create(ctx, vngcloud_mocks.MockNode3)
 	Expect(err).ToNot(HaveOccurred())
-	err = k8sClient.Create(ctx, mockNode4)
+	err = k8sClient.Create(ctx, vngcloud_mocks.MockNode4)
 	Expect(err).ToNot(HaveOccurred())
 })
 

@@ -26,29 +26,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
-const (
-	MockProjectID       = "projectID"
-	MockNetID           = "netID"
-	MockNetCIDR         = "199.0.0.0/16"
-	MockSubnetID        = "subnetID-hcm-1a"
-	MockSubnetID_1b_1   = "subnetID-hcm-1b-1"
-	MockSubnetID_1b_2   = "subnetID-hcm-1b-2"
-	MockSubnetCIDR      = "199.0.0.0/24"
-	MockSubnetCIDR_1b_1 = "299.0.0.0/24"
-	MockSubnetCIDR_1b_2 = "399.0.0.0/24"
-	MockLBNameError     = "error-lb" // create lb with this name will be error
-)
-
-const (
-	// hcm zone
-	DEFAULT_L7_PACKAGE_ID = "lbp-f562b658-0fd4-4fa6-9c57-c1a803ccbf86"
-	DEFAULT_L4_PACKAGE_ID = "lbp-96b6b072-aadb-4b58-9d5f-c16ad69d36aa"
-)
-
-var (
-	MockCerts = []string{"cert1", "cert2", "cert3"}
-)
-
 func randID() string {
 	number := randRange(1000000, 3999999)
 	return fmt.Sprint(number)
@@ -136,29 +113,29 @@ func NewMockProvider() *MockProvider {
 		subnet: [](*wrapSubnet){
 			&wrapSubnet{
 				Subnet: &entityv2.Subnet{
+					NetworkId: MockNetID,
 					Id:        MockSubnetID,
-					NetworkId: MockNetID,
-					Name:      "mock-subnet",
-					Cidr:      MockSubnetCIDR,
-					ZoneID:    string(common.HCM_03_1A_ZONE),
+					Name:      MockSubnetID,
+					Cidr:      MapSubnetToCIDR[MockSubnetID],
+					ZoneID:    MapSubnetToZone[MockSubnetID],
 				},
 			},
 			&wrapSubnet{
 				Subnet: &entityv2.Subnet{
+					NetworkId: MockNetID,
 					Id:        MockSubnetID_1b_1,
-					NetworkId: MockNetID,
-					Name:      "mock-subnet-2a",
-					Cidr:      MockSubnetCIDR_1b_1,
-					ZoneID:    string(common.HCM_03_1B_ZONE),
+					Name:      MockSubnetID_1b_1,
+					Cidr:      MapSubnetToCIDR[MockSubnetID_1b_1],
+					ZoneID:    MapSubnetToZone[MockSubnetID_1b_1],
 				},
 			},
 			&wrapSubnet{
 				Subnet: &entityv2.Subnet{
-					Id:        MockSubnetID_1b_2,
 					NetworkId: MockNetID,
-					Name:      "mock-subnet-2b",
-					Cidr:      MockSubnetCIDR_1b_2,
-					ZoneID:    string(common.HCM_03_1B_ZONE),
+					Id:        MockSubnetID_1b_2,
+					Name:      MockSubnetID_1b_2,
+					Cidr:      MapSubnetToCIDR[MockSubnetID_1b_2],
+					ZoneID:    MapSubnetToZone[MockSubnetID_1b_2],
 				},
 			},
 		},
@@ -180,24 +157,7 @@ func (m *MockProvider) Init(_ []string) error {
 	var err error
 	m.once.Do(func() {
 		// add server mock
-		serverIDs := []string{
-			"ins-00000000-0000-0000-0000-000000000001",
-			"ins-00000000-0000-0000-0000-000000000002",
-			"ins-00000000-0000-0000-0000-000000000003",
-			"ins-00000000-0000-0000-0000-000000000004",
-		}
-		mapServerSubnet := map[string]string{
-			serverIDs[0]: MockSubnetID,
-			serverIDs[1]: MockSubnetID,
-			serverIDs[2]: MockSubnetID_1b_1,
-			serverIDs[3]: MockSubnetID_1b_2,
-		}
-		mapServerZone := map[string]string{
-			serverIDs[0]: string(common.HCM_03_1A_ZONE),
-			serverIDs[1]: string(common.HCM_03_1A_ZONE),
-			serverIDs[2]: string(common.HCM_03_1B_ZONE),
-			serverIDs[3]: string(common.HCM_03_1B_ZONE),
-		}
+		serverIDs := []string{ServerId1, ServerId2, ServerId3, ServerId4}
 		for _, id := range serverIDs {
 			m.servers = append(m.servers, &wrapServer{
 				Server: &entityv2.Server{
@@ -224,10 +184,10 @@ func (m *MockProvider) Init(_ []string) error {
 					InternalInterfaces: []entityv2.NetworkInterface{
 						{
 							NetworkUuid: MockNetID,
-							SubnetUuid:  mapServerSubnet[id],
+							SubnetUuid:  MapServerIdToSubnet[id],
 						},
 					},
-					ZoneId: mapServerZone[id],
+					ZoneId: MapSubnetToZone[MapServerIdToSubnet[id]],
 				},
 			})
 		}
@@ -295,13 +255,13 @@ func (m *MockProvider) ListLoadBalancerPackageByZone(ctx context.Context, zone c
 	return &entityv2.ListLoadBalancerPackages{
 		Items: []*entityv2.LoadBalancerPackage{
 			{
-				UUID: DEFAULT_L7_PACKAGE_ID,
-				Name: "ALB_Small",
-				Type: string(loadbalancerv2.LoadBalancerTypeLayer4),
+				UUID: MockL7PackageId,
+				Name: MockL7PackageName,
+				Type: string(loadbalancerv2.LoadBalancerTypeLayer7),
 			},
 			{
-				UUID: DEFAULT_L4_PACKAGE_ID,
-				Name: "NLB_Small",
+				UUID: MockL4PackageId,
+				Name: MockL4PackageName,
 				Type: string(loadbalancerv2.LoadBalancerTypeLayer4),
 			},
 		},
