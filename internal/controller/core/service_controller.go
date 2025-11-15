@@ -193,7 +193,7 @@ func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 	endpointEventHandler := eventhandlers.NewEnqueueRequestForEndpointEvent(r.k8sClient,
 		r.logger.WithName("eventHandlers").WithName("endpoint"))
 	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.k8sClient,
-		r.logger.WithName("eventHandlers").WithName("node"))
+		r.serviceUtils, r.logger.WithName("eventHandlers").WithName("node"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("core-service").

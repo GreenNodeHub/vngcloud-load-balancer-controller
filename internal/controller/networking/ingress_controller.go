@@ -33,9 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -44,10 +42,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
-)
-
-const (
-	controllerName = "ingress"
 )
 
 func NewIngressReconciler(
@@ -199,21 +193,32 @@ func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		return err
 	}
 
-	c, err := controller.New(controllerName, mgr, controller.Options{
-		MaxConcurrentReconciles: r.maxConcurrentReconciles,
-		Reconciler:              r,
-	})
-	if err != nil {
-		return err
-	}
-
 	if err := r.setupIndexes(ctx, mgr.GetFieldIndexer()); err != nil {
 		return err
 	}
-	if err := r.setupWatches(ctx, c, mgr, clientSet); err != nil {
-		return err
-	}
-	return nil
+
+	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.k8sClient,
+		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("node"))
+	secretEventHandler := eventhandlers.NewEnqueueRequestForSecretEvent(r.k8sClient, r.eventRecorder,
+		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("secret"))
+	endpointEventHandler := eventhandlers.NewEnqueueRequestForEndpointsEvent(r.k8sClient, r.eventRecorder,
+		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("endpoint"))
+	svcEventHandler := eventhandlers.NewEnqueueRequestForServiceEvent(r.k8sClient, r.eventRecorder,
+		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("service"))
+	ingEventHandler := eventhandlers.NewEnqueueRequestForIngressEvent(r.eventRecorder,
+		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("ingress"))
+
+	return ctrl.NewControllerManagedBy(mgr).
+		Named("core-service").
+		Watches(&networkingv1.Ingress{}, ingEventHandler).
+		Watches(&corev1.Service{}, svcEventHandler).
+		Watches(&corev1.Endpoints{}, endpointEventHandler).
+		Watches(&corev1.Secret{}, secretEventHandler).
+		Watches(&corev1.Node{}, nodeEventHandler).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.maxConcurrentReconciles,
+		}).
+		Complete(r)
 }
 
 func (r *IngressReconciler) setupIndexes(ctx context.Context, fieldIndexer client.FieldIndexer) error {
@@ -231,42 +236,5 @@ func (r *IngressReconciler) setupIndexes(ctx context.Context, fieldIndexer clien
 	); err != nil {
 		return err
 	}
-	if err := fieldIndexer.IndexField(ctx, &corev1.Service{}, ingress.IndexKeySecretRefName,
-		func(obj client.Object) []string {
-			return r.referenceIndexer.BuildSecretRefIndexes(context.Background(), obj.(*corev1.Service))
-		},
-	); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *IngressReconciler) setupWatches(_ context.Context, c controller.Controller, mgr ctrl.Manager, clientSet *kubernetes.Clientset) error {
-	ingEventChan := make(chan event.TypedGenericEvent[*networkingv1.Ingress])
-	svcEventChan := make(chan event.TypedGenericEvent[*corev1.Service])
-	secretEventsChan := make(chan event.TypedGenericEvent[*corev1.Secret])
-	ingEventHandler := eventhandlers.NewEnqueueRequestsForIngressEvent(r.eventRecorder,
-		r.ingressUtils,
-		r.logger.WithName("eventHandlers").WithName("ingress"))
-	svcEventHandler := eventhandlers.NewEnqueueRequestsForServiceEvent(ingEventChan, r.k8sClient, r.eventRecorder,
-		r.logger.WithName("eventHandlers").WithName("service"))
-	secretEventHandler := eventhandlers.NewEnqueueRequestsForSecretEvent(ingEventChan, svcEventChan, r.k8sClient, r.eventRecorder,
-		r.logger.WithName("eventHandlers").WithName("secret"))
-	if err := c.Watch(source.Channel(ingEventChan, ingEventHandler)); err != nil {
-		return err
-	}
-	if err := c.Watch(source.Channel(svcEventChan, svcEventHandler)); err != nil {
-		return err
-	}
-	if err := c.Watch(source.Kind(mgr.GetCache(), &networkingv1.Ingress{}, ingEventHandler)); err != nil {
-		return err
-	}
-	if err := c.Watch(source.Kind(mgr.GetCache(), &corev1.Service{}, svcEventHandler)); err != nil {
-		return err
-	}
-	if err := c.Watch(source.Channel(secretEventsChan, secretEventHandler)); err != nil {
-		return err
-	}
-	r.secretsManager = k8s.NewSecretsManager(clientSet, secretEventsChan, ctrl.Log.WithName("secrets-manager"))
 	return nil
 }

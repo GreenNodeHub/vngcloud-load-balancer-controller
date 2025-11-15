@@ -5,7 +5,6 @@ import (
 
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -20,7 +19,7 @@ type ReferenceIndexer interface {
 	// BuildServiceRefIndexes returns the name of related Service objects.
 	BuildServiceRefIndexes(ctx context.Context, ing *networking.Ingress) []string
 	// BuildSecretRefIndexes returns the name of related Secret objects.
-	BuildSecretRefIndexes(ctx context.Context, ingOrSvc client.Object) []string
+	BuildSecretRefIndexes(ctx context.Context, ingOrSvc *networking.Ingress) []string
 }
 
 // NewDefaultReferenceIndexer constructs new defaultReferenceIndexer.
@@ -56,12 +55,12 @@ func (i *defaultReferenceIndexer) BuildServiceRefIndexes(ctx context.Context, in
 	return serviceNames.List()
 }
 
-func (i *defaultReferenceIndexer) BuildSecretRefIndexes(ctx context.Context, ingOrSvc client.Object) []string {
+func (i *defaultReferenceIndexer) BuildSecretRefIndexes(ctx context.Context, ingOrSvc *networking.Ingress) []string {
 	secretNames := sets.NewString()
 
 	// Extract secrets from Ingress TLS configuration
-	if ing, ok := ingOrSvc.(*networking.Ingress); ok {
-		for _, tls := range ing.Spec.TLS {
+	if ingOrSvc != nil {
+		for _, tls := range ingOrSvc.Spec.TLS {
 			if tls.SecretName != "" {
 				secretNames.Insert(tls.SecretName)
 			}
