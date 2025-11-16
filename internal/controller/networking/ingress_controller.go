@@ -41,7 +41,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 )
 
 func NewIngressReconciler(
@@ -72,7 +71,6 @@ type IngressReconciler struct {
 	finalizerManager k8s_helper.FinalizerManager
 
 	referenceIndexer ingress.ReferenceIndexer
-	secretsManager   k8s.SecretsManager
 	ingressUtils     ingress.IngressUtils
 	eventRecorder    record.EventRecorder
 	logger           logr.Logger
