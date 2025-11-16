@@ -17,7 +17,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -53,7 +52,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -115,7 +114,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -177,8 +176,8 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      string(domain.TargetTypeInstance),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -229,8 +228,8 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -281,8 +280,8 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -333,8 +332,8 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeIP),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeIP),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -385,8 +384,8 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "https", // different from port name
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:          string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "https", // different from port name
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -436,7 +435,7 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
 			mockEndpointResolver := utils.NewMockEndpointResolver(t)
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create real name helper
 			realNameHelper := utils.NewNameHelper(
@@ -507,7 +506,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 	t.Run("Error when ResolveNodePortEndpoints fails", func(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
-		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+		mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 		// Create real name helper
 		realNameHelper := utils.NewNameHelper(
@@ -528,7 +527,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+					domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -564,7 +563,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 	t.Run("Error when ResolvePodEndpoints fails", func(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
-		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+		mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 		// Create real name helper
 		realNameHelper := utils.NewNameHelper(
@@ -585,7 +584,7 @@ func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
+					domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -642,7 +641,7 @@ func TestGetTargetType(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 			},
@@ -655,7 +654,7 @@ func TestGetTargetType(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 			},
@@ -668,7 +667,7 @@ func TestGetTargetType(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: "invalid",
 					},
 				},
 			},
@@ -679,7 +678,7 @@ func TestGetTargetType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -723,7 +722,7 @@ func TestBuildHealthcheckPort(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
 			},
@@ -736,7 +735,7 @@ func TestBuildHealthcheckPort(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "invalid",
 					},
 				},
 			},
@@ -749,7 +748,7 @@ func TestBuildHealthcheckPort(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "-1",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "-1",
 					},
 				},
 			},
@@ -762,7 +761,7 @@ func TestBuildHealthcheckPort(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "65536",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "65536",
 					},
 				},
 			},
@@ -773,7 +772,7 @@ func TestBuildHealthcheckPort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -816,7 +815,7 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmRoundRobin),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmRoundRobin),
 					},
 				},
 			},
@@ -829,7 +828,7 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmLeastConn),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmLeastConn),
 					},
 				},
 			},
@@ -842,7 +841,7 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmSourceIP),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: string(loadbalancerv2.PoolAlgorithmSourceIP),
 					},
 				},
 			},
@@ -855,7 +854,7 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPoolAlgorithm: "invalid",
 					},
 				},
 			},
@@ -866,7 +865,7 @@ func TestBuildPoolAlgorithm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -909,7 +908,7 @@ func TestBuildIdleTimeoutClient(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutClient: "300",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutClient: "300",
 					},
 				},
 			},
@@ -922,7 +921,7 @@ func TestBuildIdleTimeoutClient(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutClient: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutClient: "invalid",
 					},
 				},
 			},
@@ -933,7 +932,7 @@ func TestBuildIdleTimeoutClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -976,7 +975,7 @@ func TestBuildIdleTimeoutMember(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutMember: "300",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutMember: "300",
 					},
 				},
 			},
@@ -989,7 +988,7 @@ func TestBuildIdleTimeoutMember(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutMember: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutMember: "invalid",
 					},
 				},
 			},
@@ -1000,7 +999,7 @@ func TestBuildIdleTimeoutMember(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -1043,7 +1042,7 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutConnection: "300",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutConnection: "300",
 					},
 				},
 			},
@@ -1056,7 +1055,7 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutConnection: "invalid",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixIdleTimeoutConnection: "invalid",
 					},
 				},
 			},
@@ -1067,7 +1066,7 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -1110,7 +1109,7 @@ func TestBuildInboundCIDRs(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24",
 					},
 				},
 			},
@@ -1123,7 +1122,7 @@ func TestBuildInboundCIDRs(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24,10.0.0.0/8",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24,10.0.0.0/8",
 					},
 				},
 			},
@@ -1134,7 +1133,7 @@ func TestBuildInboundCIDRs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")
@@ -1177,7 +1176,7 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http",
 					},
 				},
 			},
@@ -1190,7 +1189,7 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http,https",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "http,https",
 					},
 				},
 			},
@@ -1203,7 +1202,7 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*",
 					},
 				},
 			},
@@ -1216,7 +1215,7 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*,http,https",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixEnableProxyProtocol: "*,http,https",
 					},
 				},
 			},
@@ -1227,7 +1226,7 @@ func TestBuildEnableProxyProtocol(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			logger := logrus.New().WithField("test", "build_pool")

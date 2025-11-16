@@ -36,7 +36,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 )
@@ -79,21 +78,35 @@ type ServiceReconciler struct {
 	initDone atomic.Bool
 }
 
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters/status,verbs=get;update;patch
+
+// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;create;update;patch;delete
+
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
+
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=endpoints/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=endpoints/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Service object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+
+// +kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch
+
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
@@ -147,7 +160,7 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 }
 
 func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.ServiceFinalizer); err != nil {
 		return err
 	}
 	return r.serviceUseCase.EnsureServiceUseCase(ctx, req)
@@ -155,7 +168,7 @@ func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Reques
 
 func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s.HasFinalizer(obj, consts.ServiceFinalizer) {
+	if !k8s.HasFinalizer(obj, domain.ServiceFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
@@ -164,7 +177,7 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return err
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.ServiceFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.ServiceFinalizer); err != nil {
 		return err
 	}
 	return nil

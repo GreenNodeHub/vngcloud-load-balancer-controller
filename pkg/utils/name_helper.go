@@ -8,7 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 func NewNameHelper(clusterID, resourceType, resourceNamespace, resourceName string) NameHelper {
@@ -45,7 +45,7 @@ type nameHelper struct {
 func (l *nameHelper) GetLoadBalancerDefaultName() string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.clusterID, 10),
 		TrimString(l.resourceNamespace, 10),
 		TrimString(l.resourceName, 10),
@@ -56,14 +56,14 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 func (l *nameHelper) GenerateHash() string {
 	fullName := fmt.Sprintf("%s_%s_%s_%s", l.clusterID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
-	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
+	return TrimString(hash, domain.DEFAULT_HASH_NAME_LENGTH)
 }
 
 // genL4PoolName generates the name of the pool.
 func (t *nameHelper) GenL4PoolName(pPort corev1.ServicePort, realProtocol string) string {
 	hash := t.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(t.clusterID, 10),
 		TrimString(t.resourceNamespace, 9),
 		TrimString(t.resourceName, 9),
@@ -77,7 +77,7 @@ func (t *nameHelper) GenL4PoolName(pPort corev1.ServicePort, realProtocol string
 func (t *nameHelper) GenL4ListenerName(pPort corev1.ServicePort) string {
 	hash := t.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(t.clusterID, 10),
 		TrimString(t.resourceNamespace, 9),
 		TrimString(t.resourceName, 9),
@@ -106,7 +106,7 @@ func GenerateLBConfigName(prefix, baseName string) string {
 func (t *nameHelper) GenL7PoolName(serviceName string, port int) string {
 	hash := t.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		hash,
 		TrimString(fmt.Sprintf("%s-%s", t.resourceNamespace, serviceName), 35),
 		port)
@@ -117,7 +117,7 @@ func (t *nameHelper) GenL7PoolName(serviceName string, port int) string {
 func (t *nameHelper) GenL7PolicyName(mode bool, ruleIndex, pathIndex int) string {
 	hash := t.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%t_r%d_p%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		hash, mode, ruleIndex, pathIndex)
 	return ValidateName(name)
 }
@@ -128,5 +128,5 @@ func ValidateName(newName string) string {
 			newName = strings.ReplaceAll(newName, string(char), "-")
 		}
 	}
-	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
+	return TrimString(newName, domain.DEFAULT_PORTAL_NAME_LENGTH)
 }

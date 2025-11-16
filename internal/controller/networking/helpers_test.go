@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // ============================================================================
@@ -163,8 +163,8 @@ func expectNoEndpoints() {
 func listLbcByIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList, error) {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: name,
-		consts.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceName: name,
+		domain.LabelOwnerResourceType: "Ingress",
 	})
 	return lbcList, err
 }
@@ -172,8 +172,8 @@ func listLbcByIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList,
 func listNsgByIngress(name, namespace string) (*v1alpha1.NodeSecurityGroupList, error) {
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: name,
-		consts.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceName: name,
+		domain.LabelOwnerResourceType: "Ingress",
 	})
 	return nsgList, err
 }

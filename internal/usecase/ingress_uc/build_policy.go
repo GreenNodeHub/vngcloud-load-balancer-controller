@@ -8,6 +8,7 @@ import (
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -26,7 +27,7 @@ func (t *defaultModelBuildTask) buildPolicyByPath(ctx context.Context, host, pol
 		// incase not specify annotation to config, use as path type Exact
 		compareType = loadbalancerv2.PolicyCompareTypeEQUALS
 		res, err := t.buildPolicyByRegex(ctx, host, policyName, host, path)
-		if err == nil || err != errs.ErrorNoImplementationSpecificConfigFound {
+		if err == nil || err != domain.ErrorNoImplementationSpecificConfigFound {
 			return res, err
 		}
 
@@ -142,7 +143,7 @@ func (t *defaultModelBuildTask) buildPolicyByRegex(ctx context.Context, _, polic
 
 	t.logger.Warnf("No implementation specific config found for host '%s' and path '%s'.", host, path.Path)
 
-	return nil, errs.ErrorNoImplementationSpecificConfigFound
+	return nil, domain.ErrorNoImplementationSpecificConfigFound
 }
 
 type rule struct {

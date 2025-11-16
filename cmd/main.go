@@ -57,6 +57,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
@@ -65,7 +66,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
@@ -258,10 +258,10 @@ func main() {
 	}
 
 	if !disableServiceController {
-		annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 		cniDetector := utils.NewDetector(mgr.GetClient())
 		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
-		serviceUtils := service.NewServiceUtils(consts.ServiceFinalizer)
+		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
 		serviceUseCase := service_uc.NewServiceUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 		reconciler := corecontroller.NewServiceReconciler(
@@ -285,10 +285,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		annotationParser := annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
+		annotationParser := annotations.NewSuffixAnnotationParser(domain.INGRESS_ANNOTATION_PREFIX)
 		cniDetector := utils.NewDetector(mgr.GetClient())
 		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
-		ingressUtils := ingress.NewIngressUtils(consts.IngressFinalizer)
+		ingressUtils := ingress.NewIngressUtils(domain.IngressFinalizer)
 		ingressUseCase := ingress_uc.NewIngressUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, ingressUtils, cniDetector, endpointResolver)
 		reconciler := networkingcontroller.NewIngressReconciler(
@@ -306,7 +306,7 @@ func main() {
 	}
 
 	if !disableLoadBalancerConfigController {
-		lbcUtils := lbc.NewLoadBalancerConfigUtils(consts.LBCFinalizer)
+		lbcUtils := lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer)
 		lbcUseCase := lbc_uc.NewLoadBalancerConfigUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)
@@ -325,7 +325,7 @@ func main() {
 	}
 
 	if !disableNodeSecurityGroupController {
-		nsgUtils := nsg.NewNodeSecurityGroupUtils(consts.NSGFinalizer)
+		nsgUtils := nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer)
 		nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
 			conf, k8sRepo, vngcloudRepo,
 		)

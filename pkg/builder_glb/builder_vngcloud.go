@@ -514,7 +514,7 @@ func (r *vngcloudLBBuilder) EnsureListener(listenerBuilder *ListenerBuilderType,
 // 				isDefaultPool  bool
 // 				isMembersMatch bool
 // 			)
-// 			if currentPool.GetName() == consts.DEFAULT_NAME_DEFAULT_POOL {
+// 			if currentPool.GetName() == domain.DEFAULT_NAME_DEFAULT_POOL {
 // 				isDefaultPool = true
 
 // 				// check if default pool members match
@@ -703,7 +703,7 @@ func (r *vngcloudLBBuilder) getIBulkActionRequest(clusterID string, current, wan
 // 	}
 
 // 	// if default pool members not match, return false
-// 	if defaultPool := r.GetPoolBuilderByName(consts.DEFAULT_NAME_DEFAULT_POOL); defaultPool != nil {
+// 	if defaultPool := r.GetPoolBuilderByName(domain.DEFAULT_NAME_DEFAULT_POOL); defaultPool != nil {
 // 		currentMembers := defaultPool.Members
 // 		oldMembers := oldBuilder.GetDefaultPoolMembers()
 // 		if len(oldMembers) < len(currentMembers) {

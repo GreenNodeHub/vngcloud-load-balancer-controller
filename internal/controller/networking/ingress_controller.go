@@ -38,7 +38,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 )
@@ -88,15 +87,6 @@ type IngressReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Ingress object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
@@ -150,7 +140,7 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 }
 
 func (r *IngressReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.IngressFinalizer); err != nil {
 		return err
 	}
 	return r.ingressUseCase.EnsureIngressUseCase(ctx, req)
@@ -158,7 +148,7 @@ func (r *IngressReconciler) reconcileEnsure(ctx context.Context, req ctrl.Reques
 
 func (r *IngressReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s_helper.HasFinalizer(obj, consts.IngressFinalizer) {
+	if !k8s_helper.HasFinalizer(obj, domain.IngressFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
@@ -167,7 +157,7 @@ func (r *IngressReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return err
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.IngressFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.IngressFinalizer); err != nil {
 		return err
 	}
 	return nil

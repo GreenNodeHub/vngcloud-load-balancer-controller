@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -132,20 +132,20 @@ func (t *defaultModelDeployTask) generateCertName(secretName string, resourceVer
 	}
 	ingressName := ""
 	// try to get from annotation first
-	if val, ok := t.lbConfig.GetLabels()[consts.LabelOwnerResourceName]; ok {
+	if val, ok := t.lbConfig.GetLabels()[domain.LabelOwnerResourceName]; ok {
 		ingressName = val
 	}
 
 	generateHash := func() string {
 		fullName := fmt.Sprintf("%s_%s_%s_%s", clusterId, t.lbConfig.GetNamespace(), ingressName, "ingress")
 		hash := utils.HashString(fullName)
-		return utils.TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
+		return utils.TrimString(hash, domain.DEFAULT_HASH_NAME_LENGTH)
 	}
 	hash := generateHash()
-	hashSecret := utils.TrimString(utils.HashString(secretName), consts.DEFAULT_HASH_NAME_LENGTH)
+	hashSecret := utils.TrimString(utils.HashString(secretName), domain.DEFAULT_HASH_NAME_LENGTH)
 
 	name := fmt.Sprintf("%s-%s-%s-%s",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		hash,
 		hashSecret,
 		resourceVersion)

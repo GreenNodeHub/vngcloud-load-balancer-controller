@@ -16,7 +16,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 )
 
@@ -295,7 +294,7 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 		if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
 			isFoundDefaultPool := false
 			for _, p := range t.lbConfig.Spec.Pools {
-				if p.Name == consts.DEFAULT_NAME_DEFAULT_POOL {
+				if p.Name == domain.DEFAULT_NAME_DEFAULT_POOL {
 					poolSpec = p
 					isFoundDefaultPool = true
 					break

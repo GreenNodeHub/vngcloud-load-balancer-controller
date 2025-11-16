@@ -3,8 +3,11 @@ package ingress
 import (
 	"github.com/anngdinh/operator-helper/k8s"
 	networkingv1 "k8s.io/api/networking/v1"
+)
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+const (
+	// IngressClass specifies which Ingress class we accept
+	IngressClass = "vngcloud"
 )
 
 // IngressUtils to check if the object is supported by the controller
@@ -36,7 +39,7 @@ func (u *defaultIngressUtils) IsIngressSupported(object *networkingv1.Ingress) b
 	if !object.DeletionTimestamp.IsZero() {
 		return false
 	}
-	if object.Spec.IngressClassName != nil && *object.Spec.IngressClassName != consts.IngressClass {
+	if object.Spec.IngressClassName != nil && *object.Spec.IngressClassName != IngressClass {
 		return false
 	}
 	return true

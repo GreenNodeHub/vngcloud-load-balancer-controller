@@ -13,6 +13,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -42,7 +43,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 		var err error
 		if t.getTargetType(ctx) == domain.TargetTypeInstance {
 			membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
-				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+				k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
 				return nil, err
 			}
@@ -55,7 +56,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 				return nil, fmt.Errorf("failed to detect CNI type: %v", err)
 			}
 			if cniMode == utils.CiliumNativeRouting {
-				podPorts, err := t.endpointResolver.GetListTargetPort(ctx, utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)))
+				podPorts, err := t.endpointResolver.GetListTargetPort(ctx, k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)))
 				if err != nil {
 					return nil, err
 				}
@@ -79,7 +80,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 			}
 		} else {
 			membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
-				utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+				k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 			if err != nil {
 				return nil, err
 			}

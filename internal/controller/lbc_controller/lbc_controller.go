@@ -35,7 +35,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 )
@@ -74,15 +73,6 @@ type LoadBalancerConfigReconciler struct {
 // +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=loadbalancerconfigs/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the LoadBalancerConfig object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
 func (r *LoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
@@ -136,7 +126,7 @@ func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.R
 }
 
 func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
+	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.LbcFinalizer); err != nil {
 		return err
 	}
 	return r.lbcUseCase.EnsureLoadBalancerConfigUseCase(ctx, req)
@@ -144,7 +134,7 @@ func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req 
 
 func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s.HasFinalizer(obj, consts.LBCFinalizer) {
+	if !k8s.HasFinalizer(obj, domain.LbcFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
@@ -153,7 +143,7 @@ func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req 
 		return err
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, consts.LBCFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.LbcFinalizer); err != nil {
 		return err
 	}
 	return nil

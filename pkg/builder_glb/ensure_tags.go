@@ -3,7 +3,7 @@ package builder
 import (
 	"strings"
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // Tag Key   required value must length from 3 to 255
@@ -26,11 +26,11 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 	}
 
 	// ensure have cluster ids tag
-	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
+	vksClusterTags := currentTags[domain.VKS_TAG_KEY]
 	if !strings.Contains(vksClusterTags, r.fleetID) {
-		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
+		r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
 		vksClusterTags = r.joinVKSTag(vksClusterTags, r.fleetID)
-		newTags[consts.VKS_TAG_KEY] = vksClusterTags
+		newTags[domain.VKS_TAG_KEY] = vksClusterTags
 	}
 
 	return r.updateTag(currentTags, oldTags, newTags)
@@ -97,7 +97,7 @@ func (r *vngcloudLBBuilder) updateTag(currentTags, oldTags, newTags map[string]s
 }
 
 func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
-	tags := strings.Split(current, consts.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -113,10 +113,10 @@ func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
 	for tag := range tagsValid {
 		newTags = append(newTags, tag)
 	}
-	return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
 }
 func (r *vngcloudLBBuilder) removeVKSTag(current, id string) string {
-	tags := strings.Split(current, consts.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -135,11 +135,11 @@ func (r *vngcloudLBBuilder) removeVKSTag(current, id string) string {
 	if len(newTags) == 0 {
 		return ""
 	}
-	return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
 }
 
 func isValidVKSID(id string) bool {
-	return len(id) == consts.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, consts.VKS_CLUSTER_ID_PREFIX)
+	return len(id) == domain.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, domain.VKS_CLUSTER_ID_PREFIX)
 }
 
 func (r *vngcloudLBBuilder) EnsureDeleteTags(oldBuilder OldModelBuilder) error {
@@ -156,15 +156,15 @@ func (r *vngcloudLBBuilder) EnsureDeleteTags(oldBuilder OldModelBuilder) error {
 	}
 
 	// ensure have cluster ids tag
-	vksClusterTags := currentTags[consts.VKS_TAG_KEY]
+	vksClusterTags := currentTags[domain.VKS_TAG_KEY]
 	if strings.Contains(vksClusterTags, r.fleetID) {
-		r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
+		r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
 		vksClusterTags = r.removeVKSTag(vksClusterTags, r.fleetID)
 		if vksClusterTags == "" {
 			// remove tag
-			oldTags[consts.VKS_TAG_KEY] = currentTags[consts.VKS_TAG_KEY]
+			oldTags[domain.VKS_TAG_KEY] = currentTags[domain.VKS_TAG_KEY]
 		} else {
-			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.VKS_TAG_KEY] = vksClusterTags
 		}
 	}
 

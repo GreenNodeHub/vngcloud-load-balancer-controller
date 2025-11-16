@@ -9,8 +9,8 @@ import (
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -303,7 +303,7 @@ func (l *modelBuilder) createPoolBuilder(pPort corev1.ServicePort, name string) 
 func (l *modelBuilder) genL4ListenerName(pPort corev1.ServicePort) string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 9),
 		TrimString(l.resourceName, 9),
@@ -319,7 +319,7 @@ func (l *modelBuilder) genL4PoolName(pPort corev1.ServicePort) string {
 
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s_%s_%d",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 9),
 		TrimString(l.resourceName, 9),

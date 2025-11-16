@@ -7,6 +7,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -379,7 +380,7 @@ func Test_defaultEndpointResolver_ResolvePodEndpoints(t *testing.T) {
 				failOpenEnabled: true,
 			},
 			args: args{
-				svcKey: NamespacedName(svc1),
+				svcKey: k8s.NamespacedName(svc1),
 				port:   intstr.FromString("http"),
 				opts:   nil,
 			},
@@ -648,7 +649,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 				failOpenEnabled: true,
 			},
 			args: args{
-				svcKey: NamespacedName(svc1),
+				svcKey: k8s.NamespacedName(svc1),
 				port:   intstr.FromString("http"),
 				opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 			},
@@ -667,7 +668,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 				failOpenEnabled: false,
 			},
 			args: args{
-				svcKey: NamespacedName(svc1),
+				svcKey: k8s.NamespacedName(svc1),
 				port:   intstr.FromString("http"),
 				opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 			},
@@ -686,7 +687,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 				failOpenEnabled: true,
 			},
 			args: args{
-				svcKey: NamespacedName(svc1),
+				svcKey: k8s.NamespacedName(svc1),
 				port:   intstr.FromString("http"),
 				opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 			},
@@ -705,7 +706,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 				failOpenEnabled: false,
 			},
 			args: args{
-				svcKey: NamespacedName(svc1),
+				svcKey: k8s.NamespacedName(svc1),
 				port:   intstr.FromString("http"),
 				opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 			},
@@ -718,7 +719,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		// 		services: []*corev1.Service{svc1},
 		// 	},
 		// 	args: args{
-		// 		svcKey: NamespacedName(svc1),
+		// 		svcKey: k8s.NamespacedName(svc1),
 		// 		port:   intstr.FromString("http"),
 		// 		opts:   []EndpointResolveOption{WithNodeSelector(labels.Set{"labelA": "valueA"}.AsSelectorPreValidated())},
 		// 	},
@@ -737,7 +738,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		// 		services: []*corev1.Service{svc1},
 		// 	},
 		// 	args: args{
-		// 		svcKey: NamespacedName(svc1),
+		// 		svcKey: k8s.NamespacedName(svc1),
 		// 		port:   intstr.FromString("http"),
 		// 		opts:   nil,
 		// 	},
@@ -750,7 +751,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		// 		services: []*corev1.Service{svc2},
 		// 	},
 		// 	args: args{
-		// 		svcKey: NamespacedName(svc2),
+		// 		svcKey: k8s.NamespacedName(svc2),
 		// 		port:   intstr.FromString("http"),
 		// 		opts:   []EndpointResolveOption{WithNodeSelector(labels.Set{"labelA": "valueA"}.AsSelectorPreValidated())},
 		// 	},
@@ -763,7 +764,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		// 		services: []*corev1.Service{},
 		// 	},
 		// 	args: args{
-		// 		svcKey: NamespacedName(svc1),
+		// 		svcKey: k8s.NamespacedName(svc1),
 		// 		port:   intstr.FromString("http"),
 		// 		opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 		// 	},
@@ -776,7 +777,7 @@ func Test_defaultEndpointResolver_ResolveNodePortEndpoints(t *testing.T) {
 		// 		services: []*corev1.Service{svc1WithoutHTTPPort},
 		// 	},
 		// 	args: args{
-		// 		svcKey: NamespacedName(svc1),
+		// 		svcKey: k8s.NamespacedName(svc1),
 		// 		port:   intstr.FromString("http"),
 		// 		opts:   []EndpointResolveOption{WithNodeSelector(labels.Everything())},
 		// 	},

@@ -8,6 +8,7 @@ import (
 	"github.com/anngdinh/operator-helper/k8s"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -150,7 +151,7 @@ func (r *vngcloudLBBuilder) EnsureSecurityGroups(newBuilder ModelBuilder, oldBui
 	for _, rule := range needCreate {
 		_, err := r.provider.CreateSecurityGroupRule(r.context, defaultSecgroup.Id,
 			rule.GetICreateSecgroupRuleRequest(defaultSecgroup.Id))
-		if errs.IgnoreErrors(err, errs.IsSecurityGroupRuleExists) != nil {
+		if domain.IgnoreErrors(err, domain.IsSecurityGroupRuleExists) != nil {
 			r.logger.Errorf("Fail to create secgroup rule: `%s`", err.Error())
 			return err
 		}

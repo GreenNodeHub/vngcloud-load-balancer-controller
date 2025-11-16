@@ -13,6 +13,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -67,14 +68,14 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 	var err error
 	if t.getTargetType(ctx) == domain.TargetTypeInstance {
 		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
-			utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+			k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
 			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
 			return nil, err
 		}
 	} else {
 		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
-			utils.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
+			k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
 			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
 			return nil, err

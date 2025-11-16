@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 type PoolListenerHelper interface {
@@ -191,7 +191,7 @@ type nameHelper struct {
 func (l *nameHelper) GetLoadBalancerDefaultName() string {
 	hash := l.GenerateHash()
 	name := fmt.Sprintf("%s_%s_%s_%s_%s",
-		consts.DEFAULT_LB_PREFIX_NAME,
+		domain.DEFAULT_LB_PREFIX_NAME,
 		TrimString(l.fleetID, 10),
 		TrimString(l.resourceNamespace, 10),
 		TrimString(l.resourceName, 10),
@@ -202,7 +202,7 @@ func (l *nameHelper) GetLoadBalancerDefaultName() string {
 func (l *nameHelper) GenerateHash() string {
 	fullName := fmt.Sprintf("%s_%s_%s_%s", l.fleetID, l.resourceNamespace, l.resourceName, l.resourceType)
 	hash := HashString(fullName)
-	return TrimString(hash, consts.DEFAULT_HASH_NAME_LENGTH)
+	return TrimString(hash, domain.DEFAULT_HASH_NAME_LENGTH)
 }
 
 func (l *nameHelper) validateName(newName string) string {
@@ -211,8 +211,8 @@ func (l *nameHelper) validateName(newName string) string {
 			newName = strings.ReplaceAll(newName, string(char), "-")
 		}
 	}
-	if len(newName) > consts.DEFAULT_PORTAL_NAME_LENGTH {
+	if len(newName) > domain.DEFAULT_PORTAL_NAME_LENGTH {
 		logrus.Warnf("The name %s is too long, it will be truncated", newName)
 	}
-	return TrimString(newName, consts.DEFAULT_PORTAL_NAME_LENGTH)
+	return TrimString(newName, domain.DEFAULT_PORTAL_NAME_LENGTH)
 }

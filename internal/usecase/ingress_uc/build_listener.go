@@ -7,8 +7,8 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
 func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool) (*v1alpha1.Listener, error) {
@@ -18,7 +18,7 @@ func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool
 	defaultAllowedCidrs := t.buildInboundCIDRs(ctx)
 
 	opt := v1alpha1.Listener{
-		Name:              consts.DEFAULT_HTTP_LISTENER_NAME,
+		Name:              domain.DEFAULT_HTTP_LISTENER_NAME,
 		Protocol:          loadbalancerv2.ListenerProtocolHTTP,
 		ProtocolPort:      80,
 		DefaultPoolName:   nil, // set later
@@ -34,7 +34,7 @@ func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool
 	}
 
 	if isHttps {
-		opt.Name = consts.DEFAULT_HTTPS_LISTENER_NAME
+		opt.Name = domain.DEFAULT_HTTPS_LISTENER_NAME
 		opt.Protocol = loadbalancerv2.ListenerProtocolHTTPS
 		opt.ProtocolPort = 443
 

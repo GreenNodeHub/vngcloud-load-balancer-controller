@@ -131,7 +131,7 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 // // get load balancer by id in resource annotation
 // func getLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.LoadBalancer {
 // 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
-// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
 // 	Expect(loadbalancerID).ShouldNot(BeEmpty())
 // 	loadbalancer, err := mockProvider.GetLoadBalancerByID(ctx, loadbalancerID)
 // 	Expect(err).ShouldNot(HaveOccurred())
@@ -140,7 +140,7 @@ func RunMultiStepTest[T kubernetesResource](tt TestType[T]) {
 
 // func getGLBByAnnotation[T kubernetesResource](k8sClient client.Client, obj T) *entity.GlobalLoadBalancer {
 // 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)).Should(Succeed())
-// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+// 	loadbalancerID := obj.GetAnnotations()[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
 // 	Expect(loadbalancerID).ShouldNot(BeEmpty())
 // 	loadbalancer, err := mockProvider.GetGlobalLoadBalancerByID(ctx, loadbalancerID)
 // 	Expect(err).ShouldNot(HaveOccurred())

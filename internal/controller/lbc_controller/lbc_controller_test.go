@@ -39,7 +39,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -199,23 +198,23 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 					generateService: func() *corev1.Service {
 						service := newServiceResource("test-service", "default")
 						service.Annotations = map[string]string{
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName):           "test-lb",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPackageID):                  "package-iiiiiiiiiiiiiii",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixScheme):                     "internal",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutClient):          "99",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutMember):          "100",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutConnection):      "101",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixInboundCIDRs):               "1.0.0.0/8",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckPort):            "8888",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckProtocol):        "PING-UDP",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckIntervalSeconds): "102",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckTimeoutSeconds):  "103",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthyThresholdCount):      "104",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixUnhealthyThresholdCount):    "105",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPoolAlgorithm):              "SOURCE_IP",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableAutoscale):            "true",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags):                       "tag1=656,tag2=5324",
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups):             "sg-1,sg-2",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName):           "test-lb",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPackageID):                  "package-iiiiiiiiiiiiiii",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixScheme):                     "internal",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutClient):          "99",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutMember):          "100",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutConnection):      "101",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixInboundCIDRs):               "1.0.0.0/8",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckPort):            "8888",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckProtocol):        "PING-UDP",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckIntervalSeconds): "102",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckTimeoutSeconds):  "103",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthyThresholdCount):      "104",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixUnhealthyThresholdCount):    "105",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPoolAlgorithm):              "SOURCE_IP",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableAutoscale):            "true",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags):                       "tag1=656,tag2=5324",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups):             "sg-1,sg-2",
 						}
 						return service
 					},
@@ -294,7 +293,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 					generateService: func() *corev1.Service {
 						service := newServiceResource("test-service", "default")
 						service.Annotations = map[string]string{
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1",
 						}
 						return service
 					},
@@ -370,7 +369,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 					generateService: func() *corev1.Service {
 						service := newServiceResource("test-service", "default")
 						service.Annotations = map[string]string{
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1,nodeGroup=mock-node-group-a",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1,nodeGroup=mock-node-group-a",
 						}
 						return service
 					},
@@ -446,7 +445,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 					generateService: func() *corev1.Service {
 						service := newServiceResource("test-service-1", "default")
 						service.Annotations = map[string]string{
-							fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableProxyProtocol): "*",
+							fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableProxyProtocol): "*",
 						}
 						return service
 					},
@@ -815,7 +814,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								if object.Annotations == nil {
 									object.Annotations = make(map[string]string)
 								}
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetType)] = string(domain.TargetTypeIP)
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetType)] = string(domain.TargetTypeIP)
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -940,7 +939,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 				vlbcList := &v1alpha1.LoadBalancerConfigList{}
 				Eventually(func() bool {
 					err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{
-						consts.LabelOwnerResourceName: service.Name,
+						domain.LabelOwnerResourceName: service.Name,
 					})
 					if err != nil {
 						return false
@@ -1096,7 +1095,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 							tags, err = vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 							Expect(err).ShouldNot(HaveOccurred())
 							Expect(tags).ShouldNot(BeNil())
-							return len(tags.Items) == 1 && tags.Items[0].Key == consts.VKS_TAG_KEY && tags.Items[0].Value == mockConfig.Cluster.ClusterID
+							return len(tags.Items) == 1 && tags.Items[0].Key == domain.VKS_TAG_KEY && tags.Items[0].Value == mockConfig.Cluster.ClusterID
 						}, time.Second*10, interval).Should(Equal(true))
 
 						// check secgroups
@@ -1195,7 +1194,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
 								Expect((tags.Items)).Should(HaveLen(1))
-								Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+								Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 								Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 								// check secgroups
@@ -1260,8 +1259,8 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								if object.Annotations == nil {
 									object.Annotations = map[string]string{}
 								}
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1276,7 +1275,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
 								Expect((tags.Items)).Should(HaveLen(3))
-								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
+								expectKeys := []string{domain.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
 									Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1306,8 +1305,8 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								if object.Annotations == nil {
 									object.Annotations = map[string]string{}
 								}
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1322,7 +1321,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
 								Expect((tags.Items)).Should(HaveLen(3))
-								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
+								expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
 									Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1429,7 +1428,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 						Expect(err).ShouldNot(HaveOccurred())
 						Expect(tags).ShouldNot(BeNil())
 						Expect((tags.Items)).Should(HaveLen(1))
-						Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+						Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 						Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 						// check secgroups
@@ -1485,8 +1484,8 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								if object.Annotations == nil {
 									object.Annotations = map[string]string{}
 								}
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1501,7 +1500,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
 								Expect((tags.Items)).Should(HaveLen(3))
-								expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
+								expectKeys := []string{domain.VKS_TAG_KEY, "tag1", "tag2"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 								for _, tag := range tags.Items {
 									Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1531,8 +1530,8 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								if object.Annotations == nil {
 									object.Annotations = map[string]string{}
 								}
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
-								object.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22, tag3=value3"
+								object.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 								return []client.Object{&object}
 							},
 							expect: func(loadbalancer *entity.LoadBalancer) {
@@ -1547,7 +1546,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 								Expect(err).ShouldNot(HaveOccurred())
 								Expect(tags).ShouldNot(BeNil())
 								Expect((tags.Items)).Should(HaveLen(3))
-								expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
+								expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
 								expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 								for _, tag := range tags.Items {
 									Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1613,7 +1612,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 				vlbcList := &v1alpha1.LoadBalancerConfigList{}
 				Eventually(func() bool {
 					err := k8sClient.List(ctx, vlbcList, client.InNamespace("default"), client.MatchingLabels{
-						consts.LabelOwnerResourceName: obj.GetName(),
+						domain.LabelOwnerResourceName: obj.GetName(),
 					})
 					if err != nil {
 						return false
@@ -1643,7 +1642,7 @@ var _ = Describe("LoadBalancerConfig Controller", func() {
 				// Eventually(func() bool {
 				// 	getObj := &corev1.Service{}
 				// 	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: obj.GetName(), Namespace: obj.GetNamespace()}, getObj)).Should(Succeed())
-				// 	loadbalancerID = getObj.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
+				// 	loadbalancerID = getObj.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)]
 				// 	return loadbalancerID != ""
 				// }, 10*time.Second, interval).Should(BeTrue())
 

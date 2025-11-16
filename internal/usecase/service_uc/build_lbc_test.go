@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +22,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 		{
 			name: "with_load_balancer_name_annotation",
 			annotations: map[string]string{
-				consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "custom-lb-name",
+				domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "custom-lb-name",
 			},
 			expectedName: "custom-lb-name",
 			description:  "should return the custom load balancer name from annotation",
@@ -38,7 +38,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 		{
 			name: "empty_load_balancer_name_annotation",
 			annotations: map[string]string{
-				consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "",
+				domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "",
 			},
 			expectedName: "vks-TODO-test-names-test-servi-0879b",
 			description:  "should return empty when annotation is empty",
@@ -46,7 +46,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 		{
 			name: "with_multiple_annotations",
 			annotations: map[string]string{
-				consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "another-custom-name",
+				domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "another-custom-name",
 				"other.annotation": "value",
 			},
 			expectedName: "another-custom-name",
@@ -71,7 +71,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 				},
 			}
 
-			annotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 			nameHelper := utils.NewNameHelper("TODO", "service", service.GetNamespace(), service.GetName())
 
 			// Create the task with mocks

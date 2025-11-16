@@ -43,6 +43,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
@@ -50,7 +51,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
@@ -166,11 +166,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Setup annotation parser and utilities
-	annotationParser := annotations.NewSuffixAnnotationParser(consts.INGRESS_ANNOTATION_PREFIX)
+	annotationParser := annotations.NewSuffixAnnotationParser(domain.INGRESS_ANNOTATION_PREFIX)
 	cniDetector = new(utils.MockCniDetector)
 	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
-	ingressUtils := ingress.NewIngressUtils(consts.IngressFinalizer)
+	ingressUtils := ingress.NewIngressUtils(domain.IngressFinalizer)
 
 	// Setup Ingress reconciler
 	ingressUseCase := ingress_uc.NewIngressUseCase(
@@ -201,7 +201,7 @@ var _ = BeforeSuite(func() {
 		lbcUseCase,
 		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
-		lbc.NewLoadBalancerConfigUtils(consts.LBCFinalizer),
+		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -218,7 +218,7 @@ var _ = BeforeSuite(func() {
 		nsgUseCase,
 		k8sManager.GetEventRecorderFor("nsg-controller"),
 		finalizerManager,
-		nsg.NewNodeSecurityGroupUtils(consts.NSGFinalizer),
+		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

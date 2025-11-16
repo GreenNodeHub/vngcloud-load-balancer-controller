@@ -15,7 +15,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -44,7 +43,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		if err != nil {
 			return nil, nil, err
 		}
-		defaultPool.Name = consts.DEFAULT_NAME_DEFAULT_POOL
+		defaultPool.Name = domain.DEFAULT_NAME_DEFAULT_POOL
 		appendPool(*defaultPool)
 	}
 

@@ -8,6 +8,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -196,7 +197,7 @@ func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port in
 		}
 	}
 
-	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), NamespacedName(svc))
+	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), k8s.NamespacedName(svc))
 }
 
 func (r *defaultEndpointResolver) buildNodePortEndpoint(IP, instanceID string, nodePort int32) EndpointAddress {

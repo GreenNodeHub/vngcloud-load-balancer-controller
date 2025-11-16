@@ -15,7 +15,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -37,7 +36,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -102,7 +101,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -171,8 +170,8 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      string(domain.TargetTypeInstance),
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType:      string(domain.TargetTypeInstance),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixHealthcheckPort: "8080",
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -241,7 +240,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 					},
 				},
 				Spec: corev1.ServiceSpec{
@@ -307,7 +306,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 		// 			Name:      "test-service",
 		// 			Namespace: "default",
 		// 			Annotations: map[string]string{
-		// 				consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+		// 				domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 		// 			},
 		// 		},
 		// 		Spec: corev1.ServiceSpec{
@@ -358,7 +357,7 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
 			mockEndpointResolver := utils.NewMockEndpointResolver(t)
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 			mockNameHelper := utils.NewMockNameHelper(t)
 			mockCniDetector := utils.NewMockCniDetector(t)
 
@@ -540,7 +539,7 @@ func TestBuildIsAutoCreateSecGroup(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "",
 					},
 				},
 			},
@@ -554,7 +553,7 @@ func TestBuildIsAutoCreateSecGroup(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "sg-12345",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "sg-12345",
 					},
 				},
 			},
@@ -568,7 +567,7 @@ func TestBuildIsAutoCreateSecGroup(t *testing.T) {
 					Name:      "test-service",
 					Namespace: "default",
 					Annotations: map[string]string{
-						consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "sg-12345,sg-67890",
+						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixSecurityGroups: "sg-12345,sg-67890",
 					},
 				},
 			},
@@ -580,7 +579,7 @@ func TestBuildIsAutoCreateSecGroup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 
 			// Create the task
 			task := &defaultModelBuildTask{
@@ -603,7 +602,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 	t.Run("Error when ResolveNodePortEndpoints fails", func(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
-		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+		mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 		mockNameHelper := utils.NewMockNameHelper(t)
 		mockCniDetector := utils.NewMockCniDetector(t)
 
@@ -623,7 +622,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+					domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -660,7 +659,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 	t.Run("Error when ResolvePodEndpoints fails", func(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
-		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+		mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 		mockNameHelper := utils.NewMockNameHelper(t)
 		mockCniDetector := utils.NewMockCniDetector(t)
 
@@ -680,7 +679,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
+					domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeIP),
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -717,7 +716,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 	t.Run("Error when GetListTargetPort fails in Cilium native routing", func(t *testing.T) {
 		// Create mocks
 		mockEndpointResolver := utils.NewMockEndpointResolver(t)
-		mockAnnotationParser := annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+		mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 		mockNameHelper := utils.NewMockNameHelper(t)
 		mockCniDetector := utils.NewMockCniDetector(t)
 
@@ -746,7 +745,7 @@ func TestBuildDefaultSecurityGroupRule_ErrorCases(t *testing.T) {
 				Name:      "test-service",
 				Namespace: "default",
 				Annotations: map[string]string{
-					consts.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+					domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
 				},
 			},
 			Spec: corev1.ServiceSpec{

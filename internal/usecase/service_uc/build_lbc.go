@@ -14,9 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -64,7 +65,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	// update service address
 	address := t.getLBCAddress(ctx)
 	if address != "" {
-		err := t.k8sRepo.UpdateServiceStatusAddress(ctx, utils.NamespacedName(t.service), address)
+		err := t.k8sRepo.UpdateServiceStatusAddress(ctx, k8s.NamespacedName(t.service), address)
 		if err != nil {
 			t.logger.Errorf("failed to update service status address: %v", err)
 			return err
@@ -77,8 +78,8 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	// list LBC by label selector
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: t.service.Name,
-		consts.LabelOwnerResourceType: t.service.Kind,
+		domain.LabelOwnerResourceName: t.service.Name,
+		domain.LabelOwnerResourceType: t.service.Kind,
 	})
 	if err != nil {
 		t.logger.Errorf("failed to list LBC: %v", err)
@@ -125,8 +126,8 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	if lbConfig.Labels == nil {
 		lbConfig.Labels = make(map[string]string)
 	}
-	lbConfig.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
-	lbConfig.Labels[consts.LabelOwnerResourceType] = t.service.Kind
+	lbConfig.Labels[domain.LabelOwnerResourceName] = t.service.Name // TODO
+	lbConfig.Labels[domain.LabelOwnerResourceType] = t.service.Kind
 	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
 	lbConfig.Spec.SubnetId = subnetId
 	lbConfig.Spec.ZoneId = zoneId
@@ -184,8 +185,8 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	// list NodeSecurityGroup by label selector
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := t.k8sRepo.ListNodeSecurityGroup(ctx, nsgList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: t.service.Name,
-		consts.LabelOwnerResourceType: t.service.Kind,
+		domain.LabelOwnerResourceName: t.service.Name,
+		domain.LabelOwnerResourceType: t.service.Kind,
 	})
 	if err != nil {
 		return err
@@ -215,8 +216,8 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	if nsg.Labels == nil {
 		nsg.Labels = make(map[string]string)
 	}
-	nsg.Labels[consts.LabelOwnerResourceName] = t.service.Name // TODO
-	nsg.Labels[consts.LabelOwnerResourceType] = t.service.Kind
+	nsg.Labels[domain.LabelOwnerResourceName] = t.service.Name // TODO
+	nsg.Labels[domain.LabelOwnerResourceType] = t.service.Kind
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	nsg.Spec.SelectNodeLabels = targetNodeLabels
@@ -453,8 +454,8 @@ func (t *defaultModelBuildTask) getLBCAddress(ctx context.Context) string {
 	// list LBC by label selector
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.service.Namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: t.service.Name,
-		consts.LabelOwnerResourceType: t.service.Kind,
+		domain.LabelOwnerResourceName: t.service.Name,
+		domain.LabelOwnerResourceType: t.service.Kind,
 	})
 	if err != nil {
 		t.logger.Warnf("failed to list LBC: %v", err)

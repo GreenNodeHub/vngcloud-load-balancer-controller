@@ -11,10 +11,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -109,8 +109,8 @@ func (uc *serviceUseCase) EnsureServiceUseCase(ctx context.Context, req ctrl.Req
 	// some errors should not requeue
 	if err != nil {
 		switch {
-		case errs.IsExceededSecurityGroupPerServerQuota(err),
-			errs.IsLoadBalancerNotFound(err):
+		case domain.IsExceededSecurityGroupPerServerQuota(err),
+			domain.IsLoadBalancerNotFound(err):
 			err = errs.NewNoNeedRequeue(err.Error())
 		}
 	}
@@ -136,8 +136,8 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 	// get all LBCs created by this service by using label selector
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err = uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
-		consts.LabelOwnerResourceName: svc.GetName(),
-		consts.LabelOwnerResourceType: svc.Kind,
+		domain.LabelOwnerResourceName: svc.GetName(),
+		domain.LabelOwnerResourceType: svc.Kind,
 	})
 	if err != nil {
 		logger.Errorf("failed to list LBCs by label: %v", err)
@@ -157,8 +157,8 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 	// and delete them
 	secgroupList := &v1alpha1.NodeSecurityGroupList{}
 	err = uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
-		consts.LabelOwnerResourceName: svc.GetName(),
-		consts.LabelOwnerResourceType: svc.Kind,
+		domain.LabelOwnerResourceName: svc.GetName(),
+		domain.LabelOwnerResourceType: svc.Kind,
 	})
 	if err != nil {
 		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)

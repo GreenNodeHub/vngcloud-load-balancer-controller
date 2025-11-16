@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // oldTags: obj.Status.Tags
@@ -56,13 +56,13 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	// ensure vks_cluster_ids tag
 	if r.lbConfig.Spec.ClusterId != nil && *r.lbConfig.Spec.ClusterId != "" {
 		// ensure have cluster ids tag
-		vksClusterTags := currentTags[consts.VKS_TAG_KEY]
+		vksClusterTags := currentTags[domain.VKS_TAG_KEY]
 		if !strings.Contains(vksClusterTags, *r.lbConfig.Spec.ClusterId) {
-			r.logger.Debugf("Need update tag: %s", consts.VKS_TAG_KEY)
+			r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
 			vksClusterTags = r.joinVKSTag(vksClusterTags, *r.lbConfig.Spec.ClusterId)
-			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.VKS_TAG_KEY] = vksClusterTags
 		} else {
-			newTags[consts.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.VKS_TAG_KEY] = vksClusterTags
 		}
 	}
 
@@ -116,7 +116,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 }
 
 func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {
-	tags := strings.Split(current, consts.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -132,9 +132,9 @@ func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {
 	for tag := range tagsValid {
 		newTags = append(newTags, tag)
 	}
-	return strings.Join(newTags, consts.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
 }
 
 func isValidVKSID(id string) bool {
-	return len(id) == consts.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, consts.VKS_CLUSTER_ID_PREFIX)
+	return len(id) == domain.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, domain.VKS_CLUSTER_ID_PREFIX)
 }

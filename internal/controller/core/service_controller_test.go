@@ -30,9 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -309,23 +309,23 @@ var _ = Describe("Service Controller", func() {
 			// Create service with all normal annotations
 			service := newServiceResource(serviceName, namespace)
 			service.Annotations = map[string]string{
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName):           "test-lb",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPackageID):                  "package-iiiiiiiiiiiiiii",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixScheme):                     "internal",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutClient):          "99",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutMember):          "100",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutConnection):      "101",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixInboundCIDRs):               "1.0.0.0/8",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckPort):            "8888",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckProtocol):        "PING-UDP",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckIntervalSeconds): "102",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckTimeoutSeconds):  "103",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthyThresholdCount):      "104",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixUnhealthyThresholdCount):    "105",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPoolAlgorithm):              "SOURCE_IP",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableAutoscale):            "true",
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags):                       "tag1=656,tag2=5324",
-				// fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups):             "sg-1,sg-2", // TODO: create mock security groups
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerName):           "test-lb",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPackageID):                  "package-iiiiiiiiiiiiiii",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixScheme):                     "internal",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutClient):          "99",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutMember):          "100",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutConnection):      "101",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixInboundCIDRs):               "1.0.0.0/8",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckPort):            "8888",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckProtocol):        "PING-UDP",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckIntervalSeconds): "102",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthcheckTimeoutSeconds):  "103",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixHealthyThresholdCount):      "104",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixUnhealthyThresholdCount):    "105",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixPoolAlgorithm):              "SOURCE_IP",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableAutoscale):            "true",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags):                       "tag1=656,tag2=5324",
+				// fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups):             "sg-1,sg-2", // TODO: create mock security groups
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
@@ -416,7 +416,7 @@ var _ = Describe("Service Controller", func() {
 			// Create service with target node label annotation
 			service := newServiceResource(serviceName, namespace)
 			service.Annotations = map[string]string{
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels): "nodeName=mock-node-1",
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
@@ -456,7 +456,7 @@ var _ = Describe("Service Controller", func() {
 				if err != nil {
 					return err
 				}
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels)] = "nodeName=mock-node-2,nodeGroup=mock-node-group-a"
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTargetNodeLabels)] = "nodeName=mock-node-2,nodeGroup=mock-node-group-a"
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
@@ -499,7 +499,7 @@ var _ = Describe("Service Controller", func() {
 			// Create service with PROXY protocol annotation
 			service := newServiceResource(serviceName, namespace)
 			service.Annotations = map[string]string{
-				fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableProxyProtocol): "*",
+				fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixEnableProxyProtocol): "*",
 			}
 			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
 
@@ -755,7 +755,7 @@ var _ = Describe("Service Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -805,8 +805,8 @@ var _ = Describe("Service Controller", func() {
 				if svc.Annotations == nil {
 					svc.Annotations = make(map[string]string)
 				}
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
@@ -841,8 +841,8 @@ var _ = Describe("Service Controller", func() {
 				if err != nil {
 					return err
 				}
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22,tag3=value3"
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22,tag3=value3"
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
@@ -852,7 +852,7 @@ var _ = Describe("Service Controller", func() {
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
-				expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -981,7 +981,7 @@ var _ = Describe("Service Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -1030,8 +1030,8 @@ var _ = Describe("Service Controller", func() {
 				if svc.Annotations == nil {
 					svc.Annotations = make(map[string]string)
 				}
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag1=value1,tag2=value2"
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = bigbangSec.Id
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
@@ -1066,8 +1066,8 @@ var _ = Describe("Service Controller", func() {
 				if err != nil {
 					return err
 				}
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22,tag3=value3"
-				svc.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixTags)] = "tag2=value22,tag3=value3"
+				svc.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixSecurityGroups)] = blackpinkSec.Id
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
@@ -1077,7 +1077,7 @@ var _ = Describe("Service Controller", func() {
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
-				expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -1173,7 +1173,7 @@ var _ = Describe("Service Controller", func() {
 			if service2.Annotations == nil {
 				service2.Annotations = map[string]string{}
 			}
-			service2.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
+			service2.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
 			Expect(k8sClient.Create(ctx, service2)).Should(Succeed())
 
 			// Check pool - should have 2
@@ -1202,7 +1202,7 @@ var _ = Describe("Service Controller", func() {
 			if service3.Annotations == nil {
 				service3.Annotations = map[string]string{}
 			}
-			service3.Annotations[fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
+			service3.Annotations[fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = lbID
 			Expect(k8sClient.Create(ctx, service3)).Should(Succeed())
 
 			// Check pool - should have 3

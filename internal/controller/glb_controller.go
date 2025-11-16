@@ -44,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	builder "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/builder_glb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -84,7 +85,7 @@ type VngcloudGlobalLoadBalancerReconciler struct {
 
 func (r *VngcloudGlobalLoadBalancerReconciler) init() error {
 	r.eventClassification = event_classification.NewEventClassification(r.getObjectByKey, r.isValid)
-	r.annotationParser = annotations.NewSuffixAnnotationParser(consts.SERVICE_ANNOTATION_PREFIX)
+	r.annotationParser = annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
 	r.resourceDependant = NewVGLBDependant(r.Client)
 	r.defaultPackageID = "pkg-b02e62ab-a282-4faf-8732-a172ef497a7b"
 	return nil
@@ -178,7 +179,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) getNodes(client client.Client) ([
 	// filter nodes with annotation
 	filteredNodes := make([]*corev1.Node, 0)
 	for i := range nodes.Items {
-		if nodes.Items[i].Annotations[consts.LABEL_NODE_EXCLUDE_LOADBALANCER] != "true" {
+		if nodes.Items[i].Annotations[domain.LabelNodeExcludeLB] != "true" {
 			filteredNodes = append(filteredNodes, &nodes.Items[i])
 		}
 	}
@@ -296,7 +297,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcile(ctx context.Context, re
 func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer, _ interface{}) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	if err := r.FinalizerManager.AddFinalizers(ctx, obj, consts.GLBFinalizer); err != nil {
+	if err := r.FinalizerManager.AddFinalizers(ctx, obj, domain.GlbFinalizer); err != nil {
 		return err
 	}
 
@@ -392,7 +393,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureObject(ctx context.Context,
 
 		// update object annotation, also trigger reconcile immediately
 		updateObjectAnnotation(ctx, r.Client, obj, map[string]string{
-			fmt.Sprintf("%s/%s", consts.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.ID,
+			fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID): lb.ID,
 		})
 		return nil
 	} else {
@@ -568,7 +569,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) ensureSecurityGroup(currentBuilde
 func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	if !k8s.HasFinalizer(obj, consts.GLBFinalizer) {
+	if !k8s.HasFinalizer(obj, domain.GlbFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
@@ -578,7 +579,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) deleteObject(ctx context.Context,
 		return err
 	}
 
-	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, consts.GLBFinalizer); err != nil {
+	if err := r.FinalizerManager.RemoveFinalizers(ctx, obj, domain.GlbFinalizer); err != nil {
 		return err
 	}
 	return nil
@@ -626,7 +627,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 		r.knownNodes, obj)
 
 	if err != nil {
-		if errs.IsGlobalLoadBalancerNotFound(err) {
+		if domain.IsGlobalLoadBalancerNotFound(err) {
 			return nil
 		}
 		logger.Error("Failed to get current loadbalancer: ", err)
@@ -657,7 +658,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) subDeleteObject(ctx context.Conte
 
 	if deleteResource {
 		if err := r.Provider.DeleteGlobalLoadBalancer(ctx, oldBuilder.GetLoadBalancerID()); err != nil {
-			if !errs.IsGlobalLoadBalancerNotFound(err) {
+			if !domain.IsGlobalLoadBalancerNotFound(err) {
 				logger.Error("Failed to delete loadbalancer: ", err)
 				return err
 			}
@@ -791,11 +792,6 @@ func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(mgr ctrl.Manager
 					oldAnnotations := clone.Clone(oldObj.Annotations).(map[string]string)
 					newAnnotations := clone.Clone(newObj.Annotations).(map[string]string)
 
-					// remove whitelisted annotations in the comparison
-					for k := range consts.WhitelistedAnnotations {
-						delete(oldAnnotations, k)
-						delete(newAnnotations, k)
-					}
 					if !reflect.DeepEqual(oldAnnotations, newAnnotations) {
 						logrus.Info("Detect update VGLB Annotations event.")
 						debugCompareMapString(oldAnnotations, newAnnotations)

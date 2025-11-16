@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // ============================================================================
@@ -202,8 +202,8 @@ func getServiceResource(serviceName, namespace string) (*corev1.Service, error) 
 func getLBCListForService(serviceName, namespace string) (*v1alpha1.LoadBalancerConfigList, error) {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: serviceName,
-		consts.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceName: serviceName,
+		domain.LabelOwnerResourceType: "Service",
 	})
 	return lbcList, err
 }
@@ -222,8 +222,8 @@ func getLBCForService(serviceName, namespace string) (*v1alpha1.LoadBalancerConf
 func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurityGroupList, error) {
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
-		consts.LabelOwnerResourceName: serviceName,
-		consts.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceName: serviceName,
+		domain.LabelOwnerResourceType: "Service",
 	})
 	return nsgList, err
 }

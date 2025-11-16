@@ -32,9 +32,9 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -115,7 +115,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect((pools.Items)).Should(HaveLen(1)) // number of pool
 				for _, pool := range pools.Items {
 					g.Expect(pool.Name).Should(BeElementOf(
-						consts.DEFAULT_NAME_DEFAULT_POOL,
+						domain.DEFAULT_NAME_DEFAULT_POOL,
 						"vks-k8s-000000-default-test-serv-fbaa0-TCP-80"))
 					g.Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 					g.Expect(pool.Protocol).Should(Equal("HTTP"))
@@ -153,7 +153,7 @@ var _ = Describe("Ingress Controller", func() {
 					g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
 					g.Expect(listener.DefaultPoolId).Should(Equal(pools.Items[0].UUID))
 					g.Expect(listener.DefaultPoolName).Should(Equal(pools.Items[0].Name))
-					g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+					g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTP_LISTENER_NAME))
 					g.Expect(listener.TimeoutClient).Should(Equal(50))
 					g.Expect(listener.TimeoutConnection).Should(Equal(5))
 					g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -306,7 +306,7 @@ var _ = Describe("Ingress Controller", func() {
 					g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
 					g.Expect(listener.DefaultPoolId).Should(Equal(""))
 					g.Expect(listener.DefaultPoolName).Should(Equal(""))
-					g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+					g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTP_LISTENER_NAME))
 					g.Expect(listener.TimeoutClient).Should(Equal(50))
 					g.Expect(listener.TimeoutConnection).Should(Equal(5))
 					g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -410,7 +410,7 @@ var _ = Describe("Ingress Controller", func() {
 					g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
 					g.Expect(listener.DefaultPoolId).Should(Equal(""))
 					g.Expect(listener.DefaultPoolName).Should(Equal(""))
-					g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+					g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTP_LISTENER_NAME))
 					g.Expect(listener.TimeoutClient).Should(Equal(50))
 					g.Expect(listener.TimeoutConnection).Should(Equal(5))
 					g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -543,7 +543,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect((pools.Items)).Should(HaveLen(2))
 				for _, pool := range pools.Items {
 					g.Expect(pool.Name).Should(BeElementOf(
-						consts.DEFAULT_NAME_DEFAULT_POOL,
+						domain.DEFAULT_NAME_DEFAULT_POOL,
 						"vks-bea48-default-test-service-gogsf-80"))
 					g.Expect(pool.LoadBalanceMethod).Should(Equal("ROUND_ROBIN"))
 					g.Expect(pool.Protocol).Should(Equal("HTTP"))
@@ -579,8 +579,8 @@ var _ = Describe("Ingress Controller", func() {
 					g.Expect(listener.Protocol).Should(Equal("HTTP"))
 					g.Expect(listener.ProtocolPort).Should(Equal(80))
 					g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
-					g.Expect(listener.DefaultPoolName).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
-					g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTP_LISTENER_NAME))
+					g.Expect(listener.DefaultPoolName).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
+					g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTP_LISTENER_NAME))
 					g.Expect(listener.TimeoutClient).Should(Equal(50))
 					g.Expect(listener.TimeoutConnection).Should(Equal(5))
 					g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -713,7 +713,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect((pools.Items)).Should(HaveLen(2))
 				for _, pool := range pools.Items {
 					g.Expect(pool.Name).Should(BeElementOf(
-						consts.DEFAULT_NAME_DEFAULT_POOL,
+						domain.DEFAULT_NAME_DEFAULT_POOL,
 						"vks-bea48-default-test-service-gogsf-443"))
 					g.Expect(pool.Members.Items).Should(HaveLen(8))
 					for _, member := range pool.Members.Items {
@@ -838,7 +838,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check security groups
@@ -917,7 +917,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check security groups still exist
@@ -976,7 +976,7 @@ var _ = Describe("Ingress Controller", func() {
 					tagKeys = append(tagKeys, tag.Key)
 					tagValues = append(tagValues, tag.Value)
 				}
-				g.Expect(tagKeys).Should(ContainElements(consts.VKS_TAG_KEY, "tag1", "tag2"))
+				g.Expect(tagKeys).Should(ContainElements(domain.VKS_TAG_KEY, "tag1", "tag2"))
 				g.Expect(tagValues).Should(ContainElements(mockConfig.Cluster.ClusterID, "value1", "value2"))
 			}, timeout, interval).Should(Succeed())
 
@@ -1047,7 +1047,7 @@ var _ = Describe("Ingress Controller", func() {
 					tagKeys = append(tagKeys, tag.Key)
 					tagValues = append(tagValues, tag.Value)
 				}
-				g.Expect(tagKeys).Should(ContainElements(consts.VKS_TAG_KEY, "tag2", "tag3"))
+				g.Expect(tagKeys).Should(ContainElements(domain.VKS_TAG_KEY, "tag2", "tag3"))
 				g.Expect(tagValues).Should(ContainElements(mockConfig.Cluster.ClusterID, "value22", "value3"))
 				g.Expect(tagKeys).ShouldNot(ContainElement("tag1"))
 			}, timeout, interval).Should(Succeed())
@@ -1198,7 +1198,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(consts.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check secgroups
@@ -1279,7 +1279,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{consts.VKS_TAG_KEY, "tag1", "tag2"}
+				expectKeys := []string{domain.VKS_TAG_KEY, "tag1", "tag2"}
 				expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 				for _, tag := range tags.Items {
 					g.Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1333,7 +1333,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{consts.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
 				expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 				for _, tag := range tags.Items {
 					g.Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1524,7 +1524,7 @@ var _ = Describe("Ingress Controller", func() {
 			if ingress.Annotations == nil {
 				ingress.Annotations = map[string]string{}
 			}
-			ingress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = LB.UUID
+			ingress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = LB.UUID
 			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
 			// Verify the ingress controller updated the existing load balancer
@@ -1651,7 +1651,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools).ShouldNot(BeNil())
 				g.Expect((pools.Items)).Should(HaveLen(1)) // Default pool
 				for _, pool := range pools.Items {
-					g.Expect(pool.Name).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
+					g.Expect(pool.Name).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
 					g.Expect(pool.Members).ShouldNot(BeNil())
 					g.Expect((pool.Members.Items)).Should(HaveLen(4)) // 4 nodes
 
@@ -1690,7 +1690,7 @@ var _ = Describe("Ingress Controller", func() {
 			if ingress2.Annotations == nil {
 				ingress2.Annotations = map[string]string{}
 			}
-			ingress2.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = loadbalancerUUID
+			ingress2.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixLoadBalancerID)] = loadbalancerUUID
 			Expect(k8sClient.Create(ctx, ingress2)).Should(Succeed())
 
 			// Verify second ingress added its members to the same default pool (now 8 members)
@@ -1706,7 +1706,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools).ShouldNot(BeNil())
 				g.Expect((pools.Items)).Should(HaveLen(1)) // Still default pool
 				for _, pool := range pools.Items {
-					g.Expect(pool.Name).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
+					g.Expect(pool.Name).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
 					g.Expect(pool.Members).ShouldNot(BeNil())
 					g.Expect((pool.Members.Items)).Should(HaveLen(8)) // 4 nodes x 2 services
 
@@ -1753,7 +1753,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools).ShouldNot(BeNil())
 				g.Expect((pools.Items)).Should(HaveLen(1))
 				for _, pool := range pools.Items {
-					g.Expect(pool.Name).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
+					g.Expect(pool.Name).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
 					g.Expect(pool.Members).ShouldNot(BeNil())
 					g.Expect((pool.Members.Items)).Should(HaveLen(4)) // Back to 4 members
 
@@ -1836,7 +1836,7 @@ var _ = Describe("Ingress Controller", func() {
 			if ingress.Annotations == nil {
 				ingress.Annotations = map[string]string{}
 			}
-			ingress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", vngcloud_mocks.MockCerts[0], vngcloud_mocks.MockCerts[1])
+			ingress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", vngcloud_mocks.MockCerts[0], vngcloud_mocks.MockCerts[1])
 			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
 			// Verify LoadBalancer and HTTPS listener were created
@@ -1865,7 +1865,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
 				g.Expect(listener.DefaultPoolId).Should(Equal(""))
 				g.Expect(listener.DefaultPoolName).Should(Equal(""))
-				g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTPS_LISTENER_NAME))
+				g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTPS_LISTENER_NAME))
 				g.Expect(listener.TimeoutClient).Should(Equal(50))
 				g.Expect(listener.TimeoutConnection).Should(Equal(5))
 				g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -1904,9 +1904,9 @@ var _ = Describe("Ingress Controller", func() {
 				if updatedIngress.Annotations == nil {
 					updatedIngress.Annotations = map[string]string{}
 				}
-				updatedIngress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", vngcloud_mocks.MockCerts[1], vngcloud_mocks.MockCerts[2])
-				updatedIngress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixEnableTLSEncryption)] = "true"
-				updatedIngress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixEnableStickySession)] = "false"
+				updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixCertificateIDs)] = fmt.Sprintf("%s,%s", vngcloud_mocks.MockCerts[1], vngcloud_mocks.MockCerts[2])
+				updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixEnableTLSEncryption)] = "true"
+				updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixEnableStickySession)] = "false"
 
 				g.Expect(k8sClient.Update(ctx, updatedIngress)).Should(Succeed())
 			}, timeout, interval).Should(Succeed())
@@ -1937,7 +1937,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(listener.AllowedCidrs).Should(Equal("0.0.0.0/0"))
 				g.Expect(listener.DefaultPoolId).Should(Equal(""))
 				g.Expect(listener.DefaultPoolName).Should(Equal(""))
-				g.Expect(listener.Name).Should(Equal(consts.DEFAULT_HTTPS_LISTENER_NAME))
+				g.Expect(listener.Name).Should(Equal(domain.DEFAULT_HTTPS_LISTENER_NAME))
 				g.Expect(listener.TimeoutClient).Should(Equal(50))
 				g.Expect(listener.TimeoutConnection).Should(Equal(5))
 				g.Expect(listener.TimeoutMember).Should(Equal(50))
@@ -2004,7 +2004,7 @@ var _ = Describe("Ingress Controller", func() {
 					},
 				},
 			}
-			ingress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixPreferSubnetID)] = vngcloud_mocks.MockSubnetID_1b_2
+			ingress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixPreferSubnetID)] = vngcloud_mocks.MockSubnetID_1b_2
 			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
 			// Verify LoadBalancer was created in the specified subnet
@@ -2062,7 +2062,7 @@ var _ = Describe("Ingress Controller", func() {
 					},
 				},
 			}
-			ingress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixPreferZoneID)] = string(common.HCM_03_1B_ZONE)
+			ingress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixPreferZoneID)] = string(common.HCM_03_1B_ZONE)
 			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
 			// Verify LoadBalancer was created in the specified zone
@@ -2158,7 +2158,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools.Items).Should(HaveLen(1))
 
 				pool := pools.Items[0]
-				g.Expect(pool.Name).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
+				g.Expect(pool.Name).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
 				g.Expect(pool.Members).ShouldNot(BeNil())
 				g.Expect(pool.Members.Items).Should(HaveLen(2)) // Only node3 and node4
 
@@ -2211,7 +2211,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools.Items).Should(HaveLen(1))
 
 				pool := pools.Items[0]
-				g.Expect(pool.Name).Should(Equal(consts.DEFAULT_NAME_DEFAULT_POOL))
+				g.Expect(pool.Name).Should(Equal(domain.DEFAULT_NAME_DEFAULT_POOL))
 				g.Expect(pool.Members).ShouldNot(BeNil())
 				g.Expect(pool.Members.Items).Should(HaveLen(3)) // node1, node3, node4
 
@@ -2297,7 +2297,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 		if ingress.Annotations == nil {
 	// 			ingress.Annotations = map[string]string{}
 	// 		}
-	// 		ingress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"PATH","compare":"EQUAL_TO","value":"/foo#"},{"type":"PATH","compare":"REGEX","value":"/foo#anchor"}],"action":{"action":"REJECT", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 301}}]`
+	// 		ingress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"PATH","compare":"EQUAL_TO","value":"/foo#"},{"type":"PATH","compare":"REGEX","value":"/foo#anchor"}],"action":{"action":"REJECT", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 301}}]`
 	// 		Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
 
 	// 		// Verify policy with REJECT action is created
@@ -2359,7 +2359,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 			if updatedIngress.Annotations == nil {
 	// 				updatedIngress.Annotations = map[string]string{}
 	// 			}
-	// 			updatedIngress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_POOL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
+	// 			updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_POOL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
 
 	// 			g.Expect(k8sClient.Update(ctx, updatedIngress)).Should(Succeed())
 	// 		}, timeout, interval).Should(Succeed())
@@ -2424,7 +2424,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 			if updatedIngress.Annotations == nil {
 	// 				updatedIngress.Annotations = map[string]string{}
 	// 			}
-	// 			updatedIngress.Annotations[fmt.Sprintf("%s/%s", consts.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_URL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
+	// 			updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixImplementationSpecificParams)] = `[{"path":"/haha","rules":[{"type":"HOST_NAME","compare":"ENDS_WITH","value":"/hhh"},{"type":"PATH","compare":"STARTS_WITH","value":"/kkk"}],"action":{"action":"REDIRECT_TO_URL", "redirectUrl": "http://golang.cafe/a", "redirectHttpCode": 302, "keepQueryString": true}}]`
 
 	// 			g.Expect(k8sClient.Update(ctx, updatedIngress)).Should(Succeed())
 	// 		}, timeout, interval).Should(Succeed())
