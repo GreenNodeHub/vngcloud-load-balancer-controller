@@ -46,7 +46,7 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		}
 	} else {
 		// delete redundant listeners
-		if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedListener{}); err != nil {
+		if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}); err != nil {
 			return err
 		}
 

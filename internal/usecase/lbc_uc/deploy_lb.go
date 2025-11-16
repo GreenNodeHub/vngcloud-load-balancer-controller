@@ -60,7 +60,7 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		return err
 	}
 
-	err = t.deleteRedundantListeners(ctx, lbId, newCreatedListeners)
+	err = t.deleteRedundantListeners(ctx, lbId, newCreatedListeners, newCreatedPools)
 	if err != nil {
 		return err
 	}

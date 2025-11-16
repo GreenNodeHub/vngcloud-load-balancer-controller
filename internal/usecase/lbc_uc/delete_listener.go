@@ -3,6 +3,7 @@ package lbc_uc
 import (
 	"context"
 
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -10,7 +11,7 @@ import (
 
 // delete redundant listeners
 // newCreatedListeners is the listeners that are still in use
-func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener) error {
+func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener, newCreatedPools []v1alpha1.CreatedPool) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
 	for _, listener := range t.lbConfig.Status.CreatedListeners {
@@ -22,13 +23,13 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 		return err
 	}
 
-	isListenerExist := func(listenerId string) bool {
+	isListenerExist := func(listenerId string) (bool, *entityv2.Listener) {
 		for _, l := range currentListeners.Items {
 			if l.UUID == listenerId {
-				return true
+				return true, l
 			}
 		}
-		return false
+		return false, nil
 	}
 
 	isListenerInUse := func(listenerId string) bool {
@@ -42,12 +43,13 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 
 	// delete redundant listeners
 	for _, candidateId := range deleteCandidates {
-		if !isListenerExist(candidateId) {
+		isExist, listener := isListenerExist(candidateId)
+		if !isExist {
 			t.logger.Warnf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
 			continue
 		}
 
-		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, candidateId)
+		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, listener, newCreatedPools)
 		if err != nil {
 			return err
 		}
@@ -118,21 +120,22 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 // canDeleteWholeListener checks if we can delete the whole listener
 // conditions:
 // - all current policies must exist in old policies
-func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbId, listenerId string) (bool, error) {
+// - if default pool exists, can delete whole pool (case 2 ingress use same listener and default pool (merge their member), when delete one ingress, we should NOT delete whole listener)
+func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbId string, listener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool) (bool, error) {
 	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
-		t.logger.Debugf("Can delete whole listener %s, because it is layer4 listener.", listenerId)
+		t.logger.Debugf("Can delete whole listener %s, because it is layer4 listener.", listener.UUID)
 		return true, nil
 	}
 
-	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listenerId)
+	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listener.UUID)
 	if err != nil {
-		t.logger.Errorf("Failed to list policies of listener %s: %v", listenerId, err)
+		t.logger.Errorf("Failed to list policies of listener %s: %v", listener.UUID, err)
 		return false, err
 	}
 
 	createdPolicies := []v1alpha1.CreatedPolicy{}
 	for _, l := range t.lbConfig.Status.CreatedListeners {
-		if l.Id == listenerId {
+		if l.Id == listener.UUID {
 			createdPolicies = l.CreatedPolicies
 			break
 		}
@@ -153,6 +156,41 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 		}
 	}
 
-	t.logger.Debugf("Can delete whole listener %s.", listenerId)
+	if listener.DefaultPoolId != "" {
+		// check if default pool exists in new created pools
+		for _, createdPool := range newCreatedPools {
+			if createdPool.Id == listener.DefaultPoolId {
+				t.logger.Debugf("Cannot delete whole listener %s, because default pool %s exists in new created pools.", listener.UUID, createdPool.Id)
+				return false, nil
+			}
+		}
+
+		// check if default pool is created by me
+		found := false
+		createdPool := v1alpha1.CreatedPool{}
+		for _, p := range t.lbConfig.Status.CreatedPools {
+			if p.Id == listener.DefaultPoolId {
+				found = true
+				createdPool = p
+				break
+			}
+		}
+		if !found {
+			t.logger.Debugf("Can't delete whole listener, default pool %s not created by me.", listener.DefaultPoolId)
+			return false, nil
+		}
+
+		// compare pool members
+		canDeleteWhole, _, err := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
+		if err != nil {
+			return false, err
+		}
+		if !canDeleteWhole {
+			t.logger.Debugf("Can't delete whole listener, default pool %s cannot be deleted whole.", listener.DefaultPoolId)
+			return false, nil
+		}
+	}
+
+	t.logger.Debugf("Can delete whole listener %s.", listener.UUID)
 	return true, nil
 }

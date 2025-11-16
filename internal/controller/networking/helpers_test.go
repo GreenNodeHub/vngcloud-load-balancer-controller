@@ -266,3 +266,13 @@ func newEndpointResource(name, namespace string) *corev1.Endpoints {
 		},
 	}
 }
+
+// removeFisrt removes the first occurrence of a value from a slice
+func removeFisrt[T comparable](slice []T, value T) []T {
+	for i, v := range slice {
+		if v == value {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
+}
