@@ -85,7 +85,7 @@ type ServiceReconciler struct {
 
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
-// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
 
@@ -93,7 +93,6 @@ type ServiceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=endpoints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=core,resources=endpoints/finalizers,verbs=update
 
