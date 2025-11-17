@@ -43,3 +43,18 @@ mysecret:
     clientSecret: ""
     identityURL: https://iamapis.vngcloud.vn/accounts-api
     vserverURL: https://hcm-3.api.vngcloud.vn/vserver
+  loadBalancerOpts:
+    defaultL4PackageName: "NLB_Small"
+    defaultL7PackageName: "ALB_Small"
+    defaultScheme: "Internet"
+
+    defaultPoolAlgorithm: "ROUND_ROBIN"
+    defaultHealthyThreshold: 3
+    defaultUnhealthyThreshold: 3
+    defaultInterval: 30
+    defaultTimeout: 5
+
+    defaultTimeoutClient: 50
+    defaultTimeoutMember: 50
+    defaultTimeoutConnection: 5
+    defaultAllowedCidrs: 0.0.0.0/0

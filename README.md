@@ -169,6 +169,12 @@ To deploy the controller with new changes, fill secret in `config/manager/manage
 make docker-build docker-push undeploy deploy
 ```
 
+To run some integration tests:
+
+```sh
+go clean -testcache && go test -v ./internal/controller/networking/... -ginkgo.focus="When node status changes from not ready to ready"
+```
+
 ## Scripts
 
 ```bash
@@ -197,11 +203,10 @@ mockery init "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 mockery
 ```
 
-my aim is to create the best of the best vngcloud-load-balancer-controller. It must use:
-- mockery for testing
-- golangci-lint for linting
-- github actions for ci/cd
-- helm for deployment
-- end to end tests
-- dependency injection
-- 
+## Todo list
+
+- end to end test
+- global load balancer
+- linting
+- review CRD field
+- documentations
