@@ -9,6 +9,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,7 +126,7 @@ func (r *k8sRepository) patchMutateStatusObject(
 			cmpopts.IgnoreFields(v1alpha1.LoadBalancerConfig{}, "Spec"),
 			cmpopts.IgnoreFields(v1alpha1.NodeSecurityGroup{}, "Spec"),
 		)
-		if diff != "" {
+		if diff != "" && logrus.IsLevelEnabled(logrus.DebugLevel) {
 			// Print directly to stderr for clean, unescaped formatting
 			fmt.Fprintf(os.Stderr, "\n%s  status diff (before mutation -> after mutation):\n%s\n", domain.DebugIcon, diff)
 		}
