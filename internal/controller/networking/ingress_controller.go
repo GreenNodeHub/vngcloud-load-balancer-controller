@@ -197,7 +197,7 @@ func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("ingress"))
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("core-service").
+		Named("networking-ingress").
 		Watches(&networkingv1.Ingress{}, ingEventHandler).
 		Watches(&corev1.Service{}, svcEventHandler).
 		Watches(&corev1.Endpoints{}, endpointEventHandler).
