@@ -1102,6 +1102,18 @@ func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string
 		return nil, domain.ErrorNotFound
 	}
 
+	// get number of existing policies
+	listenerPolicies, err := m.ListPolicyOfListener(ctx, lbID, listenerID)
+	if err != nil {
+		return nil, err
+	}
+	lastPosition := 1
+	for _, p := range listenerPolicies.Items {
+		if p.Position >= lastPosition {
+			lastPosition = p.Position + 1
+		}
+	}
+
 	policy := opt.(*loadbalancerv2.CreatePolicyRequest)
 	newPolicy := &wrapPolicy{
 		lbID:       lbID,
@@ -1117,7 +1129,7 @@ func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string
 			RedirectHTTPCode: policy.RedirectHTTPCode,
 			KeepQueryString:  policy.KeepQueryString,
 			L7Rules:          nil,
-			Position:         0, // ????????
+			Position:         lastPosition,
 			DisplayStatus:    consts.ACTIVE_LOADBALANCER_STATUS,
 			CreatedAt:        time.Now().Format(time.RFC3339),
 			UpdatedAt:        time.Now().Format(time.RFC3339),
@@ -1244,34 +1256,46 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 		logger.Errorf("[ERROR] - ReorderPolicies: listener not found")
 		return domain.ErrorNotFound
 	}
-	newPolicies := make([]*wrapPolicy, 0)
-	for _, p := range m.policies {
-		if p.lbID == lbID && p.listenerID == listenerID {
-			newPolicies = append(newPolicies, p)
-		}
-	}
-	for _, p := range policyIDs {
-		isFound := false
-		for _, np := range newPolicies {
-			if np.UUID == p {
-				isFound = true
-				break
+
+	err := func() error {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		// Build a map of policies for this listener
+		policyMap := make(map[string]*wrapPolicy)
+		otherPolicies := make([]*wrapPolicy, 0)
+		for _, p := range m.policies {
+			if p.lbID == lbID && p.listenerID == listenerID {
+				policyMap[p.UUID] = p
+			} else {
+				otherPolicies = append(otherPolicies, p)
 			}
 		}
-		if !isFound {
-			logger.Errorf("[ERROR] - ReorderPolicies: policy not found")
-			return domain.ErrorNotFound
+
+		// Verify all policyIDs exist
+		for _, pID := range policyIDs {
+			if _, exists := policyMap[pID]; !exists {
+				logger.Errorf("[ERROR] - ReorderPolicies: policy %s not found", pID)
+				return domain.ErrorNotFound
+			}
 		}
-	}
-	m.policies = append(m.policies, newPolicies...)
-	m.policies = m.policies[len(newPolicies):]
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for i, p := range m.policies {
-		if p.lbID == lbID && p.listenerID == listenerID {
-			p.Policy.Position = i
+
+		// Reorder policies based on policyIDs order and update positions
+		reorderedPolicies := make([]*wrapPolicy, 0, len(policyIDs))
+		for i, pID := range policyIDs {
+			policy := policyMap[pID]
+			policy.Policy.Position = i + 1
+			reorderedPolicies = append(reorderedPolicies, policy)
 		}
+
+		// Rebuild m.policies with other policies + reordered policies
+		m.policies = append(otherPolicies, reorderedPolicies...)
+		return nil
+	}()
+	if err != nil {
+		return err
 	}
+
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
 	return nil

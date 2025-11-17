@@ -2490,4 +2490,157 @@ var _ = Describe("Ingress Controller", func() {
 	// 	})
 	// })
 
+	Context("When create ingress with auto-reorder-policies annotation", func() {
+		It("should automatically reorder policies when annotation is added", func() {
+
+			serviceName := "test-service-gogsf"
+			namespace := "default"
+			ingressName := "test-service-gogsf"
+
+			// Create endpoint
+			endpoint := newEndpointResource(serviceName, namespace)
+			Expect(k8sClient.Create(ctx, endpoint)).Should(Succeed())
+
+			// Create Service
+			service := newServiceNodePortResource(serviceName, namespace)
+			service.Spec.Ports = []corev1.ServicePort{
+				{Name: "http", Port: 80, TargetPort: intstr.FromInt(80), Protocol: corev1.ProtocolTCP, NodePort: 30000},
+			}
+			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+
+			// Create Ingress WITHOUT auto-reorder-policies annotation
+			ingress := newIngressResource(ingressName, namespace)
+			Expect(ingress).NotTo(BeNil())
+			ingress.Spec.DefaultBackend = nil
+			ingress.Spec.Rules = []networkingv1.IngressRule{
+				{
+					Host: "test.com",
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									PathType: ptr.To(networkingv1.PathTypePrefix),
+									Path:     "/",
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: serviceName,
+											Port: networkingv1.ServiceBackendPort{Number: 80},
+										},
+									},
+								},
+								{
+									PathType: ptr.To(networkingv1.PathTypePrefix),
+									Path:     "/web",
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: serviceName,
+											Port: networkingv1.ServiceBackendPort{Number: 80},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, ingress)).Should(Succeed())
+
+			var loadbalancerUUID string
+			var listenerUUID string
+			var initialRootPosition int
+			var initialWebPosition int
+
+			// Verify initial state: "/" has lower position (appears first) than "/web"
+			Eventually(func(g Gomega) {
+				lbcList, err := listLbcByIngress(ingressName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(len(lbcList.Items)).Should(Equal(1))
+
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+				loadbalancerId := *lbc.Status.LoadBalancerId
+
+				loadbalancer, err := vngcloudRepo.GetLoadBalancerByID(ctx, loadbalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(loadbalancer).ShouldNot(BeNil())
+				loadbalancerUUID = loadbalancer.UUID
+
+				// Check listener
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancer.UUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(listeners.Items).Should(HaveLen(1))
+				listenerUUID = listeners.Items[0].UUID
+
+				// Check policies
+				policies, err := vngcloudRepo.ListPolicyOfListener(ctx, loadbalancer.UUID, listenerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(policies).ShouldNot(BeNil())
+				g.Expect(policies.Items).Should(HaveLen(2))
+
+				// Find "/" and "/web" policies
+				for _, policy := range policies.Items {
+					if len(policy.L7Rules) > 0 {
+						for _, rule := range policy.L7Rules {
+							switch rule.RuleValue {
+							case "/":
+								initialRootPosition = policy.Position
+							case "/web":
+								initialWebPosition = policy.Position
+							}
+						}
+					}
+				}
+
+				// Verify "/" has lower position (higher priority) than "/web" initially
+				g.Expect(initialRootPosition).Should(BeNumerically("<", initialWebPosition))
+			}, timeout, interval).Should(Succeed())
+
+			// Update ingress to add auto-reorder-policies annotation
+			Eventually(func(g Gomega) {
+				updatedIngress := &networkingv1.Ingress{}
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: ingressName, Namespace: namespace}, updatedIngress)
+				g.Expect(err).ShouldNot(HaveOccurred())
+
+				updatedIngress.Annotations[fmt.Sprintf("%s/%s", domain.INGRESS_ANNOTATION_PREFIX, annotations.SuffixAutoReorderPolicies)] = "true"
+				err = k8sClient.Update(ctx, updatedIngress)
+				g.Expect(err).ShouldNot(HaveOccurred())
+			}, timeout, interval).Should(Succeed())
+
+			// Verify policies are reordered: "/web" should now have lower position (higher priority) than "/"
+			Eventually(func(g Gomega) {
+				policies, err := vngcloudRepo.ListPolicyOfListener(ctx, loadbalancerUUID, listenerUUID)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(policies).ShouldNot(BeNil())
+				g.Expect(policies.Items).Should(HaveLen(2))
+
+				var rootPosition int
+				var webPosition int
+
+				// Find "/" and "/web" policies
+				for _, policy := range policies.Items {
+					if len(policy.L7Rules) > 0 {
+						for _, rule := range policy.L7Rules {
+							switch rule.RuleValue {
+							case "/":
+								rootPosition = policy.Position
+							case "/web":
+								webPosition = policy.Position
+							}
+						}
+					}
+				}
+
+				// Verify "/web" now has lower position (higher priority) than "/"
+				// More specific paths should have higher priority (lower position number)
+				g.Expect(webPosition).Should(BeNumerically("<", rootPosition))
+			}, timeout*2, interval).Should(Succeed())
+
+			// Cleanup
+			Expect(k8sClient.Delete(ctx, ingress)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, endpoint))).Should(Succeed())
+		})
+	})
+
 })
