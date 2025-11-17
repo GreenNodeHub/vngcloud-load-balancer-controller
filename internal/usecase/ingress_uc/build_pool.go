@@ -118,6 +118,15 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		}
 	}
 
+	if options := t.buildAnnotationAutoReorderPolicies(ctx); options != nil && *options {
+		if t.buildAutoAddPolicyPosition(ctx, httpListener) != nil {
+			return nil, nil, err
+		}
+		if t.buildAutoAddPolicyPosition(ctx, httpsListener) != nil {
+			return nil, nil, err
+		}
+	}
+
 	if isNeedHTTPListener {
 		allListeners = append(allListeners, *httpListener)
 	}

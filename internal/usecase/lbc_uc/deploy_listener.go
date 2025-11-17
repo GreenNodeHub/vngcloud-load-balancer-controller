@@ -107,6 +107,11 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		return nil, err
 	}
 
+	// ensure policy position
+	if err := t.deployReorderPolicies(ctx, lbId, currentListener.UUID, listenerSpec.Policies); err != nil {
+		return nil, err
+	}
+
 	return &v1alpha1.CreatedListener{
 		Id:              currentListener.UUID,
 		Port:            currentListener.ProtocolPort,

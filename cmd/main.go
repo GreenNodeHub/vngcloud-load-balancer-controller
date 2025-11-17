@@ -69,6 +69,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	// +kubebuilder:scaffold:imports
@@ -341,6 +342,21 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")
 			os.Exit(1)
 		}
+	}
+
+	vngProvider := &provider.VNGCLOUD_Provider{
+		Config: conf,
+	}
+	if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
+		Client:           mgr.GetClient(),
+		Scheme:           mgr.GetScheme(),
+		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
+		Config:           conf,
+		Provider:         vngProvider,
+		FinalizerManager: finalizerManager,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

@@ -3,6 +3,7 @@ package lbc_uc
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -66,6 +67,9 @@ func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listene
 		if updateRequest != nil {
 			t.logger.Infof("Need update policy %s: %s.", policySpec.Name, strings.Join(messages, ", "))
 			if err := t.vngcloudRepo.UpdatePolicy(ctx, lbId, listenerId, currentPolicy.UUID, updateRequest); err != nil {
+				return nil, err
+			}
+			if err := t.statusAddPolicy(ctx, listenerId, listenerPort, currentPolicy.UUID); err != nil {
 				return nil, err
 			}
 
@@ -265,27 +269,18 @@ func (t *defaultModelDeployTask) compareL7Rules(rulesSpec []v1alpha1.L7Rule, cur
 	return nil
 }
 
-func (t *defaultModelDeployTask) deployDeleteRedundantPolicies(ctx context.Context, lbId, listenerId string, newCreatedPolicies []v1alpha1.CreatedPolicy) error {
-	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
-		return nil
-	}
-
-	createdPolicies := []v1alpha1.CreatedPolicy{}
-	for _, l := range t.lbConfig.Status.CreatedListeners {
-		if l.Id == listenerId {
-			createdPolicies = l.CreatedPolicies
+// reorder policies based on their positions
+func (t *defaultModelDeployTask) deployReorderPolicies(ctx context.Context, lbId, listenerId string, policiesSpec []v1alpha1.Policy) error {
+	isNeedCheckReorder := false
+	for _, policySpec := range policiesSpec {
+		if policySpec.Position != nil {
+			isNeedCheckReorder = true
 			break
 		}
 	}
-
-	if len(createdPolicies) == 0 {
+	if !isNeedCheckReorder {
+		t.logger.Debugf("No policy has position specified, skip reorder policies.")
 		return nil
-	}
-
-	// delete candidates include all created listeners
-	deleteCandidates := make([]string, 0)
-	for _, policy := range createdPolicies {
-		deleteCandidates = append(deleteCandidates, policy.Id)
 	}
 
 	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listenerId)
@@ -293,41 +288,64 @@ func (t *defaultModelDeployTask) deployDeleteRedundantPolicies(ctx context.Conte
 		return err
 	}
 
-	isPolicyExist := func(id string) bool {
-		for _, l := range currentPolicies.Items {
-			if l.UUID == id {
-				return true
+	type kv struct {
+		policyId        string
+		currentPosition int
+		expectPosition  int
+	}
+	var ss []kv
+	for _, policySpec := range policiesSpec {
+		currentPosition := -1
+		policyId := ""
+		for _, currentPolicy := range currentPolicies.Items {
+			if currentPolicy.Name == policySpec.Name {
+				currentPosition = currentPolicy.Position
+				policyId = currentPolicy.UUID
+				break
 			}
 		}
-		return false
+		expectPosition := -1
+		if policySpec.Position != nil {
+			expectPosition = int(*policySpec.Position)
+		}
+		ss = append(ss, kv{policyId: policyId, currentPosition: currentPosition, expectPosition: expectPosition})
 	}
 
-	isPolicyInUse := func(id string) bool {
-		for _, policy := range newCreatedPolicies {
-			if policy.Id == id {
-				return true
-			}
+	// sort by expect position asc, if expect position equal, sort by current position asc
+	// so that policies with no expect position will be at the end, and keep their current order
+	sort.Slice(ss, func(i, j int) bool {
+		if ss[i].expectPosition == ss[j].expectPosition {
+			return ss[i].currentPosition < ss[j].currentPosition
 		}
-		return false
+		return ss[i].expectPosition < ss[j].expectPosition
+	})
+
+	// check if reorder is needed
+	isNeedReorder := false
+	for i := 1; i < len(ss); i++ {
+		if ss[i-1].expectPosition < ss[i].expectPosition && ss[i-1].currentPosition > ss[i].currentPosition {
+			isNeedReorder = true
+			break
+		}
 	}
 
-	// delete redundant policies
-	for _, candidateId := range deleteCandidates {
-		if isPolicyInUse(candidateId) {
-			continue
-		}
-		if !isPolicyExist(candidateId) {
-			continue
-		}
-
-		if err := t.vngcloudRepo.DeletePolicy(ctx, lbId, listenerId, candidateId); err != nil {
-			t.logger.Error("Failed to delete policy: ", err)
-			return err
-		}
-		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return err
-		}
+	if !isNeedReorder {
+		t.logger.Debugf("Policies are already in expected order, no need to reorder.")
+		return nil
 	}
+
+	// reorder policies
+	policyIds := make([]string, len(ss))
+	for i, policy := range ss {
+		policyIds[i] = policy.policyId
+	}
+
+	if err := t.vngcloudRepo.ReorderPolicies(ctx, lbId, listenerId, policyIds); err != nil {
+		return err
+	}
+	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+		return err
+	}
+
 	return nil
 }

@@ -2,6 +2,7 @@ package ingress_uc
 
 import (
 	"context"
+	"sort"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/utils/ptr"
@@ -211,4 +212,83 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpDomainName(_ conte
 		return nil
 	}
 	return &option
+}
+
+func (t *defaultModelBuildTask) buildAnnotationAutoReorderPolicies(_ context.Context) *bool {
+	option := false
+	exists, err := t.annotationParser.ParseBoolAnnotation(annotations.SuffixAutoReorderPolicies, &option, t.ingress.Annotations)
+	if !exists {
+		return nil
+	}
+	if err != nil {
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean.",
+			annotations.SuffixAutoReorderPolicies)
+		return nil
+	}
+	return &option
+}
+
+// buildAutoAddPolicyPosition sets the policy positions automatically based on their priorities.
+func (t *defaultModelBuildTask) buildAutoAddPolicyPosition(_ context.Context, listener *v1alpha1.Listener) error {
+	if listener == nil || len(listener.Policies) == 0 {
+		return nil
+	}
+
+	type kv struct {
+		key      string
+		priority int
+	}
+	var ss []kv
+	for _, policy := range listener.Policies {
+		ss = append(ss, kv{key: policy.Name, priority: t.getPolicyPriority(&policy)})
+	}
+	sort.Slice(ss, func(i, j int) bool {
+		return ss[i].priority > ss[j].priority
+	})
+
+	// update the new policy positions
+	for i, policyName := range ss {
+		for j, policy := range listener.Policies {
+			if policy.Name == policyName.key {
+				listener.Policies[j].Position = ptr.To(int32(i + 1))
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *defaultModelBuildTask) getPolicyPriority(policy *v1alpha1.Policy) int {
+	totalPriority := 0
+	for _, rule := range policy.L7Rules {
+		totalPriority += t.getRulePriority(&rule)
+	}
+	return totalPriority
+}
+
+func (t *defaultModelBuildTask) getRulePriority(rule *v1alpha1.L7Rule) int {
+	compareTypeValue := 1
+	switch rule.CompareType {
+	case loadbalancerv2.PolicyCompareTypeREGEX:
+		compareTypeValue = 10
+	case loadbalancerv2.PolicyCompareTypeCONTAINS:
+		compareTypeValue = 100
+	case loadbalancerv2.PolicyCompareTypeENDSWITH:
+		compareTypeValue = 1000
+	case loadbalancerv2.PolicyCompareTypeSTARTSWITH:
+		compareTypeValue = 10000
+	case loadbalancerv2.PolicyCompareTypeEQUALS:
+		compareTypeValue = 100000
+	}
+
+	ruleTypeValue := 1
+	switch rule.RuleType {
+	case loadbalancerv2.PolicyRuleTypeHOSTNAME:
+		ruleTypeValue = 100
+	case loadbalancerv2.PolicyRuleTypePATH:
+		ruleTypeValue = 1
+	}
+
+	return compareTypeValue * ruleTypeValue * len(rule.RuleValue)
 }
