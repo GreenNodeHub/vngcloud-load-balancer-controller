@@ -173,8 +173,8 @@ func (t *defaultModelBuildTask) buildImplementationSpecificConfigs(_ context.Con
 		return option
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
-			annotations.SuffixImplementationSpecificParams, option)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object.",
+			annotations.SuffixImplementationSpecificParams)
 		return option
 	}
 	return option

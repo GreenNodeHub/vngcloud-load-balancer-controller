@@ -411,8 +411,8 @@ func (t *defaultModelBuildTask) buildTags(_ context.Context) map[string]string {
 	option := make(map[string]string)
 	exist, err := t.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &option, t.ingress.Annotations)
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string, using default value %v",
-			annotations.SuffixTags, nil)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string.",
+			annotations.SuffixTags)
 		return nil
 	}
 	if !exist {
@@ -425,8 +425,8 @@ func (t *defaultModelBuildTask) buildTargetNodeLabels(_ context.Context) map[str
 	option := make(map[string]string)
 	exist, err := t.annotationParser.ParseStringMapAnnotation(annotations.SuffixTargetNodeLabels, &option, t.ingress.Annotations)
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string, using default value %v",
-			annotations.SuffixTargetNodeLabels, nil)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string.",
+			annotations.SuffixTargetNodeLabels)
 		return nil
 	}
 	if !exist {

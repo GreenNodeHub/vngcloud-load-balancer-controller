@@ -247,13 +247,13 @@ func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
-			annotations.SuffixHealthcheckPort, 0)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixHealthcheckPort)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
-		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535, using default value %d",
-			annotations.SuffixHealthcheckPort, optionsInt64, 0)
+		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535.",
+			annotations.SuffixHealthcheckPort, optionsInt64)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -288,8 +288,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
-			annotations.SuffixIdleTimeoutClient, 0)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixIdleTimeoutClient)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -302,8 +302,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
-			annotations.SuffixIdleTimeoutMember, 0)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixIdleTimeoutMember)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -316,8 +316,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer, using default value %d",
-			annotations.SuffixIdleTimeoutConnection, 0)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
+			annotations.SuffixIdleTimeoutConnection)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
