@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -36,7 +37,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
+)
+
+const (
+	controllerName = "nsg"
 )
 
 func NewNodeSecurityGroupReconciler(
@@ -46,6 +53,8 @@ func NewNodeSecurityGroupReconciler(
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
 	nsgUtils nsg.NodeSecurityGroupUtils,
+	metricsCollector lbcmetrics.MetricCollector,
+	reconcileCounters *metricsutil.ReconcileCounters,
 ) *NodeSecurityGroupReconciler {
 	return &NodeSecurityGroupReconciler{
 		Client:           client,
@@ -54,6 +63,9 @@ func NewNodeSecurityGroupReconciler(
 		eventRecorder:    eventRecorder,
 		finalizerManager: finalizerManager,
 		nsgUtils:         nsgUtils,
+
+		metricsCollector:  metricsCollector,
+		reconcileCounters: reconcileCounters,
 	}
 }
 
@@ -65,6 +77,11 @@ type NodeSecurityGroupReconciler struct {
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
 	nsgUtils         nsg.NodeSecurityGroupUtils
+
+	reconcileCounters *metricsutil.ReconcileCounters
+	metricsCollector  lbcmetrics.MetricCollector
+
+	maxConcurrentReconciles int
 
 	initDone atomic.Bool
 }
@@ -79,6 +96,7 @@ func (r *NodeSecurityGroupReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	r.reconcileCounters.IncrementNsg(req.NamespacedName)
 	ctx = contexts.NewContext(ctx).SetLogName("nsg/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -89,7 +107,11 @@ func (r *NodeSecurityGroupReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
 	object := &v1alpha1.NodeSecurityGroup{}
-	err := r.Client.Get(ctx, req.NamespacedName, object)
+	var err error
+	fetchServiceFn := func() {
+		err = r.Client.Get(ctx, req.NamespacedName, object)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -126,10 +148,24 @@ func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Re
 }
 
 func (r *NodeSecurityGroupReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.NsgFinalizer); err != nil {
-		return err
+	var err error
+	addFinalizersFn := func() {
+		err = r.finalizerManager.AddFinalizers(ctx, obj, domain.NsgFinalizer)
 	}
-	return r.nsgUseCase.EnsureNodeSecurityGroupUseCase(ctx, req)
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "add_finalizers", addFinalizersFn)
+	if err != nil {
+		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+		return errs.NewErrorWithMetrics(controllerName, "add_finalizers_error", err, r.metricsCollector)
+	}
+
+	ensureFn := func() {
+		err = r.nsgUseCase.EnsureNodeSecurityGroupUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "ensure", ensureFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "ensure_error", err, r.metricsCollector)
+	}
+	return nil
 }
 
 func (r *NodeSecurityGroupReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -139,8 +175,13 @@ func (r *NodeSecurityGroupReconciler) reconcileDelete(ctx context.Context, req c
 		return nil
 	}
 
-	if err := r.nsgUseCase.DeleteNodeSecurityGroupUseCase(ctx, req); err != nil {
-		return err
+	var err error
+	deleteFn := func() {
+		err = r.nsgUseCase.DeleteNodeSecurityGroupUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "delete", deleteFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "delete_error", err, r.metricsCollector)
 	}
 
 	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.NsgFinalizer); err != nil {
@@ -173,5 +214,8 @@ func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr 
 	return ctrl.NewControllerManagedBy(mgr).
 		Watches(&v1alpha1.NodeSecurityGroup{}, nsgEventHandler).
 		Named("nodesecuritygroup").
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.maxConcurrentReconciles,
+		}).
 		Complete(r)
 }

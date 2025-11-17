@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -68,6 +69,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
@@ -258,6 +261,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	reconcileCounters := metricsutil.NewReconcileCounters()
+	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
+
 	if !disableServiceController {
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 		cniDetector := utils.NewDetector(mgr.GetClient())
@@ -272,6 +278,8 @@ func main() {
 			finalizerManager,
 			mgr.GetEventRecorderFor("service-controller"),
 			serviceUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Service")
@@ -299,6 +307,8 @@ func main() {
 			finalizerManager,
 			mgr.GetEventRecorderFor("ingress-controller"),
 			ingressUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr, clientSet); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Ingress")
@@ -318,6 +328,8 @@ func main() {
 			mgr.GetEventRecorderFor("load-balancer-config-controller"),
 			finalizerManager,
 			lbcUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "LoadBalancerConfig")
@@ -337,6 +349,8 @@ func main() {
 			mgr.GetEventRecorderFor("node-security-group-controller"),
 			finalizerManager,
 			nsgUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
 		)
 		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")
@@ -368,6 +382,16 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	go func() {
+		setupLog.Info("starting collect cache size")
+		lbcMetricsCollector.StartCollectCacheSize(ctx)
+	}()
+
+	go func() {
+		setupLog.Info("starting collect top talkers")
+		lbcMetricsCollector.StartCollectTopTalkers(ctx)
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

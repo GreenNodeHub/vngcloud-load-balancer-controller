@@ -37,7 +37,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
+)
+
+const (
+	controllerName = "service"
 )
 
 func NewServiceReconciler(
@@ -47,6 +53,8 @@ func NewServiceReconciler(
 	finalizerManager k8s.FinalizerManager,
 	eventRecorder record.EventRecorder,
 	serviceUtils service.ServiceUtils,
+	metricsCollector lbcmetrics.MetricCollector,
+	reconcileCounters *metricsutil.ReconcileCounters,
 ) *ServiceReconciler {
 	return &ServiceReconciler{
 		k8sClient:        client,
@@ -55,6 +63,9 @@ func NewServiceReconciler(
 		finalizerManager: finalizerManager,
 		eventRecorder:    eventRecorder,
 		serviceUtils:     serviceUtils,
+
+		metricsCollector:  metricsCollector,
+		reconcileCounters: reconcileCounters,
 	}
 }
 
@@ -69,9 +80,8 @@ type ServiceReconciler struct {
 	eventRecorder record.EventRecorder
 	logger        logr.Logger
 
-	// TODO
-	// reconcileCounters *metricsutil.ReconcileCounters
-	// metricsCollector  lbcmetrics.MetricCollector
+	reconcileCounters *metricsutil.ReconcileCounters
+	metricsCollector  lbcmetrics.MetricCollector
 
 	maxConcurrentReconciles int
 
@@ -112,6 +122,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	r.reconcileCounters.IncrementService(req.NamespacedName)
 	ctx = contexts.NewContext(ctx).SetLogName("svc/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -122,7 +133,11 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
 	svc := &corev1.Service{}
-	err := r.k8sClient.Get(ctx, req.NamespacedName, svc)
+	var err error
+	fetchServiceFn := func() {
+		err = r.k8sClient.Get(ctx, req.NamespacedName, svc)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -159,10 +174,24 @@ func (r *ServiceReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 }
 
 func (r *ServiceReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.ServiceFinalizer); err != nil {
-		return err
+	var err error
+	addFinalizersFn := func() {
+		err = r.finalizerManager.AddFinalizers(ctx, obj, domain.ServiceFinalizer)
 	}
-	return r.serviceUseCase.EnsureServiceUseCase(ctx, req)
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "add_finalizers", addFinalizersFn)
+	if err != nil {
+		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+		return errs.NewErrorWithMetrics(controllerName, "add_finalizers_error", err, r.metricsCollector)
+	}
+
+	ensureFn := func() {
+		err = r.serviceUseCase.EnsureServiceUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "ensure", ensureFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "ensure_error", err, r.metricsCollector)
+	}
+	return nil
 }
 
 func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
@@ -172,8 +201,13 @@ func (r *ServiceReconciler) reconcileDelete(ctx context.Context, req ctrl.Reques
 		return nil
 	}
 
-	if err := r.serviceUseCase.DeleteServiceUseCase(ctx, req); err != nil {
-		return err
+	var err error
+	deleteFn := func() {
+		err = r.serviceUseCase.DeleteServiceUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "delete", deleteFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "delete_error", err, r.metricsCollector)
 	}
 
 	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.ServiceFinalizer); err != nil {

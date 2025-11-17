@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	metricSubsystem = "vngcloud-lbc"
+	metricSubsystem = "vngcloud_lbc"
 )
 
 // These metrics are exported to be used in unit test validation.

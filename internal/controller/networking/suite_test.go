@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
@@ -53,6 +54,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	// +kubebuilder:scaffold:imports
@@ -171,6 +174,8 @@ var _ = BeforeSuite(func() {
 	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
 	ingressUtils := ingress.NewIngressUtils(domain.IngressFinalizer)
+	reconcileCounters := metricsutil.NewReconcileCounters()
+	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, k8sManager, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
 
 	// Setup Ingress reconciler
 	ingressUseCase := ingress_uc.NewIngressUseCase(
@@ -182,6 +187,8 @@ var _ = BeforeSuite(func() {
 		finalizerManager,
 		k8sManager.GetEventRecorderFor("ingress-controller"),
 		ingressUtils,
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	clientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	Expect(err).ToNot(HaveOccurred())
@@ -202,6 +209,8 @@ var _ = BeforeSuite(func() {
 		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
 		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -219,6 +228,8 @@ var _ = BeforeSuite(func() {
 		k8sManager.GetEventRecorderFor("nsg-controller"),
 		finalizerManager,
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

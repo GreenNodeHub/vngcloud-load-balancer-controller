@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	k8s_helper "github.com/anngdinh/operator-helper/k8s"
+	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -40,15 +40,23 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
+)
+
+const (
+	controllerName = "ingress"
 )
 
 func NewIngressReconciler(
 	ingressUseCase usecase.IngressUseCase,
 	client client.Client,
 	scheme *runtime.Scheme,
-	finalizerManager k8s_helper.FinalizerManager,
+	finalizerManager k8s.FinalizerManager,
 	eventRecorder record.EventRecorder,
 	ingressUtils ingress.IngressUtils,
+	metricsCollector lbcmetrics.MetricCollector,
+	reconcileCounters *metricsutil.ReconcileCounters,
 ) *IngressReconciler {
 	referenceIndexer := ingress.NewDefaultReferenceIndexer()
 	return &IngressReconciler{
@@ -59,24 +67,26 @@ func NewIngressReconciler(
 		eventRecorder:    eventRecorder,
 		ingressUtils:     ingressUtils,
 		referenceIndexer: referenceIndexer,
+
+		metricsCollector:  metricsCollector,
+		reconcileCounters: reconcileCounters,
 	}
 }
 
-// IngressReconciler reconciles a Ingress object
+// IngressReconciler reconciles an Ingress object
 type IngressReconciler struct {
 	k8sClient        client.Client
 	Scheme           *runtime.Scheme
 	ingressUseCase   usecase.IngressUseCase
-	finalizerManager k8s_helper.FinalizerManager
+	finalizerManager k8s.FinalizerManager
 
 	referenceIndexer ingress.ReferenceIndexer
 	ingressUtils     ingress.IngressUtils
 	eventRecorder    record.EventRecorder
 	logger           logr.Logger
 
-	// TODO
-	// reconcileCounters *metricsutil.ReconcileCounters
-	// metricsCollector  lbcmetrics.MetricCollector
+	reconcileCounters *metricsutil.ReconcileCounters
+	metricsCollector  lbcmetrics.MetricCollector
 
 	maxConcurrentReconciles int
 
@@ -93,6 +103,7 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
+	r.reconcileCounters.IncrementIngress(req.NamespacedName)
 	ctx = contexts.NewContext(ctx).SetLogName("ing/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
@@ -103,7 +114,11 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
 	ing := &networkingv1.Ingress{}
-	err := r.k8sClient.Get(ctx, req.NamespacedName, ing)
+	var err error
+	fetchIngressFn := func() {
+		err = r.k8sClient.Get(ctx, req.NamespacedName, ing)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchIngressFn)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -140,21 +155,40 @@ func (r *IngressReconciler) reconcile(ctx context.Context, req ctrl.Request) err
 }
 
 func (r *IngressReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
-	if err := r.finalizerManager.AddFinalizers(ctx, obj, domain.IngressFinalizer); err != nil {
-		return err
+	var err error
+	addFinalizersFn := func() {
+		err = r.finalizerManager.AddFinalizers(ctx, obj, domain.IngressFinalizer)
 	}
-	return r.ingressUseCase.EnsureIngressUseCase(ctx, req)
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "add_finalizers", addFinalizersFn)
+	if err != nil {
+		// r.eventRecorder.Event(obj, corev1.EventTypeWarning, k8s.ServiceEventReasonFailedAddFinalizer, fmt.Sprintf("Failed add finalizer due to %v", err))
+		return errs.NewErrorWithMetrics(controllerName, "add_finalizers_error", err, r.metricsCollector)
+	}
+
+	ensureFn := func() {
+		err = r.ingressUseCase.EnsureIngressUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "ensure", ensureFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "ensure_error", err, r.metricsCollector)
+	}
+	return nil
 }
 
 func (r *IngressReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s_helper.HasFinalizer(obj, domain.IngressFinalizer) {
+	if !k8s.HasFinalizer(obj, domain.IngressFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
 
-	if err := r.ingressUseCase.DeleteIngressUseCase(ctx, req); err != nil {
-		return err
+	var err error
+	deleteFn := func() {
+		err = r.ingressUseCase.DeleteIngressUseCase(ctx, req)
+	}
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "delete", deleteFn)
+	if err != nil {
+		return errs.NewErrorWithMetrics(controllerName, "delete_error", err, r.metricsCollector)
 	}
 
 	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.IngressFinalizer); err != nil {

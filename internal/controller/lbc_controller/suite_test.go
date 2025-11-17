@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
@@ -55,6 +56,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
+	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
+	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -176,6 +179,8 @@ var _ = BeforeSuite(func() {
 	serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
 	serviceUseCase := service_uc.NewServiceUseCase(
 		mockClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
+	reconcileCounters := metricsutil.NewReconcileCounters()
+	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, k8sManager, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
 	mockServiceReconciler = core.NewServiceReconciler(
 		serviceUseCase,
 		k8sManager.GetClient(),
@@ -183,6 +188,8 @@ var _ = BeforeSuite(func() {
 		finalizerManager,
 		k8sManager.GetEventRecorderFor("service-controller"),
 		serviceUtils,
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -199,6 +206,8 @@ var _ = BeforeSuite(func() {
 		k8sManager.GetEventRecorderFor("lbc-controller"),
 		finalizerManager,
 		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -215,6 +224,8 @@ var _ = BeforeSuite(func() {
 		k8sManager.GetEventRecorderFor("nsg-controller"),
 		finalizerManager,
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
+		lbcMetricsCollector,
+		reconcileCounters,
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
