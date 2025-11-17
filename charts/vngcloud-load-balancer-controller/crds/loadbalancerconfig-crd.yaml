@@ -4,8 +4,6 @@ metadata:
   name: loadbalancerconfigs.vks.vngcloud.vn
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
-  labels:
-  {{- include "vngcloud-load-balancer-controller.labels" . | nindent 4 }}
 spec:
   group: vks.vngcloud.vn
   names:
