@@ -71,7 +71,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 							FromPort:    int32(podPort),
 							ToPort:      int32(podPort),
 							CIDR:        cidr,
-							Description: "Allow other node access pod's port - Cilium native", // TODO: improve description
+							Description: "Allow other node access pod port - Cilium native", // TODO: improve description
 							Direction:   networkv2.SecgroupRuleDirectionIngress,
 							EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 						})
