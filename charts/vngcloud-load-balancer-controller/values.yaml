@@ -3,6 +3,7 @@ manager:
   manager:
     args:
     - --metrics-bind-address=:8443
+    - --metrics-secure=false
     - --leader-elect
     - --health-probe-bind-address=:8081
     containerSecurityContext:
