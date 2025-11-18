@@ -50,12 +50,10 @@ func (h *enqueueRequestsForServiceEvent) Update(ctx context.Context, e event.Upd
 	//	1. Service annotation updates
 	//	2. Service spec updates
 	//	3. Service deletions
-	if !equality.Semantic.DeepEqual(oldSvc.ResourceVersion, newSvc.ResourceVersion) {
-		if equality.Semantic.DeepEqual(oldSvc.Annotations, newSvc.Annotations) &&
-			equality.Semantic.DeepEqual(oldSvc.Spec, newSvc.Spec) &&
-			equality.Semantic.DeepEqual(oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()) {
-			return
-		}
+	if equality.Semantic.DeepEqual(oldSvc.Annotations, newSvc.Annotations) &&
+		equality.Semantic.DeepEqual(oldSvc.Spec, newSvc.Spec) &&
+		oldSvc.DeletionTimestamp.IsZero() == newSvc.DeletionTimestamp.IsZero() {
+		return
 	}
 
 	h.enqueueImpactedIngresses(ctx, queue, newSvc)
@@ -68,7 +66,7 @@ func (h *enqueueRequestsForServiceEvent) Delete(ctx context.Context, e event.Del
 func (h *enqueueRequestsForServiceEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForServiceEvent) enqueueImpactedIngresses(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], svc *corev1.Service) {
+func (h *enqueueRequestsForServiceEvent) enqueueImpactedIngresses(_ context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], svc *corev1.Service) {
 	ingList := &networkingv1.IngressList{}
 	if err := h.k8sClient.List(context.Background(), ingList,
 		client.InNamespace(svc.GetNamespace()),

@@ -46,12 +46,10 @@ func (h *enqueueRequestsForIngressEvent) Update(ctx context.Context, e event.Upd
 	//	1. Ingress annotation updates
 	//	2. Ingress spec updates
 	//	3. Ingress deletion
-	if !equality.Semantic.DeepEqual(oldIng.ResourceVersion, newIng.ResourceVersion) {
-		if equality.Semantic.DeepEqual(oldIng.Annotations, newIng.Annotations) &&
-			equality.Semantic.DeepEqual(oldIng.Spec, newIng.Spec) &&
-			equality.Semantic.DeepEqual(oldIng.DeletionTimestamp.IsZero(), newIng.DeletionTimestamp.IsZero()) {
-			return
-		}
+	if equality.Semantic.DeepEqual(oldIng.Annotations, newIng.Annotations) &&
+		equality.Semantic.DeepEqual(oldIng.Spec, newIng.Spec) &&
+		oldIng.DeletionTimestamp.IsZero() == newIng.DeletionTimestamp.IsZero() {
+		return
 	}
 
 	h.enqueueManagedIngress(ctx, queue, newIng)

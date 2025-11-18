@@ -46,14 +46,13 @@ func (h *enqueueRequestsForSecretEvent) Update(ctx context.Context, e event.Upda
 	oldSec := e.ObjectOld.(*corev1.Secret)
 	newSec := e.ObjectNew.(*corev1.Secret)
 
-	if !equality.Semantic.DeepEqual(oldSec.ResourceVersion, newSec.ResourceVersion) {
-		if equality.Semantic.DeepEqual(oldSec.Annotations, newSec.Annotations) &&
-			equality.Semantic.DeepEqual(oldSec.Data, newSec.Data) &&
-			equality.Semantic.DeepEqual(oldSec.StringData, newSec.StringData) &&
-			equality.Semantic.DeepEqual(oldSec.Type, newSec.Type) &&
-			equality.Semantic.DeepEqual(oldSec.DeletionTimestamp.IsZero(), newSec.DeletionTimestamp.IsZero()) {
-			return
-		}
+	// Skip reconciliation if only unimportant fields changed
+	if equality.Semantic.DeepEqual(oldSec.Annotations, newSec.Annotations) &&
+		equality.Semantic.DeepEqual(oldSec.Data, newSec.Data) &&
+		equality.Semantic.DeepEqual(oldSec.StringData, newSec.StringData) &&
+		equality.Semantic.DeepEqual(oldSec.Type, newSec.Type) &&
+		oldSec.DeletionTimestamp.IsZero() == newSec.DeletionTimestamp.IsZero() {
+		return
 	}
 
 	h.enqueueImpactedIngresses(ctx, queue, newSec)
@@ -66,7 +65,7 @@ func (h *enqueueRequestsForSecretEvent) Delete(ctx context.Context, e event.Dele
 func (h *enqueueRequestsForSecretEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForSecretEvent) enqueueImpactedIngresses(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], sec *corev1.Secret) {
+func (h *enqueueRequestsForSecretEvent) enqueueImpactedIngresses(_ context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], sec *corev1.Secret) {
 	ingList := &networkingv1.IngressList{}
 	if err := h.k8sClient.List(context.Background(), ingList,
 		client.InNamespace(sec.GetNamespace()),

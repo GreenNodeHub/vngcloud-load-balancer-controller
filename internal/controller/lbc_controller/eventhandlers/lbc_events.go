@@ -39,12 +39,11 @@ func (h *enqueueRequestsForLbcEvent) Update(ctx context.Context, e event.UpdateE
 	oldObj := e.ObjectOld.(*v1alpha1.LoadBalancerConfig)
 	newObj := e.ObjectNew.(*v1alpha1.LoadBalancerConfig)
 
-	if !equality.Semantic.DeepEqual(oldObj.ResourceVersion, newObj.ResourceVersion) {
-		if equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
-			equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) &&
-			equality.Semantic.DeepEqual(oldObj.DeletionTimestamp.IsZero(), newObj.DeletionTimestamp.IsZero()) {
-			return
-		}
+	// Skip reconciliation if only unimportant fields changed
+	if equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
+		equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) &&
+		oldObj.DeletionTimestamp.IsZero() == newObj.DeletionTimestamp.IsZero() {
+		return
 	}
 
 	h.enqueueManagedObject(ctx, queue, newObj)

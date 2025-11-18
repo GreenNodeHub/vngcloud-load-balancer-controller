@@ -43,18 +43,13 @@ func (h *enqueueRequestsForEndpointsEvent) Create(ctx context.Context, e event.C
 }
 
 func (h *enqueueRequestsForEndpointsEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	oldSvc := e.ObjectOld.(*corev1.Endpoints)
-	newSvc := e.ObjectNew.(*corev1.Endpoints)
+	oldEndpoint := e.ObjectOld.(*corev1.Endpoints)
+	newEndpoint := e.ObjectNew.(*corev1.Endpoints)
 
-	if !equality.Semantic.DeepEqual(oldSvc.ResourceVersion, newSvc.ResourceVersion) {
-		if equality.Semantic.DeepEqual(oldSvc.Annotations, newSvc.Annotations) &&
-			equality.Semantic.DeepEqual(oldSvc.Subsets, newSvc.Subsets) &&
-			equality.Semantic.DeepEqual(oldSvc.DeletionTimestamp.IsZero(), newSvc.DeletionTimestamp.IsZero()) {
-			return
-		}
+	// Only reconcile if the endpoint subsets have changed
+	if !equality.Semantic.DeepEqual(oldEndpoint.Subsets, newEndpoint.Subsets) {
+		h.enqueueImpactedIngresses(ctx, queue, newEndpoint)
 	}
-
-	h.enqueueImpactedIngresses(ctx, queue, newSvc)
 }
 
 func (h *enqueueRequestsForEndpointsEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -64,7 +59,7 @@ func (h *enqueueRequestsForEndpointsEvent) Delete(ctx context.Context, e event.D
 func (h *enqueueRequestsForEndpointsEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForEndpointsEvent) enqueueImpactedIngresses(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], ep *corev1.Endpoints) {
+func (h *enqueueRequestsForEndpointsEvent) enqueueImpactedIngresses(_ context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], ep *corev1.Endpoints) {
 	ingList := &networkingv1.IngressList{}
 	if err := h.k8sClient.List(context.Background(), ingList,
 		client.InNamespace(ep.GetNamespace()),
