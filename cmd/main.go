@@ -25,6 +25,7 @@ import (
 	"path"
 	runtime2 "runtime"
 	"strconv"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -38,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -95,6 +97,7 @@ func main() {
 	var disableIngressController bool
 	var disableLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
+	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -116,6 +119,10 @@ func main() {
 		"If set, the LoadBalancerConfig controller will be disabled")
 	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
 		"If set, the NodeSecurityGroup controller will be disabled")
+	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
+		"The minimum frequency at which watched resources are reconciled. "+
+			"A lower period will correct entropy more quickly, but reduce responsiveness to change if there are many watched resources. "+
+			"Examples: 5m, 1h, 30s. Defaults to 5 minutes.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -218,6 +225,9 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       fmt.Sprintf("n-%s-n.n-%s-n.lbc.vks.vngcloud.vn", conf.Cluster.ClusterID, conf.Cluster.Namespace),
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
