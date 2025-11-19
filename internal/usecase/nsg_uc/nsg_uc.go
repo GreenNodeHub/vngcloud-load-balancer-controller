@@ -100,21 +100,30 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 	if err != nil {
 		return err
 	}
-	newServerSelector := utils.GetListProviderIdFromNodeList(listNodes)
+
+	nodeInfos := make([]v1alpha1.NodeInfo, 0)
+	if listNodes != nil && len(listNodes.Items) > 0 {
+		nodeInfos = make([]v1alpha1.NodeInfo, len(listNodes.Items))
+		for i, node := range listNodes.Items {
+			providerID := utils.GetProviderIdFromNode(&node)
+			nodeInfos[i] = v1alpha1.NodeInfo{
+				Name:     node.Name,
+				ServerId: providerID,
+			}
+		}
+	}
 
 	// patch status.selectedNodes
 	err = uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-		nodeInfos := make([]v1alpha1.NodeInfo, len(newServerSelector))
-		for i, serverId := range newServerSelector {
-			nodeInfos[i] = v1alpha1.NodeInfo{
-				Name:     serverId, // TODO: get node name from serverId
-				ServerId: serverId,
-			}
-		}
 		obj.Status.SelectedNodes = nodeInfos
 	})
 	if err != nil {
 		return err
+	}
+
+	newServerSelector := make([]string, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		newServerSelector[i] = nodeInfo.ServerId
 	}
 
 	// resolve changes
@@ -233,7 +242,6 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 		}
 	}
 
-	// TODO: should add engress rules too
 	logger.Debug("Ensure secgroup rules: ")
 	for _, rule := range defaultSecgroupRules.Items {
 		if rule.Direction == string(networkv2.SecgroupRuleDirectionEgress) {

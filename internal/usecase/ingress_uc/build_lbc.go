@@ -18,6 +18,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -52,7 +53,7 @@ type defaultModelBuildTask struct {
 func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	if !t.ingressUtils.IsIngressSupported(t.ingress) {
 		if t.ingressUtils.IsIngressPendingFinalization(t.ingress) {
-			t.logger.Info("Ingress is not supported but pending finalization, running delete flow TODO")
+			return errs.NewRequeueNeeded("ingress is not supported but pending finalization, re-run delete flow")
 		}
 		return nil
 	}
@@ -127,22 +128,14 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	if lbConfig.Labels == nil {
 		lbConfig.Labels = make(map[string]string)
 	}
-	lbConfig.Labels[domain.LabelOwnerResourceName] = t.ingress.Name // TODO
+	lbConfig.Labels[domain.LabelOwnerResourceName] = t.ingress.Name
 	lbConfig.Labels[domain.LabelOwnerResourceType] = t.ingress.Kind
 	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer7
 	lbConfig.Spec.SubnetId = subnetId
 	lbConfig.Spec.ZoneId = zoneId
 
 	// should not set owner reference because sometimes user want to keep LBC after ingress is deleted
-	// lbConfig.OwnerReferences = []metav1.OwnerReference{
-	// 	{
-	// 		APIVersion: t.ingress.APIVersion,
-	// 		Kind:       t.ingress.Kind,
-	// 		Name:       t.ingress.Name,
-	// 		UID:        t.ingress.UID,
-	// 		// TODO
-	// 	},
-	// }
+	// lbConfig.OwnerReferences = []metav1.OwnerReference{...}
 
 	if t.clusterId != "" {
 		lbConfig.Spec.ClusterId = &t.clusterId
@@ -223,13 +216,12 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	if nsg.Labels == nil {
 		nsg.Labels = make(map[string]string)
 	}
-	nsg.Labels[domain.LabelOwnerResourceName] = t.ingress.Name // TODO
+	nsg.Labels[domain.LabelOwnerResourceName] = t.ingress.Name
 	nsg.Labels[domain.LabelOwnerResourceType] = t.ingress.Kind
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	nsg.Spec.SelectNodeLabels = targetNodeLabels
 
-	// TODO: update nsg.Spec based on annotations
 	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
 		nsg.Spec.ManagedSecurityGroup = nil
 		nsg.Spec.AttachSecurityGroups = secgroupIds

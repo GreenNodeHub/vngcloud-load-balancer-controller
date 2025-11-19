@@ -13,7 +13,7 @@ const (
 	ServiceFinalizer = "service.kubernetes.io/load-balancer-cleanup"
 	IngressFinalizer = "ingress.vngcloud.vn/resources"
 	GlbFinalizer     = "glb.vngcloud.vn/resources"
-	LbcFinalizer     = "lbc.vngcloud.vn/resources" // TODO: plan this finalizer name
+	LbcFinalizer     = "lbc.vngcloud.vn/resources"
 	NsgFinalizer     = "nsg.vngcloud.vn/resources"
 )
 

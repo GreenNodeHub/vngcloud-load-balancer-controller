@@ -17,6 +17,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -51,7 +52,7 @@ type defaultModelBuildTask struct {
 func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	if !t.serviceUtils.IsServiceSupported(t.service) {
 		if t.serviceUtils.IsServicePendingFinalization(t.service) {
-			t.logger.Info("Service is not supported but pending finalization, running delete flow TODO")
+			return errs.NewRequeueNeeded("service is not supported but pending finalization, re-run delete flow")
 		}
 		return nil
 	}
@@ -126,22 +127,14 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	if lbConfig.Labels == nil {
 		lbConfig.Labels = make(map[string]string)
 	}
-	lbConfig.Labels[domain.LabelOwnerResourceName] = t.service.Name // TODO
+	lbConfig.Labels[domain.LabelOwnerResourceName] = t.service.Name
 	lbConfig.Labels[domain.LabelOwnerResourceType] = t.service.Kind
 	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
 	lbConfig.Spec.SubnetId = subnetId
 	lbConfig.Spec.ZoneId = zoneId
 
 	// should not set owner reference because sometimes user want to keep LBC after service is deleted
-	// lbConfig.OwnerReferences = []metav1.OwnerReference{
-	// 	{
-	// 		APIVersion: t.service.APIVersion,
-	// 		Kind:       t.service.Kind,
-	// 		Name:       t.service.Name,
-	// 		UID:        t.service.UID,
-	// 		// TODO
-	// 	},
-	// }
+	// lbConfig.OwnerReferences = []metav1.OwnerReference{...}
 
 	if t.clusterId != "" {
 		lbConfig.Spec.ClusterId = &t.clusterId
@@ -216,13 +209,12 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	if nsg.Labels == nil {
 		nsg.Labels = make(map[string]string)
 	}
-	nsg.Labels[domain.LabelOwnerResourceName] = t.service.Name // TODO
+	nsg.Labels[domain.LabelOwnerResourceName] = t.service.Name
 	nsg.Labels[domain.LabelOwnerResourceType] = t.service.Kind
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	nsg.Spec.SelectNodeLabels = targetNodeLabels
 
-	// TODO: update nsg.Spec based on annotations
 	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
 		nsg.Spec.ManagedSecurityGroup = nil
 		nsg.Spec.AttachSecurityGroups = secgroupIds

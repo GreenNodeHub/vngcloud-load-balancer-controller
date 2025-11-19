@@ -50,3 +50,10 @@ func GetListProviderIdFromNodeList(pnodes *corev1.NodeList) []string {
 	}
 	return providerIDs
 }
+
+func GetProviderIdFromNode(pnode *corev1.Node) string {
+	if pnode == nil || !matchCloudProviderPattern(pnode.Spec.ProviderID) {
+		return ""
+	}
+	return getProviderID(pnode)
+}

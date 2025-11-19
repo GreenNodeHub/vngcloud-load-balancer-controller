@@ -64,11 +64,18 @@ func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 		logger.Errorf("failed to list nodes: %v", err)
 		return err
 	}
+	if len(nodes.Items) == 0 {
+		return errors.New("no nodes found in cluster")
+	}
 
 	// check if network info is available
 	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
-		providerIds := utils.GetListProviderIdFromNodeList(nodes) // TODO do we need get all provider ids?
-		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerIds[0])
+		// get provider ID from first node
+		firstProviderId := utils.GetProviderIdFromNode(&nodes.Items[0])
+		if firstProviderId == "" {
+			return errors.New("failed to get provider ID from node")
+		}
+		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, firstProviderId)
 		if err != nil {
 			logger.Errorf("failed to get default network info: %v", err)
 			return err

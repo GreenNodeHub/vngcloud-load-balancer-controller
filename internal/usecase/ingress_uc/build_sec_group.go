@@ -126,7 +126,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 						FromPort:    int32(podPort),
 						ToPort:      int32(podPort),
 						CIDR:        cidr,
-						Description: "Allow other node access pod port - Cilium native", // TODO: improve description
+						Description: "Allow other node access pod port - Cilium native",
 						Direction:   networkv2.SecgroupRuleDirectionIngress,
 						EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 					})
@@ -161,7 +161,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 			FromPort:    int32(member.Port),
 			ToPort:      int32(member.Port),
 			CIDR:        subnetCidr,
-			Description: fmt.Sprintf("Allow load balancer access to port %d", member.Port), // TODO: improve description
+			Description: fmt.Sprintf("Allow load balancer access to port %d", member.Port),
 			Direction:   networkv2.SecgroupRuleDirectionIngress,
 			EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 		})

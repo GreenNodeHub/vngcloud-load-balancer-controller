@@ -68,3 +68,8 @@ func IsSecurityGroupNotFound(err error) bool {
 	// TODO
 	return false
 }
+
+func IsRateLimitExceeded(err error) bool {
+	// TODO
+	return false
+}
