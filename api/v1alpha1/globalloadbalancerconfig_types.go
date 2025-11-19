@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,23 +26,294 @@ import (
 
 // GlobalLoadBalancerConfigSpec defines the desired state of GlobalLoadBalancerConfig
 type GlobalLoadBalancerConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
+	// should put cluster in in annotation, because it not belong to load balancer directly
+	// // ClusterId is the ID of the cluster where the load balancer will be deployed. It helps in organizing resources.
+	// // +optional
+	// ClusterId *string `json:"clusterId,omitempty"`
 
-	// foo is an example field of GlobalLoadBalancerConfig. Edit globalloadbalancerconfig_types.go to remove/update
+	// General fields for all load balancers
+	// Name is the name of the load balancer
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// Description is the description of the load balancer
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// Type defines the type of global load balancer
+	// +required
+	Type global.GlobalLoadBalancerType `json:"type"`
+
+	// PackageId is the size/package of the load balancer
+	// +optional
+	PackageId *string `json:"packageId,omitempty"`
+
+	// PaymentFlow defines the payment flow for the load balancer
+	// +optional
+	PaymentFlow *global.GlobalLoadBalancerPaymentFlow `json:"paymentFlow,omitempty"`
+
+	// LoadBalancerId is managed by the controller
+	// +optional
+	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
+
+	// Tags are key-value pairs for load balancer tagging
+	// +optional
+	Tags map[string]string `json:"tags,omitempty"`
+
+	// GlobalListeners defines the array of listeners for the load balancer
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	GlobalListeners []GlobalListener `json:"globalListeners,omitempty"`
+
+	// GlobalPools defines the array of pools for the load balancer
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	GlobalPools []GlobalPool `json:"globalPools,omitempty"`
+}
+
+type GlobalListener struct {
+	// Name is the name of the listener
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// Description is an optional description for the listener
+	// +optional
+	Description *string `json:"description,omitempty"`
+
+	// Protocol is the protocol for the listener
+	// +required
+	Protocol global.GlobalListenerProtocol `json:"protocol"`
+
+	// ProtocolPort is the port number for the listener
+	// +required
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	ProtocolPort int `json:"protocolPort"`
+
+	// TODO
+	// // DefaultPoolName is the name of the default pool
+	// // +optional
+	// DefaultPoolName *string `json:"defaultPoolName,omitempty"`
+
+	// TimeoutClient is the client timeout in seconds
+	// +optional
+	TimeoutClient *int32 `json:"timeoutClient,omitempty"`
+
+	// TimeoutMember is the member timeout in seconds
+	// +optional
+	TimeoutMember *int32 `json:"timeoutMember,omitempty"`
+
+	// TimeoutConnection is the connection timeout in seconds
+	// +optional
+	TimeoutConnection *int32 `json:"timeoutConnection,omitempty"`
+
+	// AllowedCidrs defines the allowed CIDR blocks
+	// +optional
+	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
+
+	// Headers defines headers to insert into requests
+	// +optional
+	// +listType=atomic
+	Headers []GlobalHeader `json:"headers,omitempty"`
+}
+
+type GlobalHeader struct {
+	// Name is the name of the header
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// Value is the value of the header
+	// +required
+	Value string `json:"value,omitempty"`
+}
+
+type GlobalPool struct {
+	// Name is the name of the pool
+	// +required
+	Name string `json:"name"`
+
+	// Description is an optional description for the pool
+	// +optional
+	Description *string `json:"description,omitempty"`
+
+	// Protocol is the protocol for the pool
+	// +required
+	Protocol global.GlobalPoolProtocol `json:"protocol"`
+
+	// Algorithm is the load balancing algorithm for the pool
+	// +optional
+	Algorithm *global.GlobalPoolAlgorithm `json:"algorithm,omitempty"`
+
+	// Stickiness enables sticky sessions for the pool
+	// +optional
+	Stickiness *bool `json:"stickiness,omitempty"`
+
+	// TLSEncryption enables TLS encryption for the pool
+	// +optional
+	TLSEncryption *bool `json:"tlsEncryption,omitempty"`
+
+	// HealthMonitor defines the health monitor configuration for the pool
+	// +optional
+	HealthMonitor GlobalPoolHealthMonitor `json:"healthMonitor,omitempty"`
+
+	// Members is the list of members in the pool
+	// +optional
+	// +listType=atomic
+	Members []GlobalPoolMember `json:"members,omitempty"`
+}
+
+type GlobalPoolHealthMonitor struct {
+	// Protocol is the protocol used for health checks
+	// +required
+	Protocol global.GlobalPoolHealthCheckProtocol `json:"protocol"`
+
+	// HealthyThreshold is the number of consecutive successful checks before marking healthy
+	// +optional
+	HealthyThreshold *int `json:"healthyThreshold"`
+
+	// UnhealthyThreshold is the number of consecutive failed checks before marking unhealthy
+	// +optional
+	UnhealthyThreshold *int `json:"unhealthyThreshold"`
+
+	// Interval is the time in seconds between each health check
+	// +optional
+	Interval *int `json:"interval"`
+
+	// Timeout is the maximum time in seconds to wait for a response
+	// +optional
+	Timeout *int `json:"timeout"`
+
+	// HealthCheckMethod specifies how the health check request is made (e.g., GET, TCP)
+	// +optional
+	HealthCheckMethod *global.GlobalPoolHealthCheckMethod `json:"healthCheckMethod,omitempty"`
+
+	// HttpVersion defines which HTTP version to use for HTTP-based health checks
+	// +optional
+	HttpVersion *global.GlobalPoolHealthCheckHttpVersion `json:"httpVersion,omitempty"`
+
+	// HealthCheckPath is the path used for HTTP health checks
+	// +optional
+	HealthCheckPath *string `json:"healthCheckPath,omitempty"`
+
+	// DomainName is the hostname sent in the HTTP Host header
+	// +optional
+	DomainName *string `json:"domainName,omitempty"`
+
+	// SuccessCode specifies which HTTP codes indicate a healthy response
+	// +optional
+	SuccessCode *string `json:"successCode,omitempty"`
+}
+
+type GlobalPoolMember struct {
+	// Name is an optional name for the pool member
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Description is an optional description for the pool member
+	// +optional
+	Description *string `json:"description,omitempty"`
+
+	// TODO
+	// Region is the region where the pool member is located
+	// +required
+	Region string `json:"region"`
+
+	// TODO
+	// TrafficDial is the traffic dial percentage for the pool member
+	// +optional
+	TrafficDial *int `json:"trafficDial,omitempty"`
+
+	// TODO
+	// VpcId is the ID of the VPC where the pool member resides
+	// +required
+	VpcId string `json:"vpcId"`
+
+	// TODO
+	// Type is the type of the pool member
+	// +required
+	Type global.GlobalPoolMemberType `json:"type"`
+
+	// TODO
+	// Members is the list of member
+	// +optional
+	// +listType=atomic
+	Members []GlobalMember `json:"members,omitempty"`
+}
+
+// TODO
+type GlobalMember struct {
+	// Address is the IP address of the member
+	// +required
+	Address string `json:"address"`
+
+	// BackupRole indicates if the member is a backup
+	// +optional
+	BackupRole bool `json:"backupRole,omitempty"`
+
+	// Description is an optional description for the member
+	// +optional
+	Description *string `json:"description,omitempty"`
+
+	// MonitorPort is the port used for health monitoring
+	// +optional
+	MonitorPort *int `json:"monitorPort,omitempty"`
+
+	// Name is the name of the member
+	// +required
+	Name string `json:"name"`
+
+	// Port is the port on which the member receives traffic
+	// +required
+	Port int `json:"port"`
+
+	// SubnetID is the ID of the subnet where the member resides
+	// +required
+	SubnetID string `json:"subnetId"`
+
+	// Weight is the weight of the member for load balancing
+	// +optional
+	Weight *int `json:"weight,omitempty"`
 }
 
 // GlobalLoadBalancerConfigStatus defines the observed state of GlobalLoadBalancerConfig.
 type GlobalLoadBalancerConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ObservedGeneration reflects the generation of the most recently observed spec
+	// +optional
+	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
 
-	// For Kubernetes API conventions, see:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+	// LastReconcileTime is the timestamp of the last reconciliation attempt
+	// +optional
+	LastReconcileTime *metav1.Time `json:"lastReconcileTime,omitempty"`
+
+	// LastReconcileMessage contains a message from the last reconciliation
+	// +optional
+	LastReconcileMessage string `json:"lastReconcileMessage,omitempty"`
+
+	// Address is the DNS name or IP address assigned to the load balancer
+	// +optional
+	Address *string `json:"address,omitempty"`
+
+	// LoadBalancerId is the actual ID of the load balancer in VNG Cloud
+	// +optional
+	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
+
+	// CreatedTags is the map of tags created on the load balancer
+	// +optional
+	CreatedTags map[string]string `json:"createdTags,omitempty"`
+
+	// CreatedListeners is the list of created listener IDs
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	CreatedPools []CreatedGlobalPool `json:"createdPools,omitempty"`
+
+	// CreatedListeners is the list of created listener IDs
+	// +optional
+	// +listType=map
+	// +listMapKey=id
+	CreatedListeners []CreatedGlobalListener `json:"createdListeners,omitempty"`
 
 	// conditions represent the current state of the GlobalLoadBalancerConfig resource.
 	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
@@ -58,8 +330,52 @@ type GlobalLoadBalancerConfigStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+type CreatedGlobalListener struct {
+	// Id is the ID of the created listener
+	// +required
+	Id string `json:"id,omitempty"`
+
+	// Port is the port number of the created listener
+	// +required
+	Port int `json:"port,omitempty"`
+
+	// Name is the name of the listener
+	// +required
+	Name string `json:"name,omitempty"`
+}
+
+type CreatedGlobalPool struct {
+	// Id is the ID of the created pool
+	// +required
+	Id string `json:"id,omitempty"`
+
+	// Name is the name of the created pool
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// CreatedPoolMembers is the list of created member IDs
+	// +optional
+	// +listType=atomic
+	CreatedPoolMembers []CreatedGlobalPoolMember `json:"createdPoolMembers,omitempty"`
+}
+
+type CreatedGlobalPoolMember struct {
+	// Id is the ID of the created member
+	// +required
+	Id string `json:"id,omitempty"`
+
+	// Name is the name of the created member
+	// +required
+	Name string `json:"name,omitempty"`
+
+	// CreatedMembers is the list of created members
+	// +optional
+	CreatedMembers []GlobalMember `json:"createdMembers,omitempty"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=glbc
 
 // GlobalLoadBalancerConfig is the Schema for the globalloadbalancerconfigs API
 type GlobalLoadBalancerConfig struct {
