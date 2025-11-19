@@ -59,9 +59,9 @@ func (h *enqueueRequestsForEndpointsEvent) Delete(ctx context.Context, e event.D
 func (h *enqueueRequestsForEndpointsEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForEndpointsEvent) enqueueImpactedIngresses(_ context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], ep *corev1.Endpoints) {
+func (h *enqueueRequestsForEndpointsEvent) enqueueImpactedIngresses(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], ep *corev1.Endpoints) {
 	ingList := &networkingv1.IngressList{}
-	if err := h.k8sClient.List(context.Background(), ingList,
+	if err := h.k8sClient.List(ctx, ingList,
 		client.InNamespace(ep.GetNamespace()),
 		// use service reference index to find impacted ingresses
 		client.MatchingFields{ingress.IndexKeyServiceRefName: ep.GetName()}); err != nil {

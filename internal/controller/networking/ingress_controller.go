@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
@@ -229,6 +230,8 @@ func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("service"))
 	ingEventHandler := eventhandlers.NewEnqueueRequestForIngressEvent(r.eventRecorder,
 		r.ingressUtils, r.logger.WithName("eventHandlers").WithName("ingress"))
+	lbcEventHandler := eventhandlers.NewEnqueueRequestForLbcEvent(r.k8sClient,
+		r.eventRecorder, r.ingressUtils, r.logger.WithName("eventHandlers").WithName("lbc"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("networking-ingress").
@@ -237,6 +240,7 @@ func (r *IngressReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		Watches(&corev1.Endpoints{}, endpointEventHandler).
 		Watches(&corev1.Secret{}, secretEventHandler).
 		Watches(&corev1.Node{}, nodeEventHandler).
+		Watches(&v1alpha1.LoadBalancerConfig{}, lbcEventHandler).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
 		}).

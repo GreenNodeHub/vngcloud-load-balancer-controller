@@ -65,9 +65,9 @@ func (h *enqueueRequestsForSecretEvent) Delete(ctx context.Context, e event.Dele
 func (h *enqueueRequestsForSecretEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (h *enqueueRequestsForSecretEvent) enqueueImpactedIngresses(_ context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], sec *corev1.Secret) {
+func (h *enqueueRequestsForSecretEvent) enqueueImpactedIngresses(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request], sec *corev1.Secret) {
 	ingList := &networkingv1.IngressList{}
-	if err := h.k8sClient.List(context.Background(), ingList,
+	if err := h.k8sClient.List(ctx, ingList,
 		client.InNamespace(sec.GetNamespace()),
 		client.MatchingFields{ingress.IndexKeySecretRefName: sec.GetName()}); err != nil {
 		h.logger.Error(err, "failed to fetch ingresses")

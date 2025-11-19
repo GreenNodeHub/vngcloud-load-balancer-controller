@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
@@ -240,12 +241,15 @@ func (r *ServiceReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manag
 		r.logger.WithName("eventHandlers").WithName("endpoint"))
 	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.k8sClient,
 		r.serviceUtils, r.logger.WithName("eventHandlers").WithName("node"))
+	lbcEventHandler := eventhandlers.NewEnqueueRequestForLbcEvent(r.k8sClient,
+		r.eventRecorder, r.serviceUtils, r.logger.WithName("eventHandlers").WithName("lbc"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("core-service").
 		Watches(&corev1.Service{}, svcEventHandler).
 		Watches(&corev1.Endpoints{}, endpointEventHandler).
 		Watches(&corev1.Node{}, nodeEventHandler).
+		Watches(&v1alpha1.LoadBalancerConfig{}, lbcEventHandler).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
 		}).
