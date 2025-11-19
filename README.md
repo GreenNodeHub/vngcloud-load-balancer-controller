@@ -193,6 +193,11 @@ kubebuilder create api --version v1alpha1 --kind NodeSecurityGroup --controller=
 go mod tidy
 make generate
 make manifests kustomize helm
+
+kubebuilder create api --version v1alpha1 --kind GlobalLoadBalancerConfig --controller=true --resource=true --namespaced=true
+go mod tidy
+make generate
+make manifests kustomize helm
 ```
 
 Mockery generation:
