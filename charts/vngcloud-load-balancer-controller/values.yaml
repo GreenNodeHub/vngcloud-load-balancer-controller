@@ -13,7 +13,7 @@ manager:
         - ALL
     image:
       repository: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller
-      tag: "v0.3.8" # release
+      tag: "v0.3.9" # release
     imagePullPolicy: Always
     resources:
       limits:
