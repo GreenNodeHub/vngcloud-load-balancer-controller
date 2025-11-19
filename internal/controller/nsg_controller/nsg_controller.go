@@ -210,10 +210,12 @@ func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr 
 
 	nsgEventHandler := eventhandlers.NewEnqueueRequestForNsgEvent(r.eventRecorder,
 		r.nsgUtils)
+	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.Client, r.nsgUtils)
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Watches(&v1alpha1.NodeSecurityGroup{}, nsgEventHandler).
 		Named("nodesecuritygroup").
+		Watches(&v1alpha1.NodeSecurityGroup{}, nsgEventHandler).
+		Watches(&corev1.Node{}, nodeEventHandler).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
 		}).
