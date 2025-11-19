@@ -36,8 +36,8 @@ type IngressUseCase interface {
 // 	DeleteVngcloudGlobalLoadBalancerUseCase(ctx context.Context, req ctrl.Request) error
 // }
 
-// type GlobalLoadBalancerConfigUseCase interface {
-// 	InitGlobalLoadBalancerConfigUseCase(ctx context.Context) error
-// 	EnsureGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
-// 	DeleteGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
-// }
+type GlobalLoadBalancerConfigUseCase interface {
+	InitGlobalLoadBalancerConfigUseCase(ctx context.Context) error
+	EnsureGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
+}

@@ -107,6 +107,7 @@ type VngCloudRepository interface {
 	PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error
 
 	ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error)
+	GetGlobalListener(ctx context.Context, glbID, listenerID string) (*entityv2.GlobalListener, error)
 	CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error)
 	DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error
 	UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error
@@ -138,4 +139,7 @@ type K8sRepository interface {
 	UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error
 
 	GetSecret(ctx context.Context, n types.NamespacedName) (*corev1.Secret, error)
+
+	GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)
+	PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)) error
 }

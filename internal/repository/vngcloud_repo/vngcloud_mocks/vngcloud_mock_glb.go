@@ -520,6 +520,17 @@ func (m *MockProvider) ListGlobalListeners(ctx context.Context, glbID string) (*
 	}, nil
 }
 
+func (m *MockProvider) GetGlobalListener(ctx context.Context, glbID, listenerID string) (*entityv2.GlobalListener, error) {
+	logger := contexts.NewContext(ctx).Log()
+	for _, l := range m.globalListeners {
+		if l.lbID == glbID && l.ID == listenerID {
+			return clone.Clone(l.GlobalListener).(*entityv2.GlobalListener), nil
+		}
+	}
+	logger.Error("Global Listener not found")
+	return nil, domain.ErrorNotFound
+}
+
 func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create global listener of load balancer %s", domain.RequestIcon, glbID)

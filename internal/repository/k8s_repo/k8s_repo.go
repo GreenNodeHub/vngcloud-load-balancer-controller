@@ -266,3 +266,22 @@ func (r *k8sRepository) GetSecret(ctx context.Context, n types.NamespacedName) (
 	err := r.client.Get(ctx, n, secret)
 	return secret, err
 }
+
+// ------------------- global load balancer config ------------------
+
+func (r *k8sRepository) GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error) {
+	glbc := &v1alpha1.GlobalLoadBalancerConfig{}
+	err := r.client.Get(ctx, n, glbc)
+	return glbc, err
+}
+
+func (r *k8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(
+	ctx context.Context,
+	glbc *v1alpha1.GlobalLoadBalancerConfig,
+	mutate func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig),
+) error {
+	return r.patchMutateStatusObject(ctx, glbc, func(ctx context.Context, obj client.Object) {
+		// type-assert so you can use strongly typed fields
+		mutate(ctx, obj.(*v1alpha1.GlobalLoadBalancerConfig))
+	})
+}

@@ -93,9 +93,9 @@ type GlobalListener struct {
 	ProtocolPort int `json:"protocolPort"`
 
 	// TODO
-	// // DefaultPoolName is the name of the default pool
-	// // +optional
-	// DefaultPoolName *string `json:"defaultPoolName,omitempty"`
+	// DefaultPoolName is the name of the default pool
+	// +optional
+	DefaultPoolName *string `json:"defaultPoolName,omitempty"`
 
 	// TimeoutClient is the client timeout in seconds
 	// +optional
@@ -115,18 +115,7 @@ type GlobalListener struct {
 
 	// Headers defines headers to insert into requests
 	// +optional
-	// +listType=atomic
-	Headers []GlobalHeader `json:"headers,omitempty"`
-}
-
-type GlobalHeader struct {
-	// Name is the name of the header
-	// +required
-	Name string `json:"name,omitempty"`
-
-	// Value is the value of the header
-	// +required
-	Value string `json:"value,omitempty"`
+	Headers []string `json:"headers,omitempty"`
 }
 
 type GlobalPool struct {

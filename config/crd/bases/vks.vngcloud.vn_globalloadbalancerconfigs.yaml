@@ -42,10 +42,6 @@ spec:
           spec:
             description: spec defines the desired state of GlobalLoadBalancerConfig
             properties:
-              clusterId:
-                description: ClusterId is the ID of the cluster where the load balancer
-                  will be deployed. It helps in organizing resources.
-                type: string
               description:
                 description: Description is the description of the load balancer
                 type: string
@@ -57,6 +53,9 @@ spec:
                     allowedCidrs:
                       description: AllowedCidrs defines the allowed CIDR blocks
                       type: string
+                    defaultPoolName:
+                      description: DefaultPoolName is the name of the default pool
+                      type: string
                     description:
                       description: Description is an optional description for the
                         listener
@@ -64,19 +63,8 @@ spec:
                     headers:
                       description: Headers defines headers to insert into requests
                       items:
-                        properties:
-                          name:
-                            description: Name is the name of the header
-                            type: string
-                          value:
-                            description: Value is the value of the header
-                            type: string
-                        required:
-                        - name
-                        - value
-                        type: object
+                        type: string
                       type: array
-                      x-kubernetes-list-type: atomic
                     name:
                       description: Name is the name of the listener
                       type: string

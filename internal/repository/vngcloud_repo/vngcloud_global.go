@@ -107,6 +107,8 @@ func (m *vngCloudRepository) WaitGlobalLoadBalancerActive(ctx context.Context, g
 	return resultGLB, err
 }
 
+// --------------------------- Global Pool ---------------------------
+
 func (m *vngCloudRepository) ListGlobalPools(ctx context.Context, glbID string) (*entityv2.ListGlobalPools, error) {
 	logger := contexts.NewContext(ctx).Log()
 	pools, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPools(global.NewListGlobalPoolsRequest(glbID).AddUserAgent(m.userAgent))
@@ -171,6 +173,8 @@ func (m *vngCloudRepository) PatchGlobalPoolMember(ctx context.Context, glbID, p
 	return nil
 }
 
+// --------------------------- Global Listener ---------------------------
+
 func (m *vngCloudRepository) ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error) {
 	logger := contexts.NewContext(ctx).Log()
 	listeners, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalListeners(global.NewListGlobalListenersRequest(glbID).AddUserAgent(m.userAgent))
@@ -179,6 +183,16 @@ func (m *vngCloudRepository) ListGlobalListeners(ctx context.Context, glbID stri
 		return nil, sdkErr.GetError()
 	}
 	return listeners, nil
+}
+
+func (m *vngCloudRepository) GetGlobalListener(ctx context.Context, glbID, listenerID string) (*entityv2.GlobalListener, error) {
+	logger := contexts.NewContext(ctx).Log()
+	listener, sdkErr := m.client.GLBGateway().V1().GLBService().GetGlo(global.NewGetGlobalListenerRequest(glbID, listenerID).AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - GetGlobalListener: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return listener, nil
 }
 
 func (m *vngCloudRepository) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {

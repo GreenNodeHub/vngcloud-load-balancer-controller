@@ -1519,6 +1519,80 @@ func (_c *MockVngCloudRepository_GetCertificateByID_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetGlobalListener provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) GetGlobalListener(ctx context.Context, glbID string, listenerID string) (*entity.GlobalListener, error) {
+	ret := _mock.Called(ctx, glbID, listenerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGlobalListener")
+	}
+
+	var r0 *entity.GlobalListener
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (*entity.GlobalListener, error)); ok {
+		return returnFunc(ctx, glbID, listenerID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) *entity.GlobalListener); ok {
+		r0 = returnFunc(ctx, glbID, listenerID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.GlobalListener)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, glbID, listenerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockVngCloudRepository_GetGlobalListener_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGlobalListener'
+type MockVngCloudRepository_GetGlobalListener_Call struct {
+	*mock.Call
+}
+
+// GetGlobalListener is a helper method to define mock.On call
+//   - ctx context.Context
+//   - glbID string
+//   - listenerID string
+func (_e *MockVngCloudRepository_Expecter) GetGlobalListener(ctx interface{}, glbID interface{}, listenerID interface{}) *MockVngCloudRepository_GetGlobalListener_Call {
+	return &MockVngCloudRepository_GetGlobalListener_Call{Call: _e.mock.On("GetGlobalListener", ctx, glbID, listenerID)}
+}
+
+func (_c *MockVngCloudRepository_GetGlobalListener_Call) Run(run func(ctx context.Context, glbID string, listenerID string)) *MockVngCloudRepository_GetGlobalListener_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetGlobalListener_Call) Return(globalListener *entity.GlobalListener, err error) *MockVngCloudRepository_GetGlobalListener_Call {
+	_c.Call.Return(globalListener, err)
+	return _c
+}
+
+func (_c *MockVngCloudRepository_GetGlobalListener_Call) RunAndReturn(run func(ctx context.Context, glbID string, listenerID string) (*entity.GlobalListener, error)) *MockVngCloudRepository_GetGlobalListener_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetGlobalLoadBalancerByID provides a mock function for the type MockVngCloudRepository
 func (_mock *MockVngCloudRepository) GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entity.GlobalLoadBalancer, error) {
 	ret := _mock.Called(ctx, glbID)
@@ -4607,6 +4681,74 @@ func (_c *MockK8sRepository_DeleteNodeSecurityGroup_Call) RunAndReturn(run func(
 	return _c
 }
 
+// GetGlobalLoadBalancerConfig provides a mock function for the type MockK8sRepository
+func (_mock *MockK8sRepository) GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error) {
+	ret := _mock.Called(ctx, n)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGlobalLoadBalancerConfig")
+	}
+
+	var r0 *v1alpha1.GlobalLoadBalancerConfig
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)); ok {
+		return returnFunc(ctx, n)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.NamespacedName) *v1alpha1.GlobalLoadBalancerConfig); ok {
+		r0 = returnFunc(ctx, n)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*v1alpha1.GlobalLoadBalancerConfig)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.NamespacedName) error); ok {
+		r1 = returnFunc(ctx, n)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockK8sRepository_GetGlobalLoadBalancerConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGlobalLoadBalancerConfig'
+type MockK8sRepository_GetGlobalLoadBalancerConfig_Call struct {
+	*mock.Call
+}
+
+// GetGlobalLoadBalancerConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - n types.NamespacedName
+func (_e *MockK8sRepository_Expecter) GetGlobalLoadBalancerConfig(ctx interface{}, n interface{}) *MockK8sRepository_GetGlobalLoadBalancerConfig_Call {
+	return &MockK8sRepository_GetGlobalLoadBalancerConfig_Call{Call: _e.mock.On("GetGlobalLoadBalancerConfig", ctx, n)}
+}
+
+func (_c *MockK8sRepository_GetGlobalLoadBalancerConfig_Call) Run(run func(ctx context.Context, n types.NamespacedName)) *MockK8sRepository_GetGlobalLoadBalancerConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 types.NamespacedName
+		if args[1] != nil {
+			arg1 = args[1].(types.NamespacedName)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8sRepository_GetGlobalLoadBalancerConfig_Call) Return(globalLoadBalancerConfig *v1alpha1.GlobalLoadBalancerConfig, err error) *MockK8sRepository_GetGlobalLoadBalancerConfig_Call {
+	_c.Call.Return(globalLoadBalancerConfig, err)
+	return _c
+}
+
+func (_c *MockK8sRepository_GetGlobalLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)) *MockK8sRepository_GetGlobalLoadBalancerConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetIngress provides a mock function for the type MockK8sRepository
 func (_mock *MockK8sRepository) GetIngress(ctx context.Context, n types.NamespacedName) (*v10.Ingress, error) {
 	ret := _mock.Called(ctx, n)
@@ -5237,6 +5379,69 @@ func (_c *MockK8sRepository_PatchLoadBalancerConfig_Call) Return(err error) *Moc
 }
 
 func (_c *MockK8sRepository_PatchLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error) *MockK8sRepository_PatchLoadBalancerConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PatchMutateStatusGlobalLoadBalancerConfig provides a mock function for the type MockK8sRepository
+func (_mock *MockK8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)) error {
+	ret := _mock.Called(ctx, glbc, mutateFunc)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PatchMutateStatusGlobalLoadBalancerConfig")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.GlobalLoadBalancerConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)) error); ok {
+		r0 = returnFunc(ctx, glbc, mutateFunc)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchMutateStatusGlobalLoadBalancerConfig'
+type MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call struct {
+	*mock.Call
+}
+
+// PatchMutateStatusGlobalLoadBalancerConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - glbc *v1alpha1.GlobalLoadBalancerConfig
+//   - mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)
+func (_e *MockK8sRepository_Expecter) PatchMutateStatusGlobalLoadBalancerConfig(ctx interface{}, glbc interface{}, mutateFunc interface{}) *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call {
+	return &MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call{Call: _e.mock.On("PatchMutateStatusGlobalLoadBalancerConfig", ctx, glbc, mutateFunc)}
+}
+
+func (_c *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call) Run(run func(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig))) *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *v1alpha1.GlobalLoadBalancerConfig
+		if args[1] != nil {
+			arg1 = args[1].(*v1alpha1.GlobalLoadBalancerConfig)
+		}
+		var arg2 func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)
+		if args[2] != nil {
+			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig))
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call) Return(err error) *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)) error) *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
