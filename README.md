@@ -210,3 +210,8 @@ mockery
 - linting
 - review CRD field
 - documentations
+- metrics
+- webhook
+- auto reconcile when lb change outside controller
+- create or update crd: https://github.com/cilium/cilium/blob/main/pkg/k8s/apis/crdhelpers/register.go
+- client manager for running remote

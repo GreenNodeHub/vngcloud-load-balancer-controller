@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
+	"github.com/anngdinh/operator-helper/contexts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -69,12 +69,14 @@ func (d *detector) DetectCNIType(ctx context.Context) (CNIType, error) {
 
 // Check if Calico Overlay is running
 func (d *detector) isCalicoOverlay(ctx context.Context) bool {
+	logger := contexts.NewContext(ctx).Log()
+
 	calicoNodeDaemonSet := &appsv1.DaemonSet{}
 	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get calico-node daemonset: %v", err)
+			logger.Warnf("Failed to get calico-node daemonset: %v", err)
 		}
 		return false
 	}
@@ -83,12 +85,14 @@ func (d *detector) isCalicoOverlay(ctx context.Context) bool {
 
 // Check if Cilium Overlay is running
 func (d *detector) isCiliumOverlay(ctx context.Context) bool {
+	logger := contexts.NewContext(ctx).Log()
+
 	ciliumDaemonSet := &appsv1.DaemonSet{}
 	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get cilium daemonset: %v", err)
+			logger.Warnf("Failed to get cilium daemonset: %v", err)
 		}
 		return false
 	}
@@ -101,13 +105,15 @@ func (d *detector) isCiliumNativeRouting(ctx context.Context) bool {
 		return false
 	}
 
+	logger := contexts.NewContext(ctx).Log()
+
 	// get cilium-config config map
 	ciliumConfigMap := &corev1.ConfigMap{}
 	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get cilium-config configmap: %v", err)
+			logger.Warnf("Failed to get cilium-config configmap: %v", err)
 		}
 		return false
 	}

@@ -98,7 +98,7 @@ func main() {
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
-	var devMode bool
+	var logLevel string
 	var disableServiceController bool
 	var disableIngressController bool
 	var disableLoadBalancerConfigController bool
@@ -115,8 +115,8 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.BoolVar(&devMode, "dev-mode", false,
-		"If set, log will be printed in different format, easier to debug")
+	flag.StringVar(&logLevel, "log-level", "info",
+		"Set the log level (debug, info, warn, error, fatal, panic)")
 	flag.BoolVar(&disableServiceController, "disable-service-controller", false,
 		"If set, the service controller will be disabled")
 	flag.BoolVar(&disableIngressController, "disable-ingress-controller", false,
@@ -137,30 +137,35 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if devMode {
-		logrus.SetLevel(logrus.DebugLevel)
-		logrus.SetReportCaller(true)
+	// Parse and set log level
+	level, err := logrus.ParseLevel(logLevel)
+	if err != nil {
+		setupLog.Error(err, "invalid log level, defaulting to info", "logLevel", logLevel)
+		level = logrus.InfoLevel
+	}
+	logrus.SetLevel(level)
+	logrus.SetReportCaller(true)
+
+	// Use simplified format for debug level
+	if level == logrus.DebugLevel {
 		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableTimestamp: true,
 			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
 				fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
-				// return frame.Function, fileName
 				return "", fileName
 			},
 		})
 	} else {
-		logrus.SetReportCaller(true)
 		logrus.SetFormatter(&logrus.TextFormatter{
 			DisableTimestamp: false,
 			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
 				fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
-				// return frame.Function, fileName
 				return "", fileName
 			},
 		})
 	}
 
-	err := conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")
+	err = conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")
 	if err != nil {
 		os.Exit(1)
 	}

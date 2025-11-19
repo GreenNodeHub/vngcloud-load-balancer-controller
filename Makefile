@@ -92,7 +92,12 @@ build-pro:
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go --dev-mode
+	go run ./cmd/main.go --log-level=debug \
+	--metrics-bind-address=:8080 --metrics-secure=false
+# 	--disable-service-controller \
+# 	--disable-load-balancer-config-controller \
+# 	--disable-ingress-controller \
+# 	--disable-node-security-group-controller \
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
