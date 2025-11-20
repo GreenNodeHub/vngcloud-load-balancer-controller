@@ -22,7 +22,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 )
 
-func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
+func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup envtest
@@ -87,7 +87,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 		defer k8sClient.Delete(ctx, testNSG)
 
 		// Test
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1", "sg-2"})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1", "sg-2"})
 		assert.NoError(t, err)
 
 		// Verify
@@ -117,7 +117,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 
 		// Test with error
 		testErr := errors.New("attachment failed")
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", testErr, []string{})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", testErr, []string{})
 		assert.NoError(t, err)
 
 		// Verify
@@ -145,7 +145,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 		defer k8sClient.Delete(ctx, testNSG)
 
 		// Add initial status
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1"})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1"})
 		require.NoError(t, err)
 
 		// Get fresh copy and update
@@ -153,7 +153,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 		err = k8sClient.Get(ctx, nsName, testNSG)
 		require.NoError(t, err)
 
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-2", "sg-3"})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-2", "sg-3"})
 		assert.NoError(t, err)
 
 		// Verify no duplication
@@ -180,7 +180,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 
 		// Add status with error
 		testErr := errors.New("previous error")
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", testErr, []string{})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", testErr, []string{})
 		require.NoError(t, err)
 
 		// Get fresh copy
@@ -190,7 +190,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 		require.NotNil(t, testNSG.Status.ServerSecurityGroups[0].Error)
 
 		// Update without error
-		err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1"})
+		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1"})
 		assert.NoError(t, err)
 
 		// Verify error was cleared
@@ -222,7 +222,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 			secgroups := []string{fmt.Sprintf("sg-%d", i)}
 
 			// Add server
-			err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
+			err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
 			require.NoError(t, err)
 
 			// Get fresh copy for next iteration
@@ -277,7 +277,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 			serverID := fmt.Sprintf("server-%d", i)
 			secgroups := []string{fmt.Sprintf("sg-%d", i)}
 
-			err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
+			err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
 			require.NoError(t, err)
 
 			// Get fresh copy for next iteration
@@ -305,7 +305,7 @@ func TestEnsureStatusNodeSecurityGroupIntegration(t *testing.T) {
 			serverID := fmt.Sprintf("server-%d", i)
 			secgroups := []string{fmt.Sprintf("sg-%d", i)}
 
-			err = useCase.ensureStatusNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
+			err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, serverID, nil, secgroups)
 			require.NoError(t, err)
 
 			// Get fresh copy for next iteration

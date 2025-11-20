@@ -73,3 +73,8 @@ func IsRateLimitExceeded(err error) bool {
 	// TODO
 	return false
 }
+
+// Cannot get server with id ins-...
+func IsServerNotFound(err error) bool {
+	return strings.HasPrefix(err.Error(), "Cannot get server with id")
+}
