@@ -20,7 +20,7 @@ func (m *nsgUseCase) statusAddStatusManagedSecurityGroup(ctx context.Context, ns
 			} else {
 				obj.Status.ManagedSecurityGroup.Id = &secgroupID
 			}
-			obj.Status.ManagedSecurityGroup.Error = toErrorPtr(err)
+			obj.Status.ManagedSecurityGroup.Error = errorToStringPtr(err)
 		})
 }
 
@@ -32,7 +32,7 @@ func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObjec
 			newStatus := v1alpha1.ServerSecurityGroupStatus{
 				ServerId:                 serverId,
 				AttachedSecurityGroupIds: attachedSecgroupIds,
-				Error:                    toErrorPtr(err),
+				Error:                    errorToStringPtr(err),
 			}
 
 			// Find and update the existing status, or append if not found
@@ -45,5 +45,12 @@ func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObjec
 
 			// Server not found in status, append new entry
 			obj.Status.ServerSecurityGroups = append(obj.Status.ServerSecurityGroups, newStatus)
+		})
+}
+
+func (m *nsgUseCase) statusServerSecurityGroupStatus(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, ssgs []v1alpha1.ServerSecurityGroupStatus) error {
+	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+			obj.Status.ServerSecurityGroups = ssgs
 		})
 }

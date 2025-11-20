@@ -85,97 +85,13 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 		return err
 	}
 
-	// collect old server IDs
-	oldServerSelector := make([]string, 0)
-	for _, nodeInfo := range nsgObject.Status.SelectedNodes {
-		oldServerSelector = append(oldServerSelector, nodeInfo.ServerId)
+	ssgs, err := uc.ensureServerSecurityGroups(ctx, nsgObject, nodeInfos, *managedSecgroupStatus)
+	if err != nil {
+		return err
 	}
-
-	newServerSelector := make([]string, len(nodeInfos))
-	for i, nodeInfo := range nodeInfos {
-		newServerSelector[i] = nodeInfo.ServerId
+	if err := uc.statusServerSecurityGroupStatus(ctx, nsgObject, ssgs); err != nil {
+		return err
 	}
-
-	// attach new security groups in spec
-	needAttachSecgroupIds := make([]string, 0)
-	needAttachSecgroupIds = append(needAttachSecgroupIds, nsgObject.Spec.AttachSecurityGroups...)
-
-	if managedSecgroupStatus.Id != nil && *managedSecgroupStatus.Id != "" {
-		needAttachSecgroupIds = append(needAttachSecgroupIds, *managedSecgroupStatus.Id)
-	}
-
-	// resolve changes
-	removeServerIDs, notChangeServerIDs, addServerIDs := resolveStringArrayChange(ctx,
-		oldServerSelector,
-		newServerSelector,
-	)
-
-	logger := contexts.NewContext(ctx).Log()
-
-	errorsList := make([]error, 0)
-	// detach security groups from removed servers
-	for _, serverId := range removeServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, []string{})
-		if err != nil {
-			if domain.IsServerNotFound(err) {
-				continue
-			} else {
-				errorsList = append(errorsList, err)
-			}
-		}
-		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, []string{})
-		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
-		}
-	}
-
-	// update security groups for not changed servers
-	for _, serverId := range notChangeServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
-		if err != nil {
-			errorsList = append(errorsList, err)
-		}
-		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
-		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
-		}
-	}
-
-	// attach security groups to added servers
-	for _, serverId := range addServerIDs {
-		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
-		if err != nil {
-			errorsList = append(errorsList, err)
-		}
-		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
-		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
-		}
-	}
-
-	// try delete managed security group if not in use and not attached to any server
-	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
-		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
-		if err != nil {
-			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
-			return err
-		}
-		if isDeleted {
-			// patch status
-			if err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, "", nil); err != nil {
-				return err
-			}
-		}
-	}
-
-	if len(errorsList) > 0 {
-		errMessages := make([]string, 0)
-		for _, err := range errorsList {
-			errMessages = append(errMessages, err.Error())
-		}
-		return errors.New("failed to update security groups for some nodes: " + strings.Join(errMessages, ", "))
-	}
-
 	return nil
 }
 
@@ -321,6 +237,105 @@ func (uc *nsgUseCase) ensureSelectedNodes(ctx context.Context, nsgObject *v1alph
 		return nil, err
 	}
 	return nodeInfos, nil
+}
+
+func (uc *nsgUseCase) ensureServerSecurityGroups(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, nodeInfos []v1alpha1.NodeInfo, managedSecgroupStatus v1alpha1.ManagedSecurityGroupStatus) ([]v1alpha1.ServerSecurityGroupStatus, error) {
+	// collect old server IDs
+	oldServerSelector := make([]string, 0)
+	for _, nodeInfo := range nsgObject.Status.SelectedNodes {
+		oldServerSelector = append(oldServerSelector, nodeInfo.ServerId)
+	}
+
+	newServerSelector := make([]string, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		newServerSelector[i] = nodeInfo.ServerId
+	}
+
+	// attach new security groups in spec
+	needAttachSecgroupIds := make([]string, 0)
+	needAttachSecgroupIds = append(needAttachSecgroupIds, nsgObject.Spec.AttachSecurityGroups...)
+
+	if managedSecgroupStatus.Id != nil && *managedSecgroupStatus.Id != "" {
+		needAttachSecgroupIds = append(needAttachSecgroupIds, *managedSecgroupStatus.Id)
+	}
+
+	// resolve changes
+	removeServerIDs, notChangeServerIDs, addServerIDs := resolveStringArrayChange(ctx,
+		oldServerSelector,
+		newServerSelector,
+	)
+
+	logger := contexts.NewContext(ctx).Log()
+
+	result := make([]v1alpha1.ServerSecurityGroupStatus, 0)
+
+	errorsList := make([]error, 0)
+	// detach security groups from removed servers
+	for _, serverId := range removeServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, []string{})
+		if err != nil && !domain.IsServerNotFound(err) {
+			errorsList = append(errorsList, err)
+		}
+	}
+
+	// update security groups for not changed servers
+	for _, serverId := range notChangeServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
+		if err != nil {
+			errorsList = append(errorsList, err)
+		}
+		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
+		if _err != nil {
+			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
+		}
+		result = append(result, v1alpha1.ServerSecurityGroupStatus{
+			ServerId:                 serverId,
+			AttachedSecurityGroupIds: needAttachSecgroupIds,
+			Error:                    errorToStringPtr(err),
+		})
+	}
+
+	// attach security groups to added servers
+	for _, serverId := range addServerIDs {
+		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, needAttachSecgroupIds)
+		if err != nil {
+			errorsList = append(errorsList, err)
+		}
+		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
+		if _err != nil {
+			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
+		}
+		result = append(result, v1alpha1.ServerSecurityGroupStatus{
+			ServerId:                 serverId,
+			AttachedSecurityGroupIds: needAttachSecgroupIds,
+			Error:                    errorToStringPtr(err),
+		})
+	}
+
+	// try delete managed security group if not in use and not attached to any server
+	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
+		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
+		if err != nil {
+			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
+			return nil, err
+		}
+		if isDeleted {
+			// patch status
+			if err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, "", nil); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if len(errorsList) > 0 {
+		errMessages := make([]string, 0)
+		for _, err := range errorsList {
+			errMessages = append(errMessages, err.Error())
+		}
+		return nil, errors.New("failed to update security groups for some nodes: " + strings.Join(errMessages, ", "))
+	}
+
+	return result, nil
 }
 
 // findSecgroupByName finds a security group by name
@@ -518,8 +533,8 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 	return nil
 }
 
-// toErrorPtr converts an error to a string pointer, returns nil if error is nil
-func toErrorPtr(err error) *string {
+// errorToStringPtr converts an error to a string pointer, returns nil if error is nil
+func errorToStringPtr(err error) *string {
 	if err == nil {
 		return nil
 	}
