@@ -2,11 +2,13 @@ package service_uc
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/pkg/errors"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -140,46 +142,33 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 		return nil
 	}
 
-	// get all LBCs created by this service by using label selector
-	lbcList := &v1alpha1.LoadBalancerConfigList{}
-	err = uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
-		domain.LabelOwnerResourceName: svc.GetName(),
-		domain.LabelOwnerResourceType: svc.Kind,
-	})
-	if err != nil {
-		logger.Errorf("failed to list LBCs by label: %v", err)
-		return err
-	}
+	// delete LoadBalancerConfig and NodeSecurityGroup created by this ingress concurrently
+	errCh := make(chan error, 2)
 
-	// delete all LBCs found
-	for _, lbc := range lbcList.Items {
-		err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
-		if client.IgnoreNotFound(err) != nil {
-			logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
-			return err
+	go func() {
+		errCh <- uc.deleteLoadBalancerConfig(ctx, svc)
+	}()
+
+	go func() {
+		errCh <- uc.deleteNodeSecurityGroup(ctx, svc)
+	}()
+
+	// Collect all errors before returning
+	var errs []error
+	for i := 0; i < 2; i++ {
+		if err := <-errCh; err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	// get all NSGs created by this service by using label selector
-	// and delete them
-	secgroupList := &v1alpha1.NodeSecurityGroupList{}
-	err = uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
-		domain.LabelOwnerResourceName: svc.GetName(),
-		domain.LabelOwnerResourceType: svc.Kind,
-	})
-	if err != nil {
-		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
-		return err
+	// Combine and return all errors if any occurred
+	if len(errs) > 0 {
+		for _, err := range errs {
+			logger.Errorf("failed to delete resources for service %s/%s: %v", svc.GetNamespace(), svc.GetName(), err)
+		}
+		return errors.Join(errs...)
 	}
 
-	// delete all NSGs found
-	for _, secgroup := range secgroupList.Items {
-		err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
-		if client.IgnoreNotFound(err) != nil {
-			logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
-			return err
-		}
-	}
 	return nil
 }
 
@@ -213,4 +202,94 @@ func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	}
 
 	return task.run(ctx)
+}
+
+func (uc *serviceUseCase) deleteLoadBalancerConfig(ctx context.Context, svc *corev1.Service) error {
+	logger := contexts.NewContext(ctx).Log()
+
+	// get all LBCs created by this service by using label selector
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
+		domain.LabelOwnerResourceName: svc.GetName(),
+		domain.LabelOwnerResourceType: svc.Kind,
+	})
+	if err != nil {
+		logger.Errorf("failed to list LBCs by label: %v", err)
+		return err
+	}
+
+	// delete all LBCs found
+	for _, lbc := range lbcList.Items {
+		err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
+		if client.IgnoreNotFound(err) != nil {
+			logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
+			return err
+		}
+
+		// wait until LBC is deleted
+		err = wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, client.ObjectKey{
+				Namespace: lbc.Namespace,
+				Name:      lbc.Name,
+			})
+			if err != nil {
+				if client.IgnoreNotFound(err) != nil {
+					return false, err
+				}
+				return true, nil // NotFound = successfully deleted
+			}
+			return false, nil
+		})
+
+		if err != nil {
+			logger.Errorf("timeout waiting for LoadBalancerConfig %s/%s to be deleted: %v", lbc.Namespace, lbc.Name, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (uc *serviceUseCase) deleteNodeSecurityGroup(ctx context.Context, svc *corev1.Service) error {
+	logger := contexts.NewContext(ctx).Log()
+	// get all NSGs created by this service by using label selector
+	// and delete them
+	secgroupList := &v1alpha1.NodeSecurityGroupList{}
+	err := uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(svc.GetNamespace()), client.MatchingLabels{
+		domain.LabelOwnerResourceName: svc.GetName(),
+		domain.LabelOwnerResourceType: svc.Kind,
+	})
+	if err != nil {
+		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
+		return err
+	}
+
+	// delete all NSGs found
+	for _, secgroup := range secgroupList.Items {
+		err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
+		if client.IgnoreNotFound(err) != nil {
+			logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
+			return err
+		}
+
+		// wait until NSG is deleted
+		err = wait.PollUntilContextTimeout(ctx, 250*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
+			_, err := uc.k8sRepo.GetNodeSecurityGroup(ctx, client.ObjectKey{
+				Namespace: secgroup.Namespace,
+				Name:      secgroup.Name,
+			})
+			if err != nil {
+				if client.IgnoreNotFound(err) != nil {
+					return false, err
+				}
+				return true, nil // NotFound = successfully deleted
+			}
+			return false, nil
+		})
+
+		if err != nil {
+			logger.Errorf("timeout waiting for NodeSecurityGroup %s/%s to be deleted: %v", secgroup.Namespace, secgroup.Name, err)
+			return err
+		}
+	}
+	return nil
 }
