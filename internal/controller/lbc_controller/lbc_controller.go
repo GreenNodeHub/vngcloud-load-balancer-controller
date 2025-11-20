@@ -24,6 +24,7 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -64,6 +65,7 @@ func NewLoadBalancerConfigReconciler(
 		finalizerManager: finalizerManager,
 		lbcUtils:         lbcUtils,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
 	}
@@ -83,6 +85,7 @@ type LoadBalancerConfigReconciler struct {
 
 	maxConcurrentReconciles int
 
+	logger   logr.Logger
 	initDone atomic.Bool
 }
 
@@ -209,7 +212,7 @@ func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr
 	}
 
 	lbcEventHandler := eventhandlers.NewEnqueueRequestForLbcEvent(r.eventRecorder,
-		r.lbcUtils)
+		r.lbcUtils, r.logger.WithName("eventHandlers").WithName("lbc"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Watches(&v1alpha1.LoadBalancerConfig{}, lbcEventHandler).

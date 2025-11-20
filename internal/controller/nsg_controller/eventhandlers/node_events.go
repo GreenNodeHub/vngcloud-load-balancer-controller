@@ -9,16 +9,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 )
 
 // NewEnqueueRequestForNodeEvent constructs new enqueueRequestsForNodeEvent.
 func NewEnqueueRequestForNodeEvent(k8sClient client.Client,
-	nsgUtils nsg.NodeSecurityGroupUtils) *enqueueRequestsForNodeEvent {
+	nsgUtils nsg.NodeSecurityGroupUtils, logger logr.Logger) *enqueueRequestsForNodeEvent {
 	return &enqueueRequestsForNodeEvent{
 		k8sClient: k8sClient,
 		nsgUtils:  nsgUtils,
+		logger:    logger,
 	}
 }
 
@@ -27,17 +29,21 @@ var _ handler.EventHandler = (*enqueueRequestsForNodeEvent)(nil)
 type enqueueRequestsForNodeEvent struct {
 	k8sClient client.Client
 	nsgUtils  nsg.NodeSecurityGroupUtils
+	logger    logr.Logger
 }
 
 func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create Node", "name", e.Object.GetName())
 	h.enqueueAllNsg(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Update Node", "name", e.ObjectNew.GetName())
 	h.enqueueAllNsg(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Delete Node", "name", e.Object.GetName())
 	h.enqueueAllNsg(ctx, queue)
 }
 

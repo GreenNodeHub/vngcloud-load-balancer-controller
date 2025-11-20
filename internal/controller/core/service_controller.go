@@ -65,6 +65,7 @@ func NewServiceReconciler(
 		eventRecorder:    eventRecorder,
 		serviceUtils:     serviceUtils,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
 	}

@@ -35,6 +35,7 @@ type enqueueRequestsForIngressEvent struct {
 }
 
 func (h *enqueueRequestsForIngressEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create Ingress", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedIngress(ctx, queue, e.Object.(*networkingv1.Ingress))
 }
 
@@ -52,6 +53,7 @@ func (h *enqueueRequestsForIngressEvent) Update(ctx context.Context, e event.Upd
 		return
 	}
 
+	h.logger.V(1).Info("Update Ingress", "namespace", newIng.GetNamespace(), "name", newIng.GetName())
 	h.enqueueManagedIngress(ctx, queue, newIng)
 }
 

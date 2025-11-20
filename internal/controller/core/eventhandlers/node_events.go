@@ -34,20 +34,19 @@ type enqueueRequestsForNodeEvent struct {
 
 func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := e.Object.(*corev1.Node)
-	h.logger.Info("node created, enqueuing all LoadBalancer services", "node", node.Name)
+	h.logger.V(1).Info("Create Node", "name", node.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	newNode := e.ObjectNew.(*corev1.Node)
-
-	h.logger.Info("node updated, enqueuing all LoadBalancer services", "node", newNode.Name)
+	h.logger.V(1).Info("Update Node", "name", newNode.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := e.Object.(*corev1.Node)
-	h.logger.Info("node deleted, enqueuing all LoadBalancer services", "node", node.Name)
+	h.logger.V(1).Info("Delete Node", "name", node.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 

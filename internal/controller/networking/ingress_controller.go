@@ -69,6 +69,7 @@ func NewIngressReconciler(
 		ingressUtils:     ingressUtils,
 		referenceIndexer: referenceIndexer,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
 	}

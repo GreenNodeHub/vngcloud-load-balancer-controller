@@ -35,6 +35,7 @@ type enqueueRequestsForServiceEvent struct {
 }
 
 func (h *enqueueRequestsForServiceEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create Service", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedService(ctx, queue, e.Object.(*corev1.Service))
 }
 
@@ -49,6 +50,7 @@ func (h *enqueueRequestsForServiceEvent) Update(ctx context.Context, e event.Upd
 		return
 	}
 
+	h.logger.V(1).Info("Update Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
 	h.enqueueManagedService(ctx, queue, newSvc)
 }
 
