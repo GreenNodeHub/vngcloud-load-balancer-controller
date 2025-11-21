@@ -222,7 +222,7 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
-                - serverId
+                - name
                 x-kubernetes-list-type: map
               serverSecurityGroups:
                 description: ServerSecurityGroups tracks the security group attachment

@@ -131,7 +131,7 @@ type NodeSecurityGroupStatus struct {
 	// SelectedNodes is the list of nodes that match the node selector
 	// +optional
 	// +listType=map
-	// +listMapKey=serverId
+	// +listMapKey=name
 	SelectedNodes []NodeInfo `json:"selectedNodes,omitempty"`
 
 	// ManagedSecurityGroup contains the status of the managed security group
