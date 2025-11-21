@@ -63,6 +63,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	vksvngcloudvn "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s/apis/vks.vngcloud.vn"
@@ -173,10 +174,18 @@ func main() {
 			os.Exit(1)
 		}
 
-		clientManager := controller.GetClientManager()
-		kubeRestConfig, err = clientManager.GetRestConfig(client.ObjectKey{Namespace: conf.Cluster.Namespace, Name: conf.Cluster.ClusterID})
+		// Create a client for the management cluster (current cluster)
+		mgmtClient, err := client.New(kubeRestConfig, client.Options{Scheme: scheme})
 		if err != nil {
-			setupLog.Error(err, "unable to get client")
+			setupLog.Error(err, "unable to create management cluster client")
+			os.Exit(1)
+		}
+
+		// Create cluster API client and get the target cluster's rest config
+		clusterAPIClient := clusterapi.NewClusterClient(mgmtClient)
+		kubeRestConfig, err = clusterAPIClient.GetRestConfig(context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
+		if err != nil {
+			setupLog.Error(err, "unable to get target cluster rest config")
 			os.Exit(1)
 		}
 	}
