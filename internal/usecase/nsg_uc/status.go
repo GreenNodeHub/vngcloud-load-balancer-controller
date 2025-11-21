@@ -12,14 +12,10 @@ func (uc *nsgUseCase) statusSetSelectedNodes(ctx context.Context, nsgObject *v1a
 	})
 }
 
-func (m *nsgUseCase) statusAddStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID string, err error) error {
+func (m *nsgUseCase) statusAddStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID *string, err error) error {
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
 		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-			if secgroupID == "" {
-				obj.Status.ManagedSecurityGroup.Id = nil
-			} else {
-				obj.Status.ManagedSecurityGroup.Id = &secgroupID
-			}
+			obj.Status.ManagedSecurityGroup.Id = secgroupID
 			obj.Status.ManagedSecurityGroup.Error = errorToStringPtr(err)
 		})
 }

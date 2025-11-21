@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
@@ -42,9 +41,7 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		return err
 	}
 
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.CreatedTags = ensuredTags
-	})
+	return t.statusAddCreatedTags(ctx, ensuredTags)
 }
 
 func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTags, newTags map[string]string) (bool, map[string]string) {

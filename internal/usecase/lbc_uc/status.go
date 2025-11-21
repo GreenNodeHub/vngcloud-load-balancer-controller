@@ -65,3 +65,16 @@ func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId
 		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{Id: poolId, Name: name, CreatedMembers: members})
 	})
 }
+
+func (t *defaultModelDeployTask) statusAddLoadBalancerId(ctx context.Context, lbId *string, address *string) error {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		obj.Status.LoadBalancerId = lbId
+		obj.Status.Address = address
+	})
+}
+
+func (t *defaultModelDeployTask) statusAddCreatedTags(ctx context.Context, tags map[string]string) error {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+		obj.Status.CreatedTags = tags
+	})
+}

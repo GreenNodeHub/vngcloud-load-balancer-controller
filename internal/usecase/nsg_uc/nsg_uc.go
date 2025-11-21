@@ -102,7 +102,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 	finalStatus = &v1alpha1.ManagedSecurityGroupStatus{}
 	finalErr = nil
 	defer func() {
-		_err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, *finalStatus.Id, finalErr)
+		_err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, finalStatus.Id, finalErr)
 		if finalErr != nil {
 			finalErr = _err
 			return
@@ -316,12 +316,12 @@ func (uc *nsgUseCase) ensureServerSecurityGroups(ctx context.Context, nsgObject 
 	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
 		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
 		if err != nil {
-			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
+			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nsgObject.Status.ManagedSecurityGroup.Id, err)
 			return nil, err
 		}
 		if isDeleted {
 			// patch status
-			if err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, "", nil); err != nil {
+			if err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nil, nil); err != nil {
 				return nil, err
 			}
 		}

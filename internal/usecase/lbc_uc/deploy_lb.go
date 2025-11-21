@@ -140,9 +140,16 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 		}
 	}
 
+	if err := t.statusAddLoadBalancerId(ctx, &lbEntity.UUID, &lbEntity.Address); err != nil {
+		return "", err
+	}
+
 	// wait for loadbalancer active, if lb is error, delete it and return error
 	if _, err = t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
 		if err == domain.ErrorLoadBalancerStatusError {
+			if err := t.statusAddLoadBalancerId(ctx, nil, nil); err != nil {
+				return "", err
+			}
 			if err := t.vngcloudRepo.DeleteLoadBalancer(ctx, lbEntity.UUID); err != nil {
 				t.logger.Error("Failed to delete loadbalancer: ", err)
 				return "", err
@@ -172,22 +179,10 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 	if lbEntity == nil {
 		var err error
-		lbEntity, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
+		_, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
 		if err != nil {
 			return "", err
 		}
-	}
-
-	// update status
-	if err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		obj.Status.Address = &lbEntity.Address
-	}); err != nil {
-		return "", err
-	}
-
-	if err := t.deployTags(ctx, lbId); err != nil {
-		return "", err
 	}
 
 	var err error
@@ -195,14 +190,20 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
+	// update status
+	if err := t.statusAddLoadBalancerId(ctx, &lbId, &lbEntity.Address); err != nil {
+		return "", err
+	}
+
+	if err := t.deployTags(ctx, lbId); err != nil {
+		return "", err
+	}
+
 	if err := t.deployPackageId(ctx, lbEntity); err != nil {
 		return "", err
 	}
 
-	return lbId, t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		obj.Status.Address = &lbEntity.Address
-	})
+	return lbId, nil
 }
 
 // resize load balancer if packageID in spec is different from current one
