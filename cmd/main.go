@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"flag"
@@ -36,13 +35,9 @@ import (
 	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/anngdinh/operator-helper/version"
 	"github.com/sirupsen/logrus"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -70,6 +65,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	vksvngcloudvn "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s/apis/vks.vngcloud.vn"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
@@ -262,16 +258,10 @@ func main() {
 		setupLog.Error(err, "unable to create CRD client")
 		os.Exit(1)
 	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_vngcloudgloballoadbalancers.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
-		os.Exit(1)
-	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_loadbalancerconfigs.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
-		os.Exit(1)
-	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_nodesecuritygroups.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
+
+	// Install all CRDs at startup
+	if err := vksvngcloudvn.InstallAllCRDs(crdClient, conf.ChartVersion, setupLog); err != nil {
+		setupLog.Error(err, "failed to install crds")
 		os.Exit(1)
 	}
 
@@ -421,39 +411,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func applyCRDFromFile(ctx context.Context, crdFile string, crdClient *apiextensionsclient.Clientset) error {
-	// Load the CRD file
-	fileData, err := os.ReadFile(crdFile)
-	if err != nil {
-		return fmt.Errorf("failed to read CRD file: %v", err)
-	}
-
-	// Wrap fileData in bytes.NewReader to convert []byte to io.Reader
-	reader := bytes.NewReader(fileData)
-
-	// Convert YAML to a CRD object
-	crd := &apiextensionsv1.CustomResourceDefinition{}
-	decoder := yaml.NewYAMLOrJSONDecoder(reader, 1000)
-	if err := decoder.Decode(crd); err != nil {
-		return fmt.Errorf("failed to decode CRD: %v", err)
-	}
-
-	// Check if the CRD already exists
-	_, err = crdClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
-	if err != nil && errors.IsNotFound(err) {
-		// If CRD is not found, create it
-		setupLog.Info("Installing CRD", "crd", crd.Name)
-		_, err = crdClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create CRD: %v", err)
-		}
-		setupLog.Info("CRD installed", "crd", crd.Name)
-	} else if err != nil {
-		return fmt.Errorf("failed to get CRD: %v", err)
-	} else {
-		setupLog.Info("CRD already exists", "crd", crd.Name)
-	}
-	return nil
 }

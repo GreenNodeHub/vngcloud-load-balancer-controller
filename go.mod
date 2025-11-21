@@ -4,6 +4,7 @@ go 1.22.5
 
 require (
 	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c
+	github.com/blang/semver/v4 v4.0.0
 	github.com/cuongpiger/joat v1.0.17
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
@@ -17,6 +18,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vngcloud/vngcloud-go-sdk/v2 v2.16.5-0.20251111065018-4e36e21e53b4
+	golang.org/x/sync v0.10.0
 	k8s.io/api v0.31.3
 	k8s.io/apiextensions-apiserver v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -24,6 +26,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	sigs.k8s.io/controller-runtime v0.19.3
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (
@@ -38,7 +41,6 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
@@ -124,7 +126,6 @@ require (
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.32.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
@@ -148,5 +149,4 @@ require (
 	sigs.k8s.io/cluster-api v1.9.1 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
-	sigs.k8s.io/yaml v1.4.0 // indirect
 )
