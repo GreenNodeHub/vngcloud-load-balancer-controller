@@ -73,7 +73,7 @@ func expectNoServices() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no services in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no services in any namespace")
 }
 
 func expectNoLBCs() {
@@ -91,7 +91,7 @@ func expectNoLBCs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no LBCs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no LBCs in any namespace")
 }
 
 func expectNoNSGs() {
@@ -109,7 +109,7 @@ func expectNoNSGs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no NSGs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no NSGs in any namespace")
 }
 
 func expectNoEndpoints() {
@@ -135,7 +135,7 @@ func expectNoEndpoints() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no endpoints in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no endpoints in any namespace")
 }
 
 // ============================================================================

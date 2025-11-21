@@ -54,7 +54,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating a LoadBalancer service", func() {
 		It("should create LBC, LoadBalancer and SecurityGroup", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -158,7 +157,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When updating service type from LoadBalancer to ClusterIP and revert", func() {
 		It("should cleanup resources when changing to ClusterIP and recreate when reverting", func() {
-			// Skip("Skip test")
 			serviceName := "test-type-change-service"
 			namespace := "default"
 
@@ -249,7 +247,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating a DNS LoadBalancer service with TCP and UDP on same port", func() {
 		It("should fail with error due to duplicate port (VNGCloud limitation)", func() {
-			// Skip("Skip test")
 			serviceName := "test-dns-service"
 			namespace := "default"
 
@@ -298,7 +295,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with all normal annotations", func() {
 		It("should create LoadBalancer with correct attributes from annotations", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -405,7 +401,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with target node label", func() {
 		It("should only add pool members from nodes matching the label", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -488,7 +483,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with PROXY protocol annotation", func() {
 		It("should use PROXY protocol for pool even though service port is TCP", func() {
-			// Skip("Skip test")
 			serviceName := "test-service-1"
 			namespace := "default"
 
@@ -535,7 +529,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When updating service port", func() {
 		It("should delete old listener and pool, and create new ones with updated port", func() {
-			// Skip("Skip test")
 			serviceName := "test-service-1"
 			namespace := "default"
 
@@ -658,7 +651,6 @@ var _ = Describe("Service Controller", func() {
 	Context("When managing security groups and tags with Cilium Native CNI", func() {
 
 		It("should manage security groups and tags with updates", func() {
-			// Skip("Skip test")
 
 			// Configure CNI detector for Cilium Native
 			cniDetector.ExpectedCalls = nil
@@ -884,7 +876,6 @@ var _ = Describe("Service Controller", func() {
 	Context("When managing security groups and tags with Calico Overlay CNI", func() {
 
 		It("should manage security groups and tags with updates", func() {
-			// Skip("Skip test")
 
 			// Configure CNI detector for Calico
 			cniDetector.ExpectedCalls = nil
@@ -1108,7 +1099,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When create 3 services using same LB", func() {
 		It("should work well, delete should delete all", func() {
-			// Skip("Skip test")
 			serviceName1 := "test-service-port-80"
 			serviceName2 := "test-service-port-81"
 			serviceName3 := "test-service-port-82"
