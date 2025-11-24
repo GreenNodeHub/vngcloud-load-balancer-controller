@@ -54,9 +54,10 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 			finalErr = err
 			return
 		}
-	} else {
-		finalStatus.Id = &defaultSecgroup.Id
 	}
+
+	// add secgroup id to status
+	finalStatus.Id = &defaultSecgroup.Id
 
 	// update secgroup rules if needed
 
