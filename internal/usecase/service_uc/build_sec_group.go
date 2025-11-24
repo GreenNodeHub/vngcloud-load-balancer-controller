@@ -163,8 +163,8 @@ func (t *defaultModelBuildTask) ensureSecgroupPING_UDP(
 		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
 			newRules = append(newRules, v1alpha1.NodeSecurityGroupRule{
 				Protocol:    networkv2.SecgroupRuleProtocolICMP,
-				FromPort:    rule.FromPort,
-				ToPort:      rule.ToPort,
+				FromPort:    1,   // ICMP layer 3, no port, only type and code
+				ToPort:      255, // ICMP layer 3, no port, only type and code
 				CIDR:        rule.CIDR,
 				Description: "Allow ICMP for health check UDP port",
 				Direction:   rule.Direction,
