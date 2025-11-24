@@ -64,6 +64,10 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		if err != nil {
 			return nil, err
 		}
+	} else {
+		if err := t.statusAddListener(ctx, currentListener.UUID, currentListener.ProtocolPort); err != nil {
+			return nil, err
+		}
 	}
 
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
@@ -81,9 +85,6 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		err := t.vngcloudRepo.UpdateListener(ctx, lbId, currentListener.UUID, updateOptions)
 		if err != nil {
 			t.logger.Error("Failed to update listener: ", err)
-			return nil, err
-		}
-		if err := t.statusAddListener(ctx, currentListener.UUID, currentListener.ProtocolPort); err != nil {
 			return nil, err
 		}
 

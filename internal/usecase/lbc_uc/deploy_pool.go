@@ -64,6 +64,13 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			Name:           pool.Name,
 			CreatedMembers: pool.Members,
 		}, nil
+	} else {
+		if err := t.statusAddPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
+			return nil, err
+		}
+		if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
+			return nil, err
+		}
 	}
 
 	// get health monitor info
@@ -82,9 +89,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			t.logger.Error("Failed to update pool: ", err)
 			return nil, err
 		}
-		if err := t.statusAddPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
-			return nil, err
-		}
+
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
 			return nil, err
