@@ -10,6 +10,7 @@ import (
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -292,7 +293,7 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		if listenerSpec.Protocol == loadbalancerv2.ListenerProtocolHTTPS {
 
 			// client certificate
-			if !comparePointer(currentListener.ClientCertificateAuthentication, listenerSpec.ClientCertificateId) {
+			if !ptr.Equal(currentListener.ClientCertificateAuthentication, listenerSpec.ClientCertificateId) {
 				message = append(message, fmt.Sprintf("client certificate (%v -> %v)",
 					pointerToString(currentListener.ClientCertificateAuthentication), pointerToString(listenerSpec.ClientCertificateId)))
 				updateOptions.ClientCertificate = listenerSpec.ClientCertificateId
@@ -402,16 +403,6 @@ func (t *defaultModelDeployTask) findListenerCertificateId(ctx context.Context, 
 		return "", errors.Errorf("certificate with name %s not found in vngcloud", *cert.Name)
 	}
 	return "", errors.New("listener certificate must have id, secretName or name")
-}
-
-func comparePointer[T comparable](current, new *T) bool {
-	if current == nil && new == nil {
-		return true
-	}
-	if current == nil || new == nil {
-		return false
-	}
-	return *current == *new
 }
 
 func pointerToString[T any](p *T) string {
