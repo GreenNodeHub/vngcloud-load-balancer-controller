@@ -25,8 +25,9 @@ const (
 
 // Labels
 const (
-	LabelOwnerResourceType = "vks.vngcloud.vn/owner-resource-type"
+	LabelOwnerResourceKind = "vks.vngcloud.vn/owner-resource-kind"
 	LabelOwnerResourceName = "vks.vngcloud.vn/owner-resource-name"
+	LabelOwnerResourceUid  = "vks.vngcloud.vn/owner-resource-uid"
 
 	// LabelNodeExcludeLB specifies that a node should not be used to create a Loadbalancer on
 	// https://github.com/kubernetes/cloud-provider/blob/25867882d509131a6fdeaf812ceebfd0f19015dd/controllers/service/controller.go#L673

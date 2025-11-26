@@ -229,7 +229,8 @@ func (uc *ingressUseCase) deleteLoadBalancerConfig(ctx context.Context, ing *net
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
 		domain.LabelOwnerResourceName: ing.GetName(),
-		domain.LabelOwnerResourceType: ing.Kind,
+		domain.LabelOwnerResourceKind: ing.Kind,
+		domain.LabelOwnerResourceUid:  string(ing.UID),
 	})
 	if err != nil {
 		logger.Errorf("failed to list LBCs by label: %v", err)
@@ -270,7 +271,8 @@ func (uc *ingressUseCase) deleteNodeSecurityGroup(ctx context.Context, ing *netw
 	secgroupList := &v1alpha1.NodeSecurityGroupList{}
 	err := uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
 		domain.LabelOwnerResourceName: ing.GetName(),
-		domain.LabelOwnerResourceType: ing.Kind,
+		domain.LabelOwnerResourceKind: ing.Kind,
+		domain.LabelOwnerResourceUid:  string(ing.UID),
 	})
 	if err != nil {
 		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)

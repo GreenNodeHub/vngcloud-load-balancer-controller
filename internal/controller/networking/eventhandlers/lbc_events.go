@@ -73,7 +73,7 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedIngresses(ctx context.Contex
 	if objLabel == nil {
 		return
 	}
-	kind := lbcObj.Labels[domain.LabelOwnerResourceType]
+	kind := lbcObj.Labels[domain.LabelOwnerResourceKind]
 	if kind != "Ingress" {
 		return
 	}
@@ -88,6 +88,10 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedIngresses(ctx context.Contex
 			return
 		}
 		h.logger.Error(err, "failed to fetch ingress")
+		return
+	}
+
+	if lbcObj.Labels[domain.LabelOwnerResourceUid] != string(ing.UID) {
 		return
 	}
 

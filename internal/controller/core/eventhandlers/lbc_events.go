@@ -73,7 +73,7 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedServicees(ctx context.Contex
 	if objLabel == nil {
 		return
 	}
-	kind := lbcObj.Labels[domain.LabelOwnerResourceType]
+	kind := lbcObj.Labels[domain.LabelOwnerResourceKind]
 	if kind != "Service" {
 		return
 	}
@@ -88,6 +88,10 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedServicees(ctx context.Contex
 			return
 		}
 		h.logger.Error(err, "failed to fetch service")
+		return
+	}
+
+	if lbcObj.Labels[domain.LabelOwnerResourceUid] != string(svc.UID) {
 		return
 	}
 

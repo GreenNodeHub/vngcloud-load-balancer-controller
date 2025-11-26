@@ -164,7 +164,7 @@ func listLbcByIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList,
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: name,
-		domain.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceKind: "Ingress",
 	})
 	return lbcList, err
 }
@@ -173,7 +173,7 @@ func listNsgByIngress(name, namespace string) (*v1alpha1.NodeSecurityGroupList, 
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: name,
-		domain.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceKind: "Ingress",
 	})
 	return nsgList, err
 }

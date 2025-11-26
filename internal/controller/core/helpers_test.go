@@ -203,7 +203,7 @@ func getLBCListForService(serviceName, namespace string) (*v1alpha1.LoadBalancer
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: serviceName,
-		domain.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceKind: "Service",
 	})
 	return lbcList, err
 }
@@ -223,7 +223,7 @@ func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurity
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: serviceName,
-		domain.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceKind: "Service",
 	})
 	return nsgList, err
 }

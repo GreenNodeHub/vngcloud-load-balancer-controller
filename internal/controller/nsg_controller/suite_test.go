@@ -51,13 +51,13 @@ import (
 )
 
 var (
-	ctx              context.Context
-	cancel           context.CancelFunc
-	testEnv          *envtest.Environment
-	cfg              *rest.Config
-	k8sClient        client.Client
+	ctx               context.Context
+	cancel            context.CancelFunc
+	testEnv           *envtest.Environment
+	cfg               *rest.Config
+	k8sClient         client.Client
 	mockNSGReconciler *NodeSecurityGroupReconciler
-	vngcloudRepo     *vngcloud_mocks.MockProvider
+	vngcloudRepo      *vngcloud_mocks.MockProvider
 
 	mockConfig = &config.Config{
 		Cluster: struct {
