@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/google/go-cmp/cmp"
@@ -73,7 +74,25 @@ func (r *k8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.Names
 func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("Creating LBC %s/%s", lbc.Namespace, lbc.Name)
-	return r.client.Create(ctx, lbc, opts...)
+
+	err := r.client.Create(ctx, lbc, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: lbc.GetNamespace(), Name: lbc.GetName()}, lbc)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
 }
 
 func (r *k8sRepository) DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error {
@@ -205,7 +224,25 @@ func (r *k8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha
 func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("Creating NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
-	return r.client.Create(ctx, nsg, opts...)
+
+	err := r.client.Create(ctx, nsg, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: nsg.GetNamespace(), Name: nsg.GetName()}, nsg)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
 }
 
 func (r *k8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {
