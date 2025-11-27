@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
-	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -68,9 +66,6 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			// CreatedPoolMembers: pool.Members,
 		}, nil
 	}
-
-	// get health monitor info
-	healthMonitor := currentPool.Health
 
 	// ensure exist pool
 	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, pool, currentPool)
@@ -140,210 +135,180 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 }
 
 // create CreatePoolRequest depend on default config and pool value
-func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId string, pool *v1alpha1.GlobalPool) global.ICreateGlobalPoolRequest {
-	convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-	for _, member := range pool.Members {
-		convertMembers = append(convertMembers,
-			loadbalancerv2.NewMember(
-				member.Name,
-				member.IP,
-				member.Port,
-				member.MonitorPort,
-			))
-	}
-	healthMonitor := loadbalancerv2.HealthMonitor{
-		HealthCheckProtocol: pool.HealthMonitor.Protocol,
-		HealthyThreshold:    t.cfg.GlobalLoadBalancerOpts.DefaultHealthyThreshold,
-		UnhealthyThreshold:  t.cfg.GlobalLoadBalancerOpts.DefaultUnhealthyThreshold,
-		Interval:            t.cfg.GlobalLoadBalancerOpts.DefaultInterval,
-		Timeout:             t.cfg.GlobalLoadBalancerOpts.DefaultTimeout,
+func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId string, poolSpec *v1alpha1.GlobalPool) global.ICreateGlobalPoolRequest {
+	globalPoolMembersRequest := make([]global.ICreateGlobalPoolMemberRequest, len(poolSpec.Members))
+	for _, poolMemberSpec := range poolSpec.Members {
 
-		HealthCheckMethod: pool.HealthMonitor.HealthCheckMethod,
-		HealthCheckPath:   pool.HealthMonitor.HealthCheckPath,
-		SuccessCode:       pool.HealthMonitor.SuccessCode,
-		HttpVersion:       pool.HealthMonitor.HttpVersion,
-		DomainName:        pool.HealthMonitor.DomainName,
-	}
-	if pool.HealthMonitor.HealthyThreshold != nil {
-		healthMonitor.HealthyThreshold = *pool.HealthMonitor.HealthyThreshold
-	}
-	if pool.HealthMonitor.UnhealthyThreshold != nil {
-		healthMonitor.UnhealthyThreshold = *pool.HealthMonitor.UnhealthyThreshold
-	}
-	if pool.HealthMonitor.Interval != nil {
-		healthMonitor.Interval = *pool.HealthMonitor.Interval
-	}
-	if pool.HealthMonitor.Timeout != nil {
-		healthMonitor.Timeout = *pool.HealthMonitor.Timeout
-	}
+		globalMembersRequest := make([]global.IGlobalMemberRequest, len(poolMemberSpec.Members))
+		for _, memberSpec := range poolMemberSpec.Members {
+			memberRequest := global.NewGlobalMemberRequest(
+				memberSpec.Name,
+				memberSpec.Address,
+				memberSpec.SubnetID,
+				memberSpec.Port,
+				*memberSpec.MonitorPort,
+				*memberSpec.Weight,
+				memberSpec.BackupRole,
+			)
 
-	r := &loadbalancerv2.CreatePoolRequest{
-		LoadBalancerCommon: common.LoadBalancerCommon{LoadBalancerId: lbId},
-		Algorithm:          loadbalancerv2.PoolAlgorithm(t.cfg.GlobalLoadBalancerOpts.DefaultPoolAlgorithm),
-		PoolName:           pool.Name,
-		PoolProtocol:       pool.Protocol,
-		Stickiness:         nil,
-		TLSEncryption:      nil,
-		HealthMonitor:      &healthMonitor,
-		Members:            convertMembers,
-	}
-	if pool.Algorithm != nil && *pool.Algorithm != "" {
-		r.Algorithm = *pool.Algorithm
-	}
-
-	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
-		// Stickiness must be specified for L7 pools
-		r.Stickiness = ptr.To(false)
-		r.TLSEncryption = ptr.To(false)
-
-		if pool.Stickiness != nil {
-			r.Stickiness = pool.Stickiness
+			globalMembersRequest = append(globalMembersRequest, memberRequest)
 		}
-		if pool.TLSEncryption != nil {
-			r.TLSEncryption = pool.TLSEncryption
-		}
+
+		poolMemberRequest := global.NewGlobalPoolMemberRequest(
+			poolMemberSpec.Name,
+			poolMemberSpec.Region,
+			poolMemberSpec.VpcId,
+			*poolMemberSpec.TrafficDial,
+			poolMemberSpec.Type,
+		)
+		poolMemberRequest.WithMembers(globalMembersRequest...)
+		globalPoolMembersRequest = append(globalPoolMembersRequest, poolMemberRequest)
+	}
+
+	healthMonitor := global.NewGlobalHealthMonitor(poolSpec.HealthMonitor.Protocol).
+		WithHealthyThreshold(t.cfg.GlobalLoadBalancerOpts.DefaultHealthyThreshold).
+		WithInterval(t.cfg.GlobalLoadBalancerOpts.DefaultInterval).
+		WithTimeout(t.cfg.GlobalLoadBalancerOpts.DefaultTimeout).
+		WithUnhealthyThreshold(t.cfg.GlobalLoadBalancerOpts.DefaultUnhealthyThreshold).
+		// WithProtocol(pprotocol GlobalPoolHealthCheckProtocol).
+		WithHealthCheckMethod(poolSpec.HealthMonitor.HealthCheckMethod).
+		WithHttpVersion(poolSpec.HealthMonitor.HttpVersion).
+		WithPath(poolSpec.HealthMonitor.HealthCheckPath).
+		WithSuccessCode(poolSpec.HealthMonitor.SuccessCode).
+		WithDomainName(poolSpec.HealthMonitor.DomainName)
+
+	if poolSpec.HealthMonitor.HealthyThreshold != nil {
+		healthMonitor.WithHealthyThreshold(*poolSpec.HealthMonitor.HealthyThreshold)
+	}
+	if poolSpec.HealthMonitor.UnhealthyThreshold != nil {
+		healthMonitor.WithUnhealthyThreshold(*poolSpec.HealthMonitor.UnhealthyThreshold)
+	}
+	if poolSpec.HealthMonitor.Interval != nil {
+		healthMonitor.WithInterval(*poolSpec.HealthMonitor.Interval)
+	}
+	if poolSpec.HealthMonitor.Timeout != nil {
+		healthMonitor.WithTimeout(*poolSpec.HealthMonitor.Timeout)
+	}
+
+	r := global.NewCreateGlobalPoolRequest(poolSpec.Name, poolSpec.Protocol).
+		WithAlgorithm(global.GlobalPoolAlgorithm(t.cfg.GlobalLoadBalancerOpts.DefaultPoolAlgorithm)).
+		// WithDescription().
+		// WithName(pname string).
+		// WithProtocol(pprotocol GlobalPoolProtocol).
+		WithHealthMonitor(healthMonitor).
+		WithMembers(globalPoolMembersRequest...).
+		WithLoadBalancerId(lbId)
+
+	if poolSpec.Algorithm != nil && *poolSpec.Algorithm != "" {
+		r.WithAlgorithm(*poolSpec.Algorithm)
 	}
 	return r
 }
 
 // return UpdateRequest and messages
-func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, pool *v1alpha1.GlobalPool, current *entityv2.GlobalPool) (*global.UpdateGlobalPoolRequest, []string) {
+func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, poolSpec *v1alpha1.GlobalPool, currentPool *entityv2.GlobalPool) (global.IUpdateGlobalPoolRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
 
-	healthMonitor := &loadbalancerv2.HealthMonitor{
-		HealthyThreshold:    current.HealthMonitor.HealthyThreshold,
-		UnhealthyThreshold:  current.HealthMonitor.UnhealthyThreshold,
-		Interval:            current.HealthMonitor.Interval,
-		Timeout:             current.HealthMonitor.Timeout,
-		HealthCheckProtocol: loadbalancerv2.HealthCheckProtocol(current.HealthMonitor.HealthCheckProtocol),
-		HealthCheckPath:     current.HealthMonitor.HealthCheckPath,
-		DomainName:          current.HealthMonitor.DomainName,
-		SuccessCode:         current.HealthMonitor.SuccessCode,
-		HealthCheckMethod: func() *loadbalancerv2.HealthCheckMethod {
-			if current.HealthMonitor != nil && current.HealthMonitor.HealthCheckMethod != nil {
-				return ptr.To(loadbalancerv2.HealthCheckMethod(*current.HealthMonitor.HealthCheckMethod))
-			}
-			return nil
-		}(),
-		HttpVersion: func() *loadbalancerv2.HealthCheckHttpVersion {
-			if current.HealthMonitor != nil && current.HealthMonitor.HttpVersion != nil {
-				return ptr.To(loadbalancerv2.HealthCheckHttpVersion(*current.HealthMonitor.HttpVersion))
-			}
-			return nil
-		}(),
-	}
-	updateOptions := &loadbalancerv2.UpdatePoolRequest{
-		PoolCommon: common.PoolCommon{
-			PoolId: current.UUID,
-		},
-		LoadBalancerCommon: common.LoadBalancerCommon{
-			LoadBalancerId: lbID,
-		},
-		Algorithm:     loadbalancerv2.PoolAlgorithm(current.LoadBalanceMethod),
-		Stickiness:    nil,
-		TLSEncryption: nil,
-		HealthMonitor: healthMonitor,
-	}
-	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
-		updateOptions.Stickiness = &current.Stickiness
-		updateOptions.TLSEncryption = &current.TLSEncryption
+	healthMonitor := global.NewGlobalHealthMonitor(global.GlobalPoolHealthCheckProtocol(currentPool.Health.Protocol)).
+		WithHealthyThreshold(currentPool.Health.HealthyThreshold).
+		WithInterval(currentPool.Health.IntervalTime).
+		WithTimeout(currentPool.Health.Timeout).
+		WithUnhealthyThreshold(currentPool.Health.UnhealthyThreshold).
+		// WithProtocol(pprotocol GlobalPoolHealthCheckProtocol).
+		WithHealthCheckMethod((*global.GlobalPoolHealthCheckMethod)(currentPool.Health.HTTPMethod)).
+		WithHttpVersion((*global.GlobalPoolHealthCheckHttpVersion)(currentPool.Health.HTTPVersion)).
+		WithPath(currentPool.Health.Path).
+		WithSuccessCode(currentPool.Health.SuccessCode).
+		WithDomainName(currentPool.Health.DomainName)
 
-		if pool.Stickiness != nil && *pool.Stickiness != current.Stickiness {
-			message = append(message, fmt.Sprintf("stickiness (%t -> %t)", current.Stickiness, *pool.Stickiness))
-			updateOptions.Stickiness = ptr.To(*pool.Stickiness)
-			isNeedUpdate = true
-		}
-		if pool.TLSEncryption != nil && *pool.TLSEncryption != current.TLSEncryption {
-			message = append(message, fmt.Sprintf("tls encryption (%t -> %t)", current.TLSEncryption, *pool.TLSEncryption))
-			updateOptions.TLSEncryption = ptr.To(*pool.TLSEncryption)
-			isNeedUpdate = true
-		}
-	}
-	if pool.Algorithm != nil && *pool.Algorithm != "" && *pool.Algorithm != loadbalancerv2.PoolAlgorithm(current.LoadBalanceMethod) {
-		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", current.LoadBalanceMethod, *pool.Algorithm))
-		updateOptions.WithAlgorithm(*pool.Algorithm)
+	if poolSpec.HealthMonitor.HealthyThreshold != nil && *poolSpec.HealthMonitor.HealthyThreshold != currentPool.Health.HealthyThreshold {
+		message = append(message, fmt.Sprintf("healthy threshold (%d -> %d)", currentPool.Health.HealthyThreshold, *poolSpec.HealthMonitor.HealthyThreshold))
+		healthMonitor.WithHealthyThreshold(*poolSpec.HealthMonitor.HealthyThreshold)
 		isNeedUpdate = true
 	}
-
-	if pool.HealthMonitor.HealthyThreshold != nil && *pool.HealthMonitor.HealthyThreshold != current.HealthMonitor.HealthyThreshold {
-		message = append(message, fmt.Sprintf("healthy threshold (%d -> %d)", current.HealthMonitor.HealthyThreshold, *pool.HealthMonitor.HealthyThreshold))
-		updateOptions.HealthMonitor.WithHealthyThreshold(*pool.HealthMonitor.HealthyThreshold)
+	if poolSpec.HealthMonitor.UnhealthyThreshold != nil && *poolSpec.HealthMonitor.UnhealthyThreshold != currentPool.Health.UnhealthyThreshold {
+		message = append(message, fmt.Sprintf("unhealthy threshold (%d -> %d)", currentPool.Health.UnhealthyThreshold, *poolSpec.HealthMonitor.UnhealthyThreshold))
+		healthMonitor.WithUnhealthyThreshold(*poolSpec.HealthMonitor.UnhealthyThreshold)
 		isNeedUpdate = true
 	}
-	if pool.HealthMonitor.UnhealthyThreshold != nil && *pool.HealthMonitor.UnhealthyThreshold != current.HealthMonitor.UnhealthyThreshold {
-		message = append(message, fmt.Sprintf("unhealthy threshold (%d -> %d)", current.HealthMonitor.UnhealthyThreshold, *pool.HealthMonitor.UnhealthyThreshold))
-		updateOptions.HealthMonitor.WithUnhealthyThreshold(*pool.HealthMonitor.UnhealthyThreshold)
+	if poolSpec.HealthMonitor.Interval != nil && *poolSpec.HealthMonitor.Interval != currentPool.Health.IntervalTime {
+		message = append(message, fmt.Sprintf("interval (%d -> %d)", currentPool.Health.IntervalTime, *poolSpec.HealthMonitor.Interval))
+		healthMonitor.WithInterval(*poolSpec.HealthMonitor.Interval)
 		isNeedUpdate = true
 	}
-	if pool.HealthMonitor.Interval != nil && *pool.HealthMonitor.Interval != current.HealthMonitor.Interval {
-		message = append(message, fmt.Sprintf("interval (%d -> %d)", current.HealthMonitor.Interval, *pool.HealthMonitor.Interval))
-		updateOptions.HealthMonitor.WithInterval(*pool.HealthMonitor.Interval)
-		isNeedUpdate = true
-	}
-	if pool.HealthMonitor.Timeout != nil && *pool.HealthMonitor.Timeout != current.HealthMonitor.Timeout {
-		message = append(message, fmt.Sprintf("timeout (%d -> %d)", current.HealthMonitor.Timeout, *pool.HealthMonitor.Timeout))
-		updateOptions.HealthMonitor.WithTimeout(*pool.HealthMonitor.Timeout)
+	if poolSpec.HealthMonitor.Timeout != nil && *poolSpec.HealthMonitor.Timeout != currentPool.Health.Timeout {
+		message = append(message, fmt.Sprintf("timeout (%d -> %d)", currentPool.Health.Timeout, *poolSpec.HealthMonitor.Timeout))
+		healthMonitor.WithTimeout(*poolSpec.HealthMonitor.Timeout)
 		isNeedUpdate = true
 	}
 
 	// compare HTTP health check options
-	if string(pool.HealthMonitor.Protocol) != current.HealthMonitor.HealthCheckProtocol {
-		message = append(message, fmt.Sprintf("health check protocol (%s -> %s)", current.HealthMonitor.HealthCheckProtocol, pool.HealthMonitor.Protocol))
-		updateOptions.HealthMonitor.WithHealthCheckProtocol(pool.HealthMonitor.Protocol)
+	if string(poolSpec.HealthMonitor.Protocol) != currentPool.Health.Protocol {
+		message = append(message, fmt.Sprintf("health check protocol (%s -> %s)", currentPool.Health.Protocol, poolSpec.HealthMonitor.Protocol))
+		healthMonitor.WithProtocol(poolSpec.HealthMonitor.Protocol)
 		isNeedUpdate = true
 	}
 	// switch from (HTTP, HTTPS) --> (HTTP, HTTPS)
-	if (current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTP) || current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTPs)) &&
-		(pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTP || pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTPs) {
+	if (currentPool.Health.Protocol == string(global.GlobalPoolHealthCheckProtocolHTTP) || currentPool.Health.Protocol == string(global.GlobalPoolHealthCheckProtocolHTTPs)) &&
+		(poolSpec.HealthMonitor.Protocol == global.GlobalPoolHealthCheckProtocolHTTP || poolSpec.HealthMonitor.Protocol == global.GlobalPoolHealthCheckProtocolHTTPs) {
 
-		if pool.HealthMonitor.HealthCheckMethod != nil && (current.HealthMonitor.HealthCheckMethod == nil || string(*pool.HealthMonitor.HealthCheckMethod) != *current.HealthMonitor.HealthCheckMethod) {
-			message = append(message, fmt.Sprintf("health check method (%v -> %v)", current.HealthMonitor.HealthCheckMethod, *pool.HealthMonitor.HealthCheckMethod))
-			updateOptions.HealthMonitor.WithHealthCheckMethod(pool.HealthMonitor.HealthCheckMethod)
+		if poolSpec.HealthMonitor.HealthCheckMethod != nil && (currentPool.Health.HTTPMethod == nil || string(*poolSpec.HealthMonitor.HealthCheckMethod) != *currentPool.Health.HTTPMethod) {
+			message = append(message, fmt.Sprintf("health check method (%v -> %v)", currentPool.Health.HTTPMethod, *poolSpec.HealthMonitor.HealthCheckMethod))
+			healthMonitor.WithHealthCheckMethod(poolSpec.HealthMonitor.HealthCheckMethod)
 			isNeedUpdate = true
 		}
-		if pool.HealthMonitor.HealthCheckPath != nil && (current.HealthMonitor.HealthCheckPath == nil || *pool.HealthMonitor.HealthCheckPath != *current.HealthMonitor.HealthCheckPath) {
-			message = append(message, fmt.Sprintf("health check path (%v -> %v)", current.HealthMonitor.HealthCheckPath, *pool.HealthMonitor.HealthCheckPath))
-			updateOptions.HealthMonitor.WithHealthCheckPath(pool.HealthMonitor.HealthCheckPath)
+		if poolSpec.HealthMonitor.HealthCheckPath != nil && (currentPool.Health.Path == nil || *poolSpec.HealthMonitor.HealthCheckPath != *currentPool.Health.Path) {
+			message = append(message, fmt.Sprintf("health check path (%v -> %v)", currentPool.Health.Path, *poolSpec.HealthMonitor.HealthCheckPath))
+			healthMonitor.WithPath(poolSpec.HealthMonitor.HealthCheckPath)
 			isNeedUpdate = true
 		}
-		if pool.HealthMonitor.SuccessCode != nil && (current.HealthMonitor.SuccessCode == nil || *pool.HealthMonitor.SuccessCode != *current.HealthMonitor.SuccessCode) {
-			message = append(message, fmt.Sprintf("success code (%v -> %v)", current.HealthMonitor.SuccessCode, *pool.HealthMonitor.SuccessCode))
-			updateOptions.HealthMonitor.WithSuccessCode(pool.HealthMonitor.SuccessCode)
+		if poolSpec.HealthMonitor.SuccessCode != nil && (currentPool.Health.SuccessCode == nil || *poolSpec.HealthMonitor.SuccessCode != *currentPool.Health.SuccessCode) {
+			message = append(message, fmt.Sprintf("success code (%v -> %v)", currentPool.Health.SuccessCode, *poolSpec.HealthMonitor.SuccessCode))
+			healthMonitor.WithSuccessCode(poolSpec.HealthMonitor.SuccessCode)
 			isNeedUpdate = true
 		}
-		if pool.HealthMonitor.HttpVersion != nil && (current.HealthMonitor.HttpVersion == nil || string(*pool.HealthMonitor.HttpVersion) != *current.HealthMonitor.HttpVersion) {
-			message = append(message, fmt.Sprintf("http version (%v -> %v)", current.HealthMonitor.HttpVersion, *pool.HealthMonitor.HttpVersion))
-			updateOptions.HealthMonitor.WithHttpVersion(pool.HealthMonitor.HttpVersion)
+		if poolSpec.HealthMonitor.HttpVersion != nil && (currentPool.Health.HTTPVersion == nil || string(*poolSpec.HealthMonitor.HttpVersion) != *currentPool.Health.HTTPVersion) {
+			message = append(message, fmt.Sprintf("http version (%v -> %v)", currentPool.Health.HTTPVersion, *poolSpec.HealthMonitor.HttpVersion))
+			healthMonitor.WithHttpVersion(poolSpec.HealthMonitor.HttpVersion)
 			isNeedUpdate = true
 		}
-		if pool.HealthMonitor.DomainName != nil && (current.HealthMonitor.DomainName == nil || *pool.HealthMonitor.DomainName != *current.HealthMonitor.DomainName) {
-			message = append(message, fmt.Sprintf("domain name (%v -> %v)", current.HealthMonitor.DomainName, *pool.HealthMonitor.DomainName))
-			updateOptions.HealthMonitor.WithDomainName(pool.HealthMonitor.DomainName)
+		if poolSpec.HealthMonitor.DomainName != nil && (currentPool.Health.DomainName == nil || *poolSpec.HealthMonitor.DomainName != *currentPool.Health.DomainName) {
+			message = append(message, fmt.Sprintf("domain name (%v -> %v)", currentPool.Health.DomainName, *poolSpec.HealthMonitor.DomainName))
+			healthMonitor.WithDomainName(poolSpec.HealthMonitor.DomainName)
 			isNeedUpdate = true
 		}
 	} else // switch from (HTTP, HTTPS) --> (TCP)
-	if (current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTP) || current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolHTTPs)) &&
-		pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolTCP {
+	if (currentPool.Health.Protocol == string(global.GlobalPoolHealthCheckProtocolHTTP) || currentPool.Health.Protocol == string(global.GlobalPoolHealthCheckProtocolHTTPs)) &&
+		poolSpec.HealthMonitor.Protocol == global.GlobalPoolHealthCheckProtocolTCP {
 
-		updateOptions.HealthMonitor.WithHealthCheckMethod(nil)
-		updateOptions.HealthMonitor.WithHealthCheckPath(nil)
-		updateOptions.HealthMonitor.WithSuccessCode(nil)
-		updateOptions.HealthMonitor.WithHttpVersion(nil)
-		updateOptions.HealthMonitor.WithDomainName(nil)
+		healthMonitor.WithHealthCheckMethod(nil)
+		healthMonitor.WithPath(nil)
+		healthMonitor.WithSuccessCode(nil)
+		healthMonitor.WithHttpVersion(nil)
+		healthMonitor.WithDomainName(nil)
 		message = append(message, "health check options (http -> tcp)")
 		isNeedUpdate = true
 
 	} else // switch from (TCP) --> (HTTP, HTTPS)
-	if current.HealthMonitor.HealthCheckProtocol == string(loadbalancerv2.HealthCheckProtocolTCP) &&
-		(pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTP || pool.HealthMonitor.Protocol == loadbalancerv2.HealthCheckProtocolHTTPs) {
+	if currentPool.Health.Protocol == string(global.GlobalPoolHealthCheckProtocolTCP) &&
+		(poolSpec.HealthMonitor.Protocol == global.GlobalPoolHealthCheckProtocolHTTP || poolSpec.HealthMonitor.Protocol == global.GlobalPoolHealthCheckProtocolHTTPs) {
 
-		updateOptions.HealthMonitor.WithHealthCheckMethod(pool.HealthMonitor.HealthCheckMethod)
-		updateOptions.HealthMonitor.WithHealthCheckPath(pool.HealthMonitor.HealthCheckPath)
-		updateOptions.HealthMonitor.WithSuccessCode(pool.HealthMonitor.SuccessCode)
-		updateOptions.HealthMonitor.WithHttpVersion(pool.HealthMonitor.HttpVersion)
-		updateOptions.HealthMonitor.WithDomainName(pool.HealthMonitor.DomainName)
+		healthMonitor.WithHealthCheckMethod(poolSpec.HealthMonitor.HealthCheckMethod)
+		healthMonitor.WithPath(poolSpec.HealthMonitor.HealthCheckPath)
+		healthMonitor.WithSuccessCode(poolSpec.HealthMonitor.SuccessCode)
+		healthMonitor.WithHttpVersion(poolSpec.HealthMonitor.HttpVersion)
+		healthMonitor.WithDomainName(poolSpec.HealthMonitor.DomainName)
 		message = append(message, "health check options (tcp -> http)")
+		isNeedUpdate = true
+	}
+
+	updateOptions := global.NewUpdateGlobalPoolRequest(lbID, currentPool.ID).
+		WithHealthMonitor(healthMonitor).WithAlgorithm(global.GlobalPoolAlgorithm(currentPool.Algorithm))
+
+	if poolSpec.Algorithm != nil && *poolSpec.Algorithm != "" && *poolSpec.Algorithm != global.GlobalPoolAlgorithm(currentPool.Algorithm) {
+		message = append(message, fmt.Sprintf("algorithm (%s -> %s)", currentPool.Algorithm, *poolSpec.Algorithm))
+		updateOptions.WithAlgorithm(*poolSpec.Algorithm)
 		isNeedUpdate = true
 	}
 

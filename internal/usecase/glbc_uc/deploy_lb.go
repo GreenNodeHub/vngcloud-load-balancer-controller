@@ -160,10 +160,6 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
-	if err := t.deployTags(ctx, lbId); err != nil {
-		return "", err
-	}
-
 	var err error
 	if lbEntity, err = t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
 		return "", err

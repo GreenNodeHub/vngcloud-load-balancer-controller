@@ -15,7 +15,7 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 				return
 			}
 		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{Id: listenerId, Port: port})
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedGlobalListener{Id: listenerId, Port: port})
 	})
 }
 
