@@ -23,7 +23,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 	}
 	isPoolExist := func(poolId string) bool {
 		for _, p := range currentPools.Items {
-			if p.UUID == poolId {
+			if p.ID == poolId {
 				return true
 			}
 		}
@@ -38,20 +38,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		return err
 	}
 	for _, listener := range currentListeners.Items {
-		mapPoolInUse[listener.DefaultPoolId] = true
-		if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer7 {
-			// check listener policies
-			policies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listener.UUID)
-			if err != nil {
-				t.logger.Error("Failed to list policies of listener: ", err)
-				return err
-			}
-			for _, policy := range policies.Items {
-				if policy.RedirectPoolID != "" {
-					mapPoolInUse[policy.RedirectPoolID] = true
-				}
-			}
-		}
+		mapPoolInUse[listener.GlobalPoolID] = true
 	}
 
 	isPoolInUse := func(poolId string) bool {
@@ -67,23 +54,23 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 			continue
 		}
 
-		createdMembers := []v1alpha1.PoolMember{}
+		createdPool := &v1alpha1.CreatedGlobalPool{}
 		for _, m := range t.lbConfig.Status.CreatedPools {
-			if m.Id == candidateId && len(m.CreatedMembers) > 0 {
-				createdMembers = m.CreatedMembers
+			if m.Id == candidateId {
+				createdPool = &m
 				break
 			}
 		}
 
-		newCreatedMembers := []v1alpha1.PoolMember{}
+		newCreatedPool := &v1alpha1.CreatedGlobalPool{}
 		for _, m := range newCreatedPools {
-			if m.Id == candidateId && len(m.CreatedMembers) > 0 {
-				newCreatedMembers = m.CreatedMembers
+			if m.Id == candidateId {
+				newCreatedPool = &m
 				break
 			}
 		}
 
-		canDeleteWhole, updateMemberOption, err := t.canDeleteWholePool(ctx, lbId, candidateId, createdMembers, newCreatedMembers)
+		canDeleteWhole, updateMemberOption, err := t.canDeleteWholePool(ctx, lbId, candidateId, createdPool, newCreatedPool)
 		if err != nil {
 			return err
 		}
@@ -118,17 +105,17 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 // canDeleteWholePool checks if we can delete the whole pool
 // conditions:
 // - all members of the pool are created by us and not in new created members
-func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdMembers, newCreatedMembers []v1alpha1.GlobalPoolMember) (bool, loadbalancerv2.IUpdatePoolMembersRequest, error) {
+func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdPool, newCreatedPool *v1alpha1.CreatedGlobalPool) (bool, loadbalancerv2.IUpdatePoolMembersRequest, error) {
 	// ensure pool members
-	currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, poolId)
+	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 	if err != nil {
-		t.logger.Error("Failed to get pool members: ", err)
+		t.logger.Error("Failed to list pool members: ", err)
 		return false, nil, err
 	}
 
 	updateMembers := t.mergePoolMembers(ctx,
 		createdMembers,
-		convertMemberList(currentListMembers),
+		convertMemberList(currentPoolMembers),
 		newCreatedMembers)
 
 	if len(updateMembers) == 0 {
@@ -136,7 +123,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 		return true, nil, nil
 	}
 
-	if !t.comparePoolMembers(ctx, updateMembers, convertMemberList(currentListMembers)) {
+	if !t.comparePoolMembers(ctx, updateMembers, convertMemberList(currentPoolMembers)) {
 		convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
 		for _, member := range updateMembers {
 			convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IP, member.Port, member.MonitorPort))

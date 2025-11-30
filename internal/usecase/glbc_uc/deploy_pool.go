@@ -7,7 +7,6 @@ import (
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -32,7 +31,7 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 	return createdPools, nil
 }
 
-func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, pool *v1alpha1.GlobalPool, currentPools *entityv2.ListGlobalPools) (*v1alpha1.CreatedGlobalPool, error) {
+func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, poolSpec *v1alpha1.GlobalPool, currentPools *entityv2.ListGlobalPools) (*v1alpha1.CreatedGlobalPool, error) {
 	searchPoolByName := func(name string) *entityv2.GlobalPool {
 		for _, p := range currentPools.Items {
 			if p.Name == name {
@@ -42,17 +41,17 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		return nil
 	}
 
-	currentPool := searchPoolByName(pool.Name)
+	currentPool := searchPoolByName(poolSpec.Name)
 	if currentPool == nil {
 		// Create new pool
 		_pool, err := t.vngcloudRepo.CreateGlobalPool(ctx, lbId,
-			t.buildCreatePoolRequest(ctx, lbId, pool),
+			t.buildCreatePoolRequest(ctx, lbId, poolSpec),
 		)
 		if err != nil {
 			return nil, err
 		}
 		// TODO: uncomment me
-		// if err := t.statusAddPoolMember(ctx, _pool.ID, pool.Name, pool.Members); err != nil {
+		// if err := t.statusAddPoolMember(ctx, _pool.ID, poolSpec.Name, poolSpec.Members); err != nil {
 		// 	return nil, err
 		// }
 
@@ -61,14 +60,14 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		}
 		return &v1alpha1.CreatedGlobalPool{
 			Id:   _pool.ID,
-			Name: pool.Name,
+			Name: poolSpec.Name,
 			// // TODO: uncomment me
-			// CreatedPoolMembers: pool.Members,
+			// CreatedPoolMembers: poolSpec.Members,
 		}, nil
 	}
 
-	// ensure exist pool
-	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, pool, currentPool)
+	// ensure exist pool (spec + health monitor, not members)
+	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, poolSpec, currentPool)
 	if updateOptions != nil {
 		t.logger.Info("Need update pool: ", strings.Join(message, ", "))
 		err := t.vngcloudRepo.UpdateGlobalPool(ctx, lbId, currentPool.ID, updateOptions)
@@ -87,50 +86,15 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	}
 
 	// ensure pool members
-	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, currentPool.ID)
+	createdPoolMembers, err := t.deployPoolMembers(ctx, lbId, currentPool.ID, currentPool.Name, poolSpec.Members)
 	if err != nil {
-		t.logger.Error("Failed to get pool members: ", err)
 		return nil, err
 	}
 
-	// get created members for this pool from status
-	createdMemberStatus := []v1alpha1.GlobalPoolMember{}
-	for _, p := range t.lbConfig.Status.CreatedPools {
-		if p.Name == pool.Name {
-			createdMemberStatus = p.CreatedPoolMembers
-			break
-		}
-	}
-
-	updateMembers := t.mergePoolMembers(ctx,
-		createdMemberStatus,
-		convertMemberList(currentPoolMembers),
-		pool.Members)
-
-	if !t.comparePoolMembers(ctx, updateMembers, convertMemberList(currentPoolMembers)) {
-		convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-		for _, member := range updateMembers {
-			convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IP, member.Port, member.MonitorPort))
-		}
-		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, currentPool.UUID).WithMembers(convertMembers...)
-
-		t.logger.Info("Need update pool members: ", updateMembers)
-		if err = t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions); err != nil {
-			t.logger.Error("Failed to update pool members: ", err)
-			return nil, err
-		}
-		if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
-			return nil, err
-		}
-		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
-		}
-	}
 	return &v1alpha1.CreatedGlobalPool{
-		Id:             currentPool.UUID,
-		Name:           currentPool.Name,
-		CreatedMembers: pool.Members,
+		Id:                 currentPool.ID,
+		Name:               currentPool.Name,
+		CreatedPoolMembers: createdPoolMembers,
 	}, nil
 }
 
@@ -205,7 +169,7 @@ func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId 
 	return r
 }
 
-// return UpdateRequest and messages
+// buildPoolUpdateRequest only compare pool's spec and heath monitor
 func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, poolSpec *v1alpha1.GlobalPool, currentPool *entityv2.GlobalPool) (global.IUpdateGlobalPoolRequest, []string) {
 	isNeedUpdate := false
 	message := make([]string, 0)
@@ -316,77 +280,4 @@ func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID 
 		return nil, nil
 	}
 	return updateOptions, message
-}
-
-// MergePoolMembers merges the pool members
-// - keep current member if it is in spec or not created by us
-func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMembers, currentMembers, poolMemberSpec []v1alpha1.PoolMember) []v1alpha1.PoolMember {
-	mergedPoolMembers := make([]v1alpha1.PoolMember, 0)
-
-	// keep current member if it is in spec or not created by us
-	for _, member := range currentMembers {
-		if t.checkIfPoolMemberExist(poolMemberSpec, &member) || !t.checkIfPoolMemberExist(createdMembers, &member) {
-			mergedPoolMembers = append(mergedPoolMembers, member)
-		}
-	}
-
-	// add new members from spec
-	for _, member := range poolMemberSpec {
-		if !t.checkIfPoolMemberExist(mergedPoolMembers, &member) {
-			mergedPoolMembers = append(mergedPoolMembers, member)
-		}
-	}
-
-	return mergedPoolMembers
-}
-
-func (t *defaultModelDeployTask) comparePoolMembers(_ context.Context, poolMembers []v1alpha1.PoolMember, current []v1alpha1.PoolMember) bool {
-	if len(poolMembers) != len(current) {
-		return false
-	}
-
-	for _, member := range poolMembers {
-		if !t.checkIfPoolMemberExist(current, &member) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// checkIfPoolMemberExist checks if the pool member exists in the pool members.
-func (t *defaultModelDeployTask) checkIfPoolMemberExist(list []v1alpha1.PoolMember, member *v1alpha1.PoolMember) bool {
-	for _, r := range list {
-		if r.IP == member.IP &&
-			r.Port == member.Port &&
-			// r.Backup == member.Backup &&
-			// r.Name == member.Name &&
-			// r.Weight == member.Weight &&
-			r.MonitorPort == member.MonitorPort {
-			return true
-		}
-	}
-	return false
-}
-
-func convertMemberList(members *entityv2.ListMembers) []v1alpha1.PoolMember {
-	result := make([]v1alpha1.PoolMember, 0)
-	if members == nil || len(members.Items) == 0 {
-		return result
-	}
-	for _, member := range members.Items {
-		result = append(result, *convertMember(member))
-	}
-	return result
-}
-
-func convertMember(member *entityv2.Member) *v1alpha1.PoolMember {
-	return &v1alpha1.PoolMember{
-		Name:        member.Name,
-		IP:          member.Address,
-		Port:        member.ProtocolPort,
-		Backup:      &member.Backup,
-		Weight:      &member.Weight,
-		MonitorPort: member.MonitorPort,
-	}
 }

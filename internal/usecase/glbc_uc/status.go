@@ -28,20 +28,20 @@ func (t *defaultModelDeployTask) statusAddPool(ctx context.Context, poolId strin
 				return
 			}
 		}
-		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedGlobalPool{Id: poolId, Name: name})
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedGlobalPool{Id: poolId, Name: name, CreatedPoolMembers: []v1alpha1.CreatedGlobalPoolMember{}})
 	})
 }
 
-func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId string, name string, members []v1alpha1.PoolMember) error {
+func (t *defaultModelDeployTask) statusUpdatePoolMember(ctx context.Context, poolId string, name string, poolMembers []v1alpha1.CreatedGlobalPoolMember) error {
 	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) {
 		// check if already exist
 		for i := range obj.Status.CreatedPools {
 			if obj.Status.CreatedPools[i].Id == poolId {
 				obj.Status.CreatedPools[i].Name = name
-				obj.Status.CreatedPools[i].CreatedMembers = members
+				obj.Status.CreatedPools[i].CreatedPoolMembers = poolMembers
 				return
 			}
 		}
-		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedGlobalPool{Id: poolId, Name: name, CreatedMembers: members})
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedGlobalPool{Id: poolId, Name: name, CreatedPoolMembers: poolMembers})
 	})
 }
