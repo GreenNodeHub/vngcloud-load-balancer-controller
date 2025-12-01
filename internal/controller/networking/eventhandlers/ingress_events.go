@@ -43,11 +43,10 @@ func (h *enqueueRequestsForIngressEvent) Update(ctx context.Context, e event.Upd
 	oldIng := e.ObjectOld.(*networkingv1.Ingress)
 	newIng := e.ObjectNew.(*networkingv1.Ingress)
 
-	// we only care below update event:
-	//	1. Ingress annotation updates
-	//	2. Ingress spec updates
-	//	3. Ingress deletion
-	if equality.Semantic.DeepEqual(oldIng.Annotations, newIng.Annotations) &&
+	// Allow periodic sync events (same resource version) for drift detection
+	isSyncEvent := oldIng.GetResourceVersion() == newIng.GetResourceVersion()
+	if !isSyncEvent &&
+		equality.Semantic.DeepEqual(oldIng.Annotations, newIng.Annotations) &&
 		equality.Semantic.DeepEqual(oldIng.Spec, newIng.Spec) &&
 		oldIng.DeletionTimestamp.IsZero() == newIng.DeletionTimestamp.IsZero() {
 		return

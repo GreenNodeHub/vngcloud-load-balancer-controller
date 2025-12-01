@@ -43,8 +43,10 @@ func (h *enqueueRequestsForNsgEvent) Update(ctx context.Context, e event.UpdateE
 	oldObj := e.ObjectOld.(*v1alpha1.NodeSecurityGroup)
 	newObj := e.ObjectNew.(*v1alpha1.NodeSecurityGroup)
 
-	// Skip reconciliation if only unimportant fields changed
-	if equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
+	// Allow periodic sync events (same resource version) for drift detection
+	isSyncEvent := oldObj.GetResourceVersion() == newObj.GetResourceVersion()
+	if !isSyncEvent &&
+		equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
 		equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) &&
 		oldObj.DeletionTimestamp.IsZero() == newObj.DeletionTimestamp.IsZero() {
 		return
