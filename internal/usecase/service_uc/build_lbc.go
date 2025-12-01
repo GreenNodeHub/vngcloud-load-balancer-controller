@@ -117,7 +117,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 		return nil
 	}
 
-	zoneId, _, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
+	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
 	if err != nil {
 		return err
 	}
@@ -133,6 +133,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Labels[domain.LabelOwnerResourceUid] = string(t.service.GetUID())
 	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
 	lbConfig.Spec.SubnetId = subnetId
+	lbConfig.Spec.VpcId = networkId
 	lbConfig.Spec.ZoneId = zoneId
 
 	// should not set owner reference because sometimes user want to keep LBC after service is deleted

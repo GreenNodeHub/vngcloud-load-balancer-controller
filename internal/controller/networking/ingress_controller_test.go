@@ -838,7 +838,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check security groups
@@ -917,7 +917,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check security groups still exist
@@ -976,7 +976,7 @@ var _ = Describe("Ingress Controller", func() {
 					tagKeys = append(tagKeys, tag.Key)
 					tagValues = append(tagValues, tag.Value)
 				}
-				g.Expect(tagKeys).Should(ContainElements(domain.VKS_TAG_KEY, "tag1", "tag2"))
+				g.Expect(tagKeys).Should(ContainElements(domain.ClusterTagKey, "tag1", "tag2"))
 				g.Expect(tagValues).Should(ContainElements(mockConfig.Cluster.ClusterID, "value1", "value2"))
 			}, timeout, interval).Should(Succeed())
 
@@ -1047,7 +1047,7 @@ var _ = Describe("Ingress Controller", func() {
 					tagKeys = append(tagKeys, tag.Key)
 					tagValues = append(tagValues, tag.Value)
 				}
-				g.Expect(tagKeys).Should(ContainElements(domain.VKS_TAG_KEY, "tag2", "tag3"))
+				g.Expect(tagKeys).Should(ContainElements(domain.ClusterTagKey, "tag2", "tag3"))
 				g.Expect(tagValues).Should(ContainElements(mockConfig.Cluster.ClusterID, "value22", "value3"))
 				g.Expect(tagKeys).ShouldNot(ContainElement("tag1"))
 			}, timeout, interval).Should(Succeed())
@@ -1198,7 +1198,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
 				// Check secgroups
@@ -1279,7 +1279,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag1", "tag2"}
+				expectKeys := []string{domain.ClusterTagKey, "tag1", "tag2"}
 				expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
 				for _, tag := range tags.Items {
 					g.Expect(tag.Key).Should(BeElementOf(expectKeys))
@@ -1333,7 +1333,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
 				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
 				expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
 				for _, tag := range tags.Items {
 					g.Expect(tag.Key).Should(BeElementOf(expectKeys))

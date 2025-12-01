@@ -48,8 +48,14 @@ const (
 	DEFAULT_NAME_DEFAULT_POOL         = "vks_default_pool"
 	DEFAULT_HTTPS_LISTENER_NAME       = "vks_https_listener"
 	DEFAULT_HTTP_LISTENER_NAME        = "vks_http_listener"
-	VKS_TAG_KEY                       = "vks-cluster-ids"
-	VKS_TAGS_SEPARATOR                = "_"
-	VKS_CLUSTER_ID_PREFIX             = "k8s-"
-	VKS_CLUSTER_ID_LENGTH             = 40
+
+	VKS_CLUSTER_ID_PREFIX = "k8s-"
+	VKS_CLUSTER_ID_LENGTH = 40
+
+	VpcTagKey                = "vng.vks.vpc.id"
+	SubnetTagKey             = "vng.vks.subnet.id"
+	BillingTagKey            = "vng.billing.product"
+	BillingTagValue          = "vks"
+	ClusterTagKey            = "vng.vks.cluster.id"
+	ClusterTagValueSeparator = "/"
 )

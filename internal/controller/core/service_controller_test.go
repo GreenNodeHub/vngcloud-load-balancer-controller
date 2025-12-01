@@ -747,7 +747,7 @@ var _ = Describe("Service Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -844,7 +844,7 @@ var _ = Describe("Service Controller", func() {
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -972,7 +972,7 @@ var _ = Describe("Service Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -1068,7 +1068,7 @@ var _ = Describe("Service Controller", func() {
 				if err != nil || tags == nil || len(tags.Items) != 3 {
 					return false
 				}
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false

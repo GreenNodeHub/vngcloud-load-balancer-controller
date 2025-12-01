@@ -409,6 +409,9 @@ spec:
               type:
                 description: Type defines the type of load balancer (network or application)
                 type: string
+              vpcId:
+                description: VpcId is the VPC id for the load balancer
+                type: string
               zoneId:
                 description: ZoneId must be the zone where the load balancer will
                   be created
@@ -417,6 +420,7 @@ spec:
             - loadBalancerName
             - subnetId
             - type
+            - vpcId
             - zoneId
             type: object
           status:

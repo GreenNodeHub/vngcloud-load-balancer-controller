@@ -26,11 +26,11 @@ func (r *vngcloudLBBuilder) EnsureTags(tags map[string]string, oldBuilder OldMod
 	}
 
 	// ensure have cluster ids tag
-	vksClusterTags := currentTags[domain.VKS_TAG_KEY]
+	vksClusterTags := currentTags[domain.ClusterTagKey]
 	if !strings.Contains(vksClusterTags, r.fleetID) {
-		r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
+		r.logger.Debugf("Need update tag: %s", domain.ClusterTagKey)
 		vksClusterTags = r.joinVKSTag(vksClusterTags, r.fleetID)
-		newTags[domain.VKS_TAG_KEY] = vksClusterTags
+		newTags[domain.ClusterTagKey] = vksClusterTags
 	}
 
 	return r.updateTag(currentTags, oldTags, newTags)
@@ -97,7 +97,7 @@ func (r *vngcloudLBBuilder) updateTag(currentTags, oldTags, newTags map[string]s
 }
 
 func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
-	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.ClusterTagValueSeparator)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -113,10 +113,10 @@ func (r *vngcloudLBBuilder) joinVKSTag(current, id string) string {
 	for tag := range tagsValid {
 		newTags = append(newTags, tag)
 	}
-	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.ClusterTagValueSeparator)
 }
 func (r *vngcloudLBBuilder) removeVKSTag(current, id string) string {
-	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.ClusterTagValueSeparator)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -135,7 +135,7 @@ func (r *vngcloudLBBuilder) removeVKSTag(current, id string) string {
 	if len(newTags) == 0 {
 		return ""
 	}
-	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.ClusterTagValueSeparator)
 }
 
 func isValidVKSID(id string) bool {
@@ -156,15 +156,15 @@ func (r *vngcloudLBBuilder) EnsureDeleteTags(oldBuilder OldModelBuilder) error {
 	}
 
 	// ensure have cluster ids tag
-	vksClusterTags := currentTags[domain.VKS_TAG_KEY]
+	vksClusterTags := currentTags[domain.ClusterTagKey]
 	if strings.Contains(vksClusterTags, r.fleetID) {
-		r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
+		r.logger.Debugf("Need update tag: %s", domain.ClusterTagKey)
 		vksClusterTags = r.removeVKSTag(vksClusterTags, r.fleetID)
 		if vksClusterTags == "" {
 			// remove tag
-			oldTags[domain.VKS_TAG_KEY] = currentTags[domain.VKS_TAG_KEY]
+			oldTags[domain.ClusterTagKey] = currentTags[domain.ClusterTagKey]
 		} else {
-			newTags[domain.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.ClusterTagKey] = vksClusterTags
 		}
 	}
 

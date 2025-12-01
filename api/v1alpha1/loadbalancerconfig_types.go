@@ -305,6 +305,10 @@ type LoadBalancerConfigSpec struct {
 	// +required
 	SubnetId string `json:"subnetId,omitempty"`
 
+	// VpcId is the VPC id for the load balancer
+	// +required
+	VpcId string `json:"vpcId,omitempty"`
+
 	// BackendSubnetId is the backend subnet id for the load balancer (for INTERVPC scheme)
 	// +optional
 	BackendSubnetId *string `json:"backendSubnetId,omitempty"`

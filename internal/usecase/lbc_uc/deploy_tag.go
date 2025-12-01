@@ -53,15 +53,28 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	// ensure vks_cluster_ids tag
 	if r.lbConfig.Spec.ClusterId != nil && *r.lbConfig.Spec.ClusterId != "" {
 		// ensure have cluster ids tag
-		vksClusterTags := currentTags[domain.VKS_TAG_KEY]
+		vksClusterTags := currentTags[domain.ClusterTagKey]
 		if !strings.Contains(vksClusterTags, *r.lbConfig.Spec.ClusterId) {
-			r.logger.Debugf("Need update tag: %s", domain.VKS_TAG_KEY)
+			r.logger.Debugf("Need update tag: %s", domain.ClusterTagKey)
 			vksClusterTags = r.joinVKSTag(vksClusterTags, *r.lbConfig.Spec.ClusterId)
-			newTags[domain.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.ClusterTagKey] = vksClusterTags
 		} else {
-			newTags[domain.VKS_TAG_KEY] = vksClusterTags
+			newTags[domain.ClusterTagKey] = vksClusterTags
 		}
 	}
+
+	// ensure vpc id tag
+	if r.lbConfig.Spec.VpcId != "" {
+		newTags[domain.VpcTagKey] = r.lbConfig.Spec.VpcId
+	}
+
+	// ensure subnet id tag
+	if r.lbConfig.Spec.SubnetId != "" {
+		newTags[domain.SubnetTagKey] = r.lbConfig.Spec.SubnetId
+	}
+
+	// ensure billing tag
+	newTags[domain.BillingTagKey] = domain.BillingTagValue
 
 	// merge tags
 	mergeTags := make(map[string]string)
@@ -113,7 +126,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 }
 
 func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {
-	tags := strings.Split(current, domain.VKS_TAGS_SEPARATOR)
+	tags := strings.Split(current, domain.ClusterTagValueSeparator)
 	tagsValid := make(map[string]bool)
 	for _, tag := range tags {
 		if isValidVKSID(tag) {
@@ -129,7 +142,7 @@ func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {
 	for tag := range tagsValid {
 		newTags = append(newTags, tag)
 	}
-	return strings.Join(newTags, domain.VKS_TAGS_SEPARATOR)
+	return strings.Join(newTags, domain.ClusterTagValueSeparator)
 }
 
 func isValidVKSID(id string) bool {
