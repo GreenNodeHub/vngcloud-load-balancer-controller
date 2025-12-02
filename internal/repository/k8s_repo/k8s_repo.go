@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
@@ -44,27 +45,38 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 		return nil
 	}
 
-	// Update the service status with the new address
+	// Update the service with the new address
 	svc := &corev1.Service{}
 	err := r.client.Get(ctx, n, svc)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	// Kubernetes forbids status.loadBalancer.ingress on NodePort/ClusterIP services
-	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
-		return nil
-	}
-
 	objectOld := svc.DeepCopy()
 
 	addr := net.ParseIP(address)
-	if addr != nil {
-		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address + ".nip.io"}}
-	} else {
-		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		// For LoadBalancer: update status.loadBalancer.ingress
+		if addr != nil {
+			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address + ".nip.io"}}
+		} else {
+			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+		}
+		return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
-	return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
+
+	// For NodePort/ClusterIP: update spec.externalIPs (only if address is an IP)
+	if addr != nil {
+		// Check if IP already exists in externalIPs
+		if slices.Contains(svc.Spec.ExternalIPs, address) {
+			return nil // already exists
+		}
+		svc.Spec.ExternalIPs = append(svc.Spec.ExternalIPs, address)
+		return r.client.Patch(ctx, svc, client.MergeFrom(objectOld))
+	}
+
+	return nil
 }
 
 func (r *k8sRepository) ListNode(ctx context.Context, list *corev1.NodeList, opts ...client.ListOption) error {

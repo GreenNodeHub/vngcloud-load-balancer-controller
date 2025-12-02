@@ -177,7 +177,7 @@ var _ = BeforeSuite(func() {
 	cniDetector = new(utils.MockCniDetector)
 	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
-	serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
+	serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 	serviceUseCase := service_uc.NewServiceUseCase(
 		mockClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 	reconcileCounters := metricsutil.NewReconcileCounters()

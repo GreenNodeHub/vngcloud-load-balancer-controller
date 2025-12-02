@@ -139,6 +139,11 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 }
 
 func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetType {
+	// Force target type to IP for ClusterIP services (no NodePort available)
+	if t.service.Spec.Type == corev1.ServiceTypeClusterIP {
+		return domain.TargetTypeIP
+	}
+
 	// TODO: store somewhere to avoid parsing again and again
 	var option string
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, t.service.Annotations)

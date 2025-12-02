@@ -33,6 +33,11 @@ const (
 	SuffixPreferZoneID               = "prefer-zone-id"               // prefer zone id
 	SuffixPreferSubnetID             = "prefer-subnet-id"             // prefer subnet id
 
+	// for non-LoadBalancer service type support
+	// Enable load balancer for NodePort/ClusterIP service types
+	// For ClusterIP: only works with Cilium native routing, target type always IP
+	SuffixEnableLoadBalancer = "enable-load-balancer"
+
 	// for l4 only
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
 

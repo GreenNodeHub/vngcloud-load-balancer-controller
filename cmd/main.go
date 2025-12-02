@@ -290,7 +290,7 @@ func main() {
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 		cniDetector := utils.NewDetector(mgr.GetClient())
 		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
-		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
+		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 		serviceUseCase := service_uc.NewServiceUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 		reconciler := corecontroller.NewServiceReconciler(
