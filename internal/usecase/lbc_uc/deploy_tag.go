@@ -19,6 +19,10 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		return err
 	}
 	for _, tag := range listTags.Items {
+		// ignore system tag, not allow to modify
+		if tag.SystemTag {
+			continue
+		}
 		currentTags[tag.Key] = tag.Value
 	}
 	ensuredTags := make(map[string]string)
@@ -50,9 +54,9 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	r.logger.Debugf("   - curTags:   %v", currentTags)
 	r.logger.Debugf("   - newTags:   %v", newTags)
 
-	// ensure vks_cluster_ids tag
+	// ensure ClusterTagKey tag
 	if r.lbConfig.Spec.ClusterId != nil && *r.lbConfig.Spec.ClusterId != "" {
-		// ensure have cluster ids tag
+		// ensure have ClusterTagKey
 		vksClusterTags := currentTags[domain.ClusterTagKey]
 		if !strings.Contains(vksClusterTags, *r.lbConfig.Spec.ClusterId) {
 			r.logger.Debugf("Need update tag: %s", domain.ClusterTagKey)
@@ -122,6 +126,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 		return false, nil
 	}
 
+	r.logger.Debugf("   - mergeTags:   %v", mergeTags)
 	return true, mergeTags
 }
 

@@ -55,7 +55,7 @@ const (
 	VpcTagKey                = "vng.vks.vpc.id"
 	SubnetTagKey             = "vng.vks.subnet.id"
 	BillingTagKey            = "vng.billing.product"
-	BillingTagValue          = "vks"
+	BillingTagValue          = "VKS"
 	ClusterTagKey            = "vng.vks.cluster.id"
 	ClusterTagValueSeparator = "/"
 
