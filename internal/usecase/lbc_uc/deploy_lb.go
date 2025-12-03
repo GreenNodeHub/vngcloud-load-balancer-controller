@@ -80,34 +80,59 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	})
 }
 
+// deployLoadBalancer creates or ensures the load balancer exists, handling migrations if necessary.
+// It returns the load balancer ID to be used for further operations.
+// The caller should requeue if a new load balancer ID is obtained to acquire the appropriate lock.
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
-	// if already an exist lb
-	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
-		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
-			return t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
-		} else {
-			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
+	statusId := ""
+	if t.lbConfig.Status.LoadBalancerId != nil {
+		statusId = *t.lbConfig.Status.LoadBalancerId
+	}
+	specId := ""
+	if t.lbConfig.Spec.LoadBalancerId != nil {
+		specId = *t.lbConfig.Spec.LoadBalancerId
+	}
+
+	if statusId != "" {
+		if specId == "" || specId == statusId {
+			// No migration, continue with existing lbId (lock already acquired on this lbId)
+			return t.ensureExistLoadBalancer(ctx, statusId, nil)
 		}
 	}
 
-	// if not exist lbId in status
-	// try to use spec lbId
-	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
-		return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
-	}
+	// All cases below will obtain a new/different lbId, need to requeue to acquire lock
+	var lbID string
+	var err error
 
-	// try to use spec lb Name
-	if t.lbConfig.Spec.LoadBalancerName != "" {
-		lb, err := t.vngcloudRepo.GetLoadBalancerByName(ctx, t.lbConfig.Spec.LoadBalancerName)
+	if statusId != "" {
+		// spec has different lbId, migrate to new one
+		lbID, err = t.migrateLoadBalancer(ctx, statusId, specId)
+	} else if specId != "" {
+		// Use spec lbId directly
+		lbID, err = t.ensureExistLoadBalancer(ctx, specId, nil)
+	} else if t.lbConfig.Spec.LoadBalancerName != "" {
+		// Try to find LB by name
+		var lb *entity.LoadBalancer
+		lb, err = t.vngcloudRepo.GetLoadBalancerByName(ctx, t.lbConfig.Spec.LoadBalancerName)
 		if err != nil {
 			return "", err
 		}
 		if lb != nil {
-			return t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
+			lbID, err = t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
+		} else {
+			// LB not found by name, create new one
+			lbID, err = t.createLoadBalancer(ctx, createdCerts)
 		}
+	} else {
+		lbID, err = t.createLoadBalancer(ctx, createdCerts)
 	}
 
-	return t.createLoadBalancer(ctx, createdCerts)
+	if err != nil {
+		return "", err
+	}
+
+	// Requeue to acquire lock with the lbId
+	return lbID, errs.NewRequeueNeeded("LoadBalancer Id obtained, requeue to acquire lock")
 }
 
 func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
@@ -162,6 +187,8 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 	}
 
 	t.logger.Infof("Created load balancer with ID %s", lbEntity.UUID)
+
+	// because load balancer is just created, need to deploy package and tag again and update status
 	return t.ensureExistLoadBalancer(ctx, lbEntity.UUID, nil)
 }
 

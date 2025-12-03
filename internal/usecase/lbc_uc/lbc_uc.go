@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"sync"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,6 +19,10 @@ type lbcUseCase struct {
 	cfg          *config.Config
 	k8sRepo      repository.K8sRepository
 	vngcloudRepo repository.VngCloudRepository
+
+	// lbLocks holds a mutex per LoadBalancer ID to prevent concurrent modifications
+	// when multiple LBCs share the same LoadBalancer
+	lbLocks sync.Map // map[string]*sync.Mutex
 }
 
 func NewLoadBalancerConfigUseCase(
@@ -36,10 +41,37 @@ func (uc *lbcUseCase) InitLoadBalancerConfigUseCase(ctx context.Context) error {
 	return nil
 }
 
+// getLBLock returns a mutex for the given LoadBalancer ID, creating one if necessary.
+// This ensures only one LBC can modify a LoadBalancer at a time.
+func (uc *lbcUseCase) getLBLock(lbID string) *sync.Mutex {
+	if lbID == "" {
+		return nil
+	}
+	lock, _ := uc.lbLocks.LoadOrStore(lbID, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
+// getLoadBalancerID returns the LoadBalancer ID from spec or status
+func (uc *lbcUseCase) getLoadBalancerID(lbConfig *v1alpha1.LoadBalancerConfig) string {
+	if lbConfig.Spec.LoadBalancerId != nil && *lbConfig.Spec.LoadBalancerId != "" {
+		return *lbConfig.Spec.LoadBalancerId
+	}
+	if lbConfig.Status.LoadBalancerId != nil && *lbConfig.Status.LoadBalancerId != "" {
+		return *lbConfig.Status.LoadBalancerId
+	}
+	return ""
+}
+
 func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error {
 	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
+	}
+
+	// Acquire lock by LoadBalancer ID to prevent concurrent modifications
+	if lock := uc.getLBLock(uc.getLoadBalancerID(lbConfig)); lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
 	}
 
 	// Perform the actual reconciliation
@@ -87,6 +119,12 @@ func (uc *lbcUseCase) DeleteLoadBalancerConfigUseCase(ctx context.Context, req c
 	lbConfig, err := uc.k8sRepo.GetLoadBalancerConfig(ctx, req.NamespacedName)
 	if err != nil {
 		return client.IgnoreNotFound(err)
+	}
+
+	// Acquire lock by LoadBalancer ID to prevent concurrent modifications
+	if lock := uc.getLBLock(uc.getLoadBalancerID(lbConfig)); lock != nil {
+		lock.Lock()
+		defer lock.Unlock()
 	}
 
 	logger := contexts.NewContext(ctx).Log()
