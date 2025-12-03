@@ -56,6 +56,7 @@ func NewServiceReconciler(
 	serviceUtils service.ServiceUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *ServiceReconciler {
 	return &ServiceReconciler{
 		k8sClient:        client,
@@ -68,6 +69,12 @@ func NewServiceReconciler(
 		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 

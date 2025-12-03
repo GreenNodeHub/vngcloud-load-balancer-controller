@@ -188,6 +188,7 @@ var _ = BeforeSuite(func() {
 		serviceUtils,
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -207,6 +208,7 @@ var _ = BeforeSuite(func() {
 		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -226,6 +228,7 @@ var _ = BeforeSuite(func() {
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		1, // only 1 because it config same nodes' security groups
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

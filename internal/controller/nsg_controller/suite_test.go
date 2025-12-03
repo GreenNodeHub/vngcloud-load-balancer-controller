@@ -164,6 +164,7 @@ var _ = BeforeSuite(func() {
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		1,
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

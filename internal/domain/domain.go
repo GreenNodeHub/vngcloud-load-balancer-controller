@@ -58,4 +58,6 @@ const (
 	BillingTagValue          = "vks"
 	ClusterTagKey            = "vng.vks.cluster.id"
 	ClusterTagValueSeparator = "/"
+
+	DefaultMaxConcurrentReconciles = 5
 )

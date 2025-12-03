@@ -48,7 +48,7 @@ const (
 )
 
 func NewNodeSecurityGroupReconciler(
-	client client.Client,
+	k8sClient client.Client,
 	scheme *runtime.Scheme,
 	nsgUseCase usecase.NodeSecurityGroupUseCase,
 	eventRecorder record.EventRecorder,
@@ -56,9 +56,10 @@ func NewNodeSecurityGroupReconciler(
 	nsgUtils nsg.NodeSecurityGroupUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *NodeSecurityGroupReconciler {
 	return &NodeSecurityGroupReconciler{
-		Client:           client,
+		k8sClient:        k8sClient,
 		Scheme:           scheme,
 		nsgUseCase:       nsgUseCase,
 		eventRecorder:    eventRecorder,
@@ -68,12 +69,18 @@ func NewNodeSecurityGroupReconciler(
 		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 
 // NodeSecurityGroupReconciler reconciles a NodeSecurityGroup object
 type NodeSecurityGroupReconciler struct {
-	client.Client
+	k8sClient        client.Client
 	Scheme           *runtime.Scheme
 	nsgUseCase       usecase.NodeSecurityGroupUseCase
 	eventRecorder    record.EventRecorder
@@ -112,7 +119,7 @@ func (r *NodeSecurityGroupReconciler) reconcile(ctx context.Context, req ctrl.Re
 	object := &v1alpha1.NodeSecurityGroup{}
 	var err error
 	fetchServiceFn := func() {
-		err = r.Client.Get(ctx, req.NamespacedName, object)
+		err = r.k8sClient.Get(ctx, req.NamespacedName, object)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
 	if err != nil {
@@ -213,7 +220,7 @@ func (r *NodeSecurityGroupReconciler) SetupWithManager(ctx context.Context, mgr 
 
 	nsgEventHandler := eventhandlers.NewEnqueueRequestForNsgEvent(r.eventRecorder,
 		r.nsgUtils, r.logger.WithName("eventHandlers").WithName("nsg"))
-	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.Client, r.nsgUtils, r.logger.WithName("eventHandlers").WithName("node"))
+	nodeEventHandler := eventhandlers.NewEnqueueRequestForNodeEvent(r.k8sClient, r.nsgUtils, r.logger.WithName("eventHandlers").WithName("node"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("nodesecuritygroup").

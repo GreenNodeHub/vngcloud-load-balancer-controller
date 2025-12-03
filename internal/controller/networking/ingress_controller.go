@@ -58,6 +58,7 @@ func NewIngressReconciler(
 	ingressUtils ingress.IngressUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *IngressReconciler {
 	referenceIndexer := ingress.NewDefaultReferenceIndexer()
 	return &IngressReconciler{
@@ -72,6 +73,12 @@ func NewIngressReconciler(
 		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 

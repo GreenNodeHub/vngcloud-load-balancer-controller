@@ -302,6 +302,7 @@ func main() {
 			serviceUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Service")
@@ -331,6 +332,7 @@ func main() {
 			ingressUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr, clientSet); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Ingress")
@@ -352,6 +354,7 @@ func main() {
 			lbcUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "LoadBalancerConfig")
@@ -373,6 +376,7 @@ func main() {
 			nsgUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			1, // only 1 because it config same nodes' security groups
 		)
 		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")

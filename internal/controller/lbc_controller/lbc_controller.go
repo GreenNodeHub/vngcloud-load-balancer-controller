@@ -48,7 +48,7 @@ const (
 )
 
 func NewLoadBalancerConfigReconciler(
-	client client.Client,
+	k8sClient client.Client,
 	scheme *runtime.Scheme,
 	lbcUseCase usecase.LoadBalancerConfigUseCase,
 	eventRecorder record.EventRecorder,
@@ -56,9 +56,10 @@ func NewLoadBalancerConfigReconciler(
 	lbcUtils lbc.LoadBalancerConfigUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *LoadBalancerConfigReconciler {
 	return &LoadBalancerConfigReconciler{
-		Client:           client,
+		k8sClient:        k8sClient,
 		Scheme:           scheme,
 		lbcUseCase:       lbcUseCase,
 		eventRecorder:    eventRecorder,
@@ -68,12 +69,18 @@ func NewLoadBalancerConfigReconciler(
 		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 
 // LoadBalancerConfigReconciler reconciles a LoadBalancerConfig object
 type LoadBalancerConfigReconciler struct {
-	client.Client
+	k8sClient        client.Client
 	Scheme           *runtime.Scheme
 	lbcUseCase       usecase.LoadBalancerConfigUseCase
 	eventRecorder    record.EventRecorder
@@ -112,7 +119,7 @@ func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.R
 	object := &v1alpha1.LoadBalancerConfig{}
 	var err error
 	fetchServiceFn := func() {
-		err = r.Client.Get(ctx, req.NamespacedName, object)
+		err = r.k8sClient.Get(ctx, req.NamespacedName, object)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
 	if err != nil {
