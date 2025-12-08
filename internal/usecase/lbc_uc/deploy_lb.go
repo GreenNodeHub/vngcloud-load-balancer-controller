@@ -84,55 +84,48 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 // It returns the load balancer ID to be used for further operations.
 // The caller should requeue if a new load balancer ID is obtained to acquire the appropriate lock.
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
-	statusId := ""
-	if t.lbConfig.Status.LoadBalancerId != nil {
-		statusId = *t.lbConfig.Status.LoadBalancerId
-	}
-	specId := ""
-	if t.lbConfig.Spec.LoadBalancerId != nil {
-		specId = *t.lbConfig.Spec.LoadBalancerId
-	}
+	errorNewLbIdObtained := errs.NewRequeueNeeded("new load balancer ID obtained, requeue needed")
 
-	if statusId != "" {
-		if specId == "" || specId == statusId {
-			// No migration, continue with existing lbId (lock already acquired on this lbId)
-			return t.ensureExistLoadBalancer(ctx, statusId, nil)
+	// if already an exist lb
+	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
+		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
+			lbId, err := t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
+		} else {
+			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
 		}
 	}
 
-	// All cases below will obtain a new/different lbId, need to requeue to acquire lock
-	var lbID string
-	var err error
+	// if not exist lbId in status
+	// try to use spec lbId
+	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
+		lbId, err := t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
+		if err != nil {
+			return lbId, err
+		}
+		return lbId, errorNewLbIdObtained
+	}
 
-	if statusId != "" {
-		// spec has different lbId, migrate to new one
-		lbID, err = t.migrateLoadBalancer(ctx, statusId, specId)
-	} else if specId != "" {
-		// Use spec lbId directly
-		lbID, err = t.ensureExistLoadBalancer(ctx, specId, nil)
-	} else if t.lbConfig.Spec.LoadBalancerName != "" {
-		// Try to find LB by name
-		var lb *entity.LoadBalancer
-		lb, err = t.vngcloudRepo.GetLoadBalancerByName(ctx, t.lbConfig.Spec.LoadBalancerName)
+	// try to use spec lb Name
+	if t.lbConfig.Spec.LoadBalancerName != "" {
+		lb, err := t.vngcloudRepo.GetLoadBalancerByName(ctx, t.lbConfig.Spec.LoadBalancerName)
 		if err != nil {
 			return "", err
 		}
 		if lb != nil {
-			lbID, err = t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
-		} else {
-			// LB not found by name, create new one
-			lbID, err = t.createLoadBalancer(ctx, createdCerts)
+			lbId, err := t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
 		}
-	} else {
-		lbID, err = t.createLoadBalancer(ctx, createdCerts)
 	}
 
-	if err != nil {
-		return "", err
-	}
-
-	// Requeue to acquire lock with the lbId
-	return lbID, errs.NewRequeueNeeded("LoadBalancer Id obtained, requeue to acquire lock")
+	// if requeue here, created Listeners and Pools is not saved in status yet, if user delete LBC quickly, may cause orphan resources
+	return t.createLoadBalancer(ctx, createdCerts)
 }
 
 func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
