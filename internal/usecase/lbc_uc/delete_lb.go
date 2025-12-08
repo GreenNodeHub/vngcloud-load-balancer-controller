@@ -67,6 +67,11 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 			if err != nil {
 				return err
 			}
+		} else {
+			// load balancer still exists, remove cluster id from cluster tags
+			if err := t.deleteRedundantTags(ctx, lbId); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -746,8 +746,15 @@ var _ = Describe("Service Controller", func() {
 				// Verify initial state: default VKS tag
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
+				g.Expect(tags.Items).Should(HaveLen(4))
+				tagsMap := make(map[string]string)
+				for _, tag := range tags.Items {
+					tagsMap[tag.Key] = tag.Value
+				}
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.ClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.DeprecatedClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.VpcTagKey, vngcloud_mocks.MockNetID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.BillingTagKey, domain.BillingTagValue))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -802,13 +809,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (VKS + 2 custom)
+			// Verify tags updated (4 default VKS + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
+			}, timeout*2, interval).Should(Equal(6), "should have 6 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -841,10 +848,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 3 {
+				if err != nil || tags == nil || len(tags.Items) != 6 {
 					return false
 				}
-				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey, domain.DeprecatedClusterTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -971,8 +978,15 @@ var _ = Describe("Service Controller", func() {
 				// Verify initial state: default VKS tag
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
+				g.Expect(tags.Items).Should(HaveLen(4))
+				tagsMap := make(map[string]string)
+				for _, tag := range tags.Items {
+					tagsMap[tag.Key] = tag.Value
+				}
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.ClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.DeprecatedClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.VpcTagKey, vngcloud_mocks.MockNetID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.BillingTagKey, domain.BillingTagValue))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -1026,13 +1040,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (VKS + 2 custom)
+			// Verify tags updated (4 default VKS + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
+			}, timeout*2, interval).Should(Equal(6), "should have 6 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -1065,10 +1079,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 3 {
+				if err != nil || tags == nil || len(tags.Items) != 6 {
 					return false
 				}
-				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey, domain.DeprecatedClusterTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false

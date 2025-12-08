@@ -11,7 +11,7 @@ import (
 // newTags: obj.Spec.Tags
 // currentTags: get in portal
 // merge them and update
-// if spec.cluster exist, add tag vks_cluster_ids
+// if spec.cluster exist, add tag cluster ids
 func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) error {
 	currentTags := make(map[string]string)
 	listTags, err := t.vngcloudRepo.ListTags(ctx, lbId)
@@ -34,6 +34,27 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		createdTags[k] = v
 	}
 
+	// ensure ClusterTagKey tag and DeprecatedClusterTagKey tag
+	if t.lbConfig.Spec.ClusterId != nil && isValidVksId(*t.lbConfig.Spec.ClusterId) {
+		// ensure have ClusterTagKey
+		vksClusterValue := currentTags[domain.ClusterTagKey]
+		vksClusterValue = joinTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
+		ensuredTags[domain.ClusterTagKey] = vksClusterValue
+
+		// ensure have DeprecatedClusterTagKey
+		deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
+		deprecatedVksClusterValue = joinTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
+		ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
+	}
+
+	// ensure vpc id tag
+	if t.lbConfig.Spec.VpcId != "" {
+		ensuredTags[domain.VpcTagKey] = t.lbConfig.Spec.VpcId
+	}
+
+	// ensure billing tag
+	ensuredTags[domain.BillingTagKey] = domain.BillingTagValue
+
 	needUpdate, ensuredTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
 	if !needUpdate {
 		return nil
@@ -53,32 +74,6 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	r.logger.Debugf("   - oldTags:   %v", oldTags)
 	r.logger.Debugf("   - curTags:   %v", currentTags)
 	r.logger.Debugf("   - newTags:   %v", newTags)
-
-	// ensure ClusterTagKey tag
-	if r.lbConfig.Spec.ClusterId != nil && *r.lbConfig.Spec.ClusterId != "" {
-		// ensure have ClusterTagKey
-		vksClusterTags := currentTags[domain.ClusterTagKey]
-		if !strings.Contains(vksClusterTags, *r.lbConfig.Spec.ClusterId) {
-			r.logger.Debugf("Need update tag: %s", domain.ClusterTagKey)
-			vksClusterTags = r.joinVKSTag(vksClusterTags, *r.lbConfig.Spec.ClusterId)
-			newTags[domain.ClusterTagKey] = vksClusterTags
-		} else {
-			newTags[domain.ClusterTagKey] = vksClusterTags
-		}
-	}
-
-	// ensure vpc id tag
-	if r.lbConfig.Spec.VpcId != "" {
-		newTags[domain.VpcTagKey] = r.lbConfig.Spec.VpcId
-	}
-
-	// ensure subnet id tag
-	if r.lbConfig.Spec.SubnetId != "" {
-		newTags[domain.SubnetTagKey] = r.lbConfig.Spec.SubnetId
-	}
-
-	// ensure billing tag
-	newTags[domain.BillingTagKey] = domain.BillingTagValue
 
 	// merge tags
 	mergeTags := make(map[string]string)
@@ -130,26 +125,39 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	return true, mergeTags
 }
 
-func (r *defaultModelDeployTask) joinVKSTag(current, id string) string {
-	tags := strings.Split(current, domain.ClusterTagValueSeparator)
-	tagsValid := make(map[string]bool)
-	for _, tag := range tags {
-		if isValidVKSID(tag) {
-			tagsValid[tag] = true
-		} else {
-			r.logger.Warnf("Invalid VKS cluster id tag: %s.", tag)
+// joinTagValue adds a value to a separated string, avoiding duplicates.
+// Example: joinTagValue("a/b", "c", "/") returns "a/b/c"
+// Example: joinTagValue("a/b", "a", "/") returns "a/b" (no duplicate)
+func joinTagValue(current, value, separator string) string {
+	values := make(map[string]bool)
+	for _, v := range strings.Split(current, separator) {
+		if v != "" {
+			values[v] = true
 		}
 	}
-	if isValidVKSID(id) {
-		tagsValid[id] = true
+	if value != "" {
+		values[value] = true
 	}
-	newTags := make([]string, 0)
-	for tag := range tagsValid {
-		newTags = append(newTags, tag)
+	result := make([]string, 0, len(values))
+	for v := range values {
+		result = append(result, v)
 	}
-	return strings.Join(newTags, domain.ClusterTagValueSeparator)
+	return strings.Join(result, separator)
 }
 
-func isValidVKSID(id string) bool {
+// removeTagValue removes a value from a separated string.
+// Example: removeTagValue("a/b/c", "b", "/") returns "a/c"
+// Example: removeTagValue("a/b", "x", "/") returns "a/b" (value not found)
+func removeTagValue(current, value, separator string) string {
+	result := make([]string, 0)
+	for _, v := range strings.Split(current, separator) {
+		if v != "" && v != value {
+			result = append(result, v)
+		}
+	}
+	return strings.Join(result, separator)
+}
+
+func isValidVksId(id string) bool {
 	return len(id) == domain.VKS_CLUSTER_ID_LENGTH && strings.HasPrefix(id, domain.VKS_CLUSTER_ID_PREFIX)
 }

@@ -52,12 +52,15 @@ const (
 	VKS_CLUSTER_ID_PREFIX = "k8s-"
 	VKS_CLUSTER_ID_LENGTH = 40
 
+	// Tags
 	VpcTagKey                = "vng.vpc.id"
-	SubnetTagKey             = "vng.subnet.id"
 	BillingTagKey            = "vng.billing.product"
 	BillingTagValue          = "VKS"
 	ClusterTagKey            = "vng.vks.cluster.ids"
 	ClusterTagValueSeparator = "/"
+
+	DeprecatedClusterTagKey            = "vks-cluster-ids"
+	DeprecatedClusterTagValueSeparator = "_"
 
 	DefaultMaxConcurrentReconciles = 5
 )
