@@ -26,7 +26,6 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/anngdinh/operator-helper/event_classification"
-	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/huandu/go-clone"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -50,6 +49,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )

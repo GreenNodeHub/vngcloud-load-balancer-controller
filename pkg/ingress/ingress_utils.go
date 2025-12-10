@@ -1,7 +1,7 @@
 package ingress
 
 import (
-	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 

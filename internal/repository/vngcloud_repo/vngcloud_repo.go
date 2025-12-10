@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/anngdinh/operator-helper/version"
 	cuongpigerutils "github.com/cuongpiger/joat/utils"
 	"github.com/pkg/errors"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/client"
@@ -14,6 +13,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 )
 
 const (

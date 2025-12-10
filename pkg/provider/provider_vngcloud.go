@@ -22,10 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/anngdinh/operator-helper/version"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 )
 
 const (

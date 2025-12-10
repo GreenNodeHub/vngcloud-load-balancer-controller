@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 )
 

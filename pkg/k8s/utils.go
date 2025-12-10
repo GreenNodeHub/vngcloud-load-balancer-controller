@@ -1,6 +1,9 @@
 package k8s
 
 import (
+	"sort"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -22,12 +25,37 @@ func ToSliceOfNamespacedNames[T metav1.ObjectMetaAccessor](s []T) []types.Namesp
 	return result
 }
 
-// IsResourceKindAvailable checks whether specific kind is available.
-func IsResourceKindAvailable(resList *metav1.APIResourceList, kind string) bool {
-	for _, res := range resList.APIResources {
-		if res.Kind == kind {
-			return true
+// NodeSlicesEqual check if two nodes equals to each other.
+func NodeSlicesEqual(x, y []*corev1.Node) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	return stringSlicesEqual(NodeNames(x), NodeNames(y))
+}
+
+// NodeNames get all the node names.
+func NodeNames(nodes []*corev1.Node) []string {
+	ret := make([]string, len(nodes))
+	for i, node := range nodes {
+		ret[i] = node.Name
+	}
+	return ret
+}
+
+func stringSlicesEqual(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	if !sort.StringsAreSorted(x) {
+		sort.Strings(x)
+	}
+	if !sort.StringsAreSorted(y) {
+		sort.Strings(y)
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			return false
 		}
 	}
-	return false
+	return true
 }
