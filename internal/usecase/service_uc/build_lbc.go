@@ -308,10 +308,10 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 			t.logger.Errorf("Failed to get load balancer by id %s: %s.", *lbID, err)
 			return common.Zone(""), "", "", "", errors.New("failed to get load balancer by id " + *lbID + ": " + err.Error())
 		}
-		if lb.SubnetID == t.defaultSubnetId {
+		if lb.BackendSubnetID == t.defaultSubnetId {
 			return
 		}
-		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.SubnetID)
+		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.BackendSubnetID)
 		if err != nil || subnet == nil {
 			t.logger.Errorf("Failed to get subnet: %s.", err)
 			return common.Zone(""), "", "", "", errors.New("failed to get subnet: " + err.Error())

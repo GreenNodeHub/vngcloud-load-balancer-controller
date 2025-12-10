@@ -82,10 +82,10 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
 				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal(mockConfig.LoadBalancerOpts.DefaultScheme))
 				g.Expect(loadbalancer.PackageID).Should(Equal(vngcloud_mocks.MockL4PackageId))
-				g.Expect(loadbalancer.SubnetID).Should(BeElementOf(vngcloud_mocks.NodeSubnetIDs))
-				g.Expect(loadbalancer.ZoneID).Should(Equal(vngcloud_mocks.MapSubnetToZone[loadbalancer.SubnetID]))
+				g.Expect(loadbalancer.BackendSubnetID).Should(BeElementOf(vngcloud_mocks.NodeSubnetIDs))
+				g.Expect(loadbalancer.ZoneID).Should(Equal(vngcloud_mocks.MapSubnetToZone[loadbalancer.BackendSubnetID]))
 				g.Expect(loadbalancer.Type).Should(Equal(string(loadbalancerv2.LoadBalancerTypeLayer4)))
-				g.Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloud_mocks.MapSubnetToCIDR[loadbalancer.SubnetID]))
+				g.Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloud_mocks.MapSubnetToCIDR[loadbalancer.BackendSubnetID]))
 
 				// check pool
 				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
@@ -342,7 +342,7 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer.Internal).Should(BeTrue())
 				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
 				g.Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
-				g.Expect(loadbalancer.SubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
+				g.Expect(loadbalancer.BackendSubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
 				g.Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 
 				// Verify pool configuration
