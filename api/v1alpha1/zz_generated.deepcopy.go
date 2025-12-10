@@ -324,6 +324,11 @@ func (in *LoadBalancerConfigSpec) DeepCopyInto(out *LoadBalancerConfigSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PrivateSubnetId != nil {
+		in, out := &in.PrivateSubnetId, &out.PrivateSubnetId
+		*out = new(string)
+		**out = **in
+	}
 	if in.PackageId != nil {
 		in, out := &in.PackageId, &out.PackageId
 		*out = new(string)

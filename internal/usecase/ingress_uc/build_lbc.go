@@ -146,7 +146,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
 	lbConfig.Spec.PackageId = t.buildPackageId(ctx)
 	lbConfig.Spec.Scheme = t.buildScheme(ctx)
-	lbConfig.Spec.BackendSubnetId = t.buildBackendSubnetId(ctx)
+	lbConfig.Spec.PrivateSubnetId = t.buildPrivateSubnetId(ctx)
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
@@ -287,13 +287,23 @@ func (t *defaultModelBuildTask) buildScheme(_ context.Context) *v2.LoadBalancerS
 	}
 }
 
-func (t *defaultModelBuildTask) buildBackendSubnetId(_ context.Context) *string {
+func (t *defaultModelBuildTask) buildPrivateSubnetId(_ context.Context) *string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.ingress.Annotations)
-	if option == "" {
-		return nil
+	// Check new annotation first (higher priority)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPrivateSubnetID, &option, t.ingress.Annotations)
+	if option != "" {
+		return &option
 	}
-	return &option
+
+	// Fall back to deprecated annotation
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.ingress.Annotations)
+	if option != "" {
+		t.logger.Warnf("Annotation '%s' is deprecated, please use '%s' instead",
+			annotations.SuffixBackendSubnetID, annotations.SuffixPrivateSubnetID)
+		return &option
+	}
+
+	return nil
 }
 
 // buildSubnetAndZone tries to get subnet and zone from annotations.

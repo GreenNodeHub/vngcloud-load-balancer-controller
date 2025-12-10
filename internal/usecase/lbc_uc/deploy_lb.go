@@ -383,9 +383,9 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		}
 	}
 
-	// build backendSubnetId
-	if t.lbConfig.Spec.BackendSubnetId == nil || *t.lbConfig.Spec.BackendSubnetId == "" {
-		return nil, errs.NewNoNeedRequeue("backendSubnetId is required for InterVpc load balancer")
+	// build privateSubnetId
+	if t.lbConfig.Spec.PrivateSubnetId == nil || *t.lbConfig.Spec.PrivateSubnetId == "" {
+		return nil, errs.NewNoNeedRequeue("privateSubnetId is required for InterVpc load balancer")
 	}
 
 	// build packageId
@@ -414,7 +414,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		t.lbConfig.Spec.LoadBalancerName,
 		packageId,
 		t.lbConfig.Spec.SubnetId,
-		*t.lbConfig.Spec.BackendSubnetId,
+		*t.lbConfig.Spec.PrivateSubnetId,
 	).WithZoneId(t.lbConfig.Spec.ZoneId)
 
 	// TODO: add more fields (ignore listener and pool for now becasue have to create inter.ListenerRequest and inter.CreatePoolRequest)

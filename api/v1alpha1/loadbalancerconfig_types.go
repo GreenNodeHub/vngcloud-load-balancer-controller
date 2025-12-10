@@ -309,9 +309,14 @@ type LoadBalancerConfigSpec struct {
 	// +required
 	VpcId string `json:"vpcId,omitempty"`
 
-	// BackendSubnetId is the backend subnet id for the load balancer (for INTERVPC scheme)
+	// BackendSubnetId is deprecated, use PrivateSubnetId instead
 	// +optional
 	BackendSubnetId *string `json:"backendSubnetId,omitempty"`
+
+	// PrivateSubnetId is the private subnet id for the load balancer (for INTERVPC scheme)
+	// This is the subnet where the LB's private interface resides
+	// +optional
+	PrivateSubnetId *string `json:"privateSubnetId,omitempty"`
 
 	// ZoneId must be the zone where the load balancer will be created
 	// +required
