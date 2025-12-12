@@ -22,9 +22,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
-	runtime2 "runtime"
-	"strconv"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -32,9 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/anngdinh/operator-helper/k8s"
-	"github.com/anngdinh/operator-helper/version"
-	"github.com/sirupsen/logrus"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -66,14 +60,17 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	vksvngcloudvn "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s/apis/vks.vngcloud.vn"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/logging"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -134,36 +131,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Parse and set log level
-	level, err := logrus.ParseLevel(logLevel)
-	if err != nil {
+	// Setup logrus logger
+	if err := logging.SetupLogger(logLevel); err != nil {
 		setupLog.Error(err, "invalid log level, defaulting to info", "logLevel", logLevel)
-		level = logrus.InfoLevel
-	}
-	logrus.SetLevel(level)
-	logrus.SetReportCaller(true)
-
-	// Use simplified format for debug level
-	if level == logrus.DebugLevel {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableTimestamp: true,
-			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
-				fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
-				return "", fileName
-			},
-		})
-	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableTimestamp: false,
-			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
-				fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
-				return "", fileName
-			},
-		})
 	}
 
-	err = conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")
-	if err != nil {
+	if err := conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml"); err != nil {
 		os.Exit(1)
 	}
 

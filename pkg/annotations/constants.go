@@ -42,8 +42,8 @@ const (
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
 
 	// for l4 inter-vpc only
-	SuffixPrivateSubnetID         = "private-subnet-id"  // new annotation
-	SuffixBackendSubnetID         = "backend-subnet-id"  // deprecated, use private-subnet-id instead
+	SuffixPrivateSubnetID = "private-subnet-id" // new annotation
+	SuffixBackendSubnetID = "backend-subnet-id" // deprecated, use private-subnet-id instead
 
 	// for l7 only
 	SuffixEnableStickySession          = "enable-sticky-session"
