@@ -145,10 +145,12 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 		}
 
 		// compare pool members
-		canDeleteWhole, _, err := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
+		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, listener.DefaultPoolId)
 		if err != nil {
+			t.logger.Errorf("Failed to get members of pool %s: %v", listener.DefaultPoolId, err)
 			return false, err
 		}
+		canDeleteWhole, _ := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, currentListMembers, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
 		if !canDeleteWhole {
 			t.logger.Debugf("Can't delete whole listener, default pool %s cannot be deleted whole.", listener.DefaultPoolId)
 			return false, nil

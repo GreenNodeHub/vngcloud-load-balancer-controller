@@ -3,6 +3,7 @@ package lbc_uc
 import (
 	"context"
 
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -83,10 +84,13 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 			}
 		}
 
-		canDeleteWhole, updateMemberOption, err := t.canDeleteWholePool(ctx, lbId, candidateId, createdMembers, newCreatedMembers)
+		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, candidateId)
 		if err != nil {
+			t.logger.Errorf("Failed to get pool members for pool %s: %v", candidateId, err)
 			return err
 		}
+
+		canDeleteWhole, updateMemberOption := t.canDeleteWholePool(ctx, lbId, candidateId, currentListMembers, createdMembers, newCreatedMembers)
 
 		if !isPoolInUse(candidateId) && canDeleteWhole {
 			// delete pool
@@ -118,14 +122,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 // canDeleteWholePool checks if we can delete the whole pool
 // conditions:
 // - all members of the pool are created by us and not in new created members
-func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdMembers, newCreatedMembers []v1alpha1.PoolMember) (bool, loadbalancerv2.IUpdatePoolMembersRequest, error) {
-	// ensure pool members
-	currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, poolId)
-	if err != nil {
-		t.logger.Error("Failed to get pool members: ", err)
-		return false, nil, err
-	}
-
+func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, currentListMembers *entity.ListMembers, createdMembers, newCreatedMembers []v1alpha1.PoolMember) (bool, loadbalancerv2.IUpdatePoolMembersRequest) {
 	updateMembers := t.mergePoolMembers(ctx,
 		createdMembers,
 		convertMemberList(currentListMembers),
@@ -133,7 +130,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 
 	if len(updateMembers) == 0 {
 		t.logger.Infof("Can delete whole pool %s, all members are created by us and not in new created members", poolId)
-		return true, nil, nil
+		return true, nil
 	}
 
 	if !t.comparePoolMembers(ctx, updateMembers, convertMemberList(currentListMembers)) {
@@ -142,8 +139,8 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 			convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IP, member.Port, member.MonitorPort))
 		}
 		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, poolId).WithMembers(convertMembers...)
-		return false, updateMemberOptions, nil
+		return false, updateMemberOptions
 	}
 
-	return false, nil, nil
+	return false, nil
 }
