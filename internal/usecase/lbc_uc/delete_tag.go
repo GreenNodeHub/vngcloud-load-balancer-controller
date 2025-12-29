@@ -41,12 +41,12 @@ func (t *defaultModelDeployTask) deleteRedundantTags(ctx context.Context, lbId s
 			ensuredTags[domain.ClusterTagKey] = vksClusterValue
 		}
 
-		// ensure remove DeprecatedClusterTagKey
-		deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
-		deprecatedVksClusterValue = removeTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
-		if deprecatedVksClusterValue != "" {
-			ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
-		}
+		// // ensure remove DeprecatedClusterTagKey
+		// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
+		// deprecatedVksClusterValue = removeTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
+		// if deprecatedVksClusterValue != "" {
+		// 	ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
+		// }
 	}
 
 	// ignore delete VpcTagKey and BillingTagKey

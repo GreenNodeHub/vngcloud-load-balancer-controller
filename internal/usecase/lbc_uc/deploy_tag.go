@@ -41,10 +41,10 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		vksClusterValue = joinTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
 		ensuredTags[domain.ClusterTagKey] = vksClusterValue
 
-		// ensure have DeprecatedClusterTagKey
-		deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
-		deprecatedVksClusterValue = joinTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
-		ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
+		// // ensure have DeprecatedClusterTagKey
+		// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
+		// deprecatedVksClusterValue = joinTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
+		// ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
 	}
 
 	// ensure vpc id tag
