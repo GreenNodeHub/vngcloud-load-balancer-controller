@@ -303,7 +303,8 @@ func (uc *nsgUseCase) DeleteNodeSecurityGroupUseCase(ctx context.Context, req ct
 	errorsList := make([]error, 0)
 	for _, server_secgroup := range nsgObject.Status.ServerSecurityGroups {
 		err := uc.ensureSecgroupForInstance(ctx, nsgObject, server_secgroup.ServerId, []string{})
-		if err != nil {
+		// Ignore ServerNotFound error since the server is already deleted
+		if err != nil && !domain.IsServerNotFound(err) {
 			errorsList = append(errorsList, err)
 		}
 	}
