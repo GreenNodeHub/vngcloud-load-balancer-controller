@@ -52,7 +52,7 @@ func (h *enqueueRequestsForLbcEvent) Update(ctx context.Context, e event.UpdateE
 		return
 	}
 
-	h.logger.V(1).Info("Update LBC", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
+	h.logger.V(1).Info("Update LoadBalancerConfig", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
