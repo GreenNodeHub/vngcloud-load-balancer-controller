@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -142,6 +143,7 @@ func joinTagValue(current, value, separator string) string {
 	for v := range values {
 		result = append(result, v)
 	}
+	slices.Sort(result) // Sort to ensure deterministic output
 	return strings.Join(result, separator)
 }
 
@@ -155,6 +157,7 @@ func removeTagValue(current, value, separator string) string {
 			result = append(result, v)
 		}
 	}
+	slices.Sort(result) // Sort to ensure deterministic output
 	return strings.Join(result, separator)
 }
 
