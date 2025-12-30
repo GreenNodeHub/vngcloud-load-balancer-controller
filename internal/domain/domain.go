@@ -55,7 +55,7 @@ const (
 	// Tags
 	VpcTagKey                = "vng.vpc.id"
 	BillingTagKey            = "vng.billing.product"
-	BillingTagValue          = "VKS"
+	BillingTagValue          = "vks"
 	ClusterTagKey            = "vng.vks.cluster.ids"
 	ClusterTagValueSeparator = "/"
 
