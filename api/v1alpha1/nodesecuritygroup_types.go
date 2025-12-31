@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"sort"
+
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -203,4 +205,25 @@ type NodeSecurityGroupList struct {
 
 func init() {
 	SchemeBuilder.Register(&NodeSecurityGroup{}, &NodeSecurityGroupList{})
+}
+
+// SortSecurityGroupRules sorts security group rules to ensure deterministic ordering.
+// This prevents unnecessary reconciliation loops caused by array order changes.
+// Sort order: Direction, Protocol, CIDR, FromPort, ToPort
+func SortSecurityGroupRules(rules []NodeSecurityGroupRule) {
+	sort.Slice(rules, func(i, j int) bool {
+		if rules[i].Direction != rules[j].Direction {
+			return rules[i].Direction < rules[j].Direction
+		}
+		if rules[i].Protocol != rules[j].Protocol {
+			return rules[i].Protocol < rules[j].Protocol
+		}
+		if rules[i].CIDR != rules[j].CIDR {
+			return rules[i].CIDR < rules[j].CIDR
+		}
+		if rules[i].FromPort != rules[j].FromPort {
+			return rules[i].FromPort < rules[j].FromPort
+		}
+		return rules[i].ToPort < rules[j].ToPort
+	})
 }

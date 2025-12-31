@@ -117,6 +117,10 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 	secgroupRules = t.ensureSecgroupPING_UDP(ctx, secgroupRules)
 	secgroupRules = t.ensureDefaultEngressSecgroupRule(ctx, secgroupRules)
 	secgroupRules = t.ensureUniqueSecgroupRules(secgroupRules)
+
+	// Sort rules to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	v1alpha1.SortSecurityGroupRules(secgroupRules)
 	return secgroupRules, nil
 }
 
