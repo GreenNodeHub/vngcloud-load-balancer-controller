@@ -394,7 +394,6 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 
 	newSecgroupIds, isNeedUpdate := mergeStringArray(ctx, currentSecgroupIds, oldSecgroupIds, newSecgroupIds)
 	if !isNeedUpdate {
-		logger.Infof("No need to update security groups for instance: %v", instanceID)
 		return nil
 	}
 
