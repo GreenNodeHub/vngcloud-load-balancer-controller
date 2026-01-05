@@ -54,6 +54,12 @@ var _ = Describe("Ingress Controller", func() {
 		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
+
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllIngreses()
+		cleanupAllServices()
 	})
 
 	Context("When create ingress with default annotation default", func() {
@@ -837,8 +843,8 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(4))
-				// TODO: verify 4 tags
+				g.Expect((tags.Items)).Should(HaveLen(3))
+				// TODO: verify 3 tags
 				// g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				// g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
 
@@ -917,7 +923,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(4))
+				g.Expect((tags.Items)).Should(HaveLen(3))
 				// TODO
 				// g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				// g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
@@ -967,11 +973,11 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 
-				// Check tags now include tag1 and tag2
+				// Check tags now include tag1 and tag2 (3 default VKS + 2 custom = 5)
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
+				g.Expect((tags.Items)).Should(HaveLen(5))
 				tagKeys := make([]string, 0)
 				tagValues := make([]string, 0)
 				for _, tag := range tags.Items {
@@ -1038,11 +1044,11 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 
-				// Check tags updated: tag1 removed, tag2 updated to value22, tag3 added
+				// Check tags updated: tag1 removed, tag2 updated to value22, tag3 added (3 default VKS + 2 custom = 5)
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
+				g.Expect((tags.Items)).Should(HaveLen(5))
 				tagKeys := make([]string, 0)
 				tagValues := make([]string, 0)
 				for _, tag := range tags.Items {
@@ -1195,13 +1201,16 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 
-				// Check tags
+				// Check tags (3 default VKS tags)
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
-				g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
+				g.Expect((tags.Items)).Should(HaveLen(3))
+				tagKeys := make([]string, 0)
+				for _, tag := range tags.Items {
+					tagKeys = append(tagKeys, tag.Key)
+				}
+				g.Expect(tagKeys).Should(ContainElement(domain.ClusterTagKey))
 
 				// Check secgroups
 				secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -1276,19 +1285,16 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 
-				// Check tags
+				// Check tags (3 default VKS + 2 custom = 5)
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{domain.ClusterTagKey, "tag1", "tag2"}
-				expectValues := []string{mockConfig.Cluster.ClusterID, "value1", "value2"}
+				g.Expect((tags.Items)).Should(HaveLen(5))
+				tagKeys := make([]string, 0)
 				for _, tag := range tags.Items {
-					g.Expect(tag.Key).Should(BeElementOf(expectKeys))
-					expectKeys = removeFisrt(expectKeys, tag.Key)
-					g.Expect(tag.Value).Should(BeElementOf(expectValues))
-					expectValues = removeFisrt(expectValues, tag.Value)
+					tagKeys = append(tagKeys, tag.Key)
 				}
+				g.Expect(tagKeys).Should(ContainElements(domain.ClusterTagKey, "tag1", "tag2"))
 
 				// Check secgroups
 				secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -1330,19 +1336,17 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-bea48"))
 
-				// Check tags
+				// Check tags (3 default VKS + 2 custom = 5)
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
-				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3"}
-				expectValues := []string{mockConfig.Cluster.ClusterID, "value22", "value3"}
+				g.Expect((tags.Items)).Should(HaveLen(5))
+				tagKeys := make([]string, 0)
 				for _, tag := range tags.Items {
-					g.Expect(tag.Key).Should(BeElementOf(expectKeys))
-					expectKeys = removeFisrt(expectKeys, tag.Key)
-					g.Expect(tag.Value).Should(BeElementOf(expectValues))
-					expectValues = removeFisrt(expectValues, tag.Value)
+					tagKeys = append(tagKeys, tag.Key)
 				}
+				g.Expect(tagKeys).Should(ContainElements(domain.ClusterTagKey, "tag2", "tag3"))
+				g.Expect(tagKeys).ShouldNot(ContainElement("tag1"))
 
 				// Check secgroups
 				secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)

@@ -142,31 +142,37 @@ func expectNoEndpoints() {
 // Helper functions to cleanup resources
 // ============================================================================
 
-func cleanupAllServices(namespace string) {
+func cleanupAllServices() {
 	serviceList := &corev1.ServiceList{}
-	err := k8sClient.List(ctx, serviceList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, serviceList)
 	if err != nil {
 		return
 	}
 	for _, svc := range serviceList.Items {
+		if svc.Name == "kubernetes" && svc.Namespace == "default" {
+			continue
+		}
 		k8sClient.Delete(ctx, &svc)
 	}
 }
 
-func cleanupAllEndpoints(namespace string) {
+func cleanupAllEndpoints() {
 	endpointList := &corev1.EndpointsList{}
-	err := k8sClient.List(ctx, endpointList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, endpointList)
 	if err != nil {
 		return
 	}
 	for _, ep := range endpointList.Items {
+		if ep.Name == "kubernetes" && ep.Namespace == "default" {
+			continue
+		}
 		k8sClient.Delete(ctx, &ep)
 	}
 }
 
-func cleanupAllLBCs(namespace string) {
+func cleanupAllLBCs() {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
-	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, lbcList)
 	if err != nil {
 		return
 	}
@@ -175,9 +181,9 @@ func cleanupAllLBCs(namespace string) {
 	}
 }
 
-func cleanupAllNSGs(namespace string) {
+func cleanupAllNSGs() {
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
-	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, nsgList)
 	if err != nil {
 		return
 	}

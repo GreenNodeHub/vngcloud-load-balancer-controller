@@ -276,3 +276,68 @@ func removeFisrt[T comparable](slice []T, value T) []T {
 	}
 	return slice
 }
+
+// ============================================================================
+// Helper functions to cleanup resources
+// ============================================================================
+
+func cleanupAllIngreses() {
+	ingressList := &networkingv1.IngressList{}
+	err := k8sClient.List(ctx, ingressList)
+	if err != nil {
+		return
+	}
+	for _, svc := range ingressList.Items {
+		k8sClient.Delete(ctx, &svc)
+	}
+}
+
+func cleanupAllServices() {
+	serviceList := &corev1.ServiceList{}
+	err := k8sClient.List(ctx, serviceList)
+	if err != nil {
+		return
+	}
+	for _, svc := range serviceList.Items {
+		if svc.Name == "kubernetes" && svc.Namespace == "default" {
+			continue
+		}
+		k8sClient.Delete(ctx, &svc)
+	}
+}
+
+func cleanupAllEndpoints() {
+	endpointList := &corev1.EndpointsList{}
+	err := k8sClient.List(ctx, endpointList)
+	if err != nil {
+		return
+	}
+	for _, ep := range endpointList.Items {
+		if ep.Name == "kubernetes" && ep.Namespace == "default" {
+			continue
+		}
+		k8sClient.Delete(ctx, &ep)
+	}
+}
+
+func cleanupAllLBCs() {
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := k8sClient.List(ctx, lbcList)
+	if err != nil {
+		return
+	}
+	for _, lbc := range lbcList.Items {
+		k8sClient.Delete(ctx, &lbc)
+	}
+}
+
+func cleanupAllNSGs() {
+	nsgList := &v1alpha1.NodeSecurityGroupList{}
+	err := k8sClient.List(ctx, nsgList)
+	if err != nil {
+		return
+	}
+	for _, nsg := range nsgList.Items {
+		k8sClient.Delete(ctx, &nsg)
+	}
+}
