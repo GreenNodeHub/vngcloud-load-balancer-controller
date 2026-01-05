@@ -1,8 +1,8 @@
-VERSION ?= v0.0.0
-COMMIT  := ""
+VERSION ?= dev
+COMMIT  := "devvv"
 LDFLAGS := "-w -s -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Commit=$(COMMIT)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
 # Image URL to use all building/pushing image targets
-IMG ?= vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:$(VERSION)
+IMG ?= vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -104,7 +104,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT="dev" -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
