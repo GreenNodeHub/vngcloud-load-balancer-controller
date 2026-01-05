@@ -318,6 +318,11 @@ type LoadBalancerConfigSpec struct {
 	// +optional
 	PrivateSubnetId *string `json:"privateSubnetId,omitempty"`
 
+	// PrivateZoneId is the zone of the client subnet for InterVPC load balancer
+	// This is required for InterVPC scheme since the client subnet is in a different VPC
+	// +optional
+	PrivateZoneId *common.Zone `json:"privateZoneId,omitempty"`
+
 	// ZoneId must be the zone where the load balancer will be created
 	// +required
 	ZoneId common.Zone `json:"zoneId,omitempty"`

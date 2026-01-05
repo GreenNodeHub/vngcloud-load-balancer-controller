@@ -395,6 +395,11 @@ spec:
                   PrivateSubnetId is the private subnet id for the load balancer (for INTERVPC scheme)
                   This is the subnet where the LB's private interface resides
                 type: string
+              privateZoneId:
+                description: |-
+                  PrivateZoneId is the zone of the client subnet for InterVPC load balancer
+                  This is required for InterVPC scheme since the client subnet is in a different VPC
+                type: string
               scheme:
                 description: Scheme defines if the load balancer is internal or external
                 enum:

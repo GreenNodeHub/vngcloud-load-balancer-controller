@@ -388,13 +388,20 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		return nil, errs.NewNoNeedRequeue("privateSubnetId is required for InterVpc load balancer")
 	}
 
+	// build privateZoneId
+	// for InterVPC, use PrivateZoneId if available
+	privateZoneId := t.lbConfig.Spec.ZoneId
+	if t.lbConfig.Spec.PrivateZoneId != nil && *t.lbConfig.Spec.PrivateZoneId != "" {
+		privateZoneId = *t.lbConfig.Spec.PrivateZoneId
+	}
+
 	// build packageId
 	packageId := ""
 	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
 		packageId = *t.lbConfig.Spec.PackageId
 	} else {
 		// use default package from config, get default package id from name and zone
-		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.lbConfig.Spec.ZoneId)
+		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, privateZoneId)
 		if err != nil {
 			return nil, err
 		}
@@ -405,7 +412,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 			}
 		}
 		if packageId == "" {
-			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
+			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, privateZoneId))
 		}
 	}
 
@@ -415,7 +422,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		packageId,
 		t.lbConfig.Spec.SubnetId,
 		*t.lbConfig.Spec.PrivateSubnetId,
-	).WithZoneId(t.lbConfig.Spec.ZoneId)
+	).WithZoneId(privateZoneId)
 
 	// TODO: add more fields (ignore listener and pool for now becasue have to create inter.ListenerRequest and inter.CreatePoolRequest)
 	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest

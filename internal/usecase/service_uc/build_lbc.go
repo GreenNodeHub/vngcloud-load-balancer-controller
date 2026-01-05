@@ -146,6 +146,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.PackageId = t.buildPackageId(ctx)
 	lbConfig.Spec.Scheme = t.buildScheme(ctx)
 	lbConfig.Spec.PrivateSubnetId = t.buildPrivateSubnetId(ctx)
+	lbConfig.Spec.PrivateZoneId = t.buildPrivateZoneId(ctx)
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
@@ -296,6 +297,16 @@ func (t *defaultModelBuildTask) buildPrivateSubnetId(_ context.Context) *string 
 		return &option
 	}
 
+	return nil
+}
+
+func (t *defaultModelBuildTask) buildPrivateZoneId(_ context.Context) *common.Zone {
+	var option string
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPrivateZoneID, &option, t.service.Annotations)
+	if option != "" {
+		zone := common.Zone(option)
+		return &zone
+	}
 	return nil
 }
 
