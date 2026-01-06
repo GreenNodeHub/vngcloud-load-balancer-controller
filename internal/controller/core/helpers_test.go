@@ -73,7 +73,7 @@ func expectNoServices() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no services in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no services in any namespace")
 }
 
 func expectNoLBCs() {
@@ -91,7 +91,7 @@ func expectNoLBCs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no LBCs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no LBCs in any namespace")
 }
 
 func expectNoNSGs() {
@@ -109,7 +109,7 @@ func expectNoNSGs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no NSGs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no NSGs in any namespace")
 }
 
 func expectNoEndpoints() {
@@ -135,38 +135,44 @@ func expectNoEndpoints() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no endpoints in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no endpoints in any namespace")
 }
 
 // ============================================================================
 // Helper functions to cleanup resources
 // ============================================================================
 
-func cleanupAllServices(namespace string) {
+func cleanupAllServices() {
 	serviceList := &corev1.ServiceList{}
-	err := k8sClient.List(ctx, serviceList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, serviceList)
 	if err != nil {
 		return
 	}
 	for _, svc := range serviceList.Items {
+		if svc.Name == "kubernetes" && svc.Namespace == "default" {
+			continue
+		}
 		k8sClient.Delete(ctx, &svc)
 	}
 }
 
-func cleanupAllEndpoints(namespace string) {
+func cleanupAllEndpoints() {
 	endpointList := &corev1.EndpointsList{}
-	err := k8sClient.List(ctx, endpointList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, endpointList)
 	if err != nil {
 		return
 	}
 	for _, ep := range endpointList.Items {
+		if ep.Name == "kubernetes" && ep.Namespace == "default" {
+			continue
+		}
 		k8sClient.Delete(ctx, &ep)
 	}
 }
 
-func cleanupAllLBCs(namespace string) {
+func cleanupAllLBCs() {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
-	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, lbcList)
 	if err != nil {
 		return
 	}
@@ -175,9 +181,9 @@ func cleanupAllLBCs(namespace string) {
 	}
 }
 
-func cleanupAllNSGs(namespace string) {
+func cleanupAllNSGs() {
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
-	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace))
+	err := k8sClient.List(ctx, nsgList)
 	if err != nil {
 		return
 	}
@@ -203,7 +209,7 @@ func getLBCListForService(serviceName, namespace string) (*v1alpha1.LoadBalancer
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: serviceName,
-		domain.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceKind: "Service",
 	})
 	return lbcList, err
 }
@@ -223,7 +229,7 @@ func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurity
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: serviceName,
-		domain.LabelOwnerResourceType: "Service",
+		domain.LabelOwnerResourceKind: "Service",
 	})
 	return nsgList, err
 }

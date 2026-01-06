@@ -35,6 +35,7 @@ type enqueueRequestsForServiceEvent struct {
 }
 
 func (h *enqueueRequestsForServiceEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create Service", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedService(ctx, queue, e.Object.(*corev1.Service))
 }
 
@@ -42,13 +43,16 @@ func (h *enqueueRequestsForServiceEvent) Update(ctx context.Context, e event.Upd
 	oldSvc := e.ObjectOld.(*corev1.Service)
 	newSvc := e.ObjectNew.(*corev1.Service)
 
-	// Skip reconciliation if only unimportant fields changed
-	if equality.Semantic.DeepEqual(oldSvc.Annotations, newSvc.Annotations) &&
+	// Allow periodic sync events (same resource version) for drift detection
+	isSyncEvent := oldSvc.GetResourceVersion() == newSvc.GetResourceVersion()
+	if !isSyncEvent &&
+		equality.Semantic.DeepEqual(oldSvc.Annotations, newSvc.Annotations) &&
 		equality.Semantic.DeepEqual(oldSvc.Spec, newSvc.Spec) &&
 		oldSvc.DeletionTimestamp.IsZero() == newSvc.DeletionTimestamp.IsZero() {
 		return
 	}
 
+	h.logger.V(1).Info("Update Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
 	h.enqueueManagedService(ctx, queue, newSvc)
 }
 

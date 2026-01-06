@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
+	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/google/go-cmp/cmp"
@@ -43,21 +45,38 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 		return nil
 	}
 
-	// Update the service status with the new address
+	// Update the service with the new address
 	svc := &corev1.Service{}
 	err := r.client.Get(ctx, n, svc)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
+
 	objectOld := svc.DeepCopy()
 
 	addr := net.ParseIP(address)
-	if addr != nil {
-		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address + ".nip.io"}}
-	} else {
-		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: address}}
+
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		// For LoadBalancer: update status.loadBalancer.ingress
+		if addr != nil {
+			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address + ".nip.io"}}
+		} else {
+			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+		}
+		return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
-	return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
+
+	// For NodePort/ClusterIP: update spec.externalIPs (only if address is an IP)
+	if addr != nil {
+		// Check if IP already exists in externalIPs
+		if slices.Contains(svc.Spec.ExternalIPs, address) {
+			return nil // already exists
+		}
+		svc.Spec.ExternalIPs = append(svc.Spec.ExternalIPs, address)
+		return r.client.Patch(ctx, svc, client.MergeFrom(objectOld))
+	}
+
+	return nil
 }
 
 func (r *k8sRepository) ListNode(ctx context.Context, list *corev1.NodeList, opts ...client.ListOption) error {
@@ -73,7 +92,25 @@ func (r *k8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.Names
 func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("Creating LBC %s/%s", lbc.Namespace, lbc.Name)
-	return r.client.Create(ctx, lbc, opts...)
+
+	err := r.client.Create(ctx, lbc, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: lbc.GetNamespace(), Name: lbc.GetName()}, lbc)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
 }
 
 func (r *k8sRepository) DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error {
@@ -205,7 +242,25 @@ func (r *k8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha
 func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Debugf("Creating NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
-	return r.client.Create(ctx, nsg, opts...)
+
+	err := r.client.Create(ctx, nsg, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: nsg.GetNamespace(), Name: nsg.GetName()}, nsg)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
 }
 
 func (r *k8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {

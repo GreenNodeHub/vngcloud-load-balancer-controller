@@ -56,6 +56,10 @@ func (t *defaultModelBuildTask) buildHttpsListenerCertificates(ctx context.Conte
 				Id: &certID,
 			})
 		}
+		// NOTE: Do NOT sort certificates from annotation - order is intentional!
+		// The first certificate is used as the default certificate,
+		// the rest are used for SNI (Server Name Indication).
+		// Sorting would make the default certificate selection unpredictable.
 		return &certificates[0], certificates[1:]
 	}
 
@@ -73,6 +77,11 @@ func (t *defaultModelBuildTask) buildHttpsListenerCertificates(ctx context.Conte
 	if len(certificates) == 0 {
 		return nil, nil
 	}
+
+	// Sort by SecretName to ensure deterministic ordering
+	sort.Slice(certificates, func(i, j int) bool {
+		return *certificates[i].SecretName < *certificates[j].SecretName
+	})
 
 	return &certificates[0], certificates[1:]
 }
@@ -95,6 +104,10 @@ func (t *defaultModelBuildTask) buildHttpInsertHeaders(ctx context.Context) []v1
 			HeaderValue: v,
 		})
 	}
+	// Sort by HeaderName to ensure deterministic ordering (map iteration is non-deterministic)
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].HeaderName < headers[j].HeaderName
+	})
 	return headers
 }
 
@@ -107,6 +120,10 @@ func (t *defaultModelBuildTask) buildHttpsInsertHeaders(ctx context.Context) []v
 			HeaderValue: v,
 		})
 	}
+	// Sort by HeaderName to ensure deterministic ordering (map iteration is non-deterministic)
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].HeaderName < headers[j].HeaderName
+	})
 	return headers
 }
 

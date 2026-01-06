@@ -97,6 +97,7 @@ spec:
                       - toPort
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                 required:
                 - name
                 type: object
@@ -220,6 +221,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               serverSecurityGroups:
                 description: ServerSecurityGroups tracks the security group attachment
                   status for each server

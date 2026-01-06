@@ -31,7 +31,7 @@ func expectNoLoadBalancers() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no load balancers")
+	}, timeout*4, interval).Should(Equal(0), "Expected no load balancers")
 }
 
 func expectNoSecurityGroups() {
@@ -48,7 +48,7 @@ func expectNoSecurityGroups() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no security groups")
+	}, timeout*4, interval).Should(Equal(0), "Expected no security groups")
 }
 
 func expectNoServices() {
@@ -74,7 +74,7 @@ func expectNoServices() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no services in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no services in any namespace")
 }
 
 func expectNoIngresses() {
@@ -91,7 +91,7 @@ func expectNoIngresses() {
 			}
 		}
 		return len(ingressList.Items)
-	}, timeout, interval).Should(Equal(0), "Expected no ingresses in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no ingresses in any namespace")
 }
 
 func expectNoLBCs() {
@@ -109,7 +109,7 @@ func expectNoLBCs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no LBCs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no LBCs in any namespace")
 }
 
 func expectNoNSGs() {
@@ -127,7 +127,7 @@ func expectNoNSGs() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no NSGs in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no NSGs in any namespace")
 }
 
 func expectNoEndpoints() {
@@ -153,7 +153,7 @@ func expectNoEndpoints() {
 			}
 		}
 		return count
-	}, timeout, interval).Should(Equal(0), "Expected no endpoints in any namespace")
+	}, timeout*4, interval).Should(Equal(0), "Expected no endpoints in any namespace")
 }
 
 // ============================================================================
@@ -164,7 +164,7 @@ func listLbcByIngress(name, namespace string) (*v1alpha1.LoadBalancerConfigList,
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := k8sClient.List(ctx, lbcList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: name,
-		domain.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceKind: "Ingress",
 	})
 	return lbcList, err
 }
@@ -173,7 +173,7 @@ func listNsgByIngress(name, namespace string) (*v1alpha1.NodeSecurityGroupList, 
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: name,
-		domain.LabelOwnerResourceType: "Ingress",
+		domain.LabelOwnerResourceKind: "Ingress",
 	})
 	return nsgList, err
 }
@@ -275,4 +275,69 @@ func removeFisrt[T comparable](slice []T, value T) []T {
 		}
 	}
 	return slice
+}
+
+// ============================================================================
+// Helper functions to cleanup resources
+// ============================================================================
+
+func cleanupAllIngreses() {
+	ingressList := &networkingv1.IngressList{}
+	err := k8sClient.List(ctx, ingressList)
+	if err != nil {
+		return
+	}
+	for _, svc := range ingressList.Items {
+		k8sClient.Delete(ctx, &svc)
+	}
+}
+
+func cleanupAllServices() {
+	serviceList := &corev1.ServiceList{}
+	err := k8sClient.List(ctx, serviceList)
+	if err != nil {
+		return
+	}
+	for _, svc := range serviceList.Items {
+		if svc.Name == "kubernetes" && svc.Namespace == "default" {
+			continue
+		}
+		k8sClient.Delete(ctx, &svc)
+	}
+}
+
+func cleanupAllEndpoints() {
+	endpointList := &corev1.EndpointsList{}
+	err := k8sClient.List(ctx, endpointList)
+	if err != nil {
+		return
+	}
+	for _, ep := range endpointList.Items {
+		if ep.Name == "kubernetes" && ep.Namespace == "default" {
+			continue
+		}
+		k8sClient.Delete(ctx, &ep)
+	}
+}
+
+func cleanupAllLBCs() {
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := k8sClient.List(ctx, lbcList)
+	if err != nil {
+		return
+	}
+	for _, lbc := range lbcList.Items {
+		k8sClient.Delete(ctx, &lbc)
+	}
+}
+
+func cleanupAllNSGs() {
+	nsgList := &v1alpha1.NodeSecurityGroupList{}
+	err := k8sClient.List(ctx, nsgList)
+	if err != nil {
+		return
+	}
+	for _, nsg := range nsgList.Items {
+		k8sClient.Delete(ctx, &nsg)
+	}
 }

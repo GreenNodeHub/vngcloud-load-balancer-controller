@@ -6,6 +6,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -40,7 +41,17 @@ func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.Create
 }
 
 func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	oldNode := e.ObjectOld.(*corev1.Node)
 	newNode := e.ObjectNew.(*corev1.Node)
+
+	// Skip reconciliation if only unimportant fields changed
+	// Only reconcile if labels, spec, addresses, or ready condition changed
+	if equality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) &&
+		equality.Semantic.DeepEqual(oldNode.Spec, newNode.Spec) &&
+		equality.Semantic.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses) &&
+		getNodeReadyCondition(oldNode) == getNodeReadyCondition(newNode) {
+		return
+	}
 
 	h.logger.Info("node updated, enqueuing all ingresss", "node", newNode.Name)
 	h.enqueueAllSupportedIngresss(ctx, queue)
@@ -72,4 +83,13 @@ func (h *enqueueRequestsForNodeEvent) enqueueAllSupportedIngresss(ctx context.Co
 			NamespacedName: client.ObjectKeyFromObject(&svc),
 		})
 	}
+}
+
+func getNodeReadyCondition(node *corev1.Node) corev1.ConditionStatus {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status
+		}
+	}
+	return corev1.ConditionUnknown
 }

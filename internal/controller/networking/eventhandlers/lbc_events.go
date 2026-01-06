@@ -40,6 +40,7 @@ type enqueueRequestsForLbcEvent struct {
 }
 
 func (h *enqueueRequestsForLbcEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create LoadBalancerConfig", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*v1alpha1.LoadBalancerConfig))
 }
 
@@ -54,10 +55,12 @@ func (h *enqueueRequestsForLbcEvent) Update(ctx context.Context, e event.UpdateE
 		return
 	}
 
+	h.logger.V(1).Info("Update LoadBalancerConfig", "namespace", newLbc.GetNamespace(), "name", newLbc.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, newLbc)
 }
 
 func (h *enqueueRequestsForLbcEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Delete LoadBalancerConfig", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*v1alpha1.LoadBalancerConfig))
 }
 
@@ -70,7 +73,7 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedIngresses(ctx context.Contex
 	if objLabel == nil {
 		return
 	}
-	kind := lbcObj.Labels[domain.LabelOwnerResourceType]
+	kind := lbcObj.Labels[domain.LabelOwnerResourceKind]
 	if kind != "Ingress" {
 		return
 	}
@@ -85,6 +88,10 @@ func (h *enqueueRequestsForLbcEvent) enqueueImpactedIngresses(ctx context.Contex
 			return
 		}
 		h.logger.Error(err, "failed to fetch ingress")
+		return
+	}
+
+	if lbcObj.Labels[domain.LabelOwnerResourceUid] != string(ing.UID) {
 		return
 	}
 

@@ -3,6 +3,7 @@ package ingress_uc
 import (
 	"context"
 	"slices"
+	"sort"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -34,6 +35,11 @@ func (t *defaultModelBuildTask) buildCreateCertificates(ctx context.Context) ([]
 			SecretName: secretName,
 		})
 	}
+
+	// Sort by SecretName to ensure deterministic ordering
+	sort.Slice(createCertificates, func(i, j int) bool {
+		return createCertificates[i].SecretName < createCertificates[j].SecretName
+	})
 
 	return createCertificates, nil
 }

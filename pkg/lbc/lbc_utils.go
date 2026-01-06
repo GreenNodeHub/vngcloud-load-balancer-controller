@@ -1,8 +1,8 @@
 package lbc
 
 import (
-	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 )
 
 // LoadBalancerConfigUtils to check if the object is supported by the controller

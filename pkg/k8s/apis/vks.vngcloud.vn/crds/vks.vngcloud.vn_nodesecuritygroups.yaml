@@ -1,9 +1,10 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: nodesecuritygroups.vks.vngcloud.vn
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
+  name: nodesecuritygroups.vks.vngcloud.vn
 spec:
   group: vks.vngcloud.vn
   names:
@@ -59,15 +60,15 @@ spec:
                   rules:
                     description: Rules is the list of security group rules
                     items:
-                      description: NodeSecurityGroupRule defines a security group rule
-                        for NodeSecurityGroup
+                      description: NodeSecurityGroupRule defines a security group
+                        rule for NodeSecurityGroup
                       properties:
                         cidr:
                           description: CIDR is the CIDR block for the rule
                           type: string
                         description:
-                          description: Description is an optional description for the
-                            rule
+                          description: Description is an optional description for
+                            the rule
                           type: string
                         direction:
                           description: Direction is the direction of the rule (ingress
@@ -96,6 +97,7 @@ spec:
                       - toPort
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                 required:
                 - name
                 type: object
@@ -112,12 +114,12 @@ spec:
                 description: |-
                   conditions represent the current state of the NodeSecurityGroup resource.
                   Each condition has a unique type and reflects the status of a specific aspect of the resource.
-  
+
                   Standard condition types include:
                   - "Available": the resource is fully functional
                   - "Progressing": the resource is being created or updated
                   - "Degraded": the resource failed to reach or maintain its desired state
-  
+
                   The status of each condition is one of True, False, or Unknown.
                 items:
                   description: Condition contains details for one aspect of the current
@@ -178,7 +180,8 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               lastReconcileMessage:
-                description: LastReconcileMessage contains a message from the last reconciliation
+                description: LastReconcileMessage contains a message from the last
+                  reconciliation
                 type: string
               lastReconcileTime:
                 description: LastReconcileTime is the timestamp of the last reconciliation
@@ -198,8 +201,8 @@ spec:
                     type: string
                 type: object
               observedGeneration:
-                description: ObservedGeneration is the generation of the resource that
-                  was most recently observed by the controller
+                description: ObservedGeneration is the generation of the resource
+                  that was most recently observed by the controller
                 format: int64
                 type: integer
               selectedNodes:
@@ -218,12 +221,15 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               serverSecurityGroups:
                 description: ServerSecurityGroups tracks the security group attachment
                   status for each server
                 items:
-                  description: ServerSecurityGroupStatus tracks the security group attachment
-                    status for a specific server
+                  description: ServerSecurityGroupStatus tracks the security group
+                    attachment status for a specific server
                   properties:
                     attachedSecurityGroupIds:
                       description: AttachedSecurityGroupIds is the list of security
@@ -232,7 +238,8 @@ spec:
                         type: string
                       type: array
                     error:
-                      description: Error contains the error message if attachment failed
+                      description: Error contains the error message if attachment
+                        failed
                       type: string
                     serverId:
                       description: ServerId is the VNG Cloud server ID
@@ -252,9 +259,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

@@ -50,11 +50,15 @@ var _ = Describe("Service Controller", func() {
 		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
+
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllServices()
 	})
 
 	Context("When creating a LoadBalancer service", func() {
 		It("should create LBC, LoadBalancer and SecurityGroup", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -83,10 +87,10 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer.Name).Should(Equal("vks-k8s-000000-default-test-servi-95466"))
 				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal(mockConfig.LoadBalancerOpts.DefaultScheme))
 				g.Expect(loadbalancer.PackageID).Should(Equal(vngcloud_mocks.MockL4PackageId))
-				g.Expect(loadbalancer.SubnetID).Should(BeElementOf(vngcloud_mocks.NodeSubnetIDs))
-				g.Expect(loadbalancer.ZoneID).Should(Equal(vngcloud_mocks.MapSubnetToZone[loadbalancer.SubnetID]))
+				g.Expect(loadbalancer.BackendSubnetID).Should(BeElementOf(vngcloud_mocks.NodeSubnetIDs))
+				g.Expect(loadbalancer.ZoneID).Should(Equal(vngcloud_mocks.MapSubnetToZone[loadbalancer.BackendSubnetID]))
 				g.Expect(loadbalancer.Type).Should(Equal(string(loadbalancerv2.LoadBalancerTypeLayer4)))
-				g.Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloud_mocks.MapSubnetToCIDR[loadbalancer.SubnetID]))
+				g.Expect(loadbalancer.PrivateSubnetCidr).Should(Equal(vngcloud_mocks.MapSubnetToCIDR[loadbalancer.BackendSubnetID]))
 
 				// check pool
 				pools, err := vngcloudRepo.ListPool(ctx, loadbalancer.UUID)
@@ -158,7 +162,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When updating service type from LoadBalancer to ClusterIP and revert", func() {
 		It("should cleanup resources when changing to ClusterIP and recreate when reverting", func() {
-			// Skip("Skip test")
 			serviceName := "test-type-change-service"
 			namespace := "default"
 
@@ -249,7 +252,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating a DNS LoadBalancer service with TCP and UDP on same port", func() {
 		It("should fail with error due to duplicate port (VNGCloud limitation)", func() {
-			// Skip("Skip test")
 			serviceName := "test-dns-service"
 			namespace := "default"
 
@@ -298,7 +300,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with all normal annotations", func() {
 		It("should create LoadBalancer with correct attributes from annotations", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -346,7 +347,7 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer.Internal).Should(BeTrue())
 				g.Expect(loadbalancer.LoadBalancerSchema).Should(Equal("Internal"))
 				g.Expect(loadbalancer.PackageID).Should(Equal("package-iiiiiiiiiiiiiii"))
-				g.Expect(loadbalancer.SubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
+				g.Expect(loadbalancer.BackendSubnetID).Should(Equal(vngcloudRepo.GetDefaultSubnetID()))
 				g.Expect(loadbalancer.Type).Should(Equal("Layer 4"))
 
 				// Verify pool configuration
@@ -405,7 +406,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with target node label", func() {
 		It("should only add pool members from nodes matching the label", func() {
-			// Skip("Skip test")
 			serviceName := "test-service"
 			namespace := "default"
 
@@ -488,7 +488,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with PROXY protocol annotation", func() {
 		It("should use PROXY protocol for pool even though service port is TCP", func() {
-			// Skip("Skip test")
 			serviceName := "test-service-1"
 			namespace := "default"
 
@@ -535,7 +534,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When updating service port", func() {
 		It("should delete old listener and pool, and create new ones with updated port", func() {
-			// Skip("Skip test")
 			serviceName := "test-service-1"
 			namespace := "default"
 
@@ -658,7 +656,6 @@ var _ = Describe("Service Controller", func() {
 	Context("When managing security groups and tags with Cilium Native CNI", func() {
 
 		It("should manage security groups and tags with updates", func() {
-			// Skip("Skip test")
 
 			// Configure CNI detector for Cilium Native
 			cniDetector.ExpectedCalls = nil
@@ -754,8 +751,14 @@ var _ = Describe("Service Controller", func() {
 				// Verify initial state: default VKS tag
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items).Should(HaveLen(3))
+				tagsMap := make(map[string]string)
+				for _, tag := range tags.Items {
+					tagsMap[tag.Key] = tag.Value
+				}
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.ClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.VpcTagKey, vngcloud_mocks.MockNetID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.BillingTagKey, domain.BillingTagValue))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -810,13 +813,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (VKS + 2 custom)
+			// Verify tags updated (3 default VKS + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
+			}, timeout*2, interval).Should(Equal(5), "should have 5 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -849,10 +852,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 3 {
+				if err != nil || tags == nil || len(tags.Items) != 5 {
 					return false
 				}
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -884,7 +887,6 @@ var _ = Describe("Service Controller", func() {
 	Context("When managing security groups and tags with Calico Overlay CNI", func() {
 
 		It("should manage security groups and tags with updates", func() {
-			// Skip("Skip test")
 
 			// Configure CNI detector for Calico
 			cniDetector.ExpectedCalls = nil
@@ -980,8 +982,14 @@ var _ = Describe("Service Controller", func() {
 				// Verify initial state: default VKS tag
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(1))
-				g.Expect(tags.Items[0].Key).Should(Equal(domain.VKS_TAG_KEY))
+				g.Expect(tags.Items).Should(HaveLen(3))
+				tagsMap := make(map[string]string)
+				for _, tag := range tags.Items {
+					tagsMap[tag.Key] = tag.Value
+				}
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.ClusterTagKey, mockClusterID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.VpcTagKey, vngcloud_mocks.MockNetID))
+				g.Expect(tagsMap).To(HaveKeyWithValue(domain.BillingTagKey, domain.BillingTagValue))
 			}, timeout*4, interval).Should(Succeed())
 
 			// Verify 3 security groups exist (default + 2 test groups)
@@ -1035,13 +1043,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (VKS + 2 custom)
+			// Verify tags updated (3 default VKS + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout, interval).Should(Equal(3), "should have 3 tags after update")
+			}, timeout*2, interval).Should(Equal(5), "should have 5 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -1074,10 +1082,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 3 {
+				if err != nil || tags == nil || len(tags.Items) != 5 {
 					return false
 				}
-				expectKeys := []string{domain.VKS_TAG_KEY, "tag2", "tag3"}
+				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -1108,7 +1116,6 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When create 3 services using same LB", func() {
 		It("should work well, delete should delete all", func() {
-			// Skip("Skip test")
 			serviceName1 := "test-service-port-80"
 			serviceName2 := "test-service-port-81"
 			serviceName3 := "test-service-port-82"

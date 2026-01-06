@@ -2,6 +2,7 @@ package service_uc
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -54,6 +55,15 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		allListeners = append(allListeners, newListener)
 	}
 
+	// Sort pools and listeners by name to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	sort.Slice(allPools, func(i, j int) bool {
+		return allPools[i].Name < allPools[j].Name
+	})
+	sort.Slice(allListeners, func(i, j int) bool {
+		return allListeners[i].Name < allListeners[j].Name
+	})
+
 	return allPools, allListeners, nil
 }
 
@@ -97,6 +107,15 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 		poolMembers = append(poolMembers, poolMember)
 	}
 
+	// Sort pool members by IP:Port to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	sort.Slice(poolMembers, func(i, j int) bool {
+		if poolMembers[i].IP != poolMembers[j].IP {
+			return poolMembers[i].IP < poolMembers[j].IP
+		}
+		return poolMembers[i].Port < poolMembers[j].Port
+	})
+
 	// build healthcheck
 	healthMonitor := v1alpha1.PoolHealthMonitor{
 		Protocol:           t.buildPoolHealthCheckProtocol(ctx, port.Protocol),
@@ -139,6 +158,11 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 }
 
 func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetType {
+	// Force target type to IP for ClusterIP services (no NodePort available)
+	if t.service.Spec.Type == corev1.ServiceTypeClusterIP {
+		return domain.TargetTypeIP
+	}
+
 	// TODO: store somewhere to avoid parsing again and again
 	var option string
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, t.service.Annotations)

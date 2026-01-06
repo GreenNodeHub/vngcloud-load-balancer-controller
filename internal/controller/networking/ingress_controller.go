@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/anngdinh/operator-helper/k8s"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -41,6 +40,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 )
@@ -58,6 +58,7 @@ func NewIngressReconciler(
 	ingressUtils ingress.IngressUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *IngressReconciler {
 	referenceIndexer := ingress.NewDefaultReferenceIndexer()
 	return &IngressReconciler{
@@ -69,8 +70,15 @@ func NewIngressReconciler(
 		ingressUtils:     ingressUtils,
 		referenceIndexer: referenceIndexer,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 

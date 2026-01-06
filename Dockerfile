@@ -33,8 +33,6 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 
-# Copy CRDs
-COPY ./config/crd/bases ./config/crd/bases
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

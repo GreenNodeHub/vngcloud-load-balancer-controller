@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anngdinh/operator-helper/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -56,6 +55,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
@@ -177,7 +177,7 @@ var _ = BeforeSuite(func() {
 	cniDetector = new(utils.MockCniDetector)
 	cniDetector.EXPECT().DetectCNIType(mock.Anything).Return(utils.CiliumNativeRouting, nil)
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, k8sManager.GetClient())
-	serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
+	serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 	serviceUseCase := service_uc.NewServiceUseCase(
 		mockClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 	reconcileCounters := metricsutil.NewReconcileCounters()
@@ -191,6 +191,7 @@ var _ = BeforeSuite(func() {
 		serviceUtils,
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	err = mockServiceReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -209,6 +210,7 @@ var _ = BeforeSuite(func() {
 		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -227,6 +229,7 @@ var _ = BeforeSuite(func() {
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		1, // only 1 because it config same nodes' security groups
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

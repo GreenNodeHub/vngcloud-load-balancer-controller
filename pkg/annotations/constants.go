@@ -33,11 +33,18 @@ const (
 	SuffixPreferZoneID               = "prefer-zone-id"               // prefer zone id
 	SuffixPreferSubnetID             = "prefer-subnet-id"             // prefer subnet id
 
+	// for non-LoadBalancer service type support
+	// Enable load balancer for NodePort/ClusterIP service types
+	// For ClusterIP: only works with Cilium native routing, target type always IP
+	SuffixEnableLoadBalancer = "enable-load-balancer"
+
 	// for l4 only
 	SuffixEnableProxyProtocol = "enable-proxy-protocol"
 
 	// for l4 inter-vpc only
-	SuffixBackendSubnetID = "backend-subnet-id"
+	SuffixPrivateSubnetID = "private-subnet-id" // new annotation
+	SuffixBackendSubnetID = "backend-subnet-id" // deprecated, use private-subnet-id instead
+	SuffixPrivateZoneID   = "private-zone-id"   // zone of the client subnet for InterVPC
 
 	// for l7 only
 	SuffixEnableStickySession          = "enable-sticky-session"

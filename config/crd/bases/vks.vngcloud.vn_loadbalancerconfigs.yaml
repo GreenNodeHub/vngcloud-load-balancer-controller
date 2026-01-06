@@ -59,8 +59,7 @@ spec:
             description: spec defines the desired state of LoadBalancerConfig
             properties:
               backendSubnetId:
-                description: BackendSubnetId is the backend subnet id for the load
-                  balancer (for INTERVPC scheme)
+                description: BackendSubnetId is deprecated, use PrivateSubnetId instead
                 type: string
               clusterId:
                 description: ClusterId is the ID of the cluster where the load balancer
@@ -391,6 +390,16 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              privateSubnetId:
+                description: |-
+                  PrivateSubnetId is the private subnet id for the load balancer (for INTERVPC scheme)
+                  This is the subnet where the LB's private interface resides
+                type: string
+              privateZoneId:
+                description: |-
+                  PrivateZoneId is the zone of the client subnet for InterVPC load balancer
+                  This is required for InterVPC scheme since the client subnet is in a different VPC
+                type: string
               scheme:
                 description: Scheme defines if the load balancer is internal or external
                 enum:
@@ -409,6 +418,9 @@ spec:
               type:
                 description: Type defines the type of load balancer (network or application)
                 type: string
+              vpcId:
+                description: VpcId is the VPC id for the load balancer
+                type: string
               zoneId:
                 description: ZoneId must be the zone where the load balancer will
                   be created
@@ -417,6 +429,7 @@ spec:
             - loadBalancerName
             - subnetId
             - type
+            - vpcId
             - zoneId
             type: object
           status:

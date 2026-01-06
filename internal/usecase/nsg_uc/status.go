@@ -1,0 +1,106 @@
+package nsg_uc
+
+import (
+	"context"
+	"slices"
+
+	"k8s.io/utils/ptr"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+)
+
+func (uc *nsgUseCase) statusSetSelectedNodes(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, nodeInfos []v1alpha1.NodeInfo) error {
+	// check if already equal
+	if nodeInfosEqual(nsgObject.Status.SelectedNodes, nodeInfos) {
+		return nil // no change needed
+	}
+
+	return uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+		obj.Status.SelectedNodes = nodeInfos
+	})
+}
+
+func (m *nsgUseCase) statusAddStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID *string, err error) error {
+	// check if already equal
+	errStr := errorToStringPtr(err)
+	if ptr.Equal(nsgObject.Status.ManagedSecurityGroup.Id, secgroupID) &&
+		ptr.Equal(nsgObject.Status.ManagedSecurityGroup.Error, errStr) {
+		return nil // no change needed
+	}
+
+	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+			obj.Status.ManagedSecurityGroup.Id = secgroupID
+			obj.Status.ManagedSecurityGroup.Error = errStr
+		})
+}
+
+// update the status.serverSecurityGroups of nsgObject for a specific server
+func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, serverId string, err error, attachedSecgroupIds []string) error {
+	// check if already equal
+	errStr := errorToStringPtr(err)
+	for _, serverSecgroup := range nsgObject.Status.ServerSecurityGroups {
+		if serverSecgroup.ServerId == serverId {
+			if slices.Equal(serverSecgroup.AttachedSecurityGroupIds, attachedSecgroupIds) &&
+				ptr.Equal(serverSecgroup.Error, errStr) {
+				return nil // no change needed
+			}
+			break
+		}
+	}
+
+	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+			// Create the new status for this server
+			newStatus := v1alpha1.ServerSecurityGroupStatus{
+				ServerId:                 serverId,
+				AttachedSecurityGroupIds: attachedSecgroupIds,
+				Error:                    errStr,
+			}
+
+			// Find and update the existing status, or append if not found
+			for i, serverSecgroup := range obj.Status.ServerSecurityGroups {
+				if serverSecgroup.ServerId == serverId {
+					obj.Status.ServerSecurityGroups[i] = newStatus
+					return
+				}
+			}
+
+			// Server not found in status, append new entry
+			obj.Status.ServerSecurityGroups = append(obj.Status.ServerSecurityGroups, newStatus)
+		})
+}
+
+func (m *nsgUseCase) statusServerSecurityGroupStatus(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, ssgs []v1alpha1.ServerSecurityGroupStatus) error {
+	// check if already equal
+	if serverSecurityGroupStatusesEqual(nsgObject.Status.ServerSecurityGroups, ssgs) {
+		return nil // no change needed
+	}
+
+	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+			obj.Status.ServerSecurityGroups = ssgs
+		})
+}
+
+// nodeInfosEqual compares two slices of NodeInfo
+func nodeInfosEqual(a, b []v1alpha1.NodeInfo) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return slices.EqualFunc(a, b, func(x, y v1alpha1.NodeInfo) bool {
+		return x.Name == y.Name && x.ServerId == y.ServerId
+	})
+}
+
+// serverSecurityGroupStatusesEqual compares two slices of ServerSecurityGroupStatus
+func serverSecurityGroupStatusesEqual(a, b []v1alpha1.ServerSecurityGroupStatus) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return slices.EqualFunc(a, b, func(x, y v1alpha1.ServerSecurityGroupStatus) bool {
+		return x.ServerId == y.ServerId &&
+			slices.Equal(x.AttachedSecurityGroupIds, y.AttachedSecurityGroupIds) &&
+			ptr.Equal(x.Error, y.Error)
+	})
+}

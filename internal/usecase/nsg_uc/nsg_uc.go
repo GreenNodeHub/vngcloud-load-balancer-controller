@@ -7,7 +7,6 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -75,46 +74,71 @@ func (uc *nsgUseCase) EnsureNodeSecurityGroupUseCase(ctx context.Context, req ct
 
 func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) error {
 
-	managedSecgroupId, err := uc.ensureManagedSecurityGroup(ctx, nsgObject)
-	uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, managedSecgroupId, err)
+	managedSecgroupStatus, err := uc.ensureManagedSecurityGroup(ctx, nsgObject)
 	if err != nil {
 		return err
 	}
 
-	// attach new security groups in spec
-	needAttachSecgroupIds := make([]string, 0)
-	needAttachSecgroupIds = append(needAttachSecgroupIds, nsgObject.Spec.AttachSecurityGroups...)
-
-	if managedSecgroupId != "" {
-		needAttachSecgroupIds = append(needAttachSecgroupIds, managedSecgroupId)
+	nodeInfos, err := uc.ensureSelectedNodes(ctx, nsgObject)
+	if err != nil {
+		return err
 	}
 
+	ssgs, err := uc.ensureServerSecurityGroups(ctx, nsgObject, nodeInfos, *managedSecgroupStatus)
+	if err != nil {
+		return err
+	}
+	if err := uc.statusServerSecurityGroupStatus(ctx, nsgObject, ssgs); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensureSelectedNodes ensures that the selected nodes are updated in the status.selectedNodes field
+func (uc *nsgUseCase) ensureSelectedNodes(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) ([]v1alpha1.NodeInfo, error) {
+	// collect new server IDs
+	listNodes, err := uc.listNodeBySelector(ctx, nsgObject.Spec.SelectNodeLabels)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeInfos := make([]v1alpha1.NodeInfo, 0)
+	if listNodes != nil && len(listNodes.Items) > 0 {
+		nodeInfos = make([]v1alpha1.NodeInfo, len(listNodes.Items))
+		for i, node := range listNodes.Items {
+			providerID := utils.GetProviderIdFromNode(&node)
+			nodeInfos[i] = v1alpha1.NodeInfo{
+				Name:     node.Name,
+				ServerId: providerID,
+			}
+		}
+	}
+
+	// patch status.selectedNodes
+	if err := uc.statusSetSelectedNodes(ctx, nsgObject, nodeInfos); err != nil {
+		return nil, err
+	}
+	return nodeInfos, nil
+}
+
+func (uc *nsgUseCase) ensureServerSecurityGroups(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, nodeInfos []v1alpha1.NodeInfo, managedSecgroupStatus v1alpha1.ManagedSecurityGroupStatus) ([]v1alpha1.ServerSecurityGroupStatus, error) {
 	// collect old server IDs
 	oldServerSelector := make([]string, 0)
 	for _, nodeInfo := range nsgObject.Status.SelectedNodes {
 		oldServerSelector = append(oldServerSelector, nodeInfo.ServerId)
 	}
 
-	// collect new server IDs
-	listNodes, err := uc.listNodeBySelector(ctx, nsgObject.Spec.SelectNodeLabels)
-	if err != nil {
-		return err
+	newServerSelector := make([]string, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		newServerSelector[i] = nodeInfo.ServerId
 	}
-	newServerSelector := utils.GetListProviderIdFromNodeList(listNodes)
 
-	// patch status.selectedNodes
-	err = uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-		nodeInfos := make([]v1alpha1.NodeInfo, len(newServerSelector))
-		for i, serverId := range newServerSelector {
-			nodeInfos[i] = v1alpha1.NodeInfo{
-				Name:     serverId, // TODO: get node name from serverId
-				ServerId: serverId,
-			}
-		}
-		obj.Status.SelectedNodes = nodeInfos
-	})
-	if err != nil {
-		return err
+	// attach new security groups in spec
+	needAttachSecgroupIds := make([]string, 0)
+	needAttachSecgroupIds = append(needAttachSecgroupIds, nsgObject.Spec.AttachSecurityGroups...)
+
+	if managedSecgroupStatus.Id != nil && *managedSecgroupStatus.Id != "" {
+		needAttachSecgroupIds = append(needAttachSecgroupIds, *managedSecgroupStatus.Id)
 	}
 
 	// resolve changes
@@ -125,16 +149,14 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 
 	logger := contexts.NewContext(ctx).Log()
 
+	result := make([]v1alpha1.ServerSecurityGroupStatus, 0)
+
 	errorsList := make([]error, 0)
 	// detach security groups from removed servers
 	for _, serverId := range removeServerIDs {
 		err := uc.ensureSecgroupForInstance(ctx, nsgObject, serverId, []string{})
-		if err != nil {
+		if err != nil && !domain.IsServerNotFound(err) {
 			errorsList = append(errorsList, err)
-		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, []string{})
-		if _err != nil {
-			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
 	}
 
@@ -144,10 +166,15 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
+		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
 		if _err != nil {
 			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
+		result = append(result, v1alpha1.ServerSecurityGroupStatus{
+			ServerId:                 serverId,
+			AttachedSecurityGroupIds: needAttachSecgroupIds,
+			Error:                    errorToStringPtr(err),
+		})
 	}
 
 	// attach security groups to added servers
@@ -156,22 +183,29 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 		if err != nil {
 			errorsList = append(errorsList, err)
 		}
-		_err := uc.ensureStatusNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
+		_err := uc.statusUpdateNodeSecurityGroup(ctx, nsgObject, serverId, err, needAttachSecgroupIds)
 		if _err != nil {
 			logger.Warn("Fail to update status for server: ", serverId, " error: ", _err)
 		}
+		result = append(result, v1alpha1.ServerSecurityGroupStatus{
+			ServerId:                 serverId,
+			AttachedSecurityGroupIds: needAttachSecgroupIds,
+			Error:                    errorToStringPtr(err),
+		})
 	}
 
 	// try delete managed security group if not in use and not attached to any server
 	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
 		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
 		if err != nil {
-			uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, *nsgObject.Status.ManagedSecurityGroup.Id, err)
-			return err
+			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nsgObject.Status.ManagedSecurityGroup.Id, err)
+			return nil, err
 		}
 		if isDeleted {
 			// patch status
-			uc.ensureStatusManagedSecurityGroup(ctx, nsgObject, "", nil)
+			if err := uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nil, nil); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -180,108 +214,10 @@ func (uc *nsgUseCase) ensure(ctx context.Context, nsgObject *v1alpha1.NodeSecuri
 		for _, err := range errorsList {
 			errMessages = append(errMessages, err.Error())
 		}
-		return errors.New("failed to update security groups for some nodes: " + strings.Join(errMessages, ", "))
+		return nil, errors.New("failed to update security groups for some nodes: " + strings.Join(errMessages, ", "))
 	}
 
-	return nil
-}
-
-// ensureManagedSecurityGroup ensures that the managed security group is created and updated according to the NSG spec
-// returns the managed security group ID
-func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup) (string, error) {
-	if nsgObject.Spec.ManagedSecurityGroup == nil {
-		return "", nil
-	}
-
-	logger := contexts.NewContext(ctx).Log()
-	// find default secgroup
-	defaultSecgroup, isExists, err := uc.findSecgroupByName(ctx, nsgObject.Spec.ManagedSecurityGroup.Name)
-	if err != nil {
-		logger.Error("Fail to find default secgroup", err)
-		return "", err
-	}
-	if !isExists {
-		// create new secgroup if not exists
-		description := "Automatically created using VNGCLOUD LoadBalancer Controller"
-		if nsgObject.Spec.ManagedSecurityGroup.Description != nil {
-			description = *nsgObject.Spec.ManagedSecurityGroup.Description
-		}
-		_secG, err := uc.vngcloudRepo.CreateSecurityGroup(ctx, nsgObject.Spec.ManagedSecurityGroup.Name, description)
-		if err != nil {
-			logger.Error("Fail to create default secgroup", err)
-			return "", err
-		}
-		defaultSecgroup, err = uc.vngcloudRepo.GetSecurityGroup(ctx, _secG.Id)
-		if err != nil {
-			logger.Error("Fail to get default secgroup", err)
-			return "", err
-		}
-	}
-
-	// update secgroup rules if needed
-
-	// get all secgroup rules of default secgroup
-	defaultSecgroupRules, err := uc.vngcloudRepo.ListSecurityGroupRules(ctx, defaultSecgroup.Id)
-	if err != nil {
-		logger.Error("Fail to list secgroup rules: ", err)
-		return "", err
-	}
-
-	if defaultSecgroupRules == nil || defaultSecgroupRules.Items == nil {
-		defaultSecgroupRules = &entityv2.ListSecgroupRules{
-			Items: []*entityv2.SecgroupRule{},
-		}
-	}
-
-	// TODO: should add engress rules too
-	logger.Debug("Ensure secgroup rules: ")
-	for _, rule := range defaultSecgroupRules.Items {
-		if rule.Direction == string(networkv2.SecgroupRuleDirectionEgress) {
-			continue
-		}
-		logger.Debugf("   - current: %v", rule)
-	}
-
-	// ensure secgroup rules
-	needDelete, needCreate, err := uc.compareSecgroupRule(ctx, defaultSecgroupRules.Items, nsgObject.Spec.ManagedSecurityGroup.Rules)
-	if err != nil {
-		logger.Error("Fail to compare secgroup rules", err)
-		return "", err
-	}
-
-	for _, rule := range needDelete {
-		logger.Debugf("   - delete : %v", rule)
-	}
-	for _, rule := range needCreate {
-		logger.Debugf("   - create : %v", rule)
-	}
-
-	for _, rule := range needDelete {
-		err := uc.vngcloudRepo.DeleteSecurityGroupRule(ctx, defaultSecgroup.Id, rule.Id)
-		if err != nil {
-			logger.Error("Fail to delete secgroup rule", err)
-			return "", err
-		}
-	}
-
-	for _, rule := range needCreate {
-		_, err := uc.vngcloudRepo.CreateSecurityGroupRule(ctx, defaultSecgroup.Id,
-			networkv2.NewCreateSecgroupRuleRequest(
-				rule.Direction,
-				rule.EtherType,
-				rule.Protocol,
-				int(rule.FromPort),
-				int(rule.ToPort),
-				rule.CIDR,
-				defaultSecgroup.Id,
-				rule.Description,
-			))
-		if err != nil {
-			logger.Error("Fail to create secgroup rule: ", err)
-			return "", err
-		}
-	}
-	return defaultSecgroup.Id, nil
+	return result, nil
 }
 
 // findSecgroupByName finds a security group by name
@@ -367,7 +303,8 @@ func (uc *nsgUseCase) DeleteNodeSecurityGroupUseCase(ctx context.Context, req ct
 	errorsList := make([]error, 0)
 	for _, server_secgroup := range nsgObject.Status.ServerSecurityGroups {
 		err := uc.ensureSecgroupForInstance(ctx, nsgObject, server_secgroup.ServerId, []string{})
-		if err != nil {
+		// Ignore ServerNotFound error since the server is already deleted
+		if err != nil && !domain.IsServerNotFound(err) {
 			errorsList = append(errorsList, err)
 		}
 	}
@@ -457,7 +394,6 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 
 	newSecgroupIds, isNeedUpdate := mergeStringArray(ctx, currentSecgroupIds, oldSecgroupIds, newSecgroupIds)
 	if !isNeedUpdate {
-		logger.Infof("No need to update security groups for instance: %v", instanceID)
 		return nil
 	}
 
@@ -479,49 +415,13 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 	return nil
 }
 
-// toErrorPtr converts an error to a string pointer, returns nil if error is nil
-func toErrorPtr(err error) *string {
+// errorToStringPtr converts an error to a string pointer, returns nil if error is nil
+func errorToStringPtr(err error) *string {
 	if err == nil {
 		return nil
 	}
 	errMsg := err.Error()
 	return &errMsg
-}
-
-// update the status.serverSecurityGroups of nsgObject for a specific server
-func (m *nsgUseCase) ensureStatusNodeSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, serverId string, err error, attachedSecgroupIds []string) error {
-	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
-		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-			// Create the new status for this server
-			newStatus := v1alpha1.ServerSecurityGroupStatus{
-				ServerId:                 serverId,
-				AttachedSecurityGroupIds: attachedSecgroupIds,
-				Error:                    toErrorPtr(err),
-			}
-
-			// Find and update the existing status, or append if not found
-			for i, serverSecgroup := range obj.Status.ServerSecurityGroups {
-				if serverSecgroup.ServerId == serverId {
-					obj.Status.ServerSecurityGroups[i] = newStatus
-					return
-				}
-			}
-
-			// Server not found in status, append new entry
-			obj.Status.ServerSecurityGroups = append(obj.Status.ServerSecurityGroups, newStatus)
-		})
-}
-
-func (m *nsgUseCase) ensureStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID string, err error) error {
-	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
-		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-			if secgroupID == "" {
-				obj.Status.ManagedSecurityGroup.Id = nil
-			} else {
-				obj.Status.ManagedSecurityGroup.Id = &secgroupID
-			}
-			obj.Status.ManagedSecurityGroup.Error = toErrorPtr(err)
-		})
 }
 
 // mergeStringArray merges current string array by removing and adding elements,

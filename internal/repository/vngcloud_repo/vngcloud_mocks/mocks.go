@@ -50,6 +50,7 @@ var (
 				"nodeName":                  "mock-node-1",
 				"nodeGroup":                 "mock-node-group-a",
 				"vks.vngcloud.vn/mgmt-zone": "mock-mgmt-zone",
+				"node.kubernetes.io/flavor": "s-general-1",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -74,8 +75,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-2",
 			Labels: map[string]string{
-				"nodeName":  "mock-node-2",
-				"nodeGroup": "mock-node-group-a",
+				"nodeName":                  "mock-node-2",
+				"nodeGroup":                 "mock-node-group-a",
+				"node.kubernetes.io/flavor": "s-general-2",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -100,8 +102,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-3",
 			Labels: map[string]string{
-				"nodeName":  "mock-node-3",
-				"nodeGroup": "mock-node-group-b",
+				"nodeName":                  "mock-node-3",
+				"nodeGroup":                 "mock-node-group-b",
+				"node.kubernetes.io/flavor": "s-general-2",
 			},
 		},
 		Spec: corev1.NodeSpec{
@@ -126,8 +129,9 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mock-node-4",
 			Labels: map[string]string{
-				"nodeName":  "mock-node-4",
-				"nodeGroup": "mock-node-group-b",
+				"nodeName":                  "mock-node-4",
+				"nodeGroup":                 "mock-node-group-b",
+				"node.kubernetes.io/flavor": "s-general-2",
 			},
 		},
 		Spec: corev1.NodeSpec{

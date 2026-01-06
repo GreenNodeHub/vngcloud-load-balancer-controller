@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/anngdinh/operator-helper/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
@@ -53,6 +52,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
@@ -189,6 +189,7 @@ var _ = BeforeSuite(func() {
 		ingressUtils,
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	clientSet, err := kubernetes.NewForConfig(k8sManager.GetConfig())
 	Expect(err).ToNot(HaveOccurred())
@@ -211,6 +212,7 @@ var _ = BeforeSuite(func() {
 		lbc.NewLoadBalancerConfigUtils(domain.LbcFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		domain.DefaultMaxConcurrentReconciles,
 	)
 	err = mockLBCReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -230,6 +232,7 @@ var _ = BeforeSuite(func() {
 		nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer),
 		lbcMetricsCollector,
 		reconcileCounters,
+		1, // only 1 because it config same nodes' security groups
 	)
 	err = mockNSGReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())

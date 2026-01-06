@@ -18,6 +18,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -52,7 +53,7 @@ type defaultModelBuildTask struct {
 func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	if !t.ingressUtils.IsIngressSupported(t.ingress) {
 		if t.ingressUtils.IsIngressPendingFinalization(t.ingress) {
-			t.logger.Info("Ingress is not supported but pending finalization, running delete flow TODO")
+			return errs.NewRequeueNeeded("ingress is not supported but pending finalization, re-run delete flow")
 		}
 		return nil
 	}
@@ -80,7 +81,8 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.ingress.Namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: t.ingress.Name,
-		domain.LabelOwnerResourceType: t.ingress.Kind,
+		domain.LabelOwnerResourceKind: t.ingress.Kind,
+		domain.LabelOwnerResourceUid:  string(t.ingress.UID),
 	})
 	if err != nil {
 		t.logger.Errorf("failed to list LBC: %v", err)
@@ -100,8 +102,8 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	} else {
 		lbConfig = &v1alpha1.LoadBalancerConfig{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      utils.GenerateLBConfigName("ing", t.ingress.Name),
-				Namespace: t.ingress.Namespace,
+				Namespace:    t.ingress.Namespace,
+				GenerateName: t.ingress.Name + "-",
 			},
 			Spec: v1alpha1.LoadBalancerConfigSpec{},
 		}
@@ -116,7 +118,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 		return nil
 	}
 
-	zoneId, _, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
+	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
 	if err != nil {
 		return err
 	}
@@ -127,22 +129,16 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	if lbConfig.Labels == nil {
 		lbConfig.Labels = make(map[string]string)
 	}
-	lbConfig.Labels[domain.LabelOwnerResourceName] = t.ingress.Name // TODO
-	lbConfig.Labels[domain.LabelOwnerResourceType] = t.ingress.Kind
+	lbConfig.Labels[domain.LabelOwnerResourceName] = t.ingress.Name
+	lbConfig.Labels[domain.LabelOwnerResourceKind] = t.ingress.Kind
+	lbConfig.Labels[domain.LabelOwnerResourceUid] = string(t.ingress.UID)
 	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer7
 	lbConfig.Spec.SubnetId = subnetId
+	lbConfig.Spec.VpcId = networkId
 	lbConfig.Spec.ZoneId = zoneId
 
 	// should not set owner reference because sometimes user want to keep LBC after ingress is deleted
-	// lbConfig.OwnerReferences = []metav1.OwnerReference{
-	// 	{
-	// 		APIVersion: t.ingress.APIVersion,
-	// 		Kind:       t.ingress.Kind,
-	// 		Name:       t.ingress.Name,
-	// 		UID:        t.ingress.UID,
-	// 		// TODO
-	// 	},
-	// }
+	// lbConfig.OwnerReferences = []metav1.OwnerReference{...}
 
 	if t.clusterId != "" {
 		lbConfig.Spec.ClusterId = &t.clusterId
@@ -150,7 +146,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.LoadBalancerId = t.buildLoadBalancerId(ctx)
 	lbConfig.Spec.PackageId = t.buildPackageId(ctx)
 	lbConfig.Spec.Scheme = t.buildScheme(ctx)
-	lbConfig.Spec.BackendSubnetId = t.buildBackendSubnetId(ctx)
+	lbConfig.Spec.PrivateSubnetId = t.buildPrivateSubnetId(ctx)
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
@@ -193,7 +189,8 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := t.k8sRepo.ListNodeSecurityGroup(ctx, nsgList, client.InNamespace(t.ingress.Namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: t.ingress.Name,
-		domain.LabelOwnerResourceType: t.ingress.Kind,
+		domain.LabelOwnerResourceKind: t.ingress.Kind,
+		domain.LabelOwnerResourceUid:  string(t.ingress.UID),
 	})
 	if err != nil {
 		return err
@@ -223,13 +220,13 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	if nsg.Labels == nil {
 		nsg.Labels = make(map[string]string)
 	}
-	nsg.Labels[domain.LabelOwnerResourceName] = t.ingress.Name // TODO
-	nsg.Labels[domain.LabelOwnerResourceType] = t.ingress.Kind
+	nsg.Labels[domain.LabelOwnerResourceName] = t.ingress.Name
+	nsg.Labels[domain.LabelOwnerResourceKind] = t.ingress.Kind
+	nsg.Labels[domain.LabelOwnerResourceUid] = string(t.ingress.UID)
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	nsg.Spec.SelectNodeLabels = targetNodeLabels
 
-	// TODO: update nsg.Spec based on annotations
 	if isAutoCreateSecGroup, secgroupIds := t.buildIsAutoCreateSecGroup(ctx); !isAutoCreateSecGroup {
 		nsg.Spec.ManagedSecurityGroup = nil
 		nsg.Spec.AttachSecurityGroups = secgroupIds
@@ -290,13 +287,23 @@ func (t *defaultModelBuildTask) buildScheme(_ context.Context) *v2.LoadBalancerS
 	}
 }
 
-func (t *defaultModelBuildTask) buildBackendSubnetId(_ context.Context) *string {
+func (t *defaultModelBuildTask) buildPrivateSubnetId(_ context.Context) *string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.ingress.Annotations)
-	if option == "" {
-		return nil
+	// Check new annotation first (higher priority)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPrivateSubnetID, &option, t.ingress.Annotations)
+	if option != "" {
+		return &option
 	}
-	return &option
+
+	// Fall back to deprecated annotation
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.ingress.Annotations)
+	if option != "" {
+		t.logger.Warnf("Annotation '%s' is deprecated, please use '%s' instead",
+			annotations.SuffixBackendSubnetID, annotations.SuffixPrivateSubnetID)
+		return &option
+	}
+
+	return nil
 }
 
 // buildSubnetAndZone tries to get subnet and zone from annotations.
@@ -318,10 +325,10 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 			t.logger.Errorf("Failed to get load balancer by id %s: %s.", *lbID, err)
 			return common.Zone(""), "", "", "", errors.New("failed to get load balancer by id " + *lbID + ": " + err.Error())
 		}
-		if lb.SubnetID == t.defaultSubnetId {
+		if lb.BackendSubnetID == t.defaultSubnetId {
 			return
 		}
-		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.SubnetID)
+		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.BackendSubnetID)
 		if err != nil || subnet == nil {
 			t.logger.Errorf("Failed to get subnet: %s.", err)
 			return common.Zone(""), "", "", "", errors.New("failed to get subnet: " + err.Error())
@@ -462,7 +469,8 @@ func (t *defaultModelBuildTask) getLBCAddress(ctx context.Context) string {
 	lbcList := &v1alpha1.LoadBalancerConfigList{}
 	err := t.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(t.ingress.Namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: t.ingress.Name,
-		domain.LabelOwnerResourceType: t.ingress.Kind,
+		domain.LabelOwnerResourceKind: t.ingress.Kind,
+		domain.LabelOwnerResourceUid:  string(t.ingress.UID),
 	})
 	if err != nil {
 		t.logger.Warnf("failed to list LBC: %v", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -34,7 +35,7 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		return err
 	}
 
-	canDelete, err := t.canDeleteWholeLoadBalancer(ctx, lbId)
+	canDelete, err := t.canDeleteWholeLoadBalancer(ctx, lbId, t.lbConfig.Spec.Type)
 	if err != nil {
 		return err
 	}
@@ -67,6 +68,11 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 			if err != nil {
 				return err
 			}
+		} else {
+			// load balancer still exists, remove cluster id from cluster tags
+			if err := t.deleteRedundantTags(ctx, lbId); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -75,7 +81,7 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 // check if can delete whole loadbalancer
 // oldBuilder and currentBuilder should be the same listeners' name, pool's name
 // if can delete whole loadbalancer, delete loadbalancer and return
-func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context, lbId string) (bool, error) {
+func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context, lbId string, lbType loadbalancerv2.LoadBalancerType) (bool, error) {
 	// get current listeners from vngcloud
 	listeners, err := t.vngcloudRepo.ListListenerOfLB(ctx, lbId)
 	if err != nil {
@@ -98,12 +104,17 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 			return false, nil
 		}
 
+		// skip policy check for L4 load balancer (L4 has no policies)
+		if lbType == loadbalancerv2.LoadBalancerTypeLayer4 {
+			return true, nil
+		}
+
 		// check policies, all policies must be in .status.createdPolicies
 		currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, createdListener.Id)
 		if err != nil {
 			return false, err
 		}
-		_canCoverPolicies, err := canCover(createdListener.CreatedPolicies, currentPolicies.Items, func(a []v1alpha1.CreatedPolicy, b *entityv2.Policy) (bool, error) {
+		_canCoverPolicies, _ := canCover(createdListener.CreatedPolicies, currentPolicies.Items, func(a []v1alpha1.CreatedPolicy, b *entityv2.Policy) (bool, error) {
 			foundPolicy := false
 			for _, oldP := range a {
 				if oldP.Id == b.UUID {
@@ -117,9 +128,6 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 			}
 			return true, nil
 		})
-		if err != nil {
-			return false, err
-		}
 		return _canCoverPolicies, nil
 	})
 	if err != nil {
@@ -155,16 +163,13 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 		if err != nil {
 			return false, err
 		}
-		_canCoverMembers, err := canCover(createPool.CreatedMembers, currentMembers.Items, func(a []v1alpha1.PoolMember, b *entityv2.Member) (bool, error) {
+		_canCoverMembers, _ := canCover(createPool.CreatedMembers, currentMembers.Items, func(a []v1alpha1.PoolMember, b *entityv2.Member) (bool, error) {
 			if !t.checkIfPoolMemberExist(a, convertMember(b)) {
 				t.logger.Debugf("Cannot delete whole loadbalancer because member %s is not in status", b.Address)
 				return false, nil
 			}
 			return true, nil
 		})
-		if err != nil {
-			return false, err
-		}
 		return _canCoverMembers, nil
 	})
 	if err != nil {

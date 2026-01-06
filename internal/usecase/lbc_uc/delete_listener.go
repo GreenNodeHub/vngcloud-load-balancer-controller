@@ -78,42 +78,6 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 		}
 	}
 
-	// TODO
-	// // reorder policies if needed
-	// if newBuilder.AutoReorderPolicies() {
-	// 	for _, listener := range r.GetListenerBuilders() {
-	// 		if listener.IsDeleted() {
-	// 			continue
-	// 		}
-	// 		// get policies to update
-	// 		policies, err := r.provider.ListPolicyOfListener(r.context, r.loadBalancerID, listener.GetID())
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		listener.policyBuilders = make([]*policyBuilderType, 0)
-	// 		for _, policy := range policies.Items {
-	// 			policyBuilder, err := r.buildPolicy(policy)
-	// 			if err != nil {
-	// 				return err
-	// 			}
-	// 			listener.policyBuilders = append(listener.policyBuilders, policyBuilder)
-	// 		}
-
-	// 		// check if need reorder policies
-	// 		isNeeded, policyIDs := listener.NeedReorder()
-	// 		if !isNeeded {
-	// 			continue
-	// 		}
-	// 		if err := r.provider.ReorderPolicies(r.context, r.GetLoadBalancerID(), listener.GetID(), policyIDs); err != nil {
-	// 			r.logger.Error("Failed to reorder policies: ", err)
-	// 			return err
-	// 		}
-	// 		if _, err := r.provider.WaitForLBActive(r.context, r.GetLoadBalancerID()); err != nil {
-	// 			r.logger.Error("Failed to wait for loadbalancer active: ", err)
-	// 			return err
-	// 		}
-	// 	}
-	// }
 	return nil
 }
 
@@ -181,10 +145,12 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 		}
 
 		// compare pool members
-		canDeleteWhole, _, err := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
+		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, listener.DefaultPoolId)
 		if err != nil {
+			t.logger.Errorf("Failed to get members of pool %s: %v", listener.DefaultPoolId, err)
 			return false, err
 		}
+		canDeleteWhole, _ := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, currentListMembers, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
 		if !canDeleteWhole {
 			t.logger.Debugf("Can't delete whole listener, default pool %s cannot be deleted whole.", listener.DefaultPoolId)
 			return false, nil

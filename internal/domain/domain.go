@@ -26,8 +26,9 @@ const (
 
 // Labels
 const (
-	LabelOwnerResourceType = "vks.vngcloud.vn/owner-resource-type"
+	LabelOwnerResourceKind = "vks.vngcloud.vn/owner-resource-kind"
 	LabelOwnerResourceName = "vks.vngcloud.vn/owner-resource-name"
+	LabelOwnerResourceUid  = "vks.vngcloud.vn/owner-resource-uid"
 
 	// LabelNodeExcludeLB specifies that a node should not be used to create a Loadbalancer on
 	// https://github.com/kubernetes/cloud-provider/blob/25867882d509131a6fdeaf812ceebfd0f19015dd/controllers/service/controller.go#L673
@@ -48,8 +49,19 @@ const (
 	DEFAULT_NAME_DEFAULT_POOL         = "vks_default_pool"
 	DEFAULT_HTTPS_LISTENER_NAME       = "vks_https_listener"
 	DEFAULT_HTTP_LISTENER_NAME        = "vks_http_listener"
-	VKS_TAG_KEY                       = "vks-cluster-ids"
-	VKS_TAGS_SEPARATOR                = "_"
-	VKS_CLUSTER_ID_PREFIX             = "k8s-"
-	VKS_CLUSTER_ID_LENGTH             = 40
+
+	VKS_CLUSTER_ID_PREFIX = "k8s-"
+	VKS_CLUSTER_ID_LENGTH = 40
+
+	// Tags
+	VpcTagKey                = "vng.vpc.id"
+	BillingTagKey            = "vng.billing.product"
+	BillingTagValue          = "vks"
+	ClusterTagKey            = "vng.vks.cluster.ids"
+	ClusterTagValueSeparator = "/"
+
+	DeprecatedClusterTagKey            = "vks-cluster-ids"
+	DeprecatedClusterTagValueSeparator = "_"
+
+	DefaultMaxConcurrentReconciles = 5
 )

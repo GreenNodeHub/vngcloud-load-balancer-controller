@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"crypto/sha1"
 	"fmt"
 	"strings"
 	"unicode"
@@ -85,21 +84,6 @@ func (t *nameHelper) GenL4ListenerName(pPort corev1.ServicePort) string {
 		TrimString(string(pPort.Protocol), 3),
 		pPort.Port)
 	return ValidateName(name)
-}
-
-func GenerateLBConfigName(prefix, baseName string) string {
-	full := fmt.Sprintf("%s-%s", prefix, baseName)
-	if len(full) <= 63 {
-		return full
-	}
-
-	hash := fmt.Sprintf("%x", sha1.Sum([]byte(full)))[:6] // lấy 6 ký tự hash
-	cutLen := 63 - len(prefix) - len(hash) - 2            // trừ thêm 2 dấu '-'
-	if cutLen < 0 {
-		cutLen = 0
-	}
-	short := baseName[:cutLen]
-	return fmt.Sprintf("%s-%s-%s", prefix, short, hash)
 }
 
 // genL7PoolName generates the name of the L7 pool.

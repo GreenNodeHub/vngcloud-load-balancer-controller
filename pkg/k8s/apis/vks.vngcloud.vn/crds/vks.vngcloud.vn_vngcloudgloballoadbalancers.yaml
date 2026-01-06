@@ -1,9 +1,10 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: vngcloudgloballoadbalancers.vks.vngcloud.vn
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
+  name: vngcloudgloballoadbalancers.vks.vngcloud.vn
 spec:
   group: vks.vngcloud.vn
   names:
@@ -52,8 +53,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: VngcloudGlobalLoadBalancerSpec defines the desired state of
-              VngcloudGlobalLoadBalancer.
+            description: VngcloudGlobalLoadBalancerSpec defines the desired state
+              of VngcloudGlobalLoadBalancer.
             type: object
           status:
             description: VngcloudGlobalLoadBalancerStatus defines the observed state
@@ -67,9 +68,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

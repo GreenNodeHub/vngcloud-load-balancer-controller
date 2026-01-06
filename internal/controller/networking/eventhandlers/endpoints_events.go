@@ -39,6 +39,7 @@ type enqueueRequestsForEndpointsEvent struct {
 }
 
 func (h *enqueueRequestsForEndpointsEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create Endpoints", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Endpoints))
 }
 
@@ -48,11 +49,13 @@ func (h *enqueueRequestsForEndpointsEvent) Update(ctx context.Context, e event.U
 
 	// Only reconcile if the endpoint subsets have changed
 	if !equality.Semantic.DeepEqual(oldEndpoint.Subsets, newEndpoint.Subsets) {
+		h.logger.V(1).Info("Update Endpoints", "namespace", newEndpoint.GetNamespace(), "name", newEndpoint.GetName())
 		h.enqueueImpactedIngresses(ctx, queue, newEndpoint)
 	}
 }
 
 func (h *enqueueRequestsForEndpointsEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Delete Endpoints", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Endpoints))
 }
 

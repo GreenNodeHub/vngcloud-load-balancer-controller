@@ -80,11 +80,20 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	})
 }
 
+// deployLoadBalancer creates or ensures the load balancer exists, handling migrations if necessary.
+// It returns the load balancer ID to be used for further operations.
+// The caller should requeue if a new load balancer ID is obtained to acquire the appropriate lock.
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (string, error) {
+	errorNewLbIdObtained := errs.NewRequeueNeeded("new load balancer ID obtained, requeue needed")
+
 	// if already an exist lb
 	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
 		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
-			return t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
+			lbId, err := t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
 		} else {
 			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
 		}
@@ -93,7 +102,11 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, created
 	// if not exist lbId in status
 	// try to use spec lbId
 	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
-		return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
+		lbId, err := t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
+		if err != nil {
+			return lbId, err
+		}
+		return lbId, errorNewLbIdObtained
 	}
 
 	// try to use spec lb Name
@@ -103,10 +116,15 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, created
 			return "", err
 		}
 		if lb != nil {
-			return t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
+			lbId, err := t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
 		}
 	}
 
+	// if requeue here, created Listeners and Pools is not saved in status yet, if user delete LBC quickly, may cause orphan resources
 	return t.createLoadBalancer(ctx, createdCerts)
 }
 
@@ -140,9 +158,16 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 		}
 	}
 
+	if err := t.statusAddLoadBalancerId(ctx, &lbEntity.UUID, &lbEntity.Address); err != nil {
+		return "", err
+	}
+
 	// wait for loadbalancer active, if lb is error, delete it and return error
 	if _, err = t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
 		if err == domain.ErrorLoadBalancerStatusError {
+			if err := t.statusAddLoadBalancerId(ctx, nil, nil); err != nil {
+				return "", err
+			}
 			if err := t.vngcloudRepo.DeleteLoadBalancer(ctx, lbEntity.UUID); err != nil {
 				t.logger.Error("Failed to delete loadbalancer: ", err)
 				return "", err
@@ -155,6 +180,8 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 	}
 
 	t.logger.Infof("Created load balancer with ID %s", lbEntity.UUID)
+
+	// because load balancer is just created, need to deploy package and tag again and update status
 	return t.ensureExistLoadBalancer(ctx, lbEntity.UUID, nil)
 }
 
@@ -172,22 +199,10 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 	if lbEntity == nil {
 		var err error
-		lbEntity, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
+		_, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
 		if err != nil {
 			return "", err
 		}
-	}
-
-	// update status
-	if err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		obj.Status.Address = &lbEntity.Address
-	}); err != nil {
-		return "", err
-	}
-
-	if err := t.deployTags(ctx, lbId); err != nil {
-		return "", err
 	}
 
 	var err error
@@ -195,14 +210,20 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
+	// update status
+	if err := t.statusAddLoadBalancerId(ctx, &lbId, &lbEntity.Address); err != nil {
+		return "", err
+	}
+
+	if err := t.deployTags(ctx, lbId); err != nil {
+		return "", err
+	}
+
 	if err := t.deployPackageId(ctx, lbEntity); err != nil {
 		return "", err
 	}
 
-	return lbId, t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		obj.Status.Address = &lbEntity.Address
-	})
+	return lbId, nil
 }
 
 // resize load balancer if packageID in spec is different from current one
@@ -362,9 +383,16 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		}
 	}
 
-	// build backendSubnetId
-	if t.lbConfig.Spec.BackendSubnetId == nil || *t.lbConfig.Spec.BackendSubnetId == "" {
-		return nil, errs.NewNoNeedRequeue("backendSubnetId is required for InterVpc load balancer")
+	// build privateSubnetId
+	if t.lbConfig.Spec.PrivateSubnetId == nil || *t.lbConfig.Spec.PrivateSubnetId == "" {
+		return nil, errs.NewNoNeedRequeue("privateSubnetId is required for InterVpc load balancer")
+	}
+
+	// build privateZoneId
+	// for InterVPC, use PrivateZoneId if available
+	privateZoneId := t.lbConfig.Spec.ZoneId
+	if t.lbConfig.Spec.PrivateZoneId != nil && *t.lbConfig.Spec.PrivateZoneId != "" {
+		privateZoneId = *t.lbConfig.Spec.PrivateZoneId
 	}
 
 	// build packageId
@@ -373,7 +401,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		packageId = *t.lbConfig.Spec.PackageId
 	} else {
 		// use default package from config, get default package id from name and zone
-		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, t.lbConfig.Spec.ZoneId)
+		listPackages, err := t.vngcloudRepo.ListLoadBalancerPackageByZone(ctx, privateZoneId)
 		if err != nil {
 			return nil, err
 		}
@@ -384,7 +412,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 			}
 		}
 		if packageId == "" {
-			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, t.lbConfig.Spec.ZoneId))
+			return nil, errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default load balancer package %s in zone %s", t.cfg.LoadBalancerOpts.DefaultL4PackageName, privateZoneId))
 		}
 	}
 
@@ -393,8 +421,8 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		t.lbConfig.Spec.LoadBalancerName,
 		packageId,
 		t.lbConfig.Spec.SubnetId,
-		*t.lbConfig.Spec.BackendSubnetId,
-	).WithZoneId(t.lbConfig.Spec.ZoneId)
+		*t.lbConfig.Spec.PrivateSubnetId,
+	).WithZoneId(privateZoneId)
 
 	// TODO: add more fields (ignore listener and pool for now becasue have to create inter.ListenerRequest and inter.CreatePoolRequest)
 	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest

@@ -58,6 +58,10 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 	secgroupRules = t.ensureSecgroupPING_UDP(ctx, secgroupRules)
 	secgroupRules = t.ensureDefaultEngressSecgroupRule(ctx, secgroupRules)
 	secgroupRules = t.ensureUniqueSecgroupRules(secgroupRules)
+
+	// Sort rules to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	v1alpha1.SortSecurityGroupRules(secgroupRules)
 	return secgroupRules, nil
 }
 
@@ -126,7 +130,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 						FromPort:    int32(podPort),
 						ToPort:      int32(podPort),
 						CIDR:        cidr,
-						Description: "Allow other node access pod port - Cilium native", // TODO: improve description
+						Description: "Allow other node access pod port - Cilium native",
 						Direction:   networkv2.SecgroupRuleDirectionIngress,
 						EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 					})
@@ -161,7 +165,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 			FromPort:    int32(member.Port),
 			ToPort:      int32(member.Port),
 			CIDR:        subnetCidr,
-			Description: fmt.Sprintf("Allow load balancer access to port %d", member.Port), // TODO: improve description
+			Description: fmt.Sprintf("Allow load balancer access to port %d", member.Port),
 			Direction:   networkv2.SecgroupRuleDirectionIngress,
 			EtherType:   networkv2.SecgroupRuleEtherTypeIPv4,
 		})
@@ -213,8 +217,8 @@ func (t *defaultModelBuildTask) ensureSecgroupPING_UDP(
 		if rule.Protocol == networkv2.SecgroupRuleProtocolUDP {
 			newRules = append(newRules, v1alpha1.NodeSecurityGroupRule{
 				Protocol:    networkv2.SecgroupRuleProtocolICMP,
-				FromPort:    rule.FromPort,
-				ToPort:      rule.ToPort,
+				FromPort:    1,   // ICMP layer 3, no port, only type and code
+				ToPort:      255, // ICMP layer 3, no port, only type and code
 				CIDR:        rule.CIDR,
 				Description: "Allow ICMP for health check UDP port",
 				Direction:   rule.Direction,

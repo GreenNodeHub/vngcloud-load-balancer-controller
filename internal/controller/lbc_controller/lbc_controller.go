@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/anngdinh/operator-helper/k8s"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -37,6 +37,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
@@ -47,7 +48,7 @@ const (
 )
 
 func NewLoadBalancerConfigReconciler(
-	client client.Client,
+	k8sClient client.Client,
 	scheme *runtime.Scheme,
 	lbcUseCase usecase.LoadBalancerConfigUseCase,
 	eventRecorder record.EventRecorder,
@@ -55,23 +56,31 @@ func NewLoadBalancerConfigReconciler(
 	lbcUtils lbc.LoadBalancerConfigUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
+	maxConcurrentReconciles int,
 ) *LoadBalancerConfigReconciler {
 	return &LoadBalancerConfigReconciler{
-		Client:           client,
+		k8sClient:        k8sClient,
 		Scheme:           scheme,
 		lbcUseCase:       lbcUseCase,
 		eventRecorder:    eventRecorder,
 		finalizerManager: finalizerManager,
 		lbcUtils:         lbcUtils,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 
 // LoadBalancerConfigReconciler reconciles a LoadBalancerConfig object
 type LoadBalancerConfigReconciler struct {
-	client.Client
+	k8sClient        client.Client
 	Scheme           *runtime.Scheme
 	lbcUseCase       usecase.LoadBalancerConfigUseCase
 	eventRecorder    record.EventRecorder
@@ -83,6 +92,7 @@ type LoadBalancerConfigReconciler struct {
 
 	maxConcurrentReconciles int
 
+	logger   logr.Logger
 	initDone atomic.Bool
 }
 
@@ -109,7 +119,7 @@ func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.R
 	object := &v1alpha1.LoadBalancerConfig{}
 	var err error
 	fetchServiceFn := func() {
-		err = r.Client.Get(ctx, req.NamespacedName, object)
+		err = r.k8sClient.Get(ctx, req.NamespacedName, object)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
 	if err != nil {
@@ -209,7 +219,7 @@ func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr
 	}
 
 	lbcEventHandler := eventhandlers.NewEnqueueRequestForLbcEvent(r.eventRecorder,
-		r.lbcUtils)
+		r.lbcUtils, r.logger.WithName("eventHandlers").WithName("lbc"))
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Watches(&v1alpha1.LoadBalancerConfig{}, lbcEventHandler).

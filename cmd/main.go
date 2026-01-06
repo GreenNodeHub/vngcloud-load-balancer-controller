@@ -17,15 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
-	"path"
-	runtime2 "runtime"
-	"strconv"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -33,16 +29,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/anngdinh/operator-helper/k8s"
-	"github.com/anngdinh/operator-helper/version"
-	"github.com/sirupsen/logrus"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -70,16 +59,21 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/glbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
+	vksvngcloudvn "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s/apis/vks.vngcloud.vn"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/logging"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -143,36 +137,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Parse and set log level
-	level, err := logrus.ParseLevel(logLevel)
-	if err != nil {
+	// Setup logrus logger
+	if err := logging.SetupLogger(logLevel); err != nil {
 		setupLog.Error(err, "invalid log level, defaulting to info", "logLevel", logLevel)
-		level = logrus.InfoLevel
-	}
-	logrus.SetLevel(level)
-	logrus.SetReportCaller(true)
-
-	// Use simplified format for debug level
-	if level == logrus.DebugLevel {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableTimestamp: true,
-			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
-				fileName := " " + path.Base(frame.File) + ":" + strconv.Itoa(frame.Line) + " |"
-				return "", fileName
-			},
-		})
-	} else {
-		logrus.SetFormatter(&logrus.TextFormatter{
-			DisableTimestamp: false,
-			CallerPrettyfier: func(frame *runtime2.Frame) (function string, file string) {
-				fileName := path.Base(frame.File) + ":" + strconv.Itoa(frame.Line)
-				return "", fileName
-			},
-		})
 	}
 
-	err = conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml")
-	if err != nil {
+	if err := conf.Init(setupLog, "/etc/vngcloud-load-balancer-controller/config.yaml"); err != nil {
 		os.Exit(1)
 	}
 
@@ -183,10 +153,18 @@ func main() {
 			os.Exit(1)
 		}
 
-		clientManager := controller.GetClientManager()
-		kubeRestConfig, err = clientManager.GetRestConfig(client.ObjectKey{Namespace: conf.Cluster.Namespace, Name: conf.Cluster.ClusterID})
+		// Create a client for the management cluster (current cluster)
+		mgmtClient, err := client.New(kubeRestConfig, client.Options{Scheme: scheme})
 		if err != nil {
-			setupLog.Error(err, "unable to get client")
+			setupLog.Error(err, "unable to create management cluster client")
+			os.Exit(1)
+		}
+
+		// Create cluster API client and get the target cluster's rest config
+		clusterAPIClient := clusterapi.NewClusterClient(mgmtClient)
+		kubeRestConfig, err = clusterAPIClient.GetRestConfig(context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
+		if err != nil {
+			setupLog.Error(err, "unable to get target cluster rest config")
 			os.Exit(1)
 		}
 	}
@@ -268,16 +246,10 @@ func main() {
 		setupLog.Error(err, "unable to create CRD client")
 		os.Exit(1)
 	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_vngcloudgloballoadbalancers.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
-		os.Exit(1)
-	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_loadbalancerconfigs.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
-		os.Exit(1)
-	}
-	if err := applyCRDFromFile(context.TODO(), "./config/crd/bases/vks.vngcloud.vn_nodesecuritygroups.yaml", crdClient); err != nil {
-		setupLog.Error(err, "unable to apply CRD")
+
+	// Install all CRDs at startup
+	if err := vksvngcloudvn.InstallAllCRDs(crdClient, conf.ChartVersion, setupLog); err != nil {
+		setupLog.Error(err, "failed to install crds")
 		os.Exit(1)
 	}
 
@@ -297,7 +269,7 @@ func main() {
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 		cniDetector := utils.NewDetector(mgr.GetClient())
 		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
-		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer)
+		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 		serviceUseCase := service_uc.NewServiceUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
 		reconciler := corecontroller.NewServiceReconciler(
@@ -309,6 +281,7 @@ func main() {
 			serviceUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Service")
@@ -338,6 +311,7 @@ func main() {
 			ingressUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr, clientSet); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Ingress")
@@ -359,6 +333,7 @@ func main() {
 			lbcUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			conf.MaxConcurrentReconciles,
 		)
 		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "LoadBalancerConfig")
@@ -401,6 +376,7 @@ func main() {
 			nsgUtils,
 			lbcMetricsCollector,
 			reconcileCounters,
+			1, // only 1 because it config same nodes' security groups
 		)
 		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeSecurityGroup")
@@ -448,39 +424,4 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-func applyCRDFromFile(ctx context.Context, crdFile string, crdClient *apiextensionsclient.Clientset) error {
-	// Load the CRD file
-	fileData, err := os.ReadFile(crdFile)
-	if err != nil {
-		return fmt.Errorf("failed to read CRD file: %v", err)
-	}
-
-	// Wrap fileData in bytes.NewReader to convert []byte to io.Reader
-	reader := bytes.NewReader(fileData)
-
-	// Convert YAML to a CRD object
-	crd := &apiextensionsv1.CustomResourceDefinition{}
-	decoder := yaml.NewYAMLOrJSONDecoder(reader, 1000)
-	if err := decoder.Decode(crd); err != nil {
-		return fmt.Errorf("failed to decode CRD: %v", err)
-	}
-
-	// Check if the CRD already exists
-	_, err = crdClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
-	if err != nil && errors.IsNotFound(err) {
-		// If CRD is not found, create it
-		setupLog.Info("Installing CRD", "crd", crd.Name)
-		_, err = crdClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create CRD: %v", err)
-		}
-		setupLog.Info("CRD installed", "crd", crd.Name)
-	} else if err != nil {
-		return fmt.Errorf("failed to get CRD: %v", err)
-	} else {
-		setupLog.Info("CRD already exists", "crd", crd.Name)
-	}
-	return nil
 }

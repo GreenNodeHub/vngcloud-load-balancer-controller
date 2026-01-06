@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -34,20 +35,30 @@ type enqueueRequestsForNodeEvent struct {
 
 func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := e.Object.(*corev1.Node)
-	h.logger.Info("node created, enqueuing all LoadBalancer services", "node", node.Name)
+	h.logger.V(1).Info("Create Node", "name", node.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	oldNode := e.ObjectOld.(*corev1.Node)
 	newNode := e.ObjectNew.(*corev1.Node)
 
-	h.logger.Info("node updated, enqueuing all LoadBalancer services", "node", newNode.Name)
+	// Skip reconciliation if only unimportant fields changed
+	// Only reconcile if labels, spec, addresses, or ready condition changed
+	if equality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) &&
+		equality.Semantic.DeepEqual(oldNode.Spec, newNode.Spec) &&
+		equality.Semantic.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses) &&
+		getNodeReadyCondition(oldNode) == getNodeReadyCondition(newNode) {
+		return
+	}
+
+	h.logger.V(1).Info("Update Node", "name", newNode.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := e.Object.(*corev1.Node)
-	h.logger.Info("node deleted, enqueuing all LoadBalancer services", "node", node.Name)
+	h.logger.V(1).Info("Delete Node", "name", node.Name)
 	h.enqueueAllSupportedServices(ctx, queue)
 }
 
@@ -71,4 +82,13 @@ func (h *enqueueRequestsForNodeEvent) enqueueAllSupportedServices(ctx context.Co
 			NamespacedName: client.ObjectKeyFromObject(&svc),
 		})
 	}
+}
+
+func getNodeReadyCondition(node *corev1.Node) corev1.ConditionStatus {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status
+		}
+	}
+	return corev1.ConditionUnknown
 }

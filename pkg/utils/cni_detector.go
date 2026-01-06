@@ -26,16 +26,16 @@ type CniDetector interface {
 }
 
 type detector struct {
-	client.Client
+	k8sClient client.Client
 
 	result *CNIType
 }
 
 // NewDetector creates a new instance of the CNI detector.
-func NewDetector(kubeClient client.Client) CniDetector {
+func NewDetector(k8sClient client.Client) CniDetector {
 	return &detector{
-		Client: kubeClient,
-		result: nil,
+		k8sClient: k8sClient,
+		result:    nil,
 	}
 }
 
@@ -72,7 +72,7 @@ func (d *detector) isCalicoOverlay(ctx context.Context) bool {
 	logger := contexts.NewContext(ctx).Log()
 
 	calicoNodeDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
+	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -88,7 +88,7 @@ func (d *detector) isCiliumOverlay(ctx context.Context) bool {
 	logger := contexts.NewContext(ctx).Log()
 
 	ciliumDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
+	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -109,7 +109,7 @@ func (d *detector) isCiliumNativeRouting(ctx context.Context) bool {
 
 	// get cilium-config config map
 	ciliumConfigMap := &corev1.ConfigMap{}
-	err := d.Client.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
+	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {

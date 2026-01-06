@@ -2,11 +2,14 @@ package ingress_uc
 
 import (
 	"context"
+	"errors"
+	"strings"
+	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/pkg/errors"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,11 +67,18 @@ func (uc *ingressUseCase) InitIngressUseCase(ctx context.Context) error {
 		logger.Errorf("failed to list nodes: %v", err)
 		return err
 	}
+	if len(nodes.Items) == 0 {
+		return errors.New("no nodes found in cluster")
+	}
 
 	// check if network info is available
 	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
-		providerIds := utils.GetListProviderIdFromNodeList(nodes) // TODO do we need get all provider ids?
-		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerIds[0])
+		// get provider ID from first node
+		firstProviderId := utils.GetProviderIdFromNode(&nodes.Items[0])
+		if firstProviderId == "" {
+			return errors.New("failed to get provider ID from node")
+		}
+		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, firstProviderId)
 		if err != nil {
 			logger.Errorf("failed to get default network info: %v", err)
 			return err
@@ -133,46 +143,50 @@ func (uc *ingressUseCase) DeleteIngressUseCase(ctx context.Context, req ctrl.Req
 		return nil
 	}
 
-	// get all LBCs created by this ingress by using label selector
-	lbcList := &v1alpha1.LoadBalancerConfigList{}
-	err = uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
-		domain.LabelOwnerResourceName: ing.GetName(),
-		domain.LabelOwnerResourceType: ing.Kind,
-	})
-	if err != nil {
-		logger.Errorf("failed to list LBCs by label: %v", err)
-		return err
+	// delete LoadBalancerConfig and NodeSecurityGroup created by this ingress concurrently
+	type deleteResult struct {
+		stillExist []string
+		err        error
 	}
+	resultCh := make(chan deleteResult, 2)
 
-	// delete all LBCs found
-	for _, lbc := range lbcList.Items {
-		err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
-		if client.IgnoreNotFound(err) != nil {
-			logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
-			return err
+	go func() {
+		stillExist, err := uc.deleteLoadBalancerConfig(ctx, ing)
+		resultCh <- deleteResult{stillExist: stillExist, err: err}
+	}()
+
+	go func() {
+		stillExist, err := uc.deleteNodeSecurityGroup(ctx, ing)
+		resultCh <- deleteResult{stillExist: stillExist, err: err}
+	}()
+
+	// Collect results
+	var allStillExist []string
+	var realErrs []error
+	for i := 0; i < 2; i++ {
+		result := <-resultCh
+		if result.err != nil {
+			realErrs = append(realErrs, result.err)
 		}
+		allStillExist = append(allStillExist, result.stillExist...)
 	}
 
-	// get all NSGs created by this ingress by using label selector
-	// and delete them
-	secgroupList := &v1alpha1.NodeSecurityGroupList{}
-	err = uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
-		domain.LabelOwnerResourceName: ing.GetName(),
-		domain.LabelOwnerResourceType: ing.Kind,
-	})
-	if err != nil {
-		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
-		return err
-	}
-
-	// delete all NSGs found
-	for _, secgroup := range secgroupList.Items {
-		err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
-		if client.IgnoreNotFound(err) != nil {
-			logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
-			return err
+	// If there are real errors, return them immediately
+	if len(realErrs) > 0 {
+		for _, err := range realErrs {
+			logger.Errorf("failed to delete resources for ingress %s/%s: %v", ing.GetNamespace(), ing.GetName(), err)
 		}
+		return errors.Join(realErrs...)
 	}
+
+	// If resources still exist, return requeue error
+	if len(allStillExist) > 0 {
+		return errs.NewRequeueNeededAfter(
+			"waiting for resources to be deleted: "+strings.Join(allStillExist, ", "),
+			2*time.Second,
+		)
+	}
+
 	return nil
 }
 
@@ -206,4 +220,89 @@ func (uc *ingressUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	}
 
 	return task.run(ctx)
+}
+
+func (uc *ingressUseCase) deleteLoadBalancerConfig(ctx context.Context, ing *networkingv1.Ingress) ([]string, error) {
+	logger := contexts.NewContext(ctx).Log()
+
+	// get all LBCs created by this ingress by using label selector
+	lbcList := &v1alpha1.LoadBalancerConfigList{}
+	err := uc.k8sRepo.ListLoadBalancerConfig(ctx, lbcList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
+		domain.LabelOwnerResourceName: ing.GetName(),
+		domain.LabelOwnerResourceKind: ing.Kind,
+		domain.LabelOwnerResourceUid:  string(ing.UID),
+	})
+	if err != nil {
+		logger.Errorf("failed to list LBCs by label: %v", err)
+		return nil, err
+	}
+
+	// If no LBCs found, nothing to delete
+	if len(lbcList.Items) == 0 {
+		logger.Debug("No LoadBalancerConfigs found to delete")
+		return nil, nil
+	}
+
+	// Delete all LBCs found (non-blocking)
+	var stillExist []string
+	for _, lbc := range lbcList.Items {
+		// If not already being deleted, initiate deletion
+		if lbc.DeletionTimestamp.IsZero() {
+			err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
+			if client.IgnoreNotFound(err) != nil {
+				logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
+				return nil, err
+			}
+		}
+
+		// Resource still exists (either just deleted or deletion in progress)
+		stillExist = append(stillExist, "lbc:"+lbc.Namespace+"/"+lbc.Name)
+	}
+
+	if len(stillExist) == 0 {
+		logger.Info("All LoadBalancerConfigs successfully deleted")
+	}
+	return stillExist, nil
+}
+
+func (uc *ingressUseCase) deleteNodeSecurityGroup(ctx context.Context, ing *networkingv1.Ingress) ([]string, error) {
+	logger := contexts.NewContext(ctx).Log()
+	// get all NSGs created by this ingress by using label selector
+	secgroupList := &v1alpha1.NodeSecurityGroupList{}
+	err := uc.k8sRepo.ListNodeSecurityGroup(ctx, secgroupList, client.InNamespace(ing.GetNamespace()), client.MatchingLabels{
+		domain.LabelOwnerResourceName: ing.GetName(),
+		domain.LabelOwnerResourceKind: ing.Kind,
+		domain.LabelOwnerResourceUid:  string(ing.UID),
+	})
+	if err != nil {
+		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
+		return nil, err
+	}
+
+	// If no NSGs found, nothing to delete
+	if len(secgroupList.Items) == 0 {
+		logger.Debug("No NodeSecurityGroups found to delete")
+		return nil, nil
+	}
+
+	// Delete all NSGs found (non-blocking)
+	var stillExist []string
+	for _, secgroup := range secgroupList.Items {
+		// If not already being deleted, initiate deletion
+		if secgroup.DeletionTimestamp.IsZero() {
+			err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
+			if client.IgnoreNotFound(err) != nil {
+				logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
+				return nil, err
+			}
+		}
+
+		// Resource still exists (either just deleted or deletion in progress)
+		stillExist = append(stillExist, "nsg:"+secgroup.Namespace+"/"+secgroup.Name)
+	}
+
+	if len(stillExist) == 0 {
+		logger.Info("All NodeSecurityGroups successfully deleted")
+	}
+	return stillExist, nil
 }

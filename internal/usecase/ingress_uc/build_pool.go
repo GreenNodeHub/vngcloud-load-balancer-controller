@@ -2,6 +2,7 @@ package ingress_uc
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -135,6 +136,21 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		allListeners = append(allListeners, *httpsListener)
 	}
 
+	// Sort pools and listeners by name to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	sort.Slice(allPools, func(i, j int) bool {
+		return allPools[i].Name < allPools[j].Name
+	})
+	sort.Slice(allListeners, func(i, j int) bool {
+		return allListeners[i].Name < allListeners[j].Name
+	})
+	// Sort policies within each listener by name
+	for i := range allListeners {
+		sort.Slice(allListeners[i].Policies, func(a, b int) bool {
+			return allListeners[i].Policies[a].Name < allListeners[i].Policies[b].Name
+		})
+	}
+
 	return allPools, allListeners, nil
 }
 
@@ -202,6 +218,15 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, service *networki
 		}
 		poolMembers = append(poolMembers, poolMember)
 	}
+
+	// Sort pool members by IP:Port to ensure deterministic ordering
+	// This prevents unnecessary reconciliation loops caused by array order changes
+	sort.Slice(poolMembers, func(i, j int) bool {
+		if poolMembers[i].IP != poolMembers[j].IP {
+			return poolMembers[i].IP < poolMembers[j].IP
+		}
+		return poolMembers[i].Port < poolMembers[j].Port
+	})
 
 	// build healthcheck
 	healthMonitor := v1alpha1.PoolHealthMonitor{

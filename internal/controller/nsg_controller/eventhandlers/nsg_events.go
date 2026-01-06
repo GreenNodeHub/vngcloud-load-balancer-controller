@@ -11,16 +11,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 )
 
 // NewEnqueueRequestForNsgEvent constructs new enqueueRequestsForNsgEvent.
 func NewEnqueueRequestForNsgEvent(eventRecorder record.EventRecorder,
-	nsgUtils nsg.NodeSecurityGroupUtils) *enqueueRequestsForNsgEvent {
+	nsgUtils nsg.NodeSecurityGroupUtils, logger logr.Logger) *enqueueRequestsForNsgEvent {
 	return &enqueueRequestsForNsgEvent{
 		eventRecorder: eventRecorder,
 		nsgUtils:      nsgUtils,
+		logger:        logger,
 	}
 }
 
@@ -29,9 +31,11 @@ var _ handler.EventHandler = (*enqueueRequestsForNsgEvent)(nil)
 type enqueueRequestsForNsgEvent struct {
 	eventRecorder record.EventRecorder
 	nsgUtils      nsg.NodeSecurityGroupUtils
+	logger        logr.Logger
 }
 
 func (h *enqueueRequestsForNsgEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create NSG", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedObject(ctx, queue, e.Object.(*v1alpha1.NodeSecurityGroup))
 }
 
@@ -39,13 +43,16 @@ func (h *enqueueRequestsForNsgEvent) Update(ctx context.Context, e event.UpdateE
 	oldObj := e.ObjectOld.(*v1alpha1.NodeSecurityGroup)
 	newObj := e.ObjectNew.(*v1alpha1.NodeSecurityGroup)
 
-	// Skip reconciliation if only unimportant fields changed
-	if equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
+	// Allow periodic sync events (same resource version) for drift detection
+	isSyncEvent := oldObj.GetResourceVersion() == newObj.GetResourceVersion()
+	if !isSyncEvent &&
+		equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
 		equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) &&
 		oldObj.DeletionTimestamp.IsZero() == newObj.DeletionTimestamp.IsZero() {
 		return
 	}
 
+	h.logger.V(1).Info("Update NSG", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
