@@ -64,9 +64,9 @@ func IgnoreErrors(err error, funcs ...func(error) bool) error {
 	return err
 }
 
+// Cannot get security group with id secg-
 func IsSecurityGroupNotFound(err error) bool {
-	// TODO
-	return false
+	return err != nil && strings.HasPrefix(err.Error(), "Cannot get security group with id secg-")
 }
 
 func IsRateLimitExceeded(err error) bool {
