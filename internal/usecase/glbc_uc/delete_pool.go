@@ -3,7 +3,7 @@ package glbc_uc
 import (
 	"context"
 
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -87,10 +87,10 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 				return err
 			}
 		} else if updateMemberOption != nil {
-			// update to delete redundant members
-			t.logger.Debugf("Update pool %s members to remove redundant members", candidateId)
-			if err = t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, candidateId, updateMemberOption); err != nil {
-				t.logger.Error("Failed to update pool members: ", err)
+			// update to delete redundant pool members
+			t.logger.Debugf("Update pool %s to remove redundant pool members", candidateId)
+			if err = t.vngcloudRepo.PatchGlobalPoolMember(ctx, lbId, candidateId, updateMemberOption); err != nil {
+				t.logger.Error("Failed to patch pool members: ", err)
 				return err
 			}
 			if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
@@ -104,8 +104,8 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 
 // canDeleteWholePool checks if we can delete the whole pool
 // conditions:
-// - all members of the pool are created by us and not in new created members
-func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdPool, newCreatedPool *v1alpha1.CreatedGlobalPool) (bool, loadbalancerv2.IUpdatePoolMembersRequest, error) {
+// - all pool members of the pool are created by us and not in new created pool members
+func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdPool, newCreatedPool *v1alpha1.CreatedGlobalPool) (bool, global.IPatchGlobalPoolMemberRequest, error) {
 	// ensure pool members
 	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 	if err != nil {
@@ -113,23 +113,46 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 		return false, nil, err
 	}
 
-	updateMembers := t.mergePoolMembers(ctx,
-		createdMembers,
-		convertMemberList(currentPoolMembers),
-		newCreatedMembers)
+	// Extract created pool member names
+	createdPoolMemberNames := make(map[string]bool)
+	for _, pm := range createdPool.CreatedPoolMembers {
+		createdPoolMemberNames[pm.Name] = true
+	}
 
-	if len(updateMembers) == 0 {
-		t.logger.Infof("Can delete whole pool %s, all members are created by us and not in new created members", poolId)
+	// Extract new created pool member names
+	newCreatedPoolMemberNames := make(map[string]bool)
+	for _, pm := range newCreatedPool.CreatedPoolMembers {
+		newCreatedPoolMemberNames[pm.Name] = true
+	}
+
+	// Check which pool members should be kept
+	poolMembersToKeep := make([]string, 0)
+	for _, pm := range currentPoolMembers.Items {
+		// Keep if: in new spec OR not created by us
+		if newCreatedPoolMemberNames[pm.Name] || !createdPoolMemberNames[pm.Name] {
+			poolMembersToKeep = append(poolMembersToKeep, pm.Name)
+		}
+	}
+
+	if len(poolMembersToKeep) == 0 {
+		t.logger.Infof("Can delete whole pool %s, all pool members are created by us and not in new created members", poolId)
 		return true, nil, nil
 	}
 
-	if !t.comparePoolMembers(ctx, updateMembers, convertMemberList(currentPoolMembers)) {
-		convertMembers := make([]loadbalancerv2.IMemberRequest, 0)
-		for _, member := range updateMembers {
-			convertMembers = append(convertMembers, loadbalancerv2.NewMember(member.Name, member.IP, member.Port, member.MonitorPort))
+	// Check if we need to delete any pool members
+	if len(poolMembersToKeep) < len(currentPoolMembers.Items) {
+		// Need to delete some pool members - build a patch request
+		bulkRequests := make([]global.IBulkActionRequest, 0)
+		for _, pm := range currentPoolMembers.Items {
+			// Delete pool members that were created by us and are not in new spec
+			if createdPoolMemberNames[pm.Name] && !newCreatedPoolMemberNames[pm.Name] {
+				t.logger.Debugf("Will delete pool member %s from pool %s", pm.Name, poolId)
+				bulkRequests = append(bulkRequests, global.NewPatchGlobalPoolDeleteBulkActionRequest(pm.ID))
+			}
 		}
-		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, poolId).WithMembers(convertMembers...)
-		return false, updateMemberOptions, nil
+		if len(bulkRequests) > 0 {
+			return false, global.NewPatchGlobalPoolMemberRequest(lbId, poolId).WithBulkAction(bulkRequests...), nil
+		}
 	}
 
 	return false, nil, nil

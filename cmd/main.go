@@ -57,18 +57,21 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/glbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/glbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
@@ -102,6 +105,7 @@ func main() {
 	var disableServiceController bool
 	var disableIngressController bool
 	var disableLoadBalancerConfigController bool
+	var disableGlobalLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
@@ -123,6 +127,8 @@ func main() {
 		"If set, the ingress controller will be disabled")
 	flag.BoolVar(&disableLoadBalancerConfigController, "disable-load-balancer-config-controller", false,
 		"If set, the LoadBalancerConfig controller will be disabled")
+	flag.BoolVar(&disableGlobalLoadBalancerConfigController, "disable-global-load-balancer-config-controller", false,
+		"If set, the GlobalLoadBalancerConfig controller will be disabled")
 	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
 		"If set, the NodeSecurityGroup controller will be disabled")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
@@ -360,6 +366,27 @@ func main() {
 		}
 	}
 
+	if !disableGlobalLoadBalancerConfigController {
+		glbcUtils := glbc.NewGlobalLoadBalancerConfigUtils(domain.GlbcFinalizer)
+		glbcUseCase := glbc_uc.NewGlobalLoadBalancerConfigUseCase(
+			conf, k8sRepo, vngcloudRepo,
+		)
+		reconciler := glbc_controller.NewGlobalLoadBalancerConfigReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			glbcUseCase,
+			mgr.GetEventRecorderFor("global-load-balancer-config-controller"),
+			finalizerManager,
+			glbcUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
+		)
+		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GlobalLoadBalancerConfig")
+			os.Exit(1)
+		}
+	}
+
 	if !disableNodeSecurityGroupController {
 		nsgUtils := nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer)
 		nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
@@ -395,13 +422,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
 		os.Exit(1)
 	}
-	// if err := (&controller.GlobalLoadBalancerConfigReconciler{
-	// 	Client: mgr.GetClient(),
-	// 	Scheme: mgr.GetScheme(),
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "GlobalLoadBalancerConfig")
-	// 	os.Exit(1)
-	// }
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
