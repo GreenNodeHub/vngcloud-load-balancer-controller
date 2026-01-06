@@ -21,7 +21,7 @@ func (t *defaultModelDeployTask) deployPoolMembers(ctx context.Context, lbId, po
 	patchRequest, allActionMessages := t.buildPatchGlobalPoolMemberRequest(ctx, lbId, poolId, currentPoolMembers, poolMembersSpec)
 	if patchRequest != nil {
 		t.logger.Info("Need to update pool members: ", strings.Join(allActionMessages, "; "))
-		if err := t.vngcloudRepo.PatchGlobalPoolMember(ctx, lbId, poolId, patchRequest); err != nil {
+		if err := t.vngcloudRepo.PatchGlobalPoolMembers(ctx, lbId, poolId, patchRequest); err != nil {
 			t.logger.Error("Failed to patch pool members: ", err)
 			return nil, err
 		}
@@ -77,7 +77,7 @@ func (t *defaultModelDeployTask) deployPoolMembers(ctx context.Context, lbId, po
 
 // ComparePoolMembers compares two pool members.
 // mustBeEqual is true if the two pool members must be equal, otherwise, just check if the pool members exist in the other pool members.
-func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.Context, lbId, poolId string, currentPoolMembers *entityv2.ListGlobalPoolMembers, poolMembersSpec []v1alpha1.GlobalPoolMember) (global.IPatchGlobalPoolMemberRequest, []string) {
+func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.Context, lbId, poolId string, currentPoolMembers *entityv2.ListGlobalPoolMembers, poolMembersSpec []v1alpha1.GlobalPoolMember) (global.IPatchGlobalPoolMembersRequest, []string) {
 	searchPoolMemberByName := func(name string) *entityv2.GlobalPoolMember {
 		for _, p := range currentPoolMembers.Items {
 			if p.Name == name {
@@ -115,7 +115,7 @@ func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.C
 		} else { // add update action
 			createdPoolMember := searchCreatedPoolMemberById(currentPoolMember.ID)
 
-			if updateRequest, messages := t.buildUpdateGlobalPoolMemberRequest(ctx, currentPoolMember, &poolMemberSpec, createdPoolMember); updateRequest != nil {
+			if updateRequest, messages := t.buildUpdateGlobalPoolMemberRequest(ctx, lbId, poolId, currentPoolMember, &poolMemberSpec, createdPoolMember); updateRequest != nil {
 
 				allActionMessages = append(allActionMessages, messages...)
 				bulkRequests = append(bulkRequests, global.NewPatchGlobalPoolUpdateBulkActionRequest(poolId, updateRequest))
@@ -127,7 +127,7 @@ func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.C
 		return nil, nil
 	}
 
-	return global.NewPatchGlobalPoolMemberRequest(lbId, poolId).WithBulkAction(bulkRequests...), allActionMessages
+	return global.NewPatchGlobalPoolMembersRequest(lbId, poolId).WithBulkAction(bulkRequests...), allActionMessages
 }
 
 func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context, lbId, poolId string, poolMemberSpec *v1alpha1.GlobalPoolMember) (global.ICreateGlobalPoolMemberRequest, []string) {
@@ -164,8 +164,8 @@ func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context,
 	return poolMemberRequest, []string{fmt.Sprintf("add %s [%s]", poolMemberSpec.Name, strings.Join(memberStrings, ", "))}
 }
 
-func (t *defaultModelDeployTask) buildUpdateGlobalPoolMemberRequest(ctx context.Context, currentPoolMember *entityv2.GlobalPoolMember, poolMemberSpec *v1alpha1.GlobalPoolMember, createdPoolMember *v1alpha1.CreatedGlobalPoolMember) (global.IUpdateGlobalPoolMemberRequest, []string) {
-	result := global.NewUpdateGlobalPoolMemberRequest(currentPoolMember.TrafficDial)
+func (t *defaultModelDeployTask) buildUpdateGlobalPoolMemberRequest(ctx context.Context, lbId, poolId string, currentPoolMember *entityv2.GlobalPoolMember, poolMemberSpec *v1alpha1.GlobalPoolMember, createdPoolMember *v1alpha1.CreatedGlobalPoolMember) (global.IUpdateGlobalPoolMemberRequest, []string) {
+	result := global.NewUpdateGlobalPoolMemberRequest(lbId, poolId, currentPoolMember.ID, currentPoolMember.TrafficDial)
 	message := make([]string, 0)
 	isNeedUpdate := false
 

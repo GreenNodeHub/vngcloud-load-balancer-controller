@@ -340,3 +340,22 @@ func (r *k8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(
 		mutate(ctx, obj.(*v1alpha1.GlobalLoadBalancerConfig))
 	})
 }
+
+// ------------------- vngcloud global load balancer ------------------
+
+func (r *k8sRepository) GetVngcloudGlobalLoadBalancer(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudGlobalLoadBalancer, error) {
+	vglb := &v1alpha1.VngcloudGlobalLoadBalancer{}
+	err := r.client.Get(ctx, n, vglb)
+	return vglb, err
+}
+
+func (r *k8sRepository) PatchMutateStatusVngcloudGlobalLoadBalancer(
+	ctx context.Context,
+	vglb *v1alpha1.VngcloudGlobalLoadBalancer,
+	mutate func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer),
+) error {
+	return r.patchMutateStatusObject(ctx, vglb, func(ctx context.Context, obj client.Object) {
+		// type-assert so you can use strongly typed fields
+		mutate(ctx, obj.(*v1alpha1.VngcloudGlobalLoadBalancer))
+	})
+}

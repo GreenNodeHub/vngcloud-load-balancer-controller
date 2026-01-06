@@ -104,7 +104,7 @@ type VngCloudRepository interface {
 	DeleteGlobalPool(ctx context.Context, glbID, poolID string) error
 	UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error
 	ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error)
-	PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error
+	PatchGlobalPoolMembers(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMembersRequest) error
 
 	ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error)
 	GetGlobalListener(ctx context.Context, glbID, listenerID string) (*entityv2.GlobalListener, error)
@@ -142,4 +142,7 @@ type K8sRepository interface {
 
 	GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)
 	PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig)) error
+
+	GetVngcloudGlobalLoadBalancer(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudGlobalLoadBalancer, error)
+	PatchMutateStatusVngcloudGlobalLoadBalancer(ctx context.Context, vglb *v1alpha1.VngcloudGlobalLoadBalancer, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer)) error
 }

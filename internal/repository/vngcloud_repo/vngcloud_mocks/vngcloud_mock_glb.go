@@ -359,11 +359,11 @@ func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID 
 	}, nil
 }
 
-func (m *MockProvider) PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error {
+func (m *MockProvider) PatchGlobalPoolMembers(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request patch global pool member of load balancer %s", domain.RequestIcon, glbID)
 
-	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMemberRequest)
+	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMembersRequest)
 	for _, action := range patch.BulkActions {
 		// action can be PatchGlobalPoolCreateBulkActionRequest or PatchGlobalPoolDeleteBulkActionRequest
 		if rawAction, ok := action.(*global.PatchGlobalPoolCreateBulkActionRequest); ok {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package glbc_controller
+package vglb_controller
 
 import (
 	"context"
@@ -34,51 +34,58 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller/eventhandlers"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/vglb_controller/eventhandlers"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/glbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vglb"
 )
 
 const (
-	controllerName = "glbc"
+	controllerName = "vglb"
 )
 
-func NewGlobalLoadBalancerConfigReconciler(
-	client client.Client,
+func NewVngcloudGlobalLoadBalancerReconciler(
+	k8sClient client.Client,
 	scheme *runtime.Scheme,
-	glbcUseCase usecase.GlobalLoadBalancerConfigUseCase,
+	vglbUseCase usecase.VngcloudGlobalLoadBalancerUseCase,
 	eventRecorder record.EventRecorder,
 	finalizerManager k8s.FinalizerManager,
-	glbcUtils glbc.GlobalLoadBalancerConfigUtils,
+	vglbUtils vglb.VngcloudGlobalLoadBalancerUtils,
 	metricsCollector lbcmetrics.MetricCollector,
 	reconcileCounters *metricsutil.ReconcileCounters,
-) *GlobalLoadBalancerConfigReconciler {
-	return &GlobalLoadBalancerConfigReconciler{
-		Client:           client,
+	maxConcurrentReconciles int,
+) *VngcloudGlobalLoadBalancerReconciler {
+	return &VngcloudGlobalLoadBalancerReconciler{
+		k8sClient:        k8sClient,
 		Scheme:           scheme,
-		glbcUseCase:      glbcUseCase,
+		vglbUseCase:      vglbUseCase,
 		eventRecorder:    eventRecorder,
 		finalizerManager: finalizerManager,
-		glbcUtils:        glbcUtils,
+		vglbUtils:        vglbUtils,
 
+		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
 		reconcileCounters: reconcileCounters,
-		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
+		maxConcurrentReconciles: func() int {
+			if maxConcurrentReconciles > 0 {
+				return maxConcurrentReconciles
+			}
+			return domain.DefaultMaxConcurrentReconciles
+		}(),
 	}
 }
 
-// GlobalLoadBalancerConfigReconciler reconciles a GlobalLoadBalancerConfig object
-type GlobalLoadBalancerConfigReconciler struct {
-	client.Client
+// VngcloudGlobalLoadBalancerReconciler reconciles a VngcloudGlobalLoadBalancer object
+type VngcloudGlobalLoadBalancerReconciler struct {
+	k8sClient        client.Client
 	Scheme           *runtime.Scheme
-	glbcUseCase      usecase.GlobalLoadBalancerConfigUseCase
+	vglbUseCase      usecase.VngcloudGlobalLoadBalancerUseCase
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
-	glbcUtils        glbc.GlobalLoadBalancerConfigUtils
+	vglbUtils        vglb.VngcloudGlobalLoadBalancerUtils
 
 	reconcileCounters *metricsutil.ReconcileCounters
 	metricsCollector  lbcmetrics.MetricCollector
@@ -89,18 +96,18 @@ type GlobalLoadBalancerConfigReconciler struct {
 	initDone atomic.Bool
 }
 
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=globalloadbalancerconfigs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=globalloadbalancerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=globalloadbalancerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudgloballoadbalancers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudgloballoadbalancers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vks.vngcloud.vn,resources=vngcloudgloballoadbalancers/finalizers,verbs=update
 
-func (r *GlobalLoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *VngcloudGlobalLoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
 		ctrl.Log.Info("Init not done yet, requeueing...")
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
-	r.reconcileCounters.IncrementGlbc(req.NamespacedName)
-	ctx = contexts.NewContext(ctx).SetLogName("glbc/" + req.Namespace + "/" + req.Name).GetContext()
+	r.reconcileCounters.IncrementVglb(req.NamespacedName)
+	ctx = contexts.NewContext(ctx).SetLogName("vglb/" + req.Namespace + "/" + req.Name).GetContext()
 	logger := contexts.NewContext(ctx).Log()
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
@@ -108,13 +115,13 @@ func (r *GlobalLoadBalancerConfigReconciler) Reconcile(ctx context.Context, req 
 	return errs.HandleReconcileError(r.reconcile(ctx, req), logger)
 }
 
-func (r *GlobalLoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
-	object := &v1alpha1.GlobalLoadBalancerConfig{}
+func (r *VngcloudGlobalLoadBalancerReconciler) reconcile(ctx context.Context, req ctrl.Request) error {
+	object := &v1alpha1.VngcloudGlobalLoadBalancer{}
 	var err error
-	fetchServiceFn := func() {
-		err = r.Client.Get(ctx, req.NamespacedName, object)
+	fetchObjectFn := func() {
+		err = r.k8sClient.Get(ctx, req.NamespacedName, object)
 	}
-	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchServiceFn)
+	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "fetch_object", fetchObjectFn)
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -122,19 +129,16 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcile(ctx context.Context, req 
 	logger := contexts.NewContext(ctx).Log()
 	key := fmt.Sprintf("%s/%s", object.Namespace, object.Name)
 
-	if !r.glbcUtils.IsSupported(object) {
-		// in case the object has finalizer but is no longer supported, we still need to call delete to clean up
-		if r.glbcUtils.IsPendingFinalization(object) {
-			err := r.reconcileDelete(ctx, req, object)
-			if err != nil {
-				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
-				r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
-				return err
-			}
-			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
-			r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
-			return nil
+	// Check if object is being deleted
+	if !object.DeletionTimestamp.IsZero() {
+		err := r.reconcileDelete(ctx, req, object)
+		if err != nil {
+			logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
+			r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
+			return err
 		}
+		logger.Infof("%s Delete successfully.", domain.SuccessIcon)
+		r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
 		return nil
 	}
 
@@ -149,10 +153,10 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcile(ctx context.Context, req 
 	return nil
 }
 
-func (r *GlobalLoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
+func (r *VngcloudGlobalLoadBalancerReconciler) reconcileEnsure(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	var err error
 	addFinalizersFn := func() {
-		err = r.finalizerManager.AddFinalizers(ctx, obj, domain.GlbcFinalizer)
+		err = r.finalizerManager.AddFinalizers(ctx, obj, domain.VglbFinalizer)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "add_finalizers", addFinalizersFn)
 	if err != nil {
@@ -160,7 +164,7 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context
 	}
 
 	ensureFn := func() {
-		err = r.glbcUseCase.EnsureGlobalLoadBalancerConfigUseCase(ctx, req)
+		err = r.vglbUseCase.EnsureVngcloudGlobalLoadBalancerUseCase(ctx, req)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "ensure", ensureFn)
 	if err != nil {
@@ -169,52 +173,51 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context
 	return nil
 }
 
-func (r *GlobalLoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
+func (r *VngcloudGlobalLoadBalancerReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
-	if !k8s.HasFinalizer(obj, domain.GlbcFinalizer) {
+	if !k8s.HasFinalizer(obj, domain.VglbFinalizer) {
 		logger.Warn("Finalizer is not found, return.")
 		return nil
 	}
 
 	var err error
 	deleteFn := func() {
-		err = r.glbcUseCase.DeleteGlobalLoadBalancerConfigUseCase(ctx, req)
+		err = r.vglbUseCase.DeleteVngcloudGlobalLoadBalancerUseCase(ctx, req)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "delete", deleteFn)
 	if err != nil {
 		return errs.NewErrorWithMetrics(controllerName, "delete_error", err, r.metricsCollector)
 	}
 
-	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.GlbcFinalizer); err != nil {
+	if err := r.finalizerManager.RemoveFinalizers(ctx, obj, domain.VglbFinalizer); err != nil {
 		return err
 	}
 	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *GlobalLoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		log := ctrl.Log.WithName("init")
-		log.Info("Running initialization...")
+		log.Info("Running VGLB initialization...")
 
-		if err := r.glbcUseCase.InitGlobalLoadBalancerConfigUseCase(ctx); err != nil {
-			log.Error(err, "Fatal: initialization failed")
+		if err := r.vglbUseCase.InitVngcloudGlobalLoadBalancerUseCase(ctx); err != nil {
+			log.Error(err, "Fatal: VGLB initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}
 
-		log.Info("Initialization complete")
+		log.Info("VGLB Initialization complete")
 		r.initDone.Store(true)
 		return nil
 	})); err != nil {
 		return err
 	}
 
-	glbcEventHandler := eventhandlers.NewEnqueueRequestForGlbcEvent(r.eventRecorder,
-		r.glbcUtils, r.logger.WithName("eventHandlers").WithName("glbc"))
+	vglbEventHandler := eventhandlers.NewEnqueueRequestForVglbEvent(r.eventRecorder, r.vglbUtils, r.logger.WithName("eventHandlers").WithName("vglb"))
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Watches(&v1alpha1.GlobalLoadBalancerConfig{}, glbcEventHandler).
-		Named("globalloadbalancerconfig").
+		Watches(&v1alpha1.VngcloudGlobalLoadBalancer{}, vglbEventHandler).
+		Named("vngcloudgloballoadbalancer").
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
 		}).

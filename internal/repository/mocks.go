@@ -10,9 +10,9 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	v1 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	v20 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	v11 "k8s.io/api/core/v1"
@@ -3445,16 +3445,16 @@ func (_c *MockVngCloudRepository_ListTags_Call) RunAndReturn(run func(ctx contex
 	return _c
 }
 
-// PatchGlobalPoolMember provides a mock function for the type MockVngCloudRepository
-func (_mock *MockVngCloudRepository) PatchGlobalPoolMember(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMemberRequest) error {
+// PatchGlobalPoolMembers provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) PatchGlobalPoolMembers(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMembersRequest) error {
 	ret := _mock.Called(ctx, glbID, poolID, opt)
 
 	if len(ret) == 0 {
-		panic("no return value specified for PatchGlobalPoolMember")
+		panic("no return value specified for PatchGlobalPoolMembers")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, v1.IPatchGlobalPoolMemberRequest) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, v1.IPatchGlobalPoolMembersRequest) error); ok {
 		r0 = returnFunc(ctx, glbID, poolID, opt)
 	} else {
 		r0 = ret.Error(0)
@@ -3462,21 +3462,21 @@ func (_mock *MockVngCloudRepository) PatchGlobalPoolMember(ctx context.Context, 
 	return r0
 }
 
-// MockVngCloudRepository_PatchGlobalPoolMember_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchGlobalPoolMember'
+// MockVngCloudRepository_PatchGlobalPoolMember_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchGlobalPoolMembers'
 type MockVngCloudRepository_PatchGlobalPoolMember_Call struct {
 	*mock.Call
 }
 
-// PatchGlobalPoolMember is a helper method to define mock.On call
+// PatchGlobalPoolMembers is a helper method to define mock.On call
 //   - ctx context.Context
 //   - glbID string
 //   - poolID string
-//   - opt v1.IPatchGlobalPoolMemberRequest
-func (_e *MockVngCloudRepository_Expecter) PatchGlobalPoolMember(ctx interface{}, glbID interface{}, poolID interface{}, opt interface{}) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
-	return &MockVngCloudRepository_PatchGlobalPoolMember_Call{Call: _e.mock.On("PatchGlobalPoolMember", ctx, glbID, poolID, opt)}
+//   - opt v1.IPatchGlobalPoolMembersRequest
+func (_e *MockVngCloudRepository_Expecter) PatchGlobalPoolMembers(ctx interface{}, glbID interface{}, poolID interface{}, opt interface{}) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
+	return &MockVngCloudRepository_PatchGlobalPoolMember_Call{Call: _e.mock.On("PatchGlobalPoolMembers", ctx, glbID, poolID, opt)}
 }
 
-func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) Run(run func(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMemberRequest)) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
+func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) Run(run func(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMembersRequest)) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -3490,9 +3490,9 @@ func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) Run(run func(ctx co
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 v1.IPatchGlobalPoolMemberRequest
+		var arg3 v1.IPatchGlobalPoolMembersRequest
 		if args[3] != nil {
-			arg3 = args[3].(v1.IPatchGlobalPoolMemberRequest)
+			arg3 = args[3].(v1.IPatchGlobalPoolMembersRequest)
 		}
 		run(
 			arg0,
@@ -3509,7 +3509,7 @@ func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) Return(err error) *
 	return _c
 }
 
-func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) RunAndReturn(run func(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMemberRequest) error) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
+func (_c *MockVngCloudRepository_PatchGlobalPoolMember_Call) RunAndReturn(run func(ctx context.Context, glbID string, poolID string, opt v1.IPatchGlobalPoolMembersRequest) error) *MockVngCloudRepository_PatchGlobalPoolMember_Call {
 	_c.Call.Return(run)
 	return _c
 }

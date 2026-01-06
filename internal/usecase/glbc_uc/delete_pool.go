@@ -89,7 +89,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		} else if updateMemberOption != nil {
 			// update to delete redundant pool members
 			t.logger.Debugf("Update pool %s to remove redundant pool members", candidateId)
-			if err = t.vngcloudRepo.PatchGlobalPoolMember(ctx, lbId, candidateId, updateMemberOption); err != nil {
+			if err = t.vngcloudRepo.PatchGlobalPoolMembers(ctx, lbId, candidateId, updateMemberOption); err != nil {
 				t.logger.Error("Failed to patch pool members: ", err)
 				return err
 			}
@@ -105,7 +105,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 // canDeleteWholePool checks if we can delete the whole pool
 // conditions:
 // - all pool members of the pool are created by us and not in new created pool members
-func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdPool, newCreatedPool *v1alpha1.CreatedGlobalPool) (bool, global.IPatchGlobalPoolMemberRequest, error) {
+func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, poolId string, createdPool, newCreatedPool *v1alpha1.CreatedGlobalPool) (bool, global.IPatchGlobalPoolMembersRequest, error) {
 	// ensure pool members
 	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 	if err != nil {
@@ -151,7 +151,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 			}
 		}
 		if len(bulkRequests) > 0 {
-			return false, global.NewPatchGlobalPoolMemberRequest(lbId, poolId).WithBulkAction(bulkRequests...), nil
+			return false, global.NewPatchGlobalPoolMembersRequest(lbId, poolId).WithBulkAction(bulkRequests...), nil
 		}
 	}
 

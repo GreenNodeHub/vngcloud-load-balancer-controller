@@ -16,6 +16,7 @@ const (
 	GlbcFinalizer    = "glbc.vngcloud.vn/resources"
 	LbcFinalizer     = "lbc.vngcloud.vn/resources" // TODO: plan this finalizer name
 	NsgFinalizer     = "nsg.vngcloud.vn/resources"
+	VglbFinalizer    = "glb.vngcloud.vn/resources"
 )
 
 // Annotations

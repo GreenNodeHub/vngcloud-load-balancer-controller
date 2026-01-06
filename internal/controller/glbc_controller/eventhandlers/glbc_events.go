@@ -11,16 +11,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/go-logr/logr"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/glbc"
 )
 
 // NewEnqueueRequestForGlbcEvent constructs new enqueueRequestsForGlbcEvent.
 func NewEnqueueRequestForGlbcEvent(eventRecorder record.EventRecorder,
-	glbcUtils glbc.GlobalLoadBalancerConfigUtils) *enqueueRequestsForGlbcEvent {
+	glbcUtils glbc.GlobalLoadBalancerConfigUtils, logger logr.Logger) *enqueueRequestsForGlbcEvent {
 	return &enqueueRequestsForGlbcEvent{
 		eventRecorder: eventRecorder,
 		glbcUtils:     glbcUtils,
+		logger:        logger,
 	}
 }
 
@@ -29,9 +31,11 @@ var _ handler.EventHandler = (*enqueueRequestsForGlbcEvent)(nil)
 type enqueueRequestsForGlbcEvent struct {
 	eventRecorder record.EventRecorder
 	glbcUtils     glbc.GlobalLoadBalancerConfigUtils
+	logger        logr.Logger
 }
 
 func (h *enqueueRequestsForGlbcEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.logger.V(1).Info("Create GlobalLoadBalancerConfig", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedObject(ctx, queue, e.Object.(*v1alpha1.GlobalLoadBalancerConfig))
 }
 
@@ -39,13 +43,16 @@ func (h *enqueueRequestsForGlbcEvent) Update(ctx context.Context, e event.Update
 	oldObj := e.ObjectOld.(*v1alpha1.GlobalLoadBalancerConfig)
 	newObj := e.ObjectNew.(*v1alpha1.GlobalLoadBalancerConfig)
 
-	// Skip reconciliation if only unimportant fields changed
-	if equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
+	// Allow periodic sync events (same resource version) for drift detection
+	isSyncEvent := oldObj.GetResourceVersion() == newObj.GetResourceVersion()
+	if !isSyncEvent &&
+		equality.Semantic.DeepEqual(oldObj.Annotations, newObj.Annotations) &&
 		equality.Semantic.DeepEqual(oldObj.Spec, newObj.Spec) &&
 		oldObj.DeletionTimestamp.IsZero() == newObj.DeletionTimestamp.IsZero() {
 		return
 	}
 
+	h.logger.V(1).Info("Update GlobalLoadBalancerConfig", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
