@@ -128,18 +128,18 @@ func (r *k8sRepository) UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alp
 func (r *k8sRepository) PatchMutateStatusLoadBalancerConfig(
 	ctx context.Context,
 	lbc *v1alpha1.LoadBalancerConfig,
-	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig),
+	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, lbc, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, lbc, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
+		return mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
 	})
 }
 
 func (r *k8sRepository) patchMutateStatusObject(
 	ctx context.Context,
 	obj client.Object,
-	mutate func(ctx context.Context, obj client.Object),
+	mutate func(ctx context.Context, obj client.Object) bool,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// get fresh copy
@@ -154,8 +154,10 @@ func (r *k8sRepository) patchMutateStatusObject(
 		// deep copy for diff/patch base
 		oldObject := objGet.DeepCopyObject().(client.Object)
 
-		// mutate the fetched object (not the input)
-		mutate(ctx, objGet)
+		// mutate the fetched object (not the input), skip patch if no change needed
+		if !mutate(ctx, objGet) {
+			return nil
+		}
 
 		diff := cmp.Diff(oldObject, objGet,
 			// Ignore metadata and spec fields - we only care about Status changes
@@ -276,11 +278,11 @@ func (r *k8sRepository) PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha
 func (r *k8sRepository) PatchMutateStatusNodeSecurityGroup(
 	ctx context.Context,
 	nsg *v1alpha1.NodeSecurityGroup,
-	mutate func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup),
+	mutate func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, nsg, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, nsg, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
+		return mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
 	})
 }
 

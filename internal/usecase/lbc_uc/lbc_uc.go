@@ -85,10 +85,15 @@ func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req c
 	}
 
 	// !IMPORTANT!: The tests will fail without this
-	statusErr := uc.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+	statusErr := uc.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		if obj.Status.ObservedGeneration == &lbConfig.Generation &&
+			obj.Status.LastReconcileMessage == message {
+			return false
+		}
 		obj.Status.ObservedGeneration = &lbConfig.Generation
-		obj.Status.LastReconcileTime = &now
 		obj.Status.LastReconcileMessage = message
+		obj.Status.LastReconcileTime = &now
+		return true
 	})
 	if statusErr != nil {
 		logger := contexts.NewContext(ctx).Log()

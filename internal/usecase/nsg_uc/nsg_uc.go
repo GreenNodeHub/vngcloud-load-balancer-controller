@@ -59,10 +59,15 @@ func (uc *nsgUseCase) EnsureNodeSecurityGroupUseCase(ctx context.Context, req ct
 	}
 
 	// !IMPORTANT!: The tests will fail without this
-	statusErr := uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-		obj.Status.ObservedGeneration = obj.Generation
-		obj.Status.LastReconcileTime = &now
+	statusErr := uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+		if obj.Status.ObservedGeneration == nsgObject.Generation &&
+			obj.Status.LastReconcileMessage == message {
+			return false
+		}
+		obj.Status.ObservedGeneration = nsgObject.Generation
 		obj.Status.LastReconcileMessage = message
+		obj.Status.LastReconcileTime = &now
+		return true
 	})
 	if statusErr != nil {
 		logger := contexts.NewContext(ctx).Log()

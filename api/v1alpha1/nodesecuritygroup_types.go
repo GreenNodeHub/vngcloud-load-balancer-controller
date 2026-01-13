@@ -176,6 +176,8 @@ type NodeSecurityGroupStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=nsg
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // NodeSecurityGroup is the Schema for the nodesecuritygroups API
 type NodeSecurityGroup struct {

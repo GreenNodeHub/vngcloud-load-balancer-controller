@@ -10,47 +10,47 @@ import (
 )
 
 func (uc *nsgUseCase) statusSetSelectedNodes(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, nodeInfos []v1alpha1.NodeInfo) error {
-	// check if already equal
-	if nodeInfosEqual(nsgObject.Status.SelectedNodes, nodeInfos) {
-		return nil // no change needed
-	}
-
-	return uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+	return uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+		// check on fresh copy if already equal
+		if nodeInfosEqual(obj.Status.SelectedNodes, nodeInfos) {
+			return false // no change needed
+		}
 		obj.Status.SelectedNodes = nodeInfos
+		return true
 	})
 }
 
 func (m *nsgUseCase) statusAddStatusManagedSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, secgroupID *string, err error) error {
-	// check if already equal
 	errStr := errorToStringPtr(err)
-	if ptr.Equal(nsgObject.Status.ManagedSecurityGroup.Id, secgroupID) &&
-		ptr.Equal(nsgObject.Status.ManagedSecurityGroup.Error, errStr) {
-		return nil // no change needed
-	}
-
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
-		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+			// check on fresh copy if already equal
+			if ptr.Equal(obj.Status.ManagedSecurityGroup.Id, secgroupID) &&
+				ptr.Equal(obj.Status.ManagedSecurityGroup.Error, errStr) {
+				return false // no change needed
+			}
 			obj.Status.ManagedSecurityGroup.Id = secgroupID
 			obj.Status.ManagedSecurityGroup.Error = errStr
+			return true
 		})
 }
 
 // update the status.serverSecurityGroups of nsgObject for a specific server
 func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, serverId string, err error, attachedSecgroupIds []string) error {
-	// check if already equal
 	errStr := errorToStringPtr(err)
-	for _, serverSecgroup := range nsgObject.Status.ServerSecurityGroups {
-		if serverSecgroup.ServerId == serverId {
-			if slices.Equal(serverSecgroup.AttachedSecurityGroupIds, attachedSecgroupIds) &&
-				ptr.Equal(serverSecgroup.Error, errStr) {
-				return nil // no change needed
-			}
-			break
-		}
-	}
-
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
-		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+			// check on fresh copy if already equal
+			for _, serverSecgroup := range obj.Status.ServerSecurityGroups {
+				if serverSecgroup.ServerId == serverId {
+					if slices.Equal(serverSecgroup.AttachedSecurityGroupIds, attachedSecgroupIds) &&
+						ptr.Equal(serverSecgroup.Error, errStr) {
+						return false // no change needed
+					}
+					break
+				}
+			}
+
 			// Create the new status for this server
 			newStatus := v1alpha1.ServerSecurityGroupStatus{
 				ServerId:                 serverId,
@@ -62,24 +62,25 @@ func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObjec
 			for i, serverSecgroup := range obj.Status.ServerSecurityGroups {
 				if serverSecgroup.ServerId == serverId {
 					obj.Status.ServerSecurityGroups[i] = newStatus
-					return
+					return true
 				}
 			}
 
 			// Server not found in status, append new entry
 			obj.Status.ServerSecurityGroups = append(obj.Status.ServerSecurityGroups, newStatus)
+			return true
 		})
 }
 
 func (m *nsgUseCase) statusServerSecurityGroupStatus(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, ssgs []v1alpha1.ServerSecurityGroupStatus) error {
-	// check if already equal
-	if serverSecurityGroupStatusesEqual(nsgObject.Status.ServerSecurityGroups, ssgs) {
-		return nil // no change needed
-	}
-
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
-		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
+		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+			// check on fresh copy if already equal
+			if serverSecurityGroupStatusesEqual(obj.Status.ServerSecurityGroups, ssgs) {
+				return false // no change needed
+			}
 			obj.Status.ServerSecurityGroups = ssgs
+			return true
 		})
 }
 
