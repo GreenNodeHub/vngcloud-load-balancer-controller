@@ -43,7 +43,7 @@ func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObjec
 			// check on fresh copy if already equal
 			for _, serverSecgroup := range obj.Status.ServerSecurityGroups {
 				if serverSecgroup.ServerId == serverId {
-					if slices.Equal(serverSecgroup.AttachedSecurityGroupIds, attachedSecgroupIds) &&
+					if v1alpha1.StringSlicesEqualUnordered(serverSecgroup.AttachedSecurityGroupIds, attachedSecgroupIds) &&
 						ptr.Equal(serverSecgroup.Error, errStr) {
 						return false // no change needed
 					}
@@ -84,24 +84,30 @@ func (m *nsgUseCase) statusServerSecurityGroupStatus(ctx context.Context, nsgObj
 		})
 }
 
-// nodeInfosEqual compares two slices of NodeInfo
+// nodeInfosEqual compares two slices of NodeInfo (order-independent)
 func nodeInfosEqual(a, b []v1alpha1.NodeInfo) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	return slices.EqualFunc(a, b, func(x, y v1alpha1.NodeInfo) bool {
-		return x.Name == y.Name && x.ServerId == y.ServerId
-	})
+	// Check that every item in a exists in b
+	for _, itemA := range a {
+		if !slices.ContainsFunc(b, itemA.Equal) {
+			return false
+		}
+	}
+	return true
 }
 
-// serverSecurityGroupStatusesEqual compares two slices of ServerSecurityGroupStatus
+// serverSecurityGroupStatusesEqual compares two slices of ServerSecurityGroupStatus (order-independent)
 func serverSecurityGroupStatusesEqual(a, b []v1alpha1.ServerSecurityGroupStatus) bool {
 	if len(a) != len(b) {
 		return false
 	}
-	return slices.EqualFunc(a, b, func(x, y v1alpha1.ServerSecurityGroupStatus) bool {
-		return x.ServerId == y.ServerId &&
-			slices.Equal(x.AttachedSecurityGroupIds, y.AttachedSecurityGroupIds) &&
-			ptr.Equal(x.Error, y.Error)
-	})
+	// Check that every item in a exists in b
+	for _, itemA := range a {
+		if !slices.ContainsFunc(b, itemA.Equal) {
+			return false
+		}
+	}
+	return true
 }

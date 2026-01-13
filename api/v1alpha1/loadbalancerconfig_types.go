@@ -27,6 +27,18 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// Condition types for LoadBalancerConfig
+const (
+	// LBCConditionTypeReady indicates the LoadBalancerConfig is ready and fully reconciled
+	LBCConditionTypeReady = "Ready"
+)
+
+// Condition reasons for LoadBalancerConfig
+const (
+	LBCReasonReconcileSuccess = "ReconcileSuccess"
+	LBCReasonReconcileFailed  = "ReconcileFailed"
+)
+
 // InsertHeader defines a header to be inserted in requests
 type InsertHeader struct {
 	// HeaderName is the name of the header to insert

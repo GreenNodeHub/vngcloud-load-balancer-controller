@@ -2,6 +2,7 @@ package ingress_uc
 
 import (
 	"context"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -174,10 +175,13 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 			return err
 		}
 	} else {
-		err = t.k8sRepo.PatchLoadBalancerConfig(ctx, lbConfig, client.MergeFrom(oldLBConfig))
-		if err != nil {
-			t.logger.Errorf("failed to patch LBC: %v", err)
-			return err
+		// Only patch if spec actually changed to avoid unnecessary generation increments
+		if !lbcSpecEqual(oldLBConfig.Spec, lbConfig.Spec) {
+			err = t.k8sRepo.PatchLoadBalancerConfig(ctx, lbConfig, client.MergeFrom(oldLBConfig))
+			if err != nil {
+				t.logger.Errorf("failed to patch LBC: %v", err)
+				return err
+			}
 		}
 	}
 
@@ -251,10 +255,13 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 			return err
 		}
 	} else {
-		err = t.k8sRepo.PatchNodeSecurityGroup(ctx, nsg, client.MergeFrom(oldNSG))
-		if err != nil {
-			t.logger.Errorf("failed to patch NodeSecurityGroup: %v", err)
-			return err
+		// Only patch if spec actually changed to avoid unnecessary generation increments
+		if !nsgSpecEqual(oldNSG.Spec, nsg.Spec) {
+			err = t.k8sRepo.PatchNodeSecurityGroup(ctx, nsg, client.MergeFrom(oldNSG))
+			if err != nil {
+				t.logger.Errorf("failed to patch NodeSecurityGroup: %v", err)
+				return err
+			}
 		}
 	}
 	return nil
@@ -489,10 +496,14 @@ func (t *defaultModelBuildTask) getLBCAddress(ctx context.Context) string {
 	return ""
 }
 
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
-// func (t *defaultModelBuildTask) build
+// lbcSpecEqual compares two LoadBalancerConfigSpec for equality.
+// Returns true if specs are equal, false otherwise.
+func lbcSpecEqual(a, b v1alpha1.LoadBalancerConfigSpec) bool {
+	return reflect.DeepEqual(a, b)
+}
+
+// nsgSpecEqual compares two NodeSecurityGroupSpec for equality.
+// Returns true if specs are equal, false otherwise.
+func nsgSpecEqual(a, b v1alpha1.NodeSecurityGroupSpec) bool {
+	return reflect.DeepEqual(a, b)
+}
