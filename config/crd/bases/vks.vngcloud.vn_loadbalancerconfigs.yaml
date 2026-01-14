@@ -20,9 +20,6 @@ spec:
     - jsonPath: .spec.type
       name: Type
       type: string
-    - jsonPath: .status.conditions[?(@.type=='Ready')].status
-      name: Ready
-      type: string
     - jsonPath: .status.loadBalancerId
       name: LoadBalancer-Id
       type: string
@@ -31,6 +28,9 @@ spec:
       type: string
     - jsonPath: .spec.zoneId
       name: Zone
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Ready
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age

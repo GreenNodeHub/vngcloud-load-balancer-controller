@@ -577,10 +577,10 @@ func (a CreatedCertificate) Equal(b CreatedCertificate) bool {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=lbc
 // +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="LoadBalancer-Id",type="string",JSONPath=".status.loadBalancerId"
 // +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.address"
 // +kubebuilder:printcolumn:name="Zone",type="string",JSONPath=".spec.zoneId"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // LoadBalancerConfig is the Schema for the loadbalancerconfigs API
