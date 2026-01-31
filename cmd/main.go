@@ -268,11 +268,11 @@ func main() {
 
 	reconcileCounters := metricsutil.NewReconcileCounters()
 	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
+	endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 
 	if !disableServiceController {
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
 		cniDetector := utils.NewDetector(mgr.GetClient())
-		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 		serviceUseCase := service_uc.NewServiceUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
@@ -302,7 +302,6 @@ func main() {
 
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.INGRESS_ANNOTATION_PREFIX)
 		cniDetector := utils.NewDetector(mgr.GetClient())
-		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 		ingressUtils := ingress.NewIngressUtils(domain.IngressFinalizer)
 		ingressUseCase := ingress_uc.NewIngressUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, ingressUtils, cniDetector, endpointResolver)
@@ -389,9 +388,10 @@ func main() {
 	}
 
 	if !disableVngcloudGlobalLoadBalancerController {
+		annotationParser := annotations.NewSuffixAnnotationParser(domain.VGLB_ANNOTATION_PREFIX)
 		vglbUtils := vglb.NewVngcloudGlobalLoadBalancerUtils(domain.VglbFinalizer)
 		vglbUseCase := vglb_uc.NewVngcloudGlobalLoadBalancerUseCase(
-			conf, k8sRepo, vngcloudRepo,
+			conf, k8sRepo, vngcloudRepo, annotationParser, endpointResolver,
 		)
 		reconciler := vglb_controller.NewVngcloudGlobalLoadBalancerReconciler(
 			mgr.GetClient(),

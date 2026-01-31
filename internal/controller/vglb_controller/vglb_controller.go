@@ -199,14 +199,14 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcileDelete(ctx context.Conte
 func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		log := ctrl.Log.WithName("init")
-		log.Info("Running VGLB initialization...")
+		log.Info("Running initialization...")
 
 		if err := r.vglbUseCase.InitVngcloudGlobalLoadBalancerUseCase(ctx); err != nil {
-			log.Error(err, "Fatal: VGLB initialization failed")
+			log.Error(err, "Fatal: initialization failed")
 			return err // returning error causes manager to stop => pod crash
 		}
 
-		log.Info("VGLB Initialization complete")
+		log.Info("Initialization complete")
 		r.initDone.Store(true)
 		return nil
 	})); err != nil {

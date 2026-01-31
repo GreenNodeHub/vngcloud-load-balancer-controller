@@ -365,6 +365,46 @@ func (r *k8sRepository) GetGlobalLoadBalancerConfig(ctx context.Context, n types
 	return glbc, err
 }
 
+func (r *k8sRepository) ListGlobalLoadBalancerConfig(ctx context.Context, list *v1alpha1.GlobalLoadBalancerConfigList, opts ...client.ListOption) error {
+	return r.client.List(ctx, list, opts...)
+}
+
+func (r *k8sRepository) CreateGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, opts ...client.CreateOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Creating GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+
+	err := r.client.Create(ctx, glbc, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: glbc.GetNamespace(), Name: glbc.GetName()}, glbc)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
+}
+
+func (r *k8sRepository) DeleteGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Deleting GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	return r.client.Delete(ctx, glbc)
+}
+
+func (r *k8sRepository) PatchGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Patching GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	return r.client.Patch(ctx, glbc, patch, opts...)
+}
+
 func (r *k8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(
 	ctx context.Context,
 	glbc *v1alpha1.GlobalLoadBalancerConfig,

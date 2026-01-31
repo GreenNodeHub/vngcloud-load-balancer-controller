@@ -141,6 +141,10 @@ type K8sRepository interface {
 	GetSecret(ctx context.Context, n types.NamespacedName) (*corev1.Secret, error)
 
 	GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)
+	ListGlobalLoadBalancerConfig(ctx context.Context, list *v1alpha1.GlobalLoadBalancerConfigList, opts ...client.ListOption) error
+	CreateGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, opts ...client.CreateOption) error
+	DeleteGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig) error
+	PatchGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error
 	PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool) error
 
 	GetVngcloudGlobalLoadBalancer(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudGlobalLoadBalancer, error)
