@@ -29,6 +29,9 @@ var (
 
 	//go:embed crds/vks.vngcloud.vn_vngcloudgloballoadbalancers.yaml
 	vngcloudgloballoadbalancersCRDBytes []byte
+
+	//go:embed crds/vks.vngcloud.vn_globalloadbalancerconfigs.yaml
+	globalloadbalancerconfigsCRDBytes []byte
 )
 
 // CRDDefinition holds the name and embedded bytes of a CRD
@@ -43,6 +46,7 @@ func GetAllCRDs() []CRDDefinition {
 		{Name: "loadbalancerconfigs.vks.vngcloud.vn", Bytes: loadbalancerconfigsCRDBytes},
 		{Name: "nodesecuritygroups.vks.vngcloud.vn", Bytes: nodesecuritygroupsCRDBytes},
 		{Name: "vngcloudgloballoadbalancers.vks.vngcloud.vn", Bytes: vngcloudgloballoadbalancersCRDBytes},
+		{Name: "globalloadbalancerconfigs.vks.vngcloud.vn", Bytes: globalloadbalancerconfigsCRDBytes},
 	}
 }
 

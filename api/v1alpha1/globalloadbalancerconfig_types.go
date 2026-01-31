@@ -17,12 +17,27 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"slices"
+
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// Condition types for GlobalLoadBalancerConfig
+const (
+	// GLBCConditionTypeReady indicates the GlobalLoadBalancerConfig is ready and fully reconciled
+	GLBCConditionTypeReady = "Ready"
+)
+
+// Condition reasons for GlobalLoadBalancerConfig
+const (
+	GLBCReasonReconcileSuccess = "ReconcileSuccess"
+	GLBCReasonReconcileFailed  = "ReconcileFailed"
+)
 
 // GlobalLoadBalancerConfigSpec defines the desired state of GlobalLoadBalancerConfig
 type GlobalLoadBalancerConfigSpec struct {
@@ -266,6 +281,17 @@ type GlobalMember struct {
 	Weight *int `json:"weight,omitempty"`
 }
 
+// Equal compares two GlobalMember for equality
+func (a GlobalMember) Equal(b GlobalMember) bool {
+	if a.Address != b.Address || a.Name != b.Name || a.Port != b.Port || a.SubnetID != b.SubnetID || a.BackupRole != b.BackupRole {
+		return false
+	}
+	if !ptr.Equal(a.Description, b.Description) || !ptr.Equal(a.MonitorPort, b.MonitorPort) || !ptr.Equal(a.Weight, b.Weight) {
+		return false
+	}
+	return true
+}
+
 // GlobalLoadBalancerConfigStatus defines the observed state of GlobalLoadBalancerConfig.
 type GlobalLoadBalancerConfigStatus struct {
 	// ObservedGeneration reflects the generation of the most recently observed spec
@@ -280,19 +306,26 @@ type GlobalLoadBalancerConfigStatus struct {
 	// +optional
 	LastReconcileMessage string `json:"lastReconcileMessage,omitempty"`
 
-	// Address is the DNS name or IP address assigned to the load balancer
-	// +optional
-	Address *string `json:"address,omitempty"`
-
 	// LoadBalancerId is the actual ID of the load balancer in VNG Cloud
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
+
+	// Vips is the list of Virtual IPs assigned to the load balancer across different regions
+	// +optional
+	// +listType=map
+	// +listMapKey=region
+	Vips []GlobalLoadBalancerVIPStatus `json:"vips,omitempty"`
+
+	// Domains is the list of DNS hostnames assigned to the load balancer
+	// +optional
+	// +listType=atomic
+	Domains []string `json:"domains,omitempty"`
 
 	// CreatedTags is the map of tags created on the load balancer
 	// +optional
 	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
-	// CreatedListeners is the list of created listener IDs
+	// CreatedPools is the list of created pool IDs
 	// +optional
 	// +listType=map
 	// +listMapKey=name
@@ -319,6 +352,26 @@ type GlobalLoadBalancerConfigStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// GlobalLoadBalancerVIPStatus represents a Virtual IP assigned to the global load balancer
+type GlobalLoadBalancerVIPStatus struct {
+	// Address is the IP address of the VIP
+	// +required
+	Address string `json:"address"`
+
+	// Region is the region where the VIP is located
+	// +required
+	Region string `json:"region"`
+
+	// Status is the status of the VIP (e.g., "ACTIVE", "PENDING")
+	// +optional
+	Status string `json:"status,omitempty"`
+}
+
+// Equal compares two GlobalLoadBalancerVIPStatus for equality
+func (a GlobalLoadBalancerVIPStatus) Equal(b GlobalLoadBalancerVIPStatus) bool {
+	return a.Address == b.Address && a.Region == b.Region && a.Status == b.Status
+}
+
 type CreatedGlobalListener struct {
 	// Id is the ID of the created listener
 	// +required
@@ -331,6 +384,11 @@ type CreatedGlobalListener struct {
 	// Name is the name of the listener
 	// +required
 	Name string `json:"name,omitempty"`
+}
+
+// Equal compares two CreatedGlobalListener for equality
+func (a CreatedGlobalListener) Equal(b CreatedGlobalListener) bool {
+	return a.Id == b.Id && a.Port == b.Port && a.Name == b.Name
 }
 
 type CreatedGlobalPool struct {
@@ -348,6 +406,22 @@ type CreatedGlobalPool struct {
 	CreatedPoolMembers []CreatedGlobalPoolMember `json:"createdPoolMembers,omitempty"`
 }
 
+// Equal compares two CreatedGlobalPool for equality (order-independent for members)
+func (a CreatedGlobalPool) Equal(b CreatedGlobalPool) bool {
+	if a.Id != b.Id || a.Name != b.Name {
+		return false
+	}
+	if len(a.CreatedPoolMembers) != len(b.CreatedPoolMembers) {
+		return false
+	}
+	for _, memberA := range a.CreatedPoolMembers {
+		if !slices.ContainsFunc(b.CreatedPoolMembers, memberA.Equal) {
+			return false
+		}
+	}
+	return true
+}
+
 type CreatedGlobalPoolMember struct {
 	// Id is the ID of the created member
 	// +required
@@ -360,6 +434,22 @@ type CreatedGlobalPoolMember struct {
 	// CreatedMembers is the list of created members
 	// +optional
 	CreatedMembers []GlobalMember `json:"createdMembers,omitempty"`
+}
+
+// Equal compares two CreatedGlobalPoolMember for equality (order-independent for members)
+func (a CreatedGlobalPoolMember) Equal(b CreatedGlobalPoolMember) bool {
+	if a.Id != b.Id || a.Name != b.Name {
+		return false
+	}
+	if len(a.CreatedMembers) != len(b.CreatedMembers) {
+		return false
+	}
+	for _, memberA := range a.CreatedMembers {
+		if !slices.ContainsFunc(b.CreatedMembers, memberA.Equal) {
+			return false
+		}
+	}
+	return true
 }
 
 // +kubebuilder:object:root=true

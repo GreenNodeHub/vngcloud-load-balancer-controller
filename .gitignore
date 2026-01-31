@@ -32,3 +32,4 @@ go.work
 charts/vngcloud-load-balancer-controller/templates/loadbalancerconfig-crd.yaml
 charts/vngcloud-load-balancer-controller/templates/nodesecuritygroup-crd.yaml
 charts/vngcloud-load-balancer-controller/templates/vngcloudgloballoadbalancer-crd.yaml
+charts/vngcloud-load-balancer-controller/templates/globalloadbalancerconfig-crd.yaml

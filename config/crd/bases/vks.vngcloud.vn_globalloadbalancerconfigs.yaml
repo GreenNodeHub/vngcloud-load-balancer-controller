@@ -280,10 +280,6 @@ spec:
           status:
             description: status defines the observed state of GlobalLoadBalancerConfig
             properties:
-              address:
-                description: Address is the DNS name or IP address assigned to the
-                  load balancer
-                type: string
               conditions:
                 description: |-
                   conditions represent the current state of the GlobalLoadBalancerConfig resource.
@@ -376,7 +372,7 @@ spec:
                 - id
                 x-kubernetes-list-type: map
               createdPools:
-                description: CreatedListeners is the list of created listener IDs
+                description: CreatedPools is the list of created pool IDs
                 items:
                   properties:
                     createdPoolMembers:
@@ -456,6 +452,13 @@ spec:
                   type: string
                 description: CreatedTags is the map of tags created on the load balancer
                 type: object
+              domains:
+                description: Domains is the list of DNS hostnames assigned to the
+                  load balancer
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: atomic
               lastReconcileMessage:
                 description: LastReconcileMessage contains a message from the last
                   reconciliation
@@ -474,6 +477,31 @@ spec:
                   recently observed spec
                 format: int64
                 type: integer
+              vips:
+                description: Vips is the list of Virtual IPs assigned to the load
+                  balancer across different regions
+                items:
+                  description: GlobalLoadBalancerVIPStatus represents a Virtual IP
+                    assigned to the global load balancer
+                  properties:
+                    address:
+                      description: Address is the IP address of the VIP
+                      type: string
+                    region:
+                      description: Region is the region where the VIP is located
+                      type: string
+                    status:
+                      description: Status is the status of the VIP (e.g., "ACTIVE",
+                        "PENDING")
+                      type: string
+                  required:
+                  - address
+                  - region
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - region
+                x-kubernetes-list-type: map
             type: object
         required:
         - spec

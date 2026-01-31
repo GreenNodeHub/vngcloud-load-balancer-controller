@@ -68,7 +68,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
 		t.logger.Error("Listener protocol mismatch: ", currentListener.Protocol, listenerSpec.Protocol)
-		return nil, errors.New("listener port " + string(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
+		return nil, errors.New("listener port " + fmt.Sprint(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
 	}
 
 	// update exist listener

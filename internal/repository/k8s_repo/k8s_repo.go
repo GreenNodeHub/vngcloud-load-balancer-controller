@@ -368,11 +368,11 @@ func (r *k8sRepository) GetGlobalLoadBalancerConfig(ctx context.Context, n types
 func (r *k8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(
 	ctx context.Context,
 	glbc *v1alpha1.GlobalLoadBalancerConfig,
-	mutate func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig),
+	mutate func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, glbc, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, glbc, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.GlobalLoadBalancerConfig))
+		return mutate(ctx, obj.(*v1alpha1.GlobalLoadBalancerConfig))
 	})
 }
 
@@ -387,10 +387,10 @@ func (r *k8sRepository) GetVngcloudGlobalLoadBalancer(ctx context.Context, n typ
 func (r *k8sRepository) PatchMutateStatusVngcloudGlobalLoadBalancer(
 	ctx context.Context,
 	vglb *v1alpha1.VngcloudGlobalLoadBalancer,
-	mutate func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer),
+	mutate func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, vglb, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, vglb, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.VngcloudGlobalLoadBalancer))
+		return mutate(ctx, obj.(*v1alpha1.VngcloudGlobalLoadBalancer))
 	})
 }

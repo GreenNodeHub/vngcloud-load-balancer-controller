@@ -24,6 +24,33 @@ type defaultModelDeployTask struct {
 	lbConfig     *v1alpha1.GlobalLoadBalancerConfig
 }
 
+// extractAddressInfo extracts VIPs and domains from the GlobalLoadBalancer entity
+func extractAddressInfo(lbEntity *entity.GlobalLoadBalancer) (vips []v1alpha1.GlobalLoadBalancerVIPStatus, domains []string) {
+	if lbEntity == nil {
+		return nil, nil
+	}
+
+	// Extract VIPs
+	for _, vip := range lbEntity.Vips {
+		if vip != nil {
+			vips = append(vips, v1alpha1.GlobalLoadBalancerVIPStatus{
+				Address: vip.Address,
+				Region:  vip.Region,
+				Status:  vip.Status,
+			})
+		}
+	}
+
+	// Extract Domains
+	for _, d := range lbEntity.Domains {
+		if d != nil && d.Hostname != "" {
+			domains = append(domains, d.Hostname)
+		}
+	}
+
+	return vips, domains
+}
+
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	// LAYER 1: Validate the GlobalLoadBalancerConfig itself (internal consistency)
 	// This runs before we even get the load balancer ID
@@ -61,17 +88,32 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	}
 
 	// update status
-	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) {
+	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool {
+		// check on fresh copy if already equal
+		if createdGlobalListenersEqual(obj.Status.CreatedListeners, newCreatedListeners) &&
+			createdGlobalPoolsEqual(obj.Status.CreatedPools, newCreatedPools) {
+			return false // no change needed
+		}
 		obj.Status.CreatedListeners = newCreatedListeners
 		obj.Status.CreatedPools = newCreatedPools
+		return true
 	})
 }
 
+// deployLoadBalancer creates or ensures the load balancer exists, handling migrations if necessary.
+// It returns the load balancer ID to be used for further operations.
+// The caller should requeue if a new load balancer ID is obtained to acquire the appropriate lock.
 func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string, error) {
+	errorNewLbIdObtained := errs.NewRequeueNeeded("new load balancer ID obtained, requeue needed")
+
 	// if already an exist lb
 	if t.lbConfig.Status.LoadBalancerId != nil && *t.lbConfig.Status.LoadBalancerId != "" {
 		if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" && *t.lbConfig.Spec.LoadBalancerId != *t.lbConfig.Status.LoadBalancerId {
-			return t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
+			lbId, err := t.migrateLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, *t.lbConfig.Spec.LoadBalancerId)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
 		} else {
 			return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Status.LoadBalancerId, nil)
 		}
@@ -80,7 +122,11 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 	// if not exist lbId in status
 	// try to use spec lbId
 	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
-		return t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
+		lbId, err := t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
+		if err != nil {
+			return lbId, err
+		}
+		return lbId, errorNewLbIdObtained
 	}
 
 	// try to use spec lb Name
@@ -90,10 +136,15 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context) (string
 			return "", err
 		}
 		if lb != nil {
-			return t.ensureExistLoadBalancer(ctx, lb.ID, lb)
+			lbId, err := t.ensureExistLoadBalancer(ctx, lb.ID, lb)
+			if err != nil {
+				return lbId, err
+			}
+			return lbId, errorNewLbIdObtained
 		}
 	}
 
+	// if requeue here, created Listeners and Pools is not saved in status yet, if user delete LBC quickly, may cause orphan resources
 	return t.createLoadBalancer(ctx)
 }
 
@@ -113,9 +164,18 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string
 		return "", errors.New("load balancer not have ID after create, need to retry")
 	}
 
+	// update status with initial ID (VIPs and Domains may not be available yet)
+	vips, domains := extractAddressInfo(lbEntity)
+	if err := t.statusAddLoadBalancerId(ctx, &lbEntity.ID, vips, domains); err != nil {
+		return "", err
+	}
+
 	// wait for loadbalancer active, if lb is error, delete it and return error
 	if _, err = t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbEntity.ID); err != nil {
 		if err == domain.ErrorLoadBalancerStatusError {
+			if err := t.statusAddLoadBalancerId(ctx, nil, nil, nil); err != nil {
+				return "", err
+			}
 			if err := t.vngcloudRepo.DeleteGlobalLoadBalancer(ctx, lbEntity.ID); err != nil {
 				t.logger.Error("Failed to delete loadbalancer: ", err)
 				return "", err
@@ -128,6 +188,8 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string
 	}
 
 	t.logger.Infof("Created load balancer with ID %s", lbEntity.ID)
+
+	// because load balancer is just created, need to deploy package and tag again and update status
 	return t.ensureExistLoadBalancer(ctx, lbEntity.ID, nil)
 }
 
@@ -145,19 +207,10 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 	if lbEntity == nil {
 		var err error
-		lbEntity, err = t.vngcloudRepo.GetGlobalLoadBalancerByID(ctx, lbId)
+		_, err = t.vngcloudRepo.GetGlobalLoadBalancerByID(ctx, lbId)
 		if err != nil {
 			return "", err
 		}
-	}
-
-	// update status
-	if err := t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		// TODO: multi address
-		// obj.Status.Address = &lbEntity.Domains
-	}); err != nil {
-		return "", err
 	}
 
 	var err error
@@ -165,15 +218,17 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		return "", err
 	}
 
+	// update status with VIPs and Domains from the active load balancer
+	vips, domains := extractAddressInfo(lbEntity)
+	if err := t.statusAddLoadBalancerId(ctx, &lbId, vips, domains); err != nil {
+		return "", err
+	}
+
 	if err := t.deployPackageId(ctx, lbEntity); err != nil {
 		return "", err
 	}
 
-	return lbId, t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) {
-		obj.Status.LoadBalancerId = &lbId
-		// TODO: multi address
-		// obj.Status.Address = &lbEntity.Address
-	})
+	return lbId, nil
 }
 
 // resize load balancer if packageID in spec is different from current one
@@ -189,7 +244,6 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	}
 
 	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.Package, *t.lbConfig.Spec.PackageId)
-	// TODO: check if can resize
 	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.ID, *t.lbConfig.Spec.PackageId); err != nil {
 		return err
 	}
