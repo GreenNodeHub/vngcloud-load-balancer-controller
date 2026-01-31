@@ -5447,7 +5447,7 @@ func (_c *MockK8sRepository_PatchMutateStatusGlobalLoadBalancerConfig_Call) RunA
 }
 
 // PatchMutateStatusLoadBalancerConfig provides a mock function for the type MockK8sRepository
-func (_mock *MockK8sRepository) PatchMutateStatusLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)) error {
+func (_mock *MockK8sRepository) PatchMutateStatusLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error {
 	ret := _mock.Called(ctx, lbc, mutateFunc)
 
 	if len(ret) == 0 {
@@ -5455,7 +5455,7 @@ func (_mock *MockK8sRepository) PatchMutateStatusLoadBalancerConfig(ctx context.
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.LoadBalancerConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.LoadBalancerConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error); ok {
 		r0 = returnFunc(ctx, lbc, mutateFunc)
 	} else {
 		r0 = ret.Error(0)
@@ -5471,12 +5471,12 @@ type MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call struct {
 // PatchMutateStatusLoadBalancerConfig is a helper method to define mock.On call
 //   - ctx context.Context
 //   - lbc *v1alpha1.LoadBalancerConfig
-//   - mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)
+//   - mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool
 func (_e *MockK8sRepository_Expecter) PatchMutateStatusLoadBalancerConfig(ctx interface{}, lbc interface{}, mutateFunc interface{}) *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call {
 	return &MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call{Call: _e.mock.On("PatchMutateStatusLoadBalancerConfig", ctx, lbc, mutateFunc)}
 }
 
-func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) Run(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig))) *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call {
+func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) Run(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool)) *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -5486,9 +5486,9 @@ func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) Run(run fu
 		if args[1] != nil {
 			arg1 = args[1].(*v1alpha1.LoadBalancerConfig)
 		}
-		var arg2 func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)
+		var arg2 func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool
 		if args[2] != nil {
-			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig))
+			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool)
 		}
 		run(
 			arg0,
@@ -5504,13 +5504,13 @@ func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) Return(err
 	return _c
 }
 
-func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)) error) *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call {
+func (_c *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error) *MockK8sRepository_PatchMutateStatusLoadBalancerConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // PatchMutateStatusNodeSecurityGroup provides a mock function for the type MockK8sRepository
-func (_mock *MockK8sRepository) PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error {
+func (_mock *MockK8sRepository) PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool) error {
 	ret := _mock.Called(ctx, nsg, mutateFunc)
 
 	if len(ret) == 0 {
@@ -5518,7 +5518,7 @@ func (_mock *MockK8sRepository) PatchMutateStatusNodeSecurityGroup(ctx context.C
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.NodeSecurityGroup, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool) error); ok {
 		r0 = returnFunc(ctx, nsg, mutateFunc)
 	} else {
 		r0 = ret.Error(0)
@@ -5534,12 +5534,12 @@ type MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call struct {
 // PatchMutateStatusNodeSecurityGroup is a helper method to define mock.On call
 //   - ctx context.Context
 //   - nsg *v1alpha1.NodeSecurityGroup
-//   - mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)
+//   - mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool
 func (_e *MockK8sRepository_Expecter) PatchMutateStatusNodeSecurityGroup(ctx interface{}, nsg interface{}, mutateFunc interface{}) *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
 	return &MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call{Call: _e.mock.On("PatchMutateStatusNodeSecurityGroup", ctx, nsg, mutateFunc)}
 }
 
-func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup))) *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Run(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool)) *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -5549,9 +5549,9 @@ func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Run(run fun
 		if args[1] != nil {
 			arg1 = args[1].(*v1alpha1.NodeSecurityGroup)
 		}
-		var arg2 func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)
+		var arg2 func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool
 		if args[2] != nil {
-			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup))
+			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool)
 		}
 		run(
 			arg0,
@@ -5567,7 +5567,7 @@ func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) Return(err 
 	return _c
 }
 
-func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error) *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
+func (_c *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call) RunAndReturn(run func(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool) error) *MockK8sRepository_PatchMutateStatusNodeSecurityGroup_Call {
 	_c.Call.Return(run)
 	return _c
 }

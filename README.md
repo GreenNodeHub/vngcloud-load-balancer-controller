@@ -219,5 +219,6 @@ mockery
 - [ ] webhook
 - [ ] auto reconcile when lb change outside controller
 - [x] create or update crd: https://github.com/cilium/cilium/blob/main/pkg/k8s/apis/crdhelpers/register.go
-- [ ] client manager for running remote
+- [x] client manager for running remote
 - [ ] create lb with pool and lis then delete immediatelly (pool and lis not manage yet -> delete not done)
+- [x] status conditions

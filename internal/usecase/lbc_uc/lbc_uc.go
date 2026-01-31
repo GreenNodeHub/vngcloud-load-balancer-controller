@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/anngdinh/operator-helper/contexts"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,18 +78,44 @@ func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req c
 	// Perform the actual reconciliation
 	err = uc.ensure(ctx, lbConfig)
 
-	// Update reconciliation tracking fields
+	// Update reconciliation tracking fields and conditions
 	now := metav1.Now()
 	message := "Successfully reconciled"
+	conditionStatus := metav1.ConditionTrue
+	conditionReason := v1alpha1.LBCReasonReconcileSuccess
 	if err != nil {
 		message = err.Error()
+		conditionStatus = metav1.ConditionFalse
+		conditionReason = v1alpha1.LBCReasonReconcileFailed
 	}
 
 	// !IMPORTANT!: The tests will fail without this
-	statusErr := uc.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
-		obj.Status.ObservedGeneration = &lbConfig.Generation
-		obj.Status.LastReconcileTime = &now
-		obj.Status.LastReconcileMessage = message
+	statusErr := uc.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		changed := false
+
+		// Update ObservedGeneration and LastReconcileMessage
+		if obj.Status.ObservedGeneration == nil || *obj.Status.ObservedGeneration != lbConfig.Generation ||
+			obj.Status.LastReconcileMessage != message {
+			obj.Status.ObservedGeneration = &lbConfig.Generation
+			obj.Status.LastReconcileMessage = message
+			obj.Status.LastReconcileTime = &now
+			changed = true
+		}
+
+		// Update Ready condition using Kubernetes standard pattern
+		newCondition := metav1.Condition{
+			Type:               v1alpha1.LBCConditionTypeReady,
+			Status:             conditionStatus,
+			ObservedGeneration: lbConfig.Generation,
+			LastTransitionTime: now,
+			Reason:             conditionReason,
+			Message:            message,
+		}
+		if meta.SetStatusCondition(&obj.Status.Conditions, newCondition) {
+			changed = true
+		}
+
+		return changed
 	})
 	if statusErr != nil {
 		logger := contexts.NewContext(ctx).Log()

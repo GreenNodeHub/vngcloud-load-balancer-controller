@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"slices"
 	"sort"
 
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
@@ -25,6 +26,18 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// Condition types for NodeSecurityGroup
+const (
+	// NSGConditionTypeReady indicates the NodeSecurityGroup is ready and fully reconciled
+	NSGConditionTypeReady = "Ready"
+)
+
+// Condition reasons for NodeSecurityGroup
+const (
+	NSGReasonReconcileSuccess = "ReconcileSuccess"
+	NSGReasonReconcileFailed  = "ReconcileFailed"
+)
 
 // NodeSecurityGroupRule defines a security group rule for NodeSecurityGroup
 type NodeSecurityGroupRule struct {
@@ -99,6 +112,11 @@ type NodeInfo struct {
 	ServerId string `json:"serverId,omitempty"`
 }
 
+// Equal compares two NodeInfo for equality
+func (a NodeInfo) Equal(b NodeInfo) bool {
+	return a.Name == b.Name && a.ServerId == b.ServerId
+}
+
 // ServerSecurityGroupStatus tracks the security group attachment status for a specific server
 type ServerSecurityGroupStatus struct {
 	// ServerId is the VNG Cloud server ID
@@ -116,6 +134,37 @@ type ServerSecurityGroupStatus struct {
 	// // LastUpdateTime is the timestamp of the last update
 	// // +optional
 	// LastUpdateTime *metav1.Time `json:"lastUpdateTime,omitempty"`
+}
+
+// Equal compares two ServerSecurityGroupStatus for equality (order-independent for AttachedSecurityGroupIds)
+func (a ServerSecurityGroupStatus) Equal(b ServerSecurityGroupStatus) bool {
+	return a.ServerId == b.ServerId &&
+		StringSlicesEqualUnordered(a.AttachedSecurityGroupIds, b.AttachedSecurityGroupIds) &&
+		ptrEqual(a.Error, b.Error)
+}
+
+// StringSlicesEqualUnordered compares two string slices for equality regardless of order
+func StringSlicesEqualUnordered(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for _, itemA := range a {
+		if !slices.Contains(b, itemA) {
+			return false
+		}
+	}
+	return true
+}
+
+// ptrEqual compares two string pointers for equality
+func ptrEqual(a, b *string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return *a == *b
 }
 
 type ManagedSecurityGroupStatus struct {
@@ -176,6 +225,8 @@ type NodeSecurityGroupStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=nsg
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // NodeSecurityGroup is the Schema for the nodesecuritygroups API
 type NodeSecurityGroup struct {

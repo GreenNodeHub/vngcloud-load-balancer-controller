@@ -58,11 +58,21 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 		// For LoadBalancer: update status.loadBalancer.ingress
+		var newHostname string
 		if addr != nil {
-			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address + ".nip.io"}}
+			newHostname = address + ".nip.io"
 		} else {
-			svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: address}}
+			newHostname = address
 		}
+
+		// Check if hostname already exists
+		if len(svc.Status.LoadBalancer.Ingress) > 0 && svc.Status.LoadBalancer.Ingress[0].Hostname == newHostname {
+			return nil // already exists
+		}
+
+		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: newHostname}}
+		logger := contexts.NewContext(ctx).Log()
+		logger.Infof("%s Updating Service LoadBalancer status address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
 		return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
 
@@ -73,6 +83,9 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 			return nil // already exists
 		}
 		svc.Spec.ExternalIPs = append(svc.Spec.ExternalIPs, address)
+
+		logger := contexts.NewContext(ctx).Log()
+		logger.Infof("%s Updating Service NodePort externalIPs address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
 		return r.client.Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
 
@@ -91,7 +104,7 @@ func (r *k8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.Names
 
 func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("Creating LBC %s/%s", lbc.Namespace, lbc.Name)
+	logger.Infof("%s Creating LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
 
 	err := r.client.Create(ctx, lbc, opts...)
 	if err != nil {
@@ -114,32 +127,38 @@ func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alp
 }
 
 func (r *k8sRepository) DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Deleting LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
 	return r.client.Delete(ctx, lbc)
 }
 
 func (r *k8sRepository) PatchLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Patching LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
 	return r.client.Patch(ctx, lbc, patch, opts...)
 }
 
 func (r *k8sRepository) UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.UpdateOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Updating LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
 	return r.client.Update(ctx, lbc, opts...)
 }
 
 func (r *k8sRepository) PatchMutateStatusLoadBalancerConfig(
 	ctx context.Context,
 	lbc *v1alpha1.LoadBalancerConfig,
-	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig),
+	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, lbc, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, lbc, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
+		return mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
 	})
 }
 
 func (r *k8sRepository) patchMutateStatusObject(
 	ctx context.Context,
 	obj client.Object,
-	mutate func(ctx context.Context, obj client.Object),
+	mutate func(ctx context.Context, obj client.Object) bool,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// get fresh copy
@@ -154,8 +173,10 @@ func (r *k8sRepository) patchMutateStatusObject(
 		// deep copy for diff/patch base
 		oldObject := objGet.DeepCopyObject().(client.Object)
 
-		// mutate the fetched object (not the input)
-		mutate(ctx, objGet)
+		// mutate the fetched object (not the input), skip patch if no change needed
+		if !mutate(ctx, objGet) {
+			return nil
+		}
 
 		diff := cmp.Diff(oldObject, objGet,
 			// Ignore metadata and spec fields - we only care about Status changes
@@ -169,6 +190,8 @@ func (r *k8sRepository) patchMutateStatusObject(
 		}
 
 		// patch only status, with optimistic lock
+		logger := contexts.NewContext(ctx).Log()
+		logger.Infof("%s Patching status %s/%s", domain.RequestIcon, objGet.GetNamespace(), objGet.GetName())
 		return r.client.Status().Patch(ctx, objGet,
 			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
 	})
@@ -241,7 +264,7 @@ func (r *k8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha
 
 func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("Creating NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
+	logger.Infof("%s Creating NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
 
 	err := r.client.Create(ctx, nsg, opts...)
 	if err != nil {
@@ -264,23 +287,25 @@ func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alph
 }
 
 func (r *k8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Deleting NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
 	return r.client.Delete(ctx, nsg)
 }
 
 func (r *k8sRepository) PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("%s Patching NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
+	logger.Infof("%s Patching NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
 	return r.client.Patch(ctx, nsg, patch, opts...)
 }
 
 func (r *k8sRepository) PatchMutateStatusNodeSecurityGroup(
 	ctx context.Context,
 	nsg *v1alpha1.NodeSecurityGroup,
-	mutate func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup),
+	mutate func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool,
 ) error {
-	return r.patchMutateStatusObject(ctx, nsg, func(ctx context.Context, obj client.Object) {
+	return r.patchMutateStatusObject(ctx, nsg, func(ctx context.Context, obj client.Object) bool {
 		// type-assert so you can use strongly typed fields
-		mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
+		return mutate(ctx, obj.(*v1alpha1.NodeSecurityGroup))
 	})
 }
 
@@ -303,14 +328,24 @@ func (r *k8sRepository) UpdateIngressStatusAddress(ctx context.Context, n types.
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	objectOld := ing.DeepCopy()
 
 	addr := net.ParseIP(address)
+	var newHostname string
 	if addr != nil {
-		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address + ".nip.io"}}
+		newHostname = address + ".nip.io"
 	} else {
-		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: address}}
+		newHostname = address
 	}
+
+	// Check if hostname already exists
+	if len(ing.Status.LoadBalancer.Ingress) > 0 && ing.Status.LoadBalancer.Ingress[0].Hostname == newHostname {
+		return nil // already exists
+	}
+
+	objectOld := ing.DeepCopy()
+	ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: newHostname}}
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Updating Ingress status address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
 	return r.client.Status().Patch(ctx, ing, client.MergeFrom(objectOld))
 }
 

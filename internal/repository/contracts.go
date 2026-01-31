@@ -125,7 +125,7 @@ type K8sRepository interface {
 	DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error
 	PatchLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error
 	UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.UpdateOption) error
-	PatchMutateStatusLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig)) error
+	PatchMutateStatusLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error
 	ListLoadBalancerConfig(ctx context.Context, list *v1alpha1.LoadBalancerConfigList, opts ...client.ListOption) error
 
 	GetNodeSecurityGroup(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error)
@@ -133,7 +133,7 @@ type K8sRepository interface {
 	CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error
 	DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error
 	PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error
-	PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup)) error
+	PatchMutateStatusNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, mutateFunc func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool) error
 
 	GetIngress(ctx context.Context, n types.NamespacedName) (*networkingv1.Ingress, error)
 	UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error

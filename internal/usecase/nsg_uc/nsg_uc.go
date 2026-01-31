@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,18 +52,44 @@ func (uc *nsgUseCase) EnsureNodeSecurityGroupUseCase(ctx context.Context, req ct
 	// Perform the actual reconciliation
 	err = uc.ensure(ctx, nsgObject)
 
-	// Update reconciliation tracking fields
+	// Update reconciliation tracking fields and conditions
 	now := metav1.Now()
 	message := "Successfully reconciled"
+	conditionStatus := metav1.ConditionTrue
+	conditionReason := v1alpha1.NSGReasonReconcileSuccess
 	if err != nil {
 		message = err.Error()
+		conditionStatus = metav1.ConditionFalse
+		conditionReason = v1alpha1.NSGReasonReconcileFailed
 	}
 
 	// !IMPORTANT!: The tests will fail without this
-	statusErr := uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) {
-		obj.Status.ObservedGeneration = obj.Generation
-		obj.Status.LastReconcileTime = &now
-		obj.Status.LastReconcileMessage = message
+	statusErr := uc.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject, func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
+		changed := false
+
+		// Update ObservedGeneration and LastReconcileMessage
+		if obj.Status.ObservedGeneration != nsgObject.Generation ||
+			obj.Status.LastReconcileMessage != message {
+			obj.Status.ObservedGeneration = nsgObject.Generation
+			obj.Status.LastReconcileMessage = message
+			obj.Status.LastReconcileTime = &now
+			changed = true
+		}
+
+		// Update Ready condition using Kubernetes standard pattern
+		newCondition := metav1.Condition{
+			Type:               v1alpha1.NSGConditionTypeReady,
+			Status:             conditionStatus,
+			ObservedGeneration: nsgObject.Generation,
+			LastTransitionTime: now,
+			Reason:             conditionReason,
+			Message:            message,
+		}
+		if meta.SetStatusCondition(&obj.Status.Conditions, newCondition) {
+			changed = true
+		}
+
+		return changed
 	})
 	if statusErr != nil {
 		logger := contexts.NewContext(ctx).Log()

@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"slices"
+
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +26,18 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// Condition types for LoadBalancerConfig
+const (
+	// LBCConditionTypeReady indicates the LoadBalancerConfig is ready and fully reconciled
+	LBCConditionTypeReady = "Ready"
+)
+
+// Condition reasons for LoadBalancerConfig
+const (
+	LBCReasonReconcileSuccess = "ReconcileSuccess"
+	LBCReasonReconcileFailed  = "ReconcileFailed"
+)
 
 // InsertHeader defines a header to be inserted in requests
 type InsertHeader struct {
@@ -195,6 +209,11 @@ type PoolMember struct {
 	// Backup indicates if the member is a backup member
 	// +optional
 	Backup *bool `json:"backup,omitempty"`
+}
+
+// Equal compares two PoolMember for equality
+func (a PoolMember) Equal(b PoolMember) bool {
+	return a.IP == b.IP && a.Port == b.Port && a.MonitorPort == b.MonitorPort && a.Name == b.Name
 }
 
 // Listener defines a listener configuration for the load balancer
@@ -431,6 +450,20 @@ type LoadBalancerConfigStatus struct {
 	// // ManageDFPMembers indicates if the controller should manage DFP members
 	// // +optional
 	// ManageDFPMembers *bool `json:"manageDFPMembers,omitempty"`
+
+	// Conditions represent the current state of the LoadBalancerConfig resource.
+	// Each condition has a unique type and reflects the status of a specific aspect of the resource.
+	//
+	// Standard condition types include:
+	// - "Ready": the resource is fully functional and ready to serve traffic
+	// - "Progressing": the resource is being created or updated
+	// - "Degraded": the resource failed to reach or maintain its desired state
+	//
+	// The status of each condition is one of True, False, or Unknown.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type CreatedPool struct {
@@ -446,6 +479,22 @@ type CreatedPool struct {
 	// +optional
 	// +listType=atomic
 	CreatedMembers []PoolMember `json:"createdMembers,omitempty"`
+}
+
+// Equal compares two CreatedPool for equality (order-independent for members)
+func (a CreatedPool) Equal(b CreatedPool) bool {
+	if a.Id != b.Id || a.Name != b.Name {
+		return false
+	}
+	if len(a.CreatedMembers) != len(b.CreatedMembers) {
+		return false
+	}
+	for _, memberA := range a.CreatedMembers {
+		if !slices.ContainsFunc(b.CreatedMembers, memberA.Equal) {
+			return false
+		}
+	}
+	return true
 }
 
 type CreatedListener struct {
@@ -464,10 +513,31 @@ type CreatedListener struct {
 	CreatedPolicies []CreatedPolicy `json:"createdPolicies,omitempty"`
 }
 
+// Equal compares two CreatedListener for equality (order-independent for policies)
+func (a CreatedListener) Equal(b CreatedListener) bool {
+	if a.Id != b.Id || a.Port != b.Port {
+		return false
+	}
+	if len(a.CreatedPolicies) != len(b.CreatedPolicies) {
+		return false
+	}
+	for _, policyA := range a.CreatedPolicies {
+		if !slices.ContainsFunc(b.CreatedPolicies, policyA.Equal) {
+			return false
+		}
+	}
+	return true
+}
+
 type CreatedPolicy struct {
 	// Id is the ID of the created policy
 	// +required
 	Id string `json:"id,omitempty"`
+}
+
+// Equal compares two CreatedPolicy for equality
+func (a CreatedPolicy) Equal(b CreatedPolicy) bool {
+	return a.Id == b.Id
 }
 
 type CreatedCertificate struct {
@@ -488,6 +558,21 @@ type CreatedCertificate struct {
 	CertificateName *string `json:"certificateName,omitempty"`
 }
 
+// Equal compares two CreatedCertificate for equality
+func (a CreatedCertificate) Equal(b CreatedCertificate) bool {
+	if a.Id != b.Id || a.SecretName != b.SecretName || a.ResourceVersion != b.ResourceVersion {
+		return false
+	}
+	// Compare optional CertificateName
+	if (a.CertificateName == nil) != (b.CertificateName == nil) {
+		return false
+	}
+	if a.CertificateName != nil && *a.CertificateName != *b.CertificateName {
+		return false
+	}
+	return true
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=lbc
@@ -495,6 +580,7 @@ type CreatedCertificate struct {
 // +kubebuilder:printcolumn:name="LoadBalancer-Id",type="string",JSONPath=".status.loadBalancerId"
 // +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.address"
 // +kubebuilder:printcolumn:name="Zone",type="string",JSONPath=".spec.zoneId"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // LoadBalancerConfig is the Schema for the loadbalancerconfigs API

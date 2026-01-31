@@ -73,10 +73,17 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	}
 
 	// update status
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) {
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		// check on fresh copy if already equal
+		if createdListenersEqual(obj.Status.CreatedListeners, newCreatedListeners) &&
+			createdPoolsEqual(obj.Status.CreatedPools, newCreatedPools) &&
+			createdCertificatesEqual(obj.Status.CreatedCertificates, createdCerts) {
+			return false // no change needed
+		}
 		obj.Status.CreatedListeners = newCreatedListeners
 		obj.Status.CreatedPools = newCreatedPools
 		obj.Status.CreatedCertificates = createdCerts
+		return true
 	})
 }
 
