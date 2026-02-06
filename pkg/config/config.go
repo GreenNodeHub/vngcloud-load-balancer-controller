@@ -82,6 +82,5 @@ func (c *Config) Init(setupLog logr.Logger, configFile string) error {
 		setupLog.Error(err, "Unable to decode the configuration")
 		return err
 	}
-	setupLog.Info("Configuration loaded", "config", c)
 	return nil
 }
