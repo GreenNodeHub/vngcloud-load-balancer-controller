@@ -57,7 +57,7 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 		return "", "", "", "", err
 	}
 
-	return common.Zone(zoneID), networkID, subnetID, subnetCIDR, nil
+	return zoneID, networkID, subnetID, subnetCIDR, nil
 }
 
 func (m *vngCloudRepository) GetServerByID(ctx context.Context, serverID string) (*entityv2.Server, error) {

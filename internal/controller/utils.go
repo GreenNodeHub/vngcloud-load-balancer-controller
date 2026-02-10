@@ -25,16 +25,6 @@ func PointerOf[T any](t T) *T {
 	return &t
 }
 
-// Generic function to remove the first occurrence of a matching value from a slice
-func removeFisrt[T comparable](slice []T, value T) []T {
-	for i, v := range slice {
-		if v == value {
-			return append(slice[:i], slice[i+1:]...)
-		}
-	}
-	return slice
-}
-
 func debugCompareMapString[T comparable](a, b map[string]T) {
 	// get all keys
 	keys := make(map[string]struct{})

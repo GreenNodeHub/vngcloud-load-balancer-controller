@@ -243,7 +243,7 @@ func (uc *serviceUseCase) deleteLoadBalancerConfig(ctx context.Context, svc *cor
 	}
 
 	// Delete all LBCs found (non-blocking)
-	var stillExist []string
+	stillExist := make([]string, 0, len(lbcList.Items))
 	for _, lbc := range lbcList.Items {
 		// If not already being deleted, initiate deletion
 		if lbc.DeletionTimestamp.IsZero() {
@@ -285,7 +285,7 @@ func (uc *serviceUseCase) deleteNodeSecurityGroup(ctx context.Context, svc *core
 	}
 
 	// Delete all NSGs found (non-blocking)
-	var stillExist []string
+	stillExist := make([]string, 0, len(secgroupList.Items))
 	for _, secgroup := range secgroupList.Items {
 		// If not already being deleted, initiate deletion
 		if secgroup.DeletionTimestamp.IsZero() {

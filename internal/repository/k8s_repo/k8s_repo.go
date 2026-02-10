@@ -197,55 +197,6 @@ func (r *k8sRepository) patchMutateStatusObject(
 	})
 }
 
-func (r *k8sRepository) patchMutateStatusObjectAndVerify(
-	ctx context.Context,
-	obj client.Object,
-	mutate func(ctx context.Context, obj client.Object),
-	verifier func(obj client.Object) bool,
-) error {
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		// get fresh copy
-		objGet := obj.DeepCopyObject().(client.Object)
-		if err := r.client.Get(ctx, types.NamespacedName{
-			Namespace: obj.GetNamespace(),
-			Name:      obj.GetName(),
-		}, objGet); err != nil {
-			return err
-		}
-
-		// deep copy for diff/patch base
-		oldObject := objGet.DeepCopyObject().(client.Object)
-
-		// mutate the fetched object (not the input)
-		mutate(ctx, objGet)
-
-		// patch only status, with optimistic lock
-		return r.client.Status().Patch(ctx, objGet,
-			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
-	})
-	if err != nil {
-		return err
-	}
-
-	// verify
-	objGet := obj.DeepCopyObject().(client.Object)
-	if err := r.client.Get(ctx, types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}, objGet); err != nil {
-		return err
-	}
-	if !verifier(objGet) {
-		diff := cmp.Diff(obj, objGet)
-		if diff != "" {
-			logger := contexts.NewContext(ctx).Log()
-			logger.Warnf("diff: %s", diff)
-		}
-		return domain.ErrorStatusNotUpdated
-	}
-	return nil
-}
-
 func (r *k8sRepository) ListLoadBalancerConfig(ctx context.Context, list *v1alpha1.LoadBalancerConfigList, opts ...client.ListOption) error {
 	return r.client.List(ctx, list, opts...)
 }

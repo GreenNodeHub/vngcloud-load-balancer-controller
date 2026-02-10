@@ -951,7 +951,7 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 		if listener.InsertHeaders == nil {
 			return nil, errors.New("Missing Headers For HTTP/HTTPS Listener")
 		}
-		newListener.Listener.InsertHeaders = *listener.InsertHeaders
+		newListener.InsertHeaders = *listener.InsertHeaders
 	}
 	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS {
 		if listener.DefaultCertificateAuthority == nil || *listener.DefaultCertificateAuthority == "" {
@@ -963,9 +963,9 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 		// if listener.ClientCertificate == nil {
 		// 	return nil, errors.New("Missing Client Certificate For HTTPS Listener")
 		// }
-		newListener.Listener.CertificateAuthorities = *listener.CertificateAuthorities
-		newListener.Listener.DefaultCertificateAuthority = listener.DefaultCertificateAuthority
-		newListener.Listener.ClientCertificateAuthentication = listener.ClientCertificate
+		newListener.CertificateAuthorities = *listener.CertificateAuthorities
+		newListener.DefaultCertificateAuthority = listener.DefaultCertificateAuthority
+		newListener.ClientCertificateAuthentication = listener.ClientCertificate
 	}
 	if listener.DefaultPoolId != nil && *listener.DefaultPoolId != "" {
 		newListener.DefaultPoolId = *listener.DefaultPoolId
@@ -982,7 +982,7 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
 	return &entityv2.Listener{
-		UUID: newListener.Listener.UUID,
+		UUID: newListener.UUID,
 	}, nil
 }
 func (m *MockProvider) ListListenerOfLB(ctx context.Context, lbID string) (*entityv2.ListListeners, error) {
@@ -1033,19 +1033,19 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 		logger.Errorf("[ERROR] - UpdateListener: listener not found")
 		return domain.ErrorNotFound
 	}
-	listener.Listener.TimeoutClient = updateOpt.TimeoutClient
-	listener.Listener.TimeoutConnection = updateOpt.TimeoutConnection
-	listener.Listener.TimeoutMember = updateOpt.TimeoutMember
-	listener.Listener.AllowedCidrs = updateOpt.AllowedCidrs
+	listener.TimeoutClient = updateOpt.TimeoutClient
+	listener.TimeoutConnection = updateOpt.TimeoutConnection
+	listener.TimeoutMember = updateOpt.TimeoutMember
+	listener.AllowedCidrs = updateOpt.AllowedCidrs
 
-	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
-		listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
+	if listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
+		listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
 		if updateOpt.InsertHeaders == nil {
 			return errors.New("Missing Headers For HTTP/HTTPS Listener")
 		}
-		listener.Listener.InsertHeaders = *updateOpt.InsertHeaders
+		listener.InsertHeaders = *updateOpt.InsertHeaders
 	}
-	if listener.Listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) {
+	if listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) {
 		if updateOpt.DefaultCertificateAuthority == nil || *updateOpt.DefaultCertificateAuthority == "" {
 			return errors.New("Missing Default Certificate Authority For HTTPS Listener")
 		}
@@ -1055,9 +1055,9 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 		// if updateOpt.ClientCertificate == nil {
 		// 	return errors.New("Missing Client Certificate For HTTPS Listener")
 		// }
-		listener.Listener.CertificateAuthorities = *updateOpt.CertificateAuthorities
-		listener.Listener.DefaultCertificateAuthority = updateOpt.DefaultCertificateAuthority
-		listener.Listener.ClientCertificateAuthentication = updateOpt.ClientCertificate
+		listener.CertificateAuthorities = *updateOpt.CertificateAuthorities
+		listener.DefaultCertificateAuthority = updateOpt.DefaultCertificateAuthority
+		listener.ClientCertificateAuthentication = updateOpt.ClientCertificate
 	}
 
 	m.updatingStatus(lbID)
@@ -1164,7 +1164,7 @@ func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
 	return &entityv2.Policy{
-		UUID: newPolicy.Policy.UUID,
+		UUID: newPolicy.UUID,
 	}, nil
 }
 func (m *MockProvider) ListPolicyOfListener(ctx context.Context, lbID, listenerID string) (*entityv2.ListPolicies, error) {
@@ -1198,11 +1198,11 @@ func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, polic
 		logger.Errorf("[ERROR] - UpdatePolicy: policy not found")
 		return domain.ErrorNotFound
 	}
-	policy.Policy.RedirectPoolID = updateOpt.RedirectPoolID
-	policy.Policy.Action = string(updateOpt.Action)
-	policy.Policy.RedirectURL = updateOpt.RedirectURL
-	policy.Policy.RedirectHTTPCode = updateOpt.RedirectHTTPCode
-	policy.Policy.KeepQueryString = updateOpt.KeepQueryString
+	policy.RedirectPoolID = updateOpt.RedirectPoolID
+	policy.Action = string(updateOpt.Action)
+	policy.RedirectURL = updateOpt.RedirectURL
+	policy.RedirectHTTPCode = updateOpt.RedirectHTTPCode
+	policy.KeepQueryString = updateOpt.KeepQueryString
 	newRules := make([]*entityv2.L7Rule, 0)
 	for _, r := range updateOpt.Rules {
 		newRules = append(newRules, &entityv2.L7Rule{
@@ -1214,7 +1214,7 @@ func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, polic
 			OperatingStatus:    consts.ACTIVE_LOADBALANCER_STATUS,
 		})
 	}
-	policy.Policy.L7Rules = newRules
+	policy.L7Rules = newRules
 
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
@@ -1284,7 +1284,7 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 		reorderedPolicies := make([]*wrapPolicy, 0, len(policyIDs))
 		for i, pID := range policyIDs {
 			policy := policyMap[pID]
-			policy.Policy.Position = i + 1
+			policy.Position = i + 1
 			reorderedPolicies = append(reorderedPolicies, policy)
 		}
 
@@ -1347,8 +1347,8 @@ func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbala
 		if pool.TLSEncryption == nil {
 			return nil, errors.New("Missing TLSEncryption For HTTP Pool")
 		}
-		newPool.Pool.TLSEncryption = *pool.TLSEncryption
-		newPool.Pool.Stickiness = *pool.Stickiness
+		newPool.TLSEncryption = *pool.TLSEncryption
+		newPool.Stickiness = *pool.Stickiness
 	}
 
 	if pool.HealthMonitor != nil {
@@ -1415,7 +1415,7 @@ func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbala
 	m.updatingStatus(lbID)
 	go m.readyAfterTime(lbID)
 	return &entityv2.Pool{
-		UUID: newPool.Pool.UUID,
+		UUID: newPool.UUID,
 	}, nil
 }
 func (m *MockProvider) ListPool(ctx context.Context, lbID string) (*entityv2.ListPools, error) {
@@ -1532,17 +1532,17 @@ func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt 
 		logger.Errorf("[ERROR] - UpdatePool: pool not found")
 		return domain.ErrorNotFound
 	}
-	pool.Pool.LoadBalanceMethod = string(updateOpt.Algorithm)
+	pool.LoadBalanceMethod = string(updateOpt.Algorithm)
 
-	if pool.Pool.Protocol == string(loadbalancerv2.PoolProtocolHTTP) {
+	if pool.Protocol == string(loadbalancerv2.PoolProtocolHTTP) {
 		if updateOpt.Stickiness == nil {
 			return errors.New("Missing Stickiness For HTTP Pool")
 		}
 		if updateOpt.TLSEncryption == nil {
 			return errors.New("Missing TLSEncryption For HTTP Pool")
 		}
-		pool.Pool.TLSEncryption = *updateOpt.TLSEncryption
-		pool.Pool.Stickiness = *updateOpt.Stickiness
+		pool.TLSEncryption = *updateOpt.TLSEncryption
+		pool.Stickiness = *updateOpt.Stickiness
 	}
 
 	m.updatingStatus(lbID)
@@ -1576,7 +1576,7 @@ func (m *MockProvider) ListCertificates(ctx context.Context) (*entityv2.ListCert
 func (m *MockProvider) GetCertificateByID(ctx context.Context, certID string) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
 	for _, c := range m.certs {
-		if c.Certificate.UUID == certID {
+		if c.UUID == certID {
 			return clone.Clone(*c.Certificate).(*entityv2.Certificate), nil
 		}
 	}
@@ -1600,7 +1600,7 @@ func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2
 	m.certs = append(m.certs, newCert)
 	m.mu.Unlock()
 	return &entityv2.Certificate{
-		UUID: newCert.Certificate.UUID,
+		UUID: newCert.UUID,
 	}, nil
 }
 
@@ -1610,7 +1610,7 @@ func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) err
 	isFound := false
 	newCerts := make([]*wrapCertificate, 0)
 	for i, c := range m.certs {
-		if c.Certificate.UUID != certID {
+		if c.UUID != certID {
 			newCerts = append(newCerts, m.certs[i])
 		} else {
 			isFound = true

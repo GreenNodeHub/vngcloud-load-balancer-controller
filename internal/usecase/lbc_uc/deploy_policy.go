@@ -91,9 +91,9 @@ func (t *defaultModelDeployTask) buildPolicyCreateRequest(_ context.Context, lbI
 				rules := make([]loadbalancerv2.L7RuleRequest, 0, len(policySpec.L7Rules))
 				for _, ruleSpec := range policySpec.L7Rules {
 					rules = append(rules, loadbalancerv2.L7RuleRequest{
-						CompareType: loadbalancerv2.PolicyCompareType(ruleSpec.CompareType),
+						CompareType: ruleSpec.CompareType,
 						RuleValue:   ruleSpec.RuleValue,
-						RuleType:    loadbalancerv2.PolicyRuleType(ruleSpec.RuleType),
+						RuleType:    ruleSpec.RuleType,
 					})
 				}
 				return rules
@@ -165,7 +165,7 @@ func (t *defaultModelDeployTask) buildPolicyUpdateRequest(_ context.Context, lbI
 
 	if policySpec.Action != "" && string(policySpec.Action) != currentPolicy.Action {
 		message = append(message, fmt.Sprintf("action (%s -> %s)", currentPolicy.Action, policySpec.Action))
-		updateOptions.Action = loadbalancerv2.PolicyAction(policySpec.Action)
+		updateOptions.Action = policySpec.Action
 		isNeedUpdate = true
 	}
 
@@ -243,9 +243,9 @@ func (t *defaultModelDeployTask) compareL7Rules(rulesSpec []v1alpha1.L7Rule, cur
 	l7RuleRequests := make([]loadbalancerv2.L7RuleRequest, 0, len(rulesSpec))
 	for _, ruleSpec := range rulesSpec {
 		l7RuleRequests = append(l7RuleRequests, loadbalancerv2.L7RuleRequest{
-			CompareType: loadbalancerv2.PolicyCompareType(ruleSpec.CompareType),
+			CompareType: ruleSpec.CompareType,
 			RuleValue:   ruleSpec.RuleValue,
-			RuleType:    loadbalancerv2.PolicyRuleType(ruleSpec.RuleType),
+			RuleType:    ruleSpec.RuleType,
 		})
 	}
 
@@ -293,7 +293,7 @@ func (t *defaultModelDeployTask) deployReorderPolicies(ctx context.Context, lbId
 		currentPosition int
 		expectPosition  int
 	}
-	var ss []kv
+	ss := make([]kv, 0, len(policiesSpec))
 	for _, policySpec := range policiesSpec {
 		currentPosition := -1
 		policyId := ""

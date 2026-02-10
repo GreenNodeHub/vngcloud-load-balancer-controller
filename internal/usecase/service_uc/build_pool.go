@@ -45,7 +45,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		newListener := v1alpha1.Listener{
 			Name:              t.nameHelper.GenL4ListenerName(port),
 			Protocol:          loadbalancerv2.ListenerProtocol(port.Protocol),
-			ProtocolPort:      int32(port.Port), // TODO
+			ProtocolPort:      port.Port,
 			DefaultPoolName:   &newPool.Name,
 			TimeoutClient:     defaultIdleTimeoutClient,
 			TimeoutMember:     defaultIdleTimeoutMember,
