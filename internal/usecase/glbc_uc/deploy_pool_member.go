@@ -310,5 +310,6 @@ func convertMember(member *entityv2.GlobalPoolMemberDetail) *v1alpha1.GlobalMemb
 		BackupRole:  member.BackupRole,
 		Weight:      &member.Weight,
 		MonitorPort: &member.MonitorPort,
+		SubnetID:    member.SubnetID,
 	}
 }

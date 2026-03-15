@@ -97,6 +97,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	return &v1alpha1.CreatedGlobalListener{
 		Id:   currentListener.ID,
 		Port: currentListener.Port,
+		Name: currentListener.Name,
 	}, nil
 }
 

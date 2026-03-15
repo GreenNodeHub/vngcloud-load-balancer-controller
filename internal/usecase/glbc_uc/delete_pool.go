@@ -77,7 +77,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 
 		if !isPoolInUse(candidateId) && canDeleteWhole {
 			// delete pool
-			err := t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
+			err := t.vngcloudRepo.DeleteGlobalPool(ctx, lbId, candidateId)
 			if err != nil {
 				t.logger.Error("Failed to delete pool: ", err)
 				return err
