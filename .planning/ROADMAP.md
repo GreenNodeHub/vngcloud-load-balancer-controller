@@ -34,7 +34,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. After a pool is created, `status.createdPools[*].createdMembers` contains the IDs of all members returned by the create response — no second reconcile needed to populate them
   2. Changing a listener's allowed headers in the GLBC spec triggers a listener update API call on the next reconcile
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — Activate pool member status tracking on pool creation (STAT-01) + implement headers comparison in buildListenerUpdateRequest (STAT-02)
 
 ### Phase 3: Test Coverage
 **Goal**: The pool member 3-way merge logic is verified by unit tests covering all edge cases, giving confidence the merge produces correct bulk-patch payloads
@@ -51,5 +54,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. P0 Bug Fixes | 2/2 | Complete    | 2026-03-15 |
-| 2. Status and Validation Completeness | 0/TBD | Not started | - |
+| 2. Status and Validation Completeness | 0/1 | In progress | - |
 | 3. Test Coverage | 0/TBD | Not started | - |
