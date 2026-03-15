@@ -118,14 +118,14 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 		return false, err
 	}
 
-	// check pools, all pools must be in .status.createdPools
+	// check pools, all pools must be in .status.createdPools and all their members must be owned
 	_canCoverPool, err := canCover(t.lbConfig.Status.CreatedPools, pools.Items, func(a []v1alpha1.CreatedGlobalPool, b *entityv2.GlobalPool) (bool, error) {
+		var createdPool v1alpha1.CreatedGlobalPool
 		found := false
-		// createPool := v1alpha1.CreatedGlobalPool{}
 		for _, oldP := range a {
 			if oldP.Id == b.ID {
 				found = true
-				// createPool = oldP
+				createdPool = oldP
 				break
 			}
 		}
@@ -133,25 +133,44 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 			t.logger.Debugf("Cannot delete whole loadbalancer because pool %s is not in status", b.Name)
 			return false, nil
 		}
-		return true, nil
 
-		// TODO
-		// // check members, all members must be in .status.createdMembers
-		// currentMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, b.ID)
-		// if err != nil {
-		// 	return false, err
-		// }
-		// _canCoverMembers, err := canCover(createPool.CreatedMembers, currentMembers.Items, func(a []v1alpha1.PoolMember, b *entityv2.Member) (bool, error) {
-		// 	if !t.checkIfPoolMemberExist(a, convertMember(b)) {
-		// 		t.logger.Debugf("Cannot delete whole loadbalancer because member %s is not in status", b.Address)
-		// 		return false, nil
-		// 	}
-		// 	return true, nil
-		// })
-		// if err != nil {
-		// 	return false, err
-		// }
-		// return _canCoverMembers, nil
+		// check members: all current pool member groups and their individual members must be in status
+		currentMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, b.ID)
+		if err != nil {
+			return false, err
+		}
+
+		// build map: groupName -> set of owned Address+Port
+		type memberKey struct {
+			address string
+			port    int
+		}
+		ownedGroups := make(map[string]map[memberKey]bool)
+		for _, pm := range createdPool.CreatedPoolMembers {
+			members := make(map[memberKey]bool)
+			for _, m := range pm.CreatedMembers {
+				members[memberKey{address: m.Address, port: m.Port}] = true
+			}
+			ownedGroups[pm.Name] = members
+		}
+
+		for _, currentGroup := range currentMembers.Items {
+			ownedMembers, groupOwned := ownedGroups[currentGroup.Name]
+			if !groupOwned {
+				t.logger.Debugf("Cannot delete whole loadbalancer because pool member group %s is not in status", currentGroup.Name)
+				return false, nil
+			}
+			if currentGroup.Members != nil {
+				for _, m := range currentGroup.Members.Items {
+					key := memberKey{address: m.Address, port: m.Port}
+					if !ownedMembers[key] {
+						t.logger.Debugf("Cannot delete whole loadbalancer because member %s:%d in group %s is not in status", m.Address, m.Port, currentGroup.Name)
+						return false, nil
+					}
+				}
+			}
+		}
+		return true, nil
 	})
 	if err != nil {
 		return false, err
