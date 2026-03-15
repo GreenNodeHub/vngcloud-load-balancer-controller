@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-p0-bug-fixes/01-02-PLAN.md
-last_updated: "2026-03-15T17:30:40.577Z"
+stopped_at: Completed 01-p0-bug-fixes-01-PLAN.md
+last_updated: "2026-03-15T17:34:12.577Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-p0-bug-fixes P02 | 4 | 2 tasks | 3 files |
+| Phase 01-p0-bug-fixes P01 | 7 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ Recent decisions affecting current work:
 - Name-based matching for pools, port-based for listeners (pending verification)
 - [Phase 01-p0-bug-fixes]: Address+Port tuple used for individual member ownership matching in canDeleteWholeListener (not Name)
 - [Phase 01-p0-bug-fixes]: Extracted deleteLoadBalancerWhenNotEmpty to fix pre-existing compile error from plan 01 test
+- [Phase 01-p0-bug-fixes]: convertMember must copy SubnetID from GlobalPoolMemberDetail for stable pool member diffs
+- [Phase 01-p0-bug-fixes]: deleteRedundantPools uses DeleteGlobalPool (not DeletePool) for correct global LB API
+- [Phase 01-p0-bug-fixes]: deployListener returns CreatedGlobalListener.Name from API entity for accurate status tracking
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-15T17:30:40.570Z
-Stopped at: Completed 01-p0-bug-fixes/01-02-PLAN.md
+Last session: 2026-03-15T17:34:12.572Z
+Stopped at: Completed 01-p0-bug-fixes-01-PLAN.md
 Resume file: None

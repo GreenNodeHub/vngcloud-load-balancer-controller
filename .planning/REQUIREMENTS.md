@@ -10,9 +10,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Bug Fixes
 
 - [x] **BUG-01**: Implement `canDeleteWholeListener` to check listener ownership before deletion
-- [ ] **BUG-02**: Fix `convertMember` to include `SubnetID` in the converted GlobalMember struct
-- [ ] **BUG-03**: Fix shared-LB empty cleanup to call `DeleteGlobalLoadBalancer` instead of `DeleteLoadBalancer`
-- [ ] **BUG-04**: Populate `Name` field in `CreatedGlobalListener` returned by `deployListener`
+- [x] **BUG-02**: Fix `convertMember` to include `SubnetID` in the converted GlobalMember struct
+- [x] **BUG-03**: Fix shared-LB empty cleanup to call `DeleteGlobalLoadBalancer` instead of `DeleteLoadBalancer`
+- [x] **BUG-04**: Populate `Name` field in `CreatedGlobalListener` returned by `deployListener`
 
 ### Status Tracking
 
@@ -56,9 +56,9 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BUG-01 | Phase 1 | Complete |
-| BUG-02 | Phase 1 | Pending |
-| BUG-03 | Phase 1 | Pending |
-| BUG-04 | Phase 1 | Pending |
+| BUG-02 | Phase 1 | Complete |
+| BUG-03 | Phase 1 | Complete |
+| BUG-04 | Phase 1 | Complete |
 | STAT-01 | Phase 2 | Pending |
 | STAT-02 | Phase 2 | Pending |
 | TEST-01 | Phase 3 | Pending |
