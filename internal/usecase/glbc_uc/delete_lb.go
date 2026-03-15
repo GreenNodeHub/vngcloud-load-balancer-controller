@@ -45,28 +45,37 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 			return err
 		}
 	} else {
-		// delete redundant listeners
-		if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedGlobalListener{}, []v1alpha1.CreatedGlobalPool{}); err != nil {
+		if err := t.deleteLoadBalancerWhenNotEmpty(ctx, lbId); err != nil {
 			return err
 		}
+	}
+	return nil
+}
 
-		// delete redundant pools, should check if pool is used by other listeners or policy then ignore
-		if err := t.deleteRedundantPools(ctx, lbId, []v1alpha1.CreatedGlobalPool{}); err != nil {
-			return err
-		}
+// deleteLoadBalancerWhenNotEmpty handles the partial-delete path:
+// remove only listeners/pools owned by this GLBC, then delete the LB if it becomes empty.
+func (t *defaultModelDeployTask) deleteLoadBalancerWhenNotEmpty(ctx context.Context, lbId string) error {
+	// delete redundant listeners
+	if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedGlobalListener{}, []v1alpha1.CreatedGlobalPool{}); err != nil {
+		return err
+	}
 
-		// after deleting lis and pools, check if currentBuilder is empty, if so, delete loadbalancer
-		// this is because CanDeleteWholeLoadBalancer sometimes return false because status is not updated yet but user has deleted svcLB
-		isEmpty, err := t.isLoadBalancerEmpty(ctx, lbId)
+	// delete redundant pools, should check if pool is used by other listeners or policy then ignore
+	if err := t.deleteRedundantPools(ctx, lbId, []v1alpha1.CreatedGlobalPool{}); err != nil {
+		return err
+	}
+
+	// after deleting lis and pools, check if currentBuilder is empty, if so, delete loadbalancer
+	// this is because CanDeleteWholeLoadBalancer sometimes return false because status is not updated yet but user has deleted svcLB
+	isEmpty, err := t.isLoadBalancerEmpty(ctx, lbId)
+	if err != nil {
+		return err
+	}
+	if isEmpty {
+		t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+		err = t.vngcloudRepo.DeleteGlobalLoadBalancer(ctx, lbId)
 		if err != nil {
 			return err
-		}
-		if isEmpty {
-			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
-			err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil
