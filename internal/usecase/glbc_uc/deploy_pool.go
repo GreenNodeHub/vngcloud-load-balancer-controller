@@ -86,7 +86,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	}
 
 	// ensure pool members
-	createdPoolMembers, err := t.deployPoolMembers(ctx, lbId, currentPool.ID, currentPool.Name, poolSpec.Members)
+	createdPoolMembers, err := t.deployPoolMembers(ctx, lbId, currentPool.ID, currentPool.Name, poolSpec.PoolMembers)
 	if err != nil {
 		return nil, err
 	}
@@ -100,29 +100,45 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 
 // create CreatePoolRequest depend on default config and pool value
 func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId string, poolSpec *v1alpha1.GlobalPool) global.ICreateGlobalPoolRequest {
-	globalPoolMembersRequest := make([]global.ICreateGlobalPoolMemberRequest, len(poolSpec.Members))
-	for _, poolMemberSpec := range poolSpec.Members {
+	globalPoolMembersRequest := make([]global.ICreateGlobalPoolMemberRequest, 0, len(poolSpec.PoolMembers))
+	for _, poolMemberSpec := range poolSpec.PoolMembers {
 
-		globalMembersRequest := make([]global.IGlobalMemberRequest, len(poolMemberSpec.Members))
+		globalMembersRequest := make([]global.IGlobalMemberRequest, 0, len(poolMemberSpec.Members))
 		for _, memberSpec := range poolMemberSpec.Members {
+			// Use default values for optional fields
+			monitorPort := memberSpec.Port // default to member port
+			if memberSpec.MonitorPort != nil {
+				monitorPort = *memberSpec.MonitorPort
+			}
+			weight := 1 // default weight
+			if memberSpec.Weight != nil {
+				weight = *memberSpec.Weight
+			}
+
 			memberRequest := global.NewGlobalMemberRequest(
 				memberSpec.Name,
 				memberSpec.Address,
 				memberSpec.SubnetID,
 				memberSpec.Port,
-				*memberSpec.MonitorPort,
-				*memberSpec.Weight,
+				monitorPort,
+				weight,
 				memberSpec.BackupRole,
 			)
 
 			globalMembersRequest = append(globalMembersRequest, memberRequest)
 		}
 
+		// Use default traffic dial if not specified
+		trafficDial := 100 // default to 100%
+		if poolMemberSpec.TrafficDial != nil {
+			trafficDial = *poolMemberSpec.TrafficDial
+		}
+
 		poolMemberRequest := global.NewGlobalPoolMemberRequest(
 			poolMemberSpec.Name,
 			poolMemberSpec.Region,
 			poolMemberSpec.VpcId,
-			*poolMemberSpec.TrafficDial,
+			trafficDial,
 			poolMemberSpec.Type,
 		)
 		poolMemberRequest.WithMembers(globalMembersRequest...)

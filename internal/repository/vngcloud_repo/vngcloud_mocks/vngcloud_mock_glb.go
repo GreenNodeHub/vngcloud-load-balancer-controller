@@ -27,6 +27,15 @@ type wrapGlobalPool struct {
 
 // --------------------------- Global Load Balancer ---------------------------
 
+func (m *MockProvider) ListGlobalPackages(ctx context.Context) (*entityv2.ListGlobalPackages, error) {
+	return &entityv2.ListGlobalPackages{
+		Items: []entityv2.GlobalPackage{
+			{ID: "glb-pkg-001", Name: "glb-small"},
+			{ID: "glb-pkg-002", Name: "glb-medium"},
+		},
+	}, nil
+}
+
 func (m *MockProvider) updatingGlobalStatus(lbID string) {
 	logger := contexts.NewContext(context.TODO()).Log()
 	var o *entityv2.GlobalLoadBalancer

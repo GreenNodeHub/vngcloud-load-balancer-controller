@@ -23,6 +23,7 @@ const (
 const (
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
+	VGLB_ANNOTATION_PREFIX    = "vks.vngcloud.vn"
 )
 
 // Labels

@@ -15,6 +15,16 @@ import (
 
 // --------------------------- Global Load Balancer ---------------------------
 
+func (m *vngCloudRepository) ListGlobalPackages(ctx context.Context) (*entityv2.ListGlobalPackages, error) {
+	logger := contexts.NewContext(ctx).Log()
+	packages, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalPackages(global.NewListGlobalPackagesRequest().AddUserAgent(m.userAgent))
+	if sdkErr != nil {
+		logger.Error("[ERROR] - ListGlobalPackages: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		return nil, sdkErr.GetError()
+	}
+	return packages, nil
+}
+
 func (m *vngCloudRepository) ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error) {
 	logger := contexts.NewContext(ctx).Log()
 	lbs, sdkErr := m.client.GLBGateway().V1().GLBService().ListGlobalLoadBalancers(global.NewListGlobalLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...).AddUserAgent(m.userAgent))

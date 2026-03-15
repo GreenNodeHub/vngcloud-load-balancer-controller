@@ -2,6 +2,7 @@ package glbc_uc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -320,6 +321,24 @@ func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Cont
 }
 
 func (t *defaultModelDeployTask) buildPackageId(ctx context.Context) (string, error) {
-	// TODO: implement if needed
-	return "", nil
+	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
+		return *t.lbConfig.Spec.PackageId, nil
+	}
+
+	// use default package from config, resolve package name to ID via API
+	if t.cfg.GlobalLoadBalancerOpts.DefaultL4PackageName != "" {
+		listPackages, err := t.vngcloudRepo.ListGlobalPackages(ctx)
+		if err != nil {
+			return "", err
+		}
+		for _, pkg := range listPackages.Items {
+			if pkg.Name == t.cfg.GlobalLoadBalancerOpts.DefaultL4PackageName {
+				return pkg.ID, nil
+			}
+		}
+		return "", errs.NewNoNeedRequeue(fmt.Sprintf("cannot find default global load balancer package %s", t.cfg.GlobalLoadBalancerOpts.DefaultL4PackageName))
+	}
+
+	// fallback to hardcoded package ID
+	return "pkg-b02e62ab-a282-4faf-8732-a172ef497a7b", nil
 }

@@ -2623,6 +2623,68 @@ func (_c *MockVngCloudRepository_ListGlobalListeners_Call) RunAndReturn(run func
 	return _c
 }
 
+// ListGlobalPackages provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) ListGlobalPackages(ctx context.Context) (*entity.ListGlobalPackages, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListGlobalPackages")
+	}
+
+	var r0 *entity.ListGlobalPackages
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*entity.ListGlobalPackages, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *entity.ListGlobalPackages); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*entity.ListGlobalPackages)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockVngCloudRepository_ListGlobalPackages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListGlobalPackages'
+type MockVngCloudRepository_ListGlobalPackages_Call struct {
+	*mock.Call
+}
+
+// ListGlobalPackages is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockVngCloudRepository_Expecter) ListGlobalPackages(ctx interface{}) *MockVngCloudRepository_ListGlobalPackages_Call {
+	return &MockVngCloudRepository_ListGlobalPackages_Call{Call: _e.mock.On("ListGlobalPackages", ctx)}
+}
+
+func (_c *MockVngCloudRepository_ListGlobalPackages_Call) Run(run func(ctx context.Context)) *MockVngCloudRepository_ListGlobalPackages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_ListGlobalPackages_Call) Return(listGlobalPackages *entity.ListGlobalPackages, err error) *MockVngCloudRepository_ListGlobalPackages_Call {
+	_c.Call.Return(listGlobalPackages, err)
+	return _c
+}
+
+func (_c *MockVngCloudRepository_ListGlobalPackages_Call) RunAndReturn(run func(ctx context.Context) (*entity.ListGlobalPackages, error)) *MockVngCloudRepository_ListGlobalPackages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListGlobalLoadBalancers provides a mock function for the type MockVngCloudRepository
 func (_mock *MockVngCloudRepository) ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entity.ListGlobalLoadBalancers, error) {
 	ret := _mock.Called(ctx, tags)

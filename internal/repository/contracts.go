@@ -92,6 +92,7 @@ type VngCloudRepository interface {
 	DeleteCertificate(ctx context.Context, certID string) error
 
 	// Global Load Balancer
+	ListGlobalPackages(ctx context.Context) (*entityv2.ListGlobalPackages, error)
 	ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error)
 	GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
 	GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)

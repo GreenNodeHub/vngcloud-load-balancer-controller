@@ -162,10 +162,10 @@ type GlobalPool struct {
 	// +optional
 	HealthMonitor GlobalPoolHealthMonitor `json:"healthMonitor,omitempty"`
 
-	// Members is the list of members in the pool
+	// PoolMembers is the list of members in the pool
 	// +optional
 	// +listType=atomic
-	Members []GlobalPoolMember `json:"members,omitempty"`
+	PoolMembers []GlobalPoolMember `json:"poolMembers,omitempty"`
 }
 
 type GlobalPoolHealthMonitor struct {

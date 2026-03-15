@@ -156,8 +156,11 @@ spec:
                       required:
                       - protocol
                       type: object
-                    members:
-                      description: Members is the list of members in the pool
+                    name:
+                      description: Name is the name of the pool
+                      type: string
+                    poolMembers:
+                      description: PoolMembers is the list of members in the pool
                       items:
                         properties:
                           description:
@@ -231,9 +234,6 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-list-type: atomic
-                    name:
-                      description: Name is the name of the pool
-                      type: string
                     protocol:
                       description: Protocol is the protocol for the pool
                       type: string

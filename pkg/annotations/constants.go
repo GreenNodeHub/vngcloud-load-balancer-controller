@@ -63,4 +63,6 @@ const (
 
 	SuffixTrigger = "trigger" // trigger
 
+	// for global load balancer
+	SuffixDescription = "description" // description for the resource
 )

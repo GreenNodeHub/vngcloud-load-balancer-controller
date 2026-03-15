@@ -28,7 +28,7 @@ func (t *defaultModelDeployTask) delete(ctx context.Context) error {
 func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId string) error {
 	// check if load balancer is exists
 	if _, err := t.vngcloudRepo.GetGlobalLoadBalancerByID(ctx, lbId); err != nil {
-		if domain.IsLoadBalancerNotFound(err) {
+		if domain.IsGlobalLoadBalancerNotFound(err) {
 			return nil
 		}
 		return err

@@ -137,26 +137,42 @@ func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context,
 		memberStrings[i] = fmt.Sprintf("%s:%d", member.Address, member.Port)
 	}
 
-	globalMembersRequest := make([]global.IGlobalMemberRequest, len(poolMemberSpec.Members))
+	globalMembersRequest := make([]global.IGlobalMemberRequest, 0, len(poolMemberSpec.Members))
 	for _, memberSpec := range poolMemberSpec.Members {
+		// Use default values for optional fields
+		monitorPort := memberSpec.Port // default to member port
+		if memberSpec.MonitorPort != nil {
+			monitorPort = *memberSpec.MonitorPort
+		}
+		weight := 1 // default weight
+		if memberSpec.Weight != nil {
+			weight = *memberSpec.Weight
+		}
+
 		memberRequest := global.NewGlobalMemberRequest(
 			memberSpec.Name,
 			memberSpec.Address,
 			memberSpec.SubnetID,
 			memberSpec.Port,
-			*memberSpec.MonitorPort,
-			*memberSpec.Weight,
+			monitorPort,
+			weight,
 			memberSpec.BackupRole,
 		)
 
 		globalMembersRequest = append(globalMembersRequest, memberRequest)
 	}
 
+	// Use default traffic dial if not specified
+	trafficDial := 100 // default to 100%
+	if poolMemberSpec.TrafficDial != nil {
+		trafficDial = *poolMemberSpec.TrafficDial
+	}
+
 	poolMemberRequest := global.NewGlobalPoolMemberRequest(
 		poolMemberSpec.Name,
 		poolMemberSpec.Region,
 		poolMemberSpec.VpcId,
-		*poolMemberSpec.TrafficDial,
+		trafficDial,
 		poolMemberSpec.Type,
 	)
 	poolMemberRequest.WithMembers(globalMembersRequest...)
@@ -200,13 +216,23 @@ func (t *defaultModelDeployTask) buildGlobalMemberRequest(ctx context.Context, c
 
 	membersRequest := make([]global.IGlobalMemberRequest, 0)
 	for _, member := range updateMembers {
+		// Use default values for optional fields
+		monitorPort := member.Port // default to member port
+		if member.MonitorPort != nil {
+			monitorPort = *member.MonitorPort
+		}
+		weight := 1 // default weight
+		if member.Weight != nil {
+			weight = *member.Weight
+		}
+
 		memberRequest := global.NewGlobalMemberRequest(
 			member.Name,
 			member.Address,
 			member.SubnetID,
 			member.Port,
-			*member.MonitorPort,
-			*member.Weight,
+			monitorPort,
+			weight,
 			member.BackupRole,
 		)
 		membersRequest = append(membersRequest, memberRequest)

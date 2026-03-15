@@ -478,8 +478,8 @@ func (in *GlobalPool) DeepCopyInto(out *GlobalPool) {
 		**out = **in
 	}
 	in.HealthMonitor.DeepCopyInto(&out.HealthMonitor)
-	if in.Members != nil {
-		in, out := &in.Members, &out.Members
+	if in.PoolMembers != nil {
+		in, out := &in.PoolMembers, &out.PoolMembers
 		*out = make([]GlobalPoolMember, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

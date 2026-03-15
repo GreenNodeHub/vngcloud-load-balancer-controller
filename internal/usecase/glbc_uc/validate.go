@@ -9,7 +9,7 @@ import (
 // These validations run before we have a load balancer ID
 // ============================================================================
 
-func (t *defaultModelDeployTask) validateSelf(ctx context.Context) error {
+func (t *defaultModelDeployTask) validateSelf(_ context.Context) error {
 
 	return nil
 }
@@ -19,7 +19,7 @@ func (t *defaultModelDeployTask) validateSelf(ctx context.Context) error {
 // These validations run after we have the load balancer ID
 // ============================================================================
 
-func (t *defaultModelDeployTask) validateCrossGLBCs(ctx context.Context, lbId string) error {
+func (t *defaultModelDeployTask) validateCrossGLBCs(_ context.Context, lbId string) error {
 
 	return nil
 }
