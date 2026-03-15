@@ -21,7 +21,7 @@ The GLBC reconciler is substantially complete but has four P0 bugs that collecti
   2. Pool members survive a re-reconcile without spurious bulk-patch calls when SubnetID is unchanged in spec
   3. A GLBC deletion where the controller owns the LB exclusively calls `DeleteGlobalLoadBalancer` (not `DeleteLoadBalancer`)
   4. `status.createdListeners` entries have their `name` field populated after a successful `deployListener` run
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 01-01-PLAN.md — Fix trivial bugs: convertMember SubnetID (BUG-02), DeleteGlobalLoadBalancer/Pool API calls (BUG-03), listener Name in status (BUG-04)
@@ -50,6 +50,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. P0 Bug Fixes | 0/2 | Planned | - |
+| 1. P0 Bug Fixes | 1/2 | In Progress|  |
 | 2. Status and Validation Completeness | 0/TBD | Not started | - |
 | 3. Test Coverage | 0/TBD | Not started | - |
