@@ -31,6 +31,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **CTRL-TEST-04**: Controller integration test for full delete flow (sole-owner LB -> DeleteGlobalLoadBalancer, backend empty)
 - [x] **CTRL-TEST-05**: Controller integration test for partial delete flow (shared LB -> only owned resources removed)
 
+### Production Bug Regression Tests
+
+- [ ] **PBUG-01**: Regression tests for duplicate pool member addresses — verify ptrIntEqual and comparePoolMembers handle nil vs non-nil pointer fields correctly
+- [ ] **PBUG-02**: Regression test for listener port assignment — verify buildCreateListenerRequest sets Port from ProtocolPort
+- [ ] **PBUG-03**: Verify pool member ID tracking on create path (already tested by TestDeployPool_PopulatesCreatedPoolMembers)
+
 ## v2 Requirements
 
 Deferred to future milestone. Tracked but not in current roadmap.
@@ -75,12 +81,15 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | CTRL-TEST-03 | Phase 4 | Planned |
 | CTRL-TEST-04 | Phase 4 | Planned |
 | CTRL-TEST-05 | Phase 4 | Planned |
+| PBUG-01 | Phase 5 | Planned |
+| PBUG-02 | Phase 5 | Planned |
+| PBUG-03 | Phase 5 | Planned |
 
 **Coverage:**
-- v1 requirements: 12 total
-- Mapped to phases: 12
+- v1 requirements: 15 total
+- Mapped to phases: 15
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-16 after Phase 4 planning*
+*Last updated: 2026-03-16 after Phase 5 planning*

@@ -70,3 +70,13 @@ Plans:
 Plans:
 - [ ] 04-01-PLAN.md — Implement UpdateGlobalPool/UpdateGlobalListener in MockProvider + create GLBC test fixtures
 - [ ] 04-02-PLAN.md — Create GLBC controller test suite (envtest setup + create/delete-full/delete-partial scenarios)
+
+### Phase 5: Fix production bugs: duplicate pool members, missing listener port, pool member ID tracking
+
+**Goal:** Regression tests lock in fixes for three production bugs (duplicate pool members from pointer comparison, missing listener port, pool member ID tracking) — all code fixes already applied in Phases 1-3
+**Requirements**: PBUG-01, PBUG-02, PBUG-03
+**Depends on:** Phase 4
+**Plans:** 1 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Add regression tests for ptrIntEqual/comparePoolMembers pointer edge cases (PBUG-01) and buildCreateListenerRequest port assignment (PBUG-02), verify existing pool member ID test (PBUG-03)
