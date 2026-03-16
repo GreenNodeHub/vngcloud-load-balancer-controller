@@ -8,7 +8,7 @@ The GLBC reconciler is substantially complete but has four P0 bugs that collecti
 
 - [x] **Phase 1: P0 Bug Fixes** - Fix the four critical bugs blocking the delete and status flows (completed 2026-03-15)
 - [x] **Phase 2: Status and Validation Completeness** - Implement stubbed status tracking and listener update headers comparison (completed 2026-03-16)
-- [ ] **Phase 3: Test Coverage** - Add unit tests verifying pool member 3-way merge edge cases
+- [x] **Phase 3: Test Coverage** - Add unit tests verifying pool member 3-way merge edge cases (completed 2026-03-16)
 
 ## Phase Details
 
@@ -47,7 +47,7 @@ Plans:
   1. Unit tests cover: add new member, remove deleted member, update existing member, and preserve manually-added member not in spec
   2. All tests pass with `go test ./internal/usecase/glbc_uc/...`
   3. No regressions in existing tests after the fix changes from Phases 1 and 2
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 03-01-PLAN.md — Add TestMergePoolMembers with 4 table-driven sub-tests for 3-way merge edge cases
@@ -58,4 +58,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. P0 Bug Fixes | 2/2 | Complete    | 2026-03-15 |
 | 2. Status and Validation Completeness | 1/1 | Complete   | 2026-03-16 |
-| 3. Test Coverage | 0/1 | Not started | - |
+| 3. Test Coverage | 1/1 | Complete   | 2026-03-16 |

@@ -21,7 +21,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Unit tests for pool member 3-way merge edge cases (add, remove, update, preserve manual members)
+- [x] **TEST-01**: Unit tests for pool member 3-way merge edge cases (add, remove, update, preserve manual members)
 
 ## v2 Requirements
 
@@ -61,7 +61,7 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | BUG-04 | Phase 1 | Complete |
 | STAT-01 | Phase 2 | Complete |
 | STAT-02 | Phase 2 | Complete |
-| TEST-01 | Phase 3 | Pending |
+| TEST-01 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 7 total
