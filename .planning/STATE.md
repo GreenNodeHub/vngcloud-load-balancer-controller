@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-16T02:47:50.025Z"
+last_updated: "2026-03-16T03:28:08.170Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 3
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-p0-bug-fixes P02 | 4 | 2 tasks | 3 files |
 | Phase 01-p0-bug-fixes P01 | 7 | 2 tasks | 6 files |
 | Phase 02-status-and-validation-completeness P01 | 6 | 3 tasks | 7 files |
+| Phase 02-status-and-validation-completeness P01 | 8 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 02-status-and-validation-completeness]: ListGlobalPoolMembers called after WaitGlobalLoadBalancerActive to get stable API-assigned pool member IDs on create path
 - [Phase 02-status-and-validation-completeness]: statusAddPool on pool update path remains commented — deployPoolMembers already calls statusUpdatePoolMember avoiding redundant status patch
 - [Phase 02-status-and-validation-completeness]: Headers comparison is case-insensitive and order-independent using stringSlicesEqualUnordered; nil entity == empty spec (no spurious update)
+- [Phase 02-status-and-validation-completeness]: ListGlobalPoolMembers NOT called on create path — spec data used directly, member IDs populated on next reconcile via update path
+- [Phase 02-status-and-validation-completeness]: statusUpdatePoolMember called BEFORE WaitGlobalLoadBalancerActive on create path (crash safety)
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T02:43:45.779Z
+Last session: 2026-03-16T03:28:08.163Z
 Stopped at: Completed 02-01-PLAN.md
 Resume file: None
