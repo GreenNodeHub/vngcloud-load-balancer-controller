@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-03-16T08:52:19.748Z"
+stopped_at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-01-PLAN.md
+last_updated: "2026-03-16T08:54:56.336Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04-add-test-from-controller-use-vngcloud-mock-repository P02 | 26 | 2 tasks | 6 files |
 | Phase 05-fix-production-bugs-duplicate-pool-members-missing-listener-port-pool-member-id-tracking P01 | 5 | 2 tasks | 2 files |
 | Phase 06-add-vglb-operator-generate-glbc-from-vglb P02 | 2 | 2 tasks | 3 files |
+| Phase 06-add-vglb-operator-generate-glbc-from-vglb P01 | 15 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [Phase 05-fix-production-bugs-duplicate-pool-members-missing-listener-port-pool-member-id-tracking]: GlobalListener.ProtocolPort is int (not int32) — matched CRD type for test struct field
 - [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Service event handler uses same-name VGLB lookup (not annotation check) — VGLB name matches Service name+namespace by design
 - [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Delete event on Service enqueues VGLB (not no-op) so reconciler detects missing Service and requeues
+- [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Init reads network info from node labels (labelMgmtZone/labelNetworkId/labelSubnetId), not VNG Cloud API
+- [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Pool member group name is {region}-{vpcId}, not 'default'; region derived from node label zone via stripZoneSuffix, not hardcoded 'hcm'
+- [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: GLB default display name uses 'vks_' prefix; service not found causes requeue (5s); ClusterIP causes requeue (30s); VGLB status address from GLBC domains only
 
 ### Roadmap Evolution
 
@@ -108,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T08:52:19.741Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-03-16T08:54:56.330Z
+Stopped at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-01-PLAN.md
 Resume file: None

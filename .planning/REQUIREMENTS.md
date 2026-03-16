@@ -39,12 +39,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### VGLB Operator — GLBC Generation
 
-- [ ] **VGLB-01**: Init reads network info from node labels (`vks.vngcloud.vn/mgmt-zone`, `network-id`, `subnet-id`) instead of VNG Cloud API
-- [ ] **VGLB-02**: Pool member group name uses `{region}-{vpcId}` format (not hardcoded `"default"`)
-- [ ] **VGLB-03**: Region derived from zone label by stripping digit+letter suffix (`hcm03b` -> `hcm`)
-- [ ] **VGLB-04**: GLB default display name uses `vks_` prefix (not `glb_`)
-- [ ] **VGLB-05**: Service not found causes requeue (not empty pool generation)
-- [ ] **VGLB-06**: ClusterIP service type causes requeue (not silent fallback to pod IPs); VGLB status address from domains only (not VIPs)
+- [x] **VGLB-01**: Init reads network info from node labels (`vks.vngcloud.vn/mgmt-zone`, `network-id`, `subnet-id`) instead of VNG Cloud API
+- [x] **VGLB-02**: Pool member group name uses `{region}-{vpcId}` format (not hardcoded `"default"`)
+- [x] **VGLB-03**: Region derived from zone label by stripping digit+letter suffix (`hcm03b` -> `hcm`)
+- [x] **VGLB-04**: GLB default display name uses `vks_` prefix (not `glb_`)
+- [x] **VGLB-05**: Service not found causes requeue (not empty pool generation)
+- [x] **VGLB-06**: ClusterIP service type causes requeue (not silent fallback to pod IPs); VGLB status address from domains only (not VIPs)
 - [x] **VGLB-07**: VGLB controller watches Service and Node resources via event handlers in SetupWithManager
 - [ ] **VGLB-08**: Unit tests for stripZoneSuffix and pool member group naming
 - [ ] **VGLB-09**: Integration test: VGLB create with NodePort Service produces correct GLBC (pools, listeners, member groups)
