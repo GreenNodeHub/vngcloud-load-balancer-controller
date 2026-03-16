@@ -51,10 +51,9 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to create listener: ", err)
 			return nil, err
 		}
-		// TODO: uncomment me
-		// if err := t.statusAddListener(ctx, _lis.UUID, int(listenerSpec.ProtocolPort)); err != nil {
-		// 	return nil, err
-		// }
+		if err := t.statusAddListener(ctx, _lis.ID, int(listenerSpec.ProtocolPort)); err != nil {
+			return nil, err
+		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
@@ -83,10 +82,9 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to update listener: ", err)
 			return nil, err
 		}
-		// TODO: uncomment me
-		// if err := t.statusAddListener(ctx, currentListener.UUID, currentListener.ProtocolPort); err != nil {
-		// 	return nil, err
-		// }
+		if err := t.statusAddListener(ctx, currentListener.ID, currentListener.Port); err != nil {
+			return nil, err
+		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
 			t.logger.Error("Failed to wait for loadbalancer active: ", err)
@@ -211,7 +209,36 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		isNeedUpdate = true
 	}
 
-	// TODO: compare headers, somewhere is []string, somewhere is *string
+	// Compare headers: entity stores as comma-joined *string, spec stores as []string.
+	// Normalize both to lowercase []string for order-independent comparison.
+	decodeHeaders := func(h *string) []string {
+		if h == nil || *h == "" {
+			return []string{}
+		}
+		parts := strings.Split(*h, ",")
+		normalized := make([]string, 0, len(parts))
+		for _, p := range parts {
+			normalized = append(normalized, strings.ToLower(p))
+		}
+		return normalized
+	}
+
+	currentHeaders := decodeHeaders(currentListener.Headers)
+	specHeaders := make([]string, 0, len(listenerSpec.Headers))
+	for _, h := range listenerSpec.Headers {
+		specHeaders = append(specHeaders, strings.ToLower(h))
+	}
+
+	if !stringSlicesEqualUnordered(currentHeaders, specHeaders) {
+		message = append(message, fmt.Sprintf("headers (%v -> %v)", currentHeaders, specHeaders))
+		if len(specHeaders) > 0 {
+			joined := strings.Join(specHeaders, ",")
+			updateOptions.Headers = &joined
+		} else {
+			updateOptions.Headers = nil
+		}
+		isNeedUpdate = true
+	}
 
 	if !isNeedUpdate {
 		return nil, nil, nil
