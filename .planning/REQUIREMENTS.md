@@ -45,7 +45,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **VGLB-04**: GLB default display name uses `vks_` prefix (not `glb_`)
 - [ ] **VGLB-05**: Service not found causes requeue (not empty pool generation)
 - [ ] **VGLB-06**: ClusterIP service type causes requeue (not silent fallback to pod IPs); VGLB status address from domains only (not VIPs)
-- [ ] **VGLB-07**: VGLB controller watches Service and Node resources via event handlers in SetupWithManager
+- [x] **VGLB-07**: VGLB controller watches Service and Node resources via event handlers in SetupWithManager
 - [ ] **VGLB-08**: Unit tests for stripZoneSuffix and pool member group naming
 - [ ] **VGLB-09**: Integration test: VGLB create with NodePort Service produces correct GLBC (pools, listeners, member groups)
 - [ ] **VGLB-10**: Integration test: VGLB delete causes owned GLBC deletion
