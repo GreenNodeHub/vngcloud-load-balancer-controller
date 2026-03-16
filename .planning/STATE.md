@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-01-PLAN.md
-last_updated: "2026-03-16T08:54:56.336Z"
+stopped_at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-03-PLAN.md
+last_updated: "2026-03-16T08:59:46.657Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05-fix-production-bugs-duplicate-pool-members-missing-listener-port-pool-member-id-tracking P01 | 5 | 2 tasks | 2 files |
 | Phase 06-add-vglb-operator-generate-glbc-from-vglb P02 | 2 | 2 tasks | 3 files |
 | Phase 06-add-vglb-operator-generate-glbc-from-vglb P01 | 15 | 2 tasks | 4 files |
+| Phase 06-add-vglb-operator-generate-glbc-from-vglb P03 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ Recent decisions affecting current work:
 - [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Init reads network info from node labels (labelMgmtZone/labelNetworkId/labelSubnetId), not VNG Cloud API
 - [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Pool member group name is {region}-{vpcId}, not 'default'; region derived from node label zone via stripZoneSuffix, not hardcoded 'hcm'
 - [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: GLB default display name uses 'vks_' prefix; service not found causes requeue (5s); ClusterIP causes requeue (30s); VGLB status address from GLBC domains only
+- [Phase 06-add-vglb-operator-generate-glbc-from-vglb]: Use mock.On with mock.Anything (not EXPECT()) for variadic opts args — testify EXPECT().Method() passes opts slice as positional arg making exact matching tricky; mock.On with mock.Anything is cleaner
 
 ### Roadmap Evolution
 
@@ -112,6 +114,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T08:54:56.330Z
-Stopped at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-01-PLAN.md
+Last session: 2026-03-16T08:59:46.646Z
+Stopped at: Completed 06-add-vglb-operator-generate-glbc-from-vglb/06-03-PLAN.md
 Resume file: None
