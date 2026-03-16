@@ -37,6 +37,20 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **PBUG-02**: Regression test for listener port assignment — verify buildCreateListenerRequest sets Port from ProtocolPort
 - [x] **PBUG-03**: Verify pool member ID tracking on create path (already tested by TestDeployPool_PopulatesCreatedPoolMembers)
 
+### VGLB Operator — GLBC Generation
+
+- [ ] **VGLB-01**: Init reads network info from node labels (`vks.vngcloud.vn/mgmt-zone`, `network-id`, `subnet-id`) instead of VNG Cloud API
+- [ ] **VGLB-02**: Pool member group name uses `{region}-{vpcId}` format (not hardcoded `"default"`)
+- [ ] **VGLB-03**: Region derived from zone label by stripping digit+letter suffix (`hcm03b` -> `hcm`)
+- [ ] **VGLB-04**: GLB default display name uses `vks_` prefix (not `glb_`)
+- [ ] **VGLB-05**: Service not found causes requeue (not empty pool generation)
+- [ ] **VGLB-06**: ClusterIP service type causes requeue (not silent fallback to pod IPs); VGLB status address from domains only (not VIPs)
+- [ ] **VGLB-07**: VGLB controller watches Service and Node resources via event handlers in SetupWithManager
+- [ ] **VGLB-08**: Unit tests for stripZoneSuffix and pool member group naming
+- [ ] **VGLB-09**: Integration test: VGLB create with NodePort Service produces correct GLBC (pools, listeners, member groups)
+- [ ] **VGLB-10**: Integration test: VGLB delete causes owned GLBC deletion
+- [ ] **VGLB-11**: Integration test: Service port change triggers GLBC spec update
+
 ## v2 Requirements
 
 Deferred to future milestone. Tracked but not in current roadmap.
@@ -61,7 +75,6 @@ Deferred to future milestone. Tracked but not in current roadmap.
 |---------|--------|
 | Tag management | VNG Cloud SDK doesn't support tags at creation |
 | CRD schema changes | Focus on reconciler logic, not API shape |
-| VGLB build logic | Separate operator, later phase |
 | Webhook admission controller | Premature; reconcile-time validation sufficient |
 | Gateway API integration | Not applicable to VNG Cloud proprietary API |
 
@@ -84,12 +97,23 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | PBUG-01 | Phase 5 | Planned |
 | PBUG-02 | Phase 5 | Planned |
 | PBUG-03 | Phase 5 | Planned |
+| VGLB-01 | Phase 6 | Planned |
+| VGLB-02 | Phase 6 | Planned |
+| VGLB-03 | Phase 6 | Planned |
+| VGLB-04 | Phase 6 | Planned |
+| VGLB-05 | Phase 6 | Planned |
+| VGLB-06 | Phase 6 | Planned |
+| VGLB-07 | Phase 6 | Planned |
+| VGLB-08 | Phase 6 | Planned |
+| VGLB-09 | Phase 6 | Planned |
+| VGLB-10 | Phase 6 | Planned |
+| VGLB-11 | Phase 6 | Planned |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 15
+- v1 requirements: 26 total
+- Mapped to phases: 26
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-16 after Phase 5 planning*
+*Last updated: 2026-03-16 after Phase 6 planning*

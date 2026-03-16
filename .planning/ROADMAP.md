@@ -80,3 +80,16 @@ Plans:
 
 Plans:
 - [ ] 05-01-PLAN.md — Add regression tests for ptrIntEqual/comparePoolMembers pointer edge cases (PBUG-01) and buildCreateListenerRequest port assignment (PBUG-02), verify existing pool member ID test (PBUG-03)
+
+### Phase 6: add vglb operator, generate glbc from vglb
+
+**Goal:** VGLB operator correctly generates GLBC resources from matching Services using node-label-derived network info, with Service and Node watches for reactivity, and integration tests verifying the full pipeline
+**Requirements**: VGLB-01, VGLB-02, VGLB-03, VGLB-04, VGLB-05, VGLB-06, VGLB-07, VGLB-08, VGLB-09, VGLB-10, VGLB-11
+**Depends on:** Phase 5
+**Plans:** 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Fix core logic: init reads node labels, pool member group naming, vks_ prefix, service-not-found requeue, ClusterIP rejection, domains-only address
+- [ ] 06-02-PLAN.md — Add Service and Node event handlers + wire into VGLB controller SetupWithManager
+- [ ] 06-03-PLAN.md — Unit tests for stripZoneSuffix and pool member group naming
+- [ ] 06-04-PLAN.md — Integration tests: VGLB create/delete/service-update flows with envtest
