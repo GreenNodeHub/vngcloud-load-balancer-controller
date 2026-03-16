@@ -86,7 +86,7 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 	glbcList := &v1alpha1.GlobalLoadBalancerConfigList{}
 	err = t.k8sRepo.ListGlobalLoadBalancerConfig(ctx, glbcList, client.InNamespace(t.vglb.Namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: t.vglb.Name,
-		domain.LabelOwnerResourceKind: t.vglb.Kind,
+		domain.LabelOwnerResourceKind: domain.KindVngcloudGlobalLoadBalancer,
 		domain.LabelOwnerResourceUid:  string(t.vglb.UID),
 	})
 	if err != nil {
@@ -121,7 +121,7 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		glbConfig.Labels = make(map[string]string)
 	}
 	glbConfig.Labels[domain.LabelOwnerResourceName] = t.vglb.Name
-	glbConfig.Labels[domain.LabelOwnerResourceKind] = t.vglb.Kind
+	glbConfig.Labels[domain.LabelOwnerResourceKind] = domain.KindVngcloudGlobalLoadBalancer
 	glbConfig.Labels[domain.LabelOwnerResourceUid] = string(t.vglb.GetUID())
 
 	// Build spec from VGLB annotations
@@ -216,7 +216,7 @@ func (t *defaultModelBuildTask) getGLBCAddress(ctx context.Context) string {
 	glbcList := &v1alpha1.GlobalLoadBalancerConfigList{}
 	err := t.k8sRepo.ListGlobalLoadBalancerConfig(ctx, glbcList, client.InNamespace(t.vglb.Namespace), client.MatchingLabels{
 		domain.LabelOwnerResourceName: t.vglb.Name,
-		domain.LabelOwnerResourceKind: t.vglb.Kind,
+		domain.LabelOwnerResourceKind: domain.KindVngcloudGlobalLoadBalancer,
 		domain.LabelOwnerResourceUid:  string(t.vglb.UID),
 	})
 	if err != nil {

@@ -162,7 +162,7 @@ func (uc *vglbUseCase) deleteGlobalLoadBalancerConfig(ctx context.Context, vglb 
 	glbcList := &v1alpha1.GlobalLoadBalancerConfigList{}
 	err := uc.k8sRepo.ListGlobalLoadBalancerConfig(ctx, glbcList, client.InNamespace(vglb.GetNamespace()), client.MatchingLabels{
 		domain.LabelOwnerResourceName: vglb.GetName(),
-		domain.LabelOwnerResourceKind: vglb.Kind,
+		domain.LabelOwnerResourceKind: domain.KindVngcloudGlobalLoadBalancer,
 		domain.LabelOwnerResourceUid:  string(vglb.UID),
 	})
 	if err != nil {

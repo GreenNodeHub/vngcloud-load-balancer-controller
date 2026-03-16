@@ -153,9 +153,17 @@ var _ = BeforeSuite(func() {
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeInternalIP, Address: "10.0.0.1"},
 			},
+			Conditions: []corev1.NodeCondition{
+				{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
 		},
 	}
 	Expect(k8sClient.Create(ctx, node)).To(Succeed())
+	// Update node status (envtest requires a separate status update)
+	Expect(k8sClient.Status().Update(ctx, node)).To(Succeed())
 
 	// Setup VGLB reconciler
 	annotationParser := annotations.NewSuffixAnnotationParser(domain.VGLB_ANNOTATION_PREFIX)

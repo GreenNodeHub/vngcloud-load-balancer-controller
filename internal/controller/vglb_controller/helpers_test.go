@@ -71,7 +71,7 @@ func findGLBCByOwnerLabels(ctx context.Context, k8sClient client.Client, vglbObj
 		client.InNamespace(vglbObj.Namespace),
 		client.MatchingLabels{
 			domain.LabelOwnerResourceName: vglbObj.Name,
-			domain.LabelOwnerResourceKind: vglbObj.Kind,
+			domain.LabelOwnerResourceKind: domain.KindVngcloudGlobalLoadBalancer,
 			domain.LabelOwnerResourceUid:  string(vglbObj.UID),
 		},
 	)

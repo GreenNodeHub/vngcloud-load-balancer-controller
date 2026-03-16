@@ -26,6 +26,12 @@ const (
 	VGLB_ANNOTATION_PREFIX    = "vks.vngcloud.vn"
 )
 
+// CRD kind names (K8s strips TypeMeta from objects returned by Get; use these constants
+// instead of obj.Kind when setting labels that must survive round-trips through the API server)
+const (
+	KindVngcloudGlobalLoadBalancer = "VngcloudGlobalLoadBalancer"
+)
+
 // Labels
 const (
 	LabelOwnerResourceKind = "vks.vngcloud.vn/owner-resource-kind"
