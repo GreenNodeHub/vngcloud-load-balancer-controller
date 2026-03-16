@@ -118,7 +118,7 @@ func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.C
 			if updateRequest, messages := t.buildUpdateGlobalPoolMemberRequest(ctx, lbId, poolId, currentPoolMember, &poolMemberSpec, createdPoolMember); updateRequest != nil {
 
 				allActionMessages = append(allActionMessages, messages...)
-				bulkRequests = append(bulkRequests, global.NewPatchGlobalPoolUpdateBulkActionRequest(poolId, updateRequest))
+				bulkRequests = append(bulkRequests, global.NewPatchGlobalPoolUpdateBulkActionRequest(currentPoolMember.ID, updateRequest))
 			}
 		}
 	}

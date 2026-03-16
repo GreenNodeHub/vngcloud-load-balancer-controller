@@ -9,21 +9,22 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int) error {
+func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int, name string) error {
 	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, l := range obj.Status.CreatedListeners {
-			if l.Id == listenerId && l.Port == port {
+			if l.Id == listenerId && l.Port == port && l.Name == name {
 				return false // no change needed
 			}
 		}
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id == listenerId {
 				obj.Status.CreatedListeners[i].Port = port
+				obj.Status.CreatedListeners[i].Name = name
 				return true
 			}
 		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedGlobalListener{Id: listenerId, Port: port})
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedGlobalListener{Id: listenerId, Port: port, Name: name})
 		return true
 	})
 }

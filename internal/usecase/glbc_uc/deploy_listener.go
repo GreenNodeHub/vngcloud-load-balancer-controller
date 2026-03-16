@@ -51,7 +51,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to create listener: ", err)
 			return nil, err
 		}
-		if err := t.statusAddListener(ctx, _lis.ID, int(listenerSpec.ProtocolPort)); err != nil {
+		if err := t.statusAddListener(ctx, _lis.ID, int(listenerSpec.ProtocolPort), listenerSpec.Name); err != nil {
 			return nil, err
 		}
 
@@ -82,7 +82,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to update listener: ", err)
 			return nil, err
 		}
-		if err := t.statusAddListener(ctx, currentListener.ID, currentListener.Port); err != nil {
+		if err := t.statusAddListener(ctx, currentListener.ID, currentListener.Port, currentListener.Name); err != nil {
 			return nil, err
 		}
 
