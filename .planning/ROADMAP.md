@@ -93,3 +93,13 @@ Plans:
 - [ ] 06-02-PLAN.md — Add Service and Node event handlers + wire into VGLB controller SetupWithManager
 - [ ] 06-03-PLAN.md — Unit tests for stripZoneSuffix and pool member group naming
 - [ ] 06-04-PLAN.md — Integration tests: VGLB create/delete/service-update flows with envtest
+
+### Phase 7: global load balancer operator with resource Service, use annotation with prefix glb.vks.vngcloud.vn
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 7 to break down)

@@ -103,6 +103,7 @@ Recent decisions affecting current work:
 - Phase 4 added: Add test from controller use vngcloud mock repository
 - Phase 5 added: Fix production bugs: duplicate pool members, missing listener port, pool member ID tracking
 - Phase 6 added: add vglb operator, generate glbc from vglb
+- Phase 7 added: global load balancer operator with resource Service, use annotation with prefix glb.vks.vngcloud.vn
 
 ### Pending Todos
 
