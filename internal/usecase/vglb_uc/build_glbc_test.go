@@ -37,7 +37,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			vglbName:     "my-vglb",
 			namespace:    "default",
 			annotations:  map[string]string{},
-			expectedName: "glb_default_my_vglb",
+			expectedName: "vks_default_my_vglb",
 			description:  "should return default name based on namespace and vglb name",
 		},
 		{
@@ -47,7 +47,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			annotations: map[string]string{
 				domain.VGLB_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "",
 			},
-			expectedName: "glb_production_test_vglb",
+			expectedName: "vks_production_test_vglb",
 			description:  "should return default name when annotation is empty",
 		},
 		{
@@ -55,7 +55,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			vglbName:     "my-test-vglb-123",
 			namespace:    "my-namespace",
 			annotations:  map[string]string{},
-			expectedName: "glb_my_namespace_my_test_vglb_123",
+			expectedName: "vks_my_namespace_my_test_vglb_123",
 			description:  "should handle names with hyphens and numbers",
 		},
 	}

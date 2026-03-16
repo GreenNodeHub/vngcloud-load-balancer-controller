@@ -125,8 +125,8 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 	poolMembers := []v1alpha1.GlobalPoolMember{}
 	if len(globalMembers) > 0 {
 		poolMembers = append(poolMembers, v1alpha1.GlobalPoolMember{
-			Name:    "default",
-			Region:  "hcm", // TODO
+			Name:    fmt.Sprintf("%s-%s", t.defaultRegion, t.defaultNetworkId),
+			Region:  t.defaultRegion,
 			VpcId:   t.defaultNetworkId,
 			Type:    global.GlobalPoolMemberTypePrivate,
 			Members: globalMembers,

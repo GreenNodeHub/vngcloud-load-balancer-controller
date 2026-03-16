@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -68,8 +70,16 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		Name:      t.vglb.Name,
 	})
 	if err != nil {
-		t.logger.Warnf("Service %s/%s not found, skipping pools and listeners generation: %v", t.vglb.Namespace, t.vglb.Name, err)
-		svc = nil // Continue without service - only basic GLBC fields will be set
+		if client.IgnoreNotFound(err) == nil {
+			// Service not found — requeue until it appears
+			return errs.NewRequeueNeededAfter("service "+t.vglb.Namespace+"/"+t.vglb.Name+" not found, waiting", 5*time.Second)
+		}
+		return err
+	}
+
+	// ClusterIP services have no NodePort — reject and wait for type change
+	if svc.Spec.Type == corev1.ServiceTypeClusterIP {
+		return errs.NewRequeueNeededAfter("service "+svc.Namespace+"/"+svc.Name+" is ClusterIP (no NodePort), waiting for type change", 30*time.Second)
 	}
 
 	// list GLBC by label selector
@@ -121,17 +131,15 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 	glbConfig.Spec.Description = t.buildDescription(ctx)
 	glbConfig.Spec.Type = t.buildType(ctx)
 
-	// Build pools and listeners from Service if available
-	if svc != nil {
-		t.servicePointer = svc
-		pools, listeners, err := t.buildPoolsAndListeners(ctx, nil)
-		if err != nil {
-			t.logger.Errorf("failed to build pools and listeners: %v", err)
-			return err
-		}
-		glbConfig.Spec.GlobalPools = pools
-		glbConfig.Spec.GlobalListeners = listeners
+	// Build pools and listeners from Service
+	t.servicePointer = svc
+	pools, listeners, err := t.buildPoolsAndListeners(ctx, nil)
+	if err != nil {
+		t.logger.Errorf("failed to build pools and listeners: %v", err)
+		return err
 	}
+	glbConfig.Spec.GlobalPools = pools
+	glbConfig.Spec.GlobalListeners = listeners
 
 	// Create or update GLBC
 	if !isCreated {
@@ -171,7 +179,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerName(_ context.Context) string 
 	}
 	// Default name based on VGLB name
 	// GLB name only allows a-z, A-Z, 0-9, '_', '.' and must be 5-50 characters
-	name := "glb_" + t.vglb.Namespace + "_" + t.vglb.Name
+	name := "vks_" + t.vglb.Namespace + "_" + t.vglb.Name
 	name = strings.ReplaceAll(name, "-", "_")
 	if len(name) > 50 {
 		name = name[:50]
@@ -222,10 +230,6 @@ func (t *defaultModelBuildTask) getGLBCAddress(ctx context.Context) string {
 	// Return first domain if available
 	if len(glbcList.Items[0].Status.Domains) > 0 {
 		return glbcList.Items[0].Status.Domains[0]
-	}
-	// Otherwise return first VIP address
-	if len(glbcList.Items[0].Status.Vips) > 0 {
-		return glbcList.Items[0].Status.Vips[0].Address
 	}
 	return ""
 }
