@@ -51,24 +51,20 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			return nil, err
 		}
 
-		// Build pool members from spec and save status immediately after create
-		createdPoolMembers := make([]v1alpha1.CreatedGlobalPoolMember, 0, len(poolSpec.PoolMembers))
-		for _, poolMemberSpec := range poolSpec.PoolMembers {
-			createdMembers := make([]v1alpha1.GlobalMember, 0, len(poolMemberSpec.Members))
-			for _, memberSpec := range poolMemberSpec.Members {
-				createdMembers = append(createdMembers, memberSpec)
-			}
-			createdPoolMembers = append(createdPoolMembers, v1alpha1.CreatedGlobalPoolMember{
-				Name:           poolMemberSpec.Name,
-				CreatedMembers: createdMembers,
-			})
-		}
+		// Save empty pool members first, populate with IDs after LB is active
+		createdPoolMembers := make([]v1alpha1.CreatedGlobalPoolMember, 0)
 
 		if err := t.statusUpdatePoolMember(ctx, _pool.ID, poolSpec.Name, createdPoolMembers); err != nil {
 			return nil, err
 		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
+			return nil, err
+		}
+
+		// Now pool members have IDs, use deployPoolMembers to populate status
+		createdPoolMembers, err = t.deployPoolMembers(ctx, lbId, _pool.ID, poolSpec.Name, poolSpec.PoolMembers)
+		if err != nil {
 			return nil, err
 		}
 

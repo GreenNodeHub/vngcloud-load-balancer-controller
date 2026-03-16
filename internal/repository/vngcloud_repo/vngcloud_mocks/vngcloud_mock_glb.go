@@ -2,6 +2,7 @@ package vngcloud_mocks
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -411,6 +412,29 @@ func (m *MockProvider) PatchGlobalPoolMembers(ctx context.Context, glbID, poolID
 	logger.Infof("%s Request patch global pool member of load balancer %s", domain.RequestIcon, glbID)
 
 	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMembersRequest)
+
+	// Validate no duplicate addresses across all actions (matches real API behavior)
+	seenAddresses := make(map[string]struct{})
+	for _, action := range patch.BulkActions {
+		var members []global.IGlobalMemberRequest
+		if rawAction, ok := action.(*global.PatchGlobalPoolCreateBulkActionRequest); ok {
+			createOpts := rawAction.CreatePoolMember.ToRequestBody().(*global.GlobalPoolMemberRequest)
+			members = createOpts.Members
+		} else if rawAction, ok := action.(*global.PatchGlobalPoolUpdateBulkActionRequest); ok {
+			updateOpts := rawAction.UpdatePoolMember.ToRequestBody().(*global.UpdateGlobalPoolMemberRequest)
+			members = updateOpts.Members
+		}
+		for _, mem := range members {
+			member := mem.ToRequestBody().(*global.GlobalMemberRequest)
+			key := fmt.Sprintf("%s:%d", member.Address, member.Port)
+			if _, exists := seenAddresses[key]; exists {
+				logger.Errorf("Duplicate address %s", key)
+				return fmt.Errorf("Duplicate address %s", key)
+			}
+			seenAddresses[key] = struct{}{}
+		}
+	}
+
 	for _, action := range patch.BulkActions {
 		// action can be PatchGlobalPoolCreateBulkActionRequest or PatchGlobalPoolDeleteBulkActionRequest
 		if rawAction, ok := action.(*global.PatchGlobalPoolCreateBulkActionRequest); ok {
@@ -582,6 +606,17 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 	logger := contexts.NewContext(ctx).Log()
 	logger.Infof("%s Request create global listener of load balancer %s", domain.RequestIcon, glbID)
 	listener := opt.ToRequestBody().(*global.CreateGlobalListenerRequest)
+
+	// Reject duplicate port on the same LB (matches real API behavior)
+	m.mu.Lock()
+	for _, l := range m.globalListeners {
+		if l.lbID == glbID && l.Port == listener.Port {
+			m.mu.Unlock()
+			return nil, fmt.Errorf("Global listener port %d already exists", listener.Port)
+		}
+	}
+	m.mu.Unlock()
+
 	newListener := &wrapGlobalListener{
 		lbID: glbID,
 		GlobalListener: &entityv2.GlobalListener{

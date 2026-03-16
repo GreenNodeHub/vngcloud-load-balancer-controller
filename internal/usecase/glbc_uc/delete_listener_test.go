@@ -207,8 +207,8 @@ func TestCanDeleteWholeListener(t *testing.T) {
 			newCreatedPools: []v1alpha1.CreatedGlobalPool{},
 			createdPools: []v1alpha1.CreatedGlobalPool{
 				{
-					Id:   "pool-1",
-					Name: "pool-1",
+					Id:                 "pool-1",
+					Name:               "pool-1",
 					CreatedPoolMembers: []v1alpha1.CreatedGlobalPoolMember{},
 				},
 			},

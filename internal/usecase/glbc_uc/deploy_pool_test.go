@@ -71,7 +71,6 @@ func TestDeployPool_PopulatesCreatedPoolMembers(t *testing.T) {
 		Items: []*entityv2.GlobalPool{}, // empty — forces create path
 	}
 
-	// Setup mocks — no ListGlobalPoolMembers needed, status built from spec
 	mockVngcloudRepo.On("CreateGlobalPool", mock.Anything, "glb-123", mock.Anything).
 		Return(&entityv2.GlobalPool{ID: "pool-123", Name: "test-pool"}, nil)
 
@@ -81,18 +80,29 @@ func TestDeployPool_PopulatesCreatedPoolMembers(t *testing.T) {
 	mockVngcloudRepo.On("WaitGlobalLoadBalancerActive", mock.Anything, "glb-123").
 		Return(&entityv2.GlobalLoadBalancer{}, nil)
 
+	mockVngcloudRepo.On("ListGlobalPoolMembers", mock.Anything, "glb-123", "pool-123").
+		Return(&entityv2.ListGlobalPoolMembers{
+			Items: []*entityv2.GlobalPoolMember{
+				{
+					ID:   "gpoolmem-1",
+					Name: "pm-region-1",
+					Members: &entityv2.ListGlobalMembers{Items: []*entityv2.GlobalPoolMemberDetail{
+						{Name: "m1", Address: "10.0.0.1", Port: 80, Weight: 1, MonitorPort: 80, SubnetID: "subnet-1"},
+					}},
+				},
+			},
+		}, nil)
+
 	result, err := task.deployPool(context.Background(), "glb-123", poolSpec, currentPools)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Len(t, result.CreatedPoolMembers, 1, "CreatedPoolMembers must be populated from spec")
+	assert.Len(t, result.CreatedPoolMembers, 1, "CreatedPoolMembers must be populated after LB active")
+	assert.Equal(t, "gpoolmem-1", result.CreatedPoolMembers[0].Id)
 	assert.Equal(t, "pm-region-1", result.CreatedPoolMembers[0].Name)
 	assert.Equal(t, "10.0.0.1", result.CreatedPoolMembers[0].CreatedMembers[0].Address)
 	assert.Equal(t, 80, result.CreatedPoolMembers[0].CreatedMembers[0].Port)
 	assert.Equal(t, "subnet-1", result.CreatedPoolMembers[0].CreatedMembers[0].SubnetID)
-
-	// ListGlobalPoolMembers should NOT be called
-	mockVngcloudRepo.AssertNotCalled(t, "ListGlobalPoolMembers", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestDeployPool_StatusUpdatedOnCreate tests that statusUpdatePoolMember (via
@@ -144,6 +154,13 @@ func TestDeployPool_StatusUpdatedOnCreate(t *testing.T) {
 
 	mockVngcloudRepo.On("WaitGlobalLoadBalancerActive", mock.Anything, "glb-123").
 		Return(&entityv2.GlobalLoadBalancer{}, nil)
+
+	mockVngcloudRepo.On("ListGlobalPoolMembers", mock.Anything, "glb-123", "pool-123").
+		Return(&entityv2.ListGlobalPoolMembers{
+			Items: []*entityv2.GlobalPoolMember{
+				{ID: "gpoolmem-1", Name: "pm-region-1", Members: &entityv2.ListGlobalMembers{Items: []*entityv2.GlobalPoolMemberDetail{}}},
+			},
+		}, nil)
 
 	_, err := task.deployPool(context.Background(), "glb-123", poolSpec, currentPools)
 

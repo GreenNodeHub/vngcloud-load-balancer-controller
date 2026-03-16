@@ -247,14 +247,14 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 
 	// keep current member if it is in spec or not created by us
 	for _, member := range currentMembers {
-		if checkIfPoolMemberExist(poolMemberSpec, &member) || !checkIfPoolMemberExist(createdMembers, &member) {
+		if checkIfPoolMemberExistByAddress(poolMemberSpec, &member) || !checkIfPoolMemberExistByAddress(createdMembers, &member) {
 			mergedPoolMembers = append(mergedPoolMembers, member)
 		}
 	}
 
-	// add new members from spec
+	// add new members from spec that aren't already in merged (by address+port identity)
 	for _, member := range poolMemberSpec {
-		if !checkIfPoolMemberExist(mergedPoolMembers, &member) {
+		if !checkIfPoolMemberExistByAddress(mergedPoolMembers, &member) {
 			mergedPoolMembers = append(mergedPoolMembers, member)
 		}
 	}
@@ -276,19 +276,40 @@ func comparePoolMembers(poolMembers []v1alpha1.GlobalMember, current []v1alpha1.
 	return true
 }
 
-// checkIfPoolMemberExist checks if the pool member exists in the pool members.
-func checkIfPoolMemberExist(list []v1alpha1.GlobalMember, member *v1alpha1.GlobalMember) bool {
+// checkIfPoolMemberExistByAddress checks if a member with the same Address+Port exists in the list.
+// Used for identity matching in mergePoolMembers to prevent duplicate addresses.
+func checkIfPoolMemberExistByAddress(list []v1alpha1.GlobalMember, member *v1alpha1.GlobalMember) bool {
 	for _, r := range list {
-		if r.Address == member.Address &&
-			r.Port == member.Port &&
-			r.Weight == member.Weight &&
-			r.BackupRole == member.BackupRole &&
-			r.SubnetID == member.SubnetID &&
-			r.MonitorPort == member.MonitorPort {
+		if r.Address == member.Address && r.Port == member.Port {
 			return true
 		}
 	}
 	return false
+}
+
+// checkIfPoolMemberExist checks if the pool member exists in the pool members (all fields must match).
+func checkIfPoolMemberExist(list []v1alpha1.GlobalMember, member *v1alpha1.GlobalMember) bool {
+	for _, r := range list {
+		if r.Address == member.Address &&
+			r.Port == member.Port &&
+			ptrIntEqual(r.Weight, member.Weight) &&
+			r.BackupRole == member.BackupRole &&
+			r.SubnetID == member.SubnetID &&
+			ptrIntEqual(r.MonitorPort, member.MonitorPort) {
+			return true
+		}
+	}
+	return false
+}
+
+func ptrIntEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func convertMemberList(members *entityv2.ListGlobalMembers) []v1alpha1.GlobalMember {

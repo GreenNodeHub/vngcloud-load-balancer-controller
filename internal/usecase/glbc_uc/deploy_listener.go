@@ -103,7 +103,8 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 	createRequest := global.NewCreateGlobalListenerRequest(
 		lbId,
 		listenerSpec.Name,
-	).WithAllowedCidrs(t.cfg.GlobalLoadBalancerOpts.DefaultAllowedCidrs).
+	).WithPort(int(listenerSpec.ProtocolPort)).
+		WithAllowedCidrs(t.cfg.GlobalLoadBalancerOpts.DefaultAllowedCidrs).
 		WithTimeoutClient(t.cfg.GlobalLoadBalancerOpts.DefaultTimeoutClient).
 		WithTimeoutMember(t.cfg.GlobalLoadBalancerOpts.DefaultTimeoutMember).
 		WithTimeoutConnection(t.cfg.GlobalLoadBalancerOpts.DefaultTimeoutConnection).
