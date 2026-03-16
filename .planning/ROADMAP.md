@@ -7,7 +7,7 @@ The GLBC reconciler is substantially complete but has four P0 bugs that collecti
 ## Phases
 
 - [x] **Phase 1: P0 Bug Fixes** - Fix the four critical bugs blocking the delete and status flows (completed 2026-03-15)
-- [ ] **Phase 2: Status and Validation Completeness** - Implement stubbed status tracking and listener update headers comparison
+- [x] **Phase 2: Status and Validation Completeness** - Implement stubbed status tracking and listener update headers comparison (completed 2026-03-16)
 - [ ] **Phase 3: Test Coverage** - Add unit tests verifying pool member 3-way merge edge cases
 
 ## Phase Details
@@ -34,7 +34,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. After a pool is created, `status.createdPools[*].createdMembers` contains the IDs of all members returned by the create response — no second reconcile needed to populate them
   2. Changing a listener's allowed headers in the GLBC spec triggers a listener update API call on the next reconcile
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 02-01-PLAN.md — Activate pool member status tracking on pool creation (STAT-01) + implement headers comparison in buildListenerUpdateRequest (STAT-02)
@@ -54,5 +54,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. P0 Bug Fixes | 2/2 | Complete    | 2026-03-15 |
-| 2. Status and Validation Completeness | 0/1 | In progress | - |
+| 2. Status and Validation Completeness | 1/1 | Complete   | 2026-03-16 |
 | 3. Test Coverage | 0/TBD | Not started | - |

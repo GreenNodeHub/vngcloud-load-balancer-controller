@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-16T01:44:44.204Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-16T02:43:45.786Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01-p0-bug-fixes P02 | 4 | 2 tasks | 3 files |
 | Phase 01-p0-bug-fixes P01 | 7 | 2 tasks | 6 files |
+| Phase 02-status-and-validation-completeness P01 | 6 | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase 01-p0-bug-fixes]: convertMember must copy SubnetID from GlobalPoolMemberDetail for stable pool member diffs
 - [Phase 01-p0-bug-fixes]: deleteRedundantPools uses DeleteGlobalPool (not DeletePool) for correct global LB API
 - [Phase 01-p0-bug-fixes]: deployListener returns CreatedGlobalListener.Name from API entity for accurate status tracking
+- [Phase 02-status-and-validation-completeness]: ListGlobalPoolMembers called after WaitGlobalLoadBalancerActive to get stable API-assigned pool member IDs on create path
+- [Phase 02-status-and-validation-completeness]: statusAddPool on pool update path remains commented — deployPoolMembers already calls statusUpdatePoolMember avoiding redundant status patch
+- [Phase 02-status-and-validation-completeness]: Headers comparison is case-insensitive and order-independent using stringSlicesEqualUnordered; nil entity == empty spec (no spurious update)
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T01:44:44.197Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-status-and-validation-completeness/02-CONTEXT.md
+Last session: 2026-03-16T02:43:45.779Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None

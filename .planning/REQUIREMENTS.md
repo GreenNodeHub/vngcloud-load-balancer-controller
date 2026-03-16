@@ -16,8 +16,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Status Tracking
 
-- [ ] **STAT-01**: Uncomment and activate pool member status tracking on pool creation in `deploy_pool.go`
-- [ ] **STAT-02**: Implement headers comparison in `buildListenerUpdateRequest` (replace TODO)
+- [x] **STAT-01**: Uncomment and activate pool member status tracking on pool creation in `deploy_pool.go`
+- [x] **STAT-02**: Implement headers comparison in `buildListenerUpdateRequest` (replace TODO)
 
 ### Testing
 
@@ -59,8 +59,8 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | BUG-02 | Phase 1 | Complete |
 | BUG-03 | Phase 1 | Complete |
 | BUG-04 | Phase 1 | Complete |
-| STAT-01 | Phase 2 | Pending |
-| STAT-02 | Phase 2 | Pending |
+| STAT-01 | Phase 2 | Complete |
+| STAT-02 | Phase 2 | Complete |
 | TEST-01 | Phase 3 | Pending |
 
 **Coverage:**
