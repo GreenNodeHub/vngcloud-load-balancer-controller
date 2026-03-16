@@ -349,8 +349,46 @@ func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID strin
 
 func (m *MockProvider) UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return domain.ErrorNotImplemented
+	logger.Infof("%s Request update global pool %s of load balancer %s", domain.RequestIcon, poolID, glbID)
+
+	req := opt.ToRequestBody().(*global.UpdateGlobalPoolRequest)
+
+	found := false
+	m.mu.Lock()
+	for _, p := range m.globalPools {
+		if p.lbID == glbID && p.ID == poolID {
+			p.Algorithm = string(req.Algorithm)
+			if req.HealthMonitor != nil {
+				health := req.HealthMonitor.ToRequestBody().(*global.GlobalHealthMonitorRequest)
+				if p.Health != nil {
+					p.Health.HealthyThreshold = health.HealthyThreshold
+					p.Health.UnhealthyThreshold = health.UnhealthyThreshold
+					p.Health.IntervalTime = health.Interval
+					p.Health.Timeout = health.Timeout
+					p.Health.Protocol = string(health.HealthCheckProtocol)
+					p.Health.HTTPMethod = (*string)(health.HttpMethod)
+					p.Health.HTTPVersion = (*string)(health.HttpVersion)
+					p.Health.Path = health.Path
+					p.Health.SuccessCode = health.SuccessCode
+					p.Health.DomainName = health.DomainName
+					p.Health.UpdatedAt = time.Now().Format(time.RFC3339)
+				}
+			}
+			p.UpdatedAt = time.Now().Format(time.RFC3339)
+			found = true
+			break
+		}
+	}
+	m.mu.Unlock()
+
+	if !found {
+		logger.Errorf("Global pool %s not found in load balancer %s", poolID, glbID)
+		return domain.ErrorNotFound
+	}
+
+	m.updatingGlobalStatus(glbID)
+	go m.readyGlobalAfterTime(glbID)
+	return nil
 }
 
 func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error) {
@@ -668,6 +706,33 @@ func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listener
 
 func (m *MockProvider) UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Error("not implemented yet")
-	return domain.ErrorNotImplemented
+	logger.Infof("%s Request update global listener %s of load balancer %s", domain.RequestIcon, listenerID, glbID)
+
+	req := opt.ToRequestBody().(*global.UpdateGlobalListenerRequest)
+
+	found := false
+	m.mu.Lock()
+	for _, l := range m.globalListeners {
+		if l.lbID == glbID && l.ID == listenerID {
+			l.AllowedCidrs = req.AllowedCidrs
+			l.TimeoutClient = req.TimeoutClient
+			l.TimeoutMember = req.TimeoutMember
+			l.TimeoutConnection = req.TimeoutConnection
+			l.GlobalPoolID = req.GlobalPoolId
+			l.Headers = req.Headers
+			l.UpdatedAt = time.Now().Format(time.RFC3339)
+			found = true
+			break
+		}
+	}
+	m.mu.Unlock()
+
+	if !found {
+		logger.Errorf("Global listener %s not found in load balancer %s", listenerID, glbID)
+		return domain.ErrorNotFound
+	}
+
+	m.updatingGlobalStatus(glbID)
+	go m.readyGlobalAfterTime(glbID)
+	return nil
 }
