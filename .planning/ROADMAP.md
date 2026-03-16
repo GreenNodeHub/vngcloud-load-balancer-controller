@@ -59,3 +59,13 @@ Plans:
 | 1. P0 Bug Fixes | 2/2 | Complete    | 2026-03-15 |
 | 2. Status and Validation Completeness | 1/1 | Complete   | 2026-03-16 |
 | 3. Test Coverage | 1/1 | Complete   | 2026-03-16 |
+
+### Phase 4: Add test from controller use vngcloud mock repository
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 3
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 4 to break down)

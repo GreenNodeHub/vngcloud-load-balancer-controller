@@ -78,6 +78,10 @@ Recent decisions affecting current work:
 - [Phase 02-status-and-validation-completeness]: statusUpdatePoolMember called BEFORE WaitGlobalLoadBalancerActive on create path (crash safety)
 - [Phase 03-test-coverage]: Use nil for Weight/MonitorPort in test fixtures — checkIfPoolMemberExist compares *int by pointer address not value
 
+### Roadmap Evolution
+
+- Phase 4 added: Add test from controller use vngcloud mock repository
+
 ### Pending Todos
 
 None yet.
