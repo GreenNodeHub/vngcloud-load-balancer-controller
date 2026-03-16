@@ -14,16 +14,17 @@ Activate pool member status tracking on pool creation (STAT-01) and implement he
 ## Implementation Decisions
 
 ### Status Tracking Scope
-- Uncomment ALL 5 commented-out status calls, not just the STAT-01 scoped ones:
+- Uncomment 4 of the 5 commented-out status calls:
   1. `statusAddPoolMember` on pool creation (deploy_pool.go:53-56)
   2. `CreatedPoolMembers` population on pool creation (deploy_pool.go:64-65)
-  3. `statusAddPool` on pool update (deploy_pool.go:78-81)
+  3. ~~`statusAddPool` on pool update (deploy_pool.go:78-81)~~ — **EXCEPTION**: Leave commented. Research found `deployPoolMembers` already calls `statusUpdatePoolMember` on the update path, making this redundant and causing spurious status patches every reconcile.
   4. `statusAddListener` on listener creation (deploy_listener.go:54-57)
   5. `statusAddListener` on listener update (deploy_listener.go:86-89)
 - If `statusAddListener` or `statusAddPool` functions don't exist in the GLBC use case, implement them following the LBC pattern
 
 ### Status Save Timing
 - Save status immediately after each resource creation/update, BEFORE calling `WaitGlobalLoadBalancerActive`
+- **EXCEPTION for pool member status (STAT-01):** `ListGlobalPoolMembers` requires the pool to be active, so the status save must come AFTER `WaitGlobalLoadBalancerActive` on the pool creation path. This is a structural constraint — the user decision applies to listener paths where resource IDs are available immediately.
 - If reconcile crashes mid-way, status should reflect what was actually created
 
 ### Status Mutation Method
