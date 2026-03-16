@@ -27,9 +27,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **CTRL-TEST-01**: Implement `UpdateGlobalPool` in MockProvider (replace ErrorNotImplemented stub)
 - [x] **CTRL-TEST-02**: Implement `UpdateGlobalListener` in MockProvider and create GLBC test fixtures
-- [ ] **CTRL-TEST-03**: Controller integration test for create flow (GLBC CR -> LB/pool/listener created, status populated)
-- [ ] **CTRL-TEST-04**: Controller integration test for full delete flow (sole-owner LB -> DeleteGlobalLoadBalancer, backend empty)
-- [ ] **CTRL-TEST-05**: Controller integration test for partial delete flow (shared LB -> only owned resources removed)
+- [x] **CTRL-TEST-03**: Controller integration test for create flow (GLBC CR -> LB/pool/listener created, status populated)
+- [x] **CTRL-TEST-04**: Controller integration test for full delete flow (sole-owner LB -> DeleteGlobalLoadBalancer, backend empty)
+- [x] **CTRL-TEST-05**: Controller integration test for partial delete flow (shared LB -> only owned resources removed)
 
 ## v2 Requirements
 

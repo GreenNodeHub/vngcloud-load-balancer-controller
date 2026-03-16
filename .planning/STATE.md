@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-add-test-from-controller-use-vngcloud-mock-repository/04-01-PLAN.md
-last_updated: "2026-03-16T05:37:38.204Z"
+stopped_at: Completed 04-add-test-from-controller-use-vngcloud-mock-repository/04-02-PLAN.md
+last_updated: "2026-03-16T06:08:40.802Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-status-and-validation-completeness P01 | 8 | 3 tasks | 4 files |
 | Phase 03-test-coverage P01 | 5 | 1 tasks | 1 files |
 | Phase 04-add-test-from-controller-use-vngcloud-mock-repository P01 | 5 | 2 tasks | 2 files |
+| Phase 04-add-test-from-controller-use-vngcloud-mock-repository P02 | 26 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 03-test-coverage]: Use nil for Weight/MonitorPort in test fixtures — checkIfPoolMemberExist compares *int by pointer address not value
 - [Phase 04-add-test-from-controller-use-vngcloud-mock-repository]: UpdateGlobalPool/UpdateGlobalListener unlock before updatingGlobalStatus to prevent deadlock (updatingGlobalStatus re-acquires m.mu when WaitAfterTime > 0)
 - [Phase 04-add-test-from-controller-use-vngcloud-mock-repository]: MockGLBCSharedSpec uses port 8080 for listener to avoid port conflicts with MockGLBCMinimalSpec (port 80) in shared-LB tests
+- [Phase 04-add-test-from-controller-use-vngcloud-mock-repository]: statusAddListener signature extended to include name parameter — CRD requires name field in createdListeners list-map
+- [Phase 04-add-test-from-controller-use-vngcloud-mock-repository]: NewPatchGlobalPoolUpdateBulkActionRequest receives pool member group ID (currentPoolMember.ID), not pool ID
 
 ### Roadmap Evolution
 
@@ -98,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T05:37:38.198Z
-Stopped at: Completed 04-add-test-from-controller-use-vngcloud-mock-repository/04-01-PLAN.md
+Last session: 2026-03-16T06:08:40.793Z
+Stopped at: Completed 04-add-test-from-controller-use-vngcloud-mock-repository/04-02-PLAN.md
 Resume file: None
