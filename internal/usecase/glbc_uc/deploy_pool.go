@@ -50,19 +50,57 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		if err != nil {
 			return nil, err
 		}
-		// TODO: uncomment me
-		// if err := t.statusAddPoolMember(ctx, _pool.ID, poolSpec.Name, poolSpec.Members); err != nil {
-		// 	return nil, err
-		// }
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
 			return nil, err
 		}
+
+		// Fetch API-assigned member data (CreateGlobalPool response does not include member IDs)
+		currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, _pool.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		searchPoolMemberByName := func(name string) *entityv2.GlobalPoolMember {
+			for _, p := range currentPoolMembers.Items {
+				if p.Name == name {
+					return p
+				}
+			}
+			return nil
+		}
+
+		createdPoolMembers := make([]v1alpha1.CreatedGlobalPoolMember, 0)
+		for _, poolMemberSpec := range poolSpec.PoolMembers {
+			if currentPoolMember := searchPoolMemberByName(poolMemberSpec.Name); currentPoolMember != nil {
+				createdMembers := make([]v1alpha1.GlobalMember, 0)
+				for _, member := range currentPoolMember.Members.Items {
+					createdMembers = append(createdMembers, v1alpha1.GlobalMember{
+						Name:        member.Name,
+						Address:     member.Address,
+						Port:        member.Port,
+						BackupRole:  member.BackupRole,
+						Weight:      &member.Weight,
+						MonitorPort: &member.MonitorPort,
+						SubnetID:    member.SubnetID,
+					})
+				}
+				createdPoolMembers = append(createdPoolMembers, v1alpha1.CreatedGlobalPoolMember{
+					Id:             currentPoolMember.ID,
+					Name:           currentPoolMember.Name,
+					CreatedMembers: createdMembers,
+				})
+			}
+		}
+
+		if err := t.statusUpdatePoolMember(ctx, _pool.ID, poolSpec.Name, createdPoolMembers); err != nil {
+			return nil, err
+		}
+
 		return &v1alpha1.CreatedGlobalPool{
-			Id:   _pool.ID,
-			Name: poolSpec.Name,
-			// // TODO: uncomment me
-			// CreatedPoolMembers: poolSpec.Members,
+			Id:                 _pool.ID,
+			Name:               poolSpec.Name,
+			CreatedPoolMembers: createdPoolMembers,
 		}, nil
 	}
 
