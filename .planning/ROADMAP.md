@@ -47,7 +47,10 @@ Plans:
   1. Unit tests cover: add new member, remove deleted member, update existing member, and preserve manually-added member not in spec
   2. All tests pass with `go test ./internal/usecase/glbc_uc/...`
   3. No regressions in existing tests after the fix changes from Phases 1 and 2
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 03-01-PLAN.md — Add TestMergePoolMembers with 4 table-driven sub-tests for 3-way merge edge cases
 
 ## Progress
 
@@ -55,4 +58,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. P0 Bug Fixes | 2/2 | Complete    | 2026-03-15 |
 | 2. Status and Validation Completeness | 1/1 | Complete   | 2026-03-16 |
-| 3. Test Coverage | 0/TBD | Not started | - |
+| 3. Test Coverage | 0/1 | Not started | - |
