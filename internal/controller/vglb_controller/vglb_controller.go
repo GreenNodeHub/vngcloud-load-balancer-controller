@@ -214,9 +214,21 @@ func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(ctx context.Cont
 	}
 
 	vglbEventHandler := eventhandlers.NewEnqueueRequestForVglbEvent(r.eventRecorder, r.vglbUtils, r.logger.WithName("eventHandlers").WithName("vglb"))
+	nodeEventHandler := eventhandlers.NewEnqueueRequestForVglbNodeEvent(
+		r.k8sClient,
+		r.vglbUtils,
+		r.logger.WithName("eventHandlers").WithName("node"),
+	)
+	svcEventHandler := eventhandlers.NewEnqueueRequestForVglbServiceEvent(
+		r.k8sClient,
+		r.vglbUtils,
+		r.logger.WithName("eventHandlers").WithName("service"),
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Watches(&v1alpha1.VngcloudGlobalLoadBalancer{}, vglbEventHandler).
+		Watches(&corev1.Service{}, svcEventHandler).
+		Watches(&corev1.Node{}, nodeEventHandler).
 		Named("vngcloudgloballoadbalancer").
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.maxConcurrentReconciles,
