@@ -23,6 +23,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **TEST-01**: Unit tests for pool member 3-way merge edge cases (add, remove, update, preserve manual members)
 
+### Controller Integration Tests
+
+- [ ] **CTRL-TEST-01**: Implement `UpdateGlobalPool` in MockProvider (replace ErrorNotImplemented stub)
+- [ ] **CTRL-TEST-02**: Implement `UpdateGlobalListener` in MockProvider and create GLBC test fixtures
+- [ ] **CTRL-TEST-03**: Controller integration test for create flow (GLBC CR -> LB/pool/listener created, status populated)
+- [ ] **CTRL-TEST-04**: Controller integration test for full delete flow (sole-owner LB -> DeleteGlobalLoadBalancer, backend empty)
+- [ ] **CTRL-TEST-05**: Controller integration test for partial delete flow (shared LB -> only owned resources removed)
+
 ## v2 Requirements
 
 Deferred to future milestone. Tracked but not in current roadmap.
@@ -62,12 +70,17 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | STAT-01 | Phase 2 | Complete |
 | STAT-02 | Phase 2 | Complete |
 | TEST-01 | Phase 3 | Complete |
+| CTRL-TEST-01 | Phase 4 | Planned |
+| CTRL-TEST-02 | Phase 4 | Planned |
+| CTRL-TEST-03 | Phase 4 | Planned |
+| CTRL-TEST-04 | Phase 4 | Planned |
+| CTRL-TEST-05 | Phase 4 | Planned |
 
 **Coverage:**
-- v1 requirements: 7 total
-- Mapped to phases: 7
+- v1 requirements: 12 total
+- Mapped to phases: 12
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-15 after roadmap creation*
+*Last updated: 2026-03-16 after Phase 4 planning*

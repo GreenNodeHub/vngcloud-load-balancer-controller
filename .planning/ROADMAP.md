@@ -62,10 +62,11 @@ Plans:
 
 ### Phase 4: Add test from controller use vngcloud mock repository
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Controller-level integration tests exercise the full GLBC reconcile loop (envtest + manager) with mocked VNG Cloud backend, verifying create, full-delete, and shared-LB partial-delete flows
+**Requirements**: CTRL-TEST-01, CTRL-TEST-02, CTRL-TEST-03, CTRL-TEST-04, CTRL-TEST-05
 **Depends on:** Phase 3
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 4 to break down)
+- [ ] 04-01-PLAN.md — Implement UpdateGlobalPool/UpdateGlobalListener in MockProvider + create GLBC test fixtures
+- [ ] 04-02-PLAN.md — Create GLBC controller test suite (envtest setup + create/delete-full/delete-partial scenarios)
