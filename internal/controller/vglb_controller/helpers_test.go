@@ -44,25 +44,6 @@ func newNodePortService(name, namespace string, ports []corev1.ServicePort) *cor
 	}
 }
 
-// newNodeWithLabels creates a Node with VKS network labels and an internal IP.
-func newNodeWithLabels(name string, internalIP string) *corev1.Node {
-	return &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"vks.vngcloud.vn/mgmt-zone":  "hcm03b",
-				"vks.vngcloud.vn/network-id": "net-test-vpc",
-				"vks.vngcloud.vn/subnet-id":  "sub-test-subnet",
-			},
-		},
-		Status: corev1.NodeStatus{
-			Addresses: []corev1.NodeAddress{
-				{Type: corev1.NodeInternalIP, Address: internalIP},
-			},
-		},
-	}
-}
-
 // findGLBCByOwnerLabels lists GlobalLoadBalancerConfigs using owner label selector matching the VGLB.
 // GLBC names are generated with generateName so we look them up by labels.
 func findGLBCByOwnerLabels(ctx context.Context, k8sClient client.Client, vglbObj *v1alpha1.VngcloudGlobalLoadBalancer) (*v1alpha1.GlobalLoadBalancerConfig, error) {
