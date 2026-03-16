@@ -33,9 +33,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Production Bug Regression Tests
 
-- [ ] **PBUG-01**: Regression tests for duplicate pool member addresses — verify ptrIntEqual and comparePoolMembers handle nil vs non-nil pointer fields correctly
-- [ ] **PBUG-02**: Regression test for listener port assignment — verify buildCreateListenerRequest sets Port from ProtocolPort
-- [ ] **PBUG-03**: Verify pool member ID tracking on create path (already tested by TestDeployPool_PopulatesCreatedPoolMembers)
+- [x] **PBUG-01**: Regression tests for duplicate pool member addresses — verify ptrIntEqual and comparePoolMembers handle nil vs non-nil pointer fields correctly
+- [x] **PBUG-02**: Regression test for listener port assignment — verify buildCreateListenerRequest sets Port from ProtocolPort
+- [x] **PBUG-03**: Verify pool member ID tracking on create path (already tested by TestDeployPool_PopulatesCreatedPoolMembers)
 
 ## v2 Requirements
 
