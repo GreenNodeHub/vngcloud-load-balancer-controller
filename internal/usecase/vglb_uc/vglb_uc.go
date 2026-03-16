@@ -2,12 +2,12 @@ package vglb_uc
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/pkg/errors"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +22,19 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
+const (
+	labelMgmtZone  = "vks.vngcloud.vn/mgmt-zone"
+	labelNetworkId = "vks.vngcloud.vn/network-id"
+	labelSubnetId  = "vks.vngcloud.vn/subnet-id"
+)
+
+var zoneRe = regexp.MustCompile(`\d+[a-z]*$`)
+
+// stripZoneSuffix converts zone to region: "hcm03b" -> "hcm", "sgn01a" -> "sgn", "han01" -> "han"
+func stripZoneSuffix(zone string) string {
+	return zoneRe.ReplaceAllString(zone, "")
+}
+
 type vglbUseCase struct {
 	cfg              *config.Config
 	k8sRepo          repository.K8sRepository
@@ -33,7 +46,7 @@ type vglbUseCase struct {
 	defaultNetworkId  string
 	defaultSubnetId   string
 	defaultSubnetCIDR string
-	defaultZone       common.Zone
+	defaultRegion     string
 }
 
 func NewVngcloudGlobalLoadBalancerUseCase(
@@ -65,21 +78,19 @@ func (uc *vglbUseCase) InitVngcloudGlobalLoadBalancerUseCase(ctx context.Context
 		return errors.New("no nodes found in cluster")
 	}
 
-	// check if network info is available
-	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
-		// get provider ID from first node
-		firstProviderId := utils.GetProviderIdFromNode(&nodes.Items[0])
-		if firstProviderId == "" {
-			return errors.New("failed to get provider ID from node")
-		}
-		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, firstProviderId)
-		if err != nil {
-			logger.Errorf("failed to get default network info: %v", err)
-			return err
-		}
-		if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
-			return errors.New("default network info is incomplete")
-		}
+	// Read network info from node labels
+	firstNode := &nodes.Items[0]
+	rawZone := firstNode.Labels[labelMgmtZone]
+	uc.defaultNetworkId = firstNode.Labels[labelNetworkId]
+	uc.defaultSubnetId = firstNode.Labels[labelSubnetId]
+	uc.defaultRegion = stripZoneSuffix(rawZone)
+	uc.defaultSubnetCIDR = ""
+
+	if uc.defaultRegion == "" || uc.defaultNetworkId == "" || uc.defaultSubnetId == "" {
+		return errors.Errorf(
+			"incomplete network info from node labels: zone=%q (region=%q), networkId=%q, subnetId=%q",
+			rawZone, uc.defaultRegion, uc.defaultNetworkId, uc.defaultSubnetId,
+		)
 	}
 
 	return nil
@@ -109,7 +120,7 @@ func (uc *vglbUseCase) ensure(ctx context.Context, vglb *v1alpha1.VngcloudGlobal
 		annotationParser: uc.annotationParser,
 		endpointResolver: uc.endpointResolver,
 
-		defaultZone:       uc.defaultZone,
+		defaultRegion:     uc.defaultRegion,
 		defaultNetworkId:  uc.defaultNetworkId,
 		defaultSubnetId:   uc.defaultSubnetId,
 		defaultSubnetCIDR: uc.defaultSubnetCIDR,
