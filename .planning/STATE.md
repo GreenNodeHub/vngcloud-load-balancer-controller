@@ -87,6 +87,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 4 added: Add test from controller use vngcloud mock repository
+- Phase 5 added: Fix production bugs: duplicate pool members, missing listener port, pool member ID tracking
 
 ### Pending Todos
 
