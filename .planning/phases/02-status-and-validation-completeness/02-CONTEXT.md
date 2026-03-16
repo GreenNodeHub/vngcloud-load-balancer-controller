@@ -1,7 +1,7 @@
 # Phase 2: Status and Validation Completeness - Context
 
-**Gathered:** 2026-03-16
-**Status:** Ready for planning
+**Gathered:** 2026-03-16 (updated 2026-03-16)
+**Status:** Updated after implementation
 
 <domain>
 ## Phase Boundary
@@ -24,15 +24,16 @@ Activate pool member status tracking on pool creation (STAT-01) and implement he
 
 ### Status Save Timing
 - Save status immediately after each resource creation/update, BEFORE calling `WaitGlobalLoadBalancerActive`
-- **EXCEPTION for pool member status (STAT-01):** `ListGlobalPoolMembers` requires the pool to be active, so the status save must come AFTER `WaitGlobalLoadBalancerActive` on the pool creation path. This is a structural constraint — the user decision applies to listener paths where resource IDs are available immediately.
+- No exceptions — all paths (pool create, listener create, listener update) save status before wait
 - If reconcile crashes mid-way, status should reflect what was actually created
 
 ### Status Mutation Method
 - Use the existing status mutation helper function (not direct Status().Update or Patch calls)
 
 ### Pool Member Status Data
-- Store both IDs and address:port tuples for each member in status
-- The existing `CreatedGlobalPoolMember` type has `Id`, `Name`, and `CreatedMembers` (with `GlobalMember` entries) — populate all fields from the API create response
+- On pool creation: use the pool ID from `CreateGlobalPool` response + spec data (member names, addresses, ports) to build status. No `ListGlobalPoolMembers` API call needed.
+- `CreatedGlobalPoolMember.Id` (pool member group ID) is left empty on the create path — it will be populated on the next reconcile when the pool already exists (update path via `deployPoolMembers`)
+- `CreatedGlobalPoolMember.Name` and `CreatedMembers` are populated from the spec directly
 
 ### Headers Comparison (STAT-02)
 - Join spec `Headers []string` with comma separator (sorted, lowercase), compare against entity `Headers *string`
@@ -47,9 +48,8 @@ Activate pool member status tracking on pool creation (STAT-01) and implement he
 
 ### Claude's Discretion
 - Exact implementation of the status mutation helper calls
-- How to extract member data (IDs, addresses, ports) from the CreateGlobalPool API response
 - Order of status saves within the deploy flow
-- Any necessary type conversions between API response types and CRD status types
+- Any necessary type conversions between spec types and CRD status types
 
 </decisions>
 
