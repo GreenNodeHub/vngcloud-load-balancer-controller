@@ -15,7 +15,7 @@ import (
 
 // oldPools are in Status
 // newPools are in Spec
-// ensure them to portal. Don't delete old pool becasue some listener is using them
+// ensure them to portal. Don't delete old pool because some listener is using them
 func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) ([]v1alpha1.CreatedPool, error) {
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {

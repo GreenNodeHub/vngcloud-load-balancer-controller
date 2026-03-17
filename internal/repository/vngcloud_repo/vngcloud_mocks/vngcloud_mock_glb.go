@@ -321,7 +321,7 @@ func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt g
 	m.updatingGlobalStatus(glbID)
 	go m.readyGlobalAfterTime(glbID)
 	return &entityv2.GlobalPool{
-		ID: newPool.GlobalPool.ID,
+		ID: newPool.ID,
 	}, nil
 }
 
@@ -645,7 +645,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 	m.updatingGlobalStatus(glbID)
 	go m.readyGlobalAfterTime(glbID)
 	return &entityv2.GlobalListener{
-		ID: newListener.GlobalListener.ID,
+		ID: newListener.ID,
 	}, nil
 
 	// logger := contexts.NewContext(ctx).Log()

@@ -255,7 +255,7 @@ func (t *defaultModelBuildTask) buildAutoAddPolicyPosition(_ context.Context, li
 		key      string
 		priority int
 	}
-	var ss []kv
+	ss := make([]kv, 0, len(listener.Policies))
 	for _, policy := range listener.Policies {
 		ss = append(ss, kv{key: policy.Name, priority: t.getPolicyPriority(&policy)})
 	}

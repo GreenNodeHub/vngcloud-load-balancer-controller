@@ -337,7 +337,7 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 			return common.Zone(""), "", "", "", errors.New("failed to get load balancer by id " + *lbID + ": " + err.Error())
 		}
 		if lb.BackendSubnetID == t.defaultSubnetId {
-			return
+			return zone, networkId, subnetId, subnetCIDR, _err
 		}
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.BackendSubnetID)
 		if err != nil || subnet == nil {
@@ -352,7 +352,7 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPreferSubnetID, &preferSubnetId, t.service.Annotations)
 	if preferSubnetId != "" {
 		if preferSubnetId == t.defaultSubnetId {
-			return
+			return zone, networkId, subnetId, subnetCIDR, _err
 		}
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, preferSubnetId)
 		if err != nil || subnet == nil {
@@ -367,7 +367,7 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPreferZoneID, &preferZoneId, t.service.Annotations)
 	if preferZoneId != "" {
 		if common.Zone(preferZoneId) == t.defaultZone {
-			return
+			return zone, networkId, subnetId, subnetCIDR, _err
 		}
 
 		nodes := &corev1.NodeList{}

@@ -214,17 +214,6 @@ func getLBCListForService(serviceName, namespace string) (*v1alpha1.LoadBalancer
 	return lbcList, err
 }
 
-func getLBCForService(serviceName, namespace string) (*v1alpha1.LoadBalancerConfig, error) {
-	lbcList, err := getLBCListForService(serviceName, namespace)
-	if err != nil {
-		return nil, err
-	}
-	if len(lbcList.Items) == 0 {
-		return nil, nil
-	}
-	return &lbcList.Items[0], nil
-}
-
 func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurityGroupList, error) {
 	nsgList := &v1alpha1.NodeSecurityGroupList{}
 	err := k8sClient.List(ctx, nsgList, client.InNamespace(namespace), client.MatchingLabels{

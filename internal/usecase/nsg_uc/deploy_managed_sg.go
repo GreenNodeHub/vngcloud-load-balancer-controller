@@ -25,7 +25,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 	}()
 
 	if nsgObject.Spec.ManagedSecurityGroup == nil {
-		return
+		return finalStatus, finalErr
 	}
 
 	logger := contexts.NewContext(ctx).Log()
@@ -34,7 +34,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 	if err != nil {
 		logger.Error("Fail to find default secgroup by name", err)
 		finalErr = err
-		return
+		return finalStatus, finalErr
 	}
 	if !isExists {
 		// create new secgroup if not exists
@@ -46,13 +46,13 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 		if err != nil {
 			logger.Error("Fail to create default secgroup", err)
 			finalErr = err
-			return
+			return finalStatus, finalErr
 		}
 		defaultSecgroup, err = uc.vngcloudRepo.GetSecurityGroup(ctx, _secG.Id)
 		if err != nil {
 			logger.Error("Fail to get default secgroup", err)
 			finalErr = err
-			return
+			return finalStatus, finalErr
 		}
 	}
 
@@ -66,7 +66,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 	if err != nil {
 		logger.Error("Fail to list secgroup rules: ", err)
 		finalErr = err
-		return
+		return finalStatus, finalErr
 	}
 
 	if defaultSecgroupRules == nil || defaultSecgroupRules.Items == nil {
@@ -88,7 +88,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 	if err != nil {
 		logger.Error("Fail to compare secgroup rules", err)
 		finalErr = err
-		return
+		return finalStatus, finalErr
 	}
 
 	for _, rule := range needDelete {
@@ -103,7 +103,7 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 		if err != nil {
 			logger.Error("Fail to delete secgroup rule", err)
 			finalErr = err
-			return
+			return finalStatus, finalErr
 		}
 	}
 
@@ -122,9 +122,9 @@ func (uc *nsgUseCase) ensureManagedSecurityGroup(ctx context.Context, nsgObject 
 		if err != nil {
 			logger.Error("Fail to create secgroup rule: ", err)
 			finalErr = err
-			return
+			return finalStatus, finalErr
 		}
 	}
 
-	return
+	return finalStatus, finalErr
 }

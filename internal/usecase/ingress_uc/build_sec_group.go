@@ -253,17 +253,6 @@ func (t *defaultModelBuildTask) ensureUniqueSecgroupRules(rules []v1alpha1.NodeS
 	return result
 }
 
-func (t *defaultModelBuildTask) coreProtocolToSecgroupProtocol(protocol corev1.Protocol) networkv2.SecgroupRuleProtocol {
-	switch protocol {
-	case corev1.ProtocolTCP:
-		return networkv2.SecgroupRuleProtocolTCP
-	case corev1.ProtocolUDP:
-		return networkv2.SecgroupRuleProtocolUDP
-	default:
-		return networkv2.SecgroupRuleProtocolTCP
-	}
-}
-
 func (t *defaultModelBuildTask) getAllSubnetCidrs(ctx context.Context) ([]string, error) {
 	subnetCidrs := make([]string, 0)
 
