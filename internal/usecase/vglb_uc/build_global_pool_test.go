@@ -114,10 +114,10 @@ func TestBuildPoolsAndListeners_1to1Mapping(t *testing.T) {
 	assert.Len(t, listeners, 2, "should create one listener per service port")
 
 	poolNames := []string{pools[0].Name, pools[1].Name}
-	assert.Contains(t, poolNames, "pool-TCP-80-tcp")
-	assert.Contains(t, poolNames, "pool-TCP-443-tcp")
+	assert.Contains(t, poolNames, "pool-80-tcp")
+	assert.Contains(t, poolNames, "pool-443-tcp")
 
 	listenerNames := []string{listeners[0].Name, listeners[1].Name}
-	assert.Contains(t, listenerNames, "listener-TCP-80")
-	assert.Contains(t, listenerNames, "listener-TCP-443")
+	assert.Contains(t, listenerNames, "listener-80")
+	assert.Contains(t, listenerNames, "listener-443")
 }
