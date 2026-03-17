@@ -455,6 +455,11 @@ func (a CreatedGlobalPoolMember) Equal(b CreatedGlobalPoolMember) bool {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=glbc
+// +kubebuilder:printcolumn:name="Type",type="string",JSONPath=".spec.type"
+// +kubebuilder:printcolumn:name="LoadBalancer-Id",type="string",JSONPath=".status.loadBalancerId"
+// +kubebuilder:printcolumn:name="Address",type="string",JSONPath=".status.domains[0]"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // GlobalLoadBalancerConfig is the Schema for the globalloadbalancerconfigs API
 type GlobalLoadBalancerConfig struct {
