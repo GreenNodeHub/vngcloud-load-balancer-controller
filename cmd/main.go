@@ -49,6 +49,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/service_glb_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/vglb_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
@@ -57,6 +58,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_glb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vglb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -72,6 +74,7 @@ import (
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service_glb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vglb"
@@ -103,6 +106,7 @@ func main() {
 	var disableGlobalLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
 	var disableVngcloudGlobalLoadBalancerController bool
+	var disableServiceGLBController bool
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -129,6 +133,8 @@ func main() {
 		"If set, the NodeSecurityGroup controller will be disabled")
 	flag.BoolVar(&disableVngcloudGlobalLoadBalancerController, "disable-vngcloud-global-load-balancer-controller", false,
 		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
+	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
+		"If set, the ServiceGLB controller will be disabled")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
 			"A lower period will correct entropy more quickly, but reduce responsiveness to change if there are many watched resources. "+
@@ -406,6 +412,29 @@ func main() {
 		)
 		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
+			os.Exit(1)
+		}
+	}
+
+	if !disableServiceGLBController {
+		glbAnnotationParser := annotations.NewSuffixAnnotationParser(domain.GLB_ANNOTATION_PREFIX)
+		serviceGLBUtils := service_glb.NewServiceGLBUtils(domain.ServiceGLBFinalizer, glbAnnotationParser)
+		serviceGLBUseCase := service_glb_uc.NewServiceGLBUseCase(
+			conf, k8sRepo, vngcloudRepo, glbAnnotationParser, endpointResolver,
+		)
+		serviceGLBReconciler := service_glb_controller.NewServiceGLBReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			serviceGLBUseCase,
+			mgr.GetEventRecorderFor("service-glb-controller"),
+			finalizerManager,
+			serviceGLBUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
+			conf.MaxConcurrentReconciles,
+		)
+		if err := serviceGLBReconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceGLB")
 			os.Exit(1)
 		}
 	}
