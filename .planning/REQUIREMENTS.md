@@ -57,8 +57,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **SGLB-02**: ServiceGLBUtils package with IsServiceGLBSupported (checks glb.vks.vngcloud.vn/enable=true) and IsServiceGLBPendingFinalization
 - [x] **SGLB-03**: ServiceGLBUseCase interface defined in contracts.go with Init/Ensure/Delete methods
 - [x] **SGLB-04**: Usecase implementation: Init reads node labels, Ensure creates/patches GLBC with owner labels (Kind=Service), Delete removes owned GLBCs. Pool builder forces TargetTypeIP for ClusterIP. Deterministic sort on pools/listeners/members.
-- [ ] **SGLB-05**: ServiceGLBReconciler controller with Service+Node watches, Service event handler detects annotation removal, Node event handler enqueues all GLB-annotated Services
-- [ ] **SGLB-06**: Controller registered in cmd/main.go with --disable-service-glb-controller flag
+- [x] **SGLB-05**: ServiceGLBReconciler controller with Service+Node watches, Service event handler detects annotation removal, Node event handler enqueues all GLB-annotated Services
+- [x] **SGLB-06**: Controller registered in cmd/main.go with --disable-service-glb-controller flag
 - [ ] **SGLB-07**: Integration tests: Service annotation creates GLBC, port change updates GLBC spec, annotation removal deletes GLBC
 
 ## v2 Requirements

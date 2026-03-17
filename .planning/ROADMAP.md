@@ -99,7 +99,7 @@ Plans:
 **Goal:** Service-annotation-driven GLB controller creates/updates/deletes GLBC resources when Services have `glb.vks.vngcloud.vn/enable=true`, with annotation removal triggering cleanup, and integration tests verifying the full lifecycle
 **Requirements**: SGLB-01, SGLB-02, SGLB-03, SGLB-04, SGLB-05, SGLB-06, SGLB-07
 **Depends on:** Phase 6
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md — Domain/annotation constants, ServiceGLBUtils, ServiceGLBUseCase interface, usecase implementation (build GLBC/pool/listener)

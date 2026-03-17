@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-03-17T03:49:37.516Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-03-17T03:58:27.376Z"
 last_activity: 2026-03-15 — Roadmap created, ready to begin Phase 1 planning
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 06-add-vglb-operator-generate-glbc-from-vglb P03 | 2min | 1 tasks | 2 files |
 | Phase 06-add-vglb-operator-generate-glbc-from-vglb P04 | 20min | 2 tasks | 6 files |
 | Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn P01 | 5min | 2 tasks | 8 files |
+| Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn P02 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn]: ServiceGLBUtils does NOT check ServiceType — any service type can be GLB-enabled via glb.vks.vngcloud.vn/enable annotation
 - [Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn]: GLBC owner label uses domain.KindService constant (not svc.Kind) for label survival through API server round-trips
 - [Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn]: Service GLB annotation prefix is glb.vks.vngcloud.vn (distinct from vks.vngcloud.vn); ClusterIP forces TargetTypeIP
+- [Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn]: Service event handler includes annotationParser field for hadGLBAnnotation; controller creates GLB-prefix parser internally
+- [Phase 07-global-load-balancer-operator-with-resource-service-use-annotation-with-prefix-glb-vks-vngcloud-vn]: ServiceGLBReconciler stores annotationParser internally from GLB_ANNOTATION_PREFIX to keep constructor signature clean
 
 ### Roadmap Evolution
 
@@ -122,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T03:49:37.508Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-03-17T03:58:27.369Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
