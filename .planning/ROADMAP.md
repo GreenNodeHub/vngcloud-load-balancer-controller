@@ -96,10 +96,12 @@ Plans:
 
 ### Phase 7: global load balancer operator with resource Service, use annotation with prefix glb.vks.vngcloud.vn
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Service-annotation-driven GLB controller creates/updates/deletes GLBC resources when Services have `glb.vks.vngcloud.vn/enable=true`, with annotation removal triggering cleanup, and integration tests verifying the full lifecycle
+**Requirements**: SGLB-01, SGLB-02, SGLB-03, SGLB-04, SGLB-05, SGLB-06, SGLB-07
 **Depends on:** Phase 6
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 7 to break down)
+- [ ] 07-01-PLAN.md — Domain/annotation constants, ServiceGLBUtils, ServiceGLBUseCase interface, usecase implementation (build GLBC/pool/listener)
+- [ ] 07-02-PLAN.md — ServiceGLBReconciler controller + event handlers (Service with annotation-removal detection, Node) + main.go registration
+- [ ] 07-03-PLAN.md — Integration tests: Service annotation creates GLBC, port change updates spec, annotation removal deletes GLBC

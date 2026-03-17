@@ -51,6 +51,16 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **VGLB-10**: Integration test: VGLB delete causes owned GLBC deletion
 - [x] **VGLB-11**: Integration test: Service port change triggers GLBC spec update
 
+### Service GLB Operator — Annotation-Driven GLBC Generation
+
+- [ ] **SGLB-01**: Domain constants (GLB_ANNOTATION_PREFIX, ServiceGLBFinalizer, KindService) and annotation constant (SuffixGLBEnable) added
+- [ ] **SGLB-02**: ServiceGLBUtils package with IsServiceGLBSupported (checks glb.vks.vngcloud.vn/enable=true) and IsServiceGLBPendingFinalization
+- [ ] **SGLB-03**: ServiceGLBUseCase interface defined in contracts.go with Init/Ensure/Delete methods
+- [ ] **SGLB-04**: Usecase implementation: Init reads node labels, Ensure creates/patches GLBC with owner labels (Kind=Service), Delete removes owned GLBCs. Pool builder forces TargetTypeIP for ClusterIP. Deterministic sort on pools/listeners/members.
+- [ ] **SGLB-05**: ServiceGLBReconciler controller with Service+Node watches, Service event handler detects annotation removal, Node event handler enqueues all GLB-annotated Services
+- [ ] **SGLB-06**: Controller registered in cmd/main.go with --disable-service-glb-controller flag
+- [ ] **SGLB-07**: Integration tests: Service annotation creates GLBC, port change updates GLBC spec, annotation removal deletes GLBC
+
 ## v2 Requirements
 
 Deferred to future milestone. Tracked but not in current roadmap.
@@ -108,12 +118,19 @@ Deferred to future milestone. Tracked but not in current roadmap.
 | VGLB-09 | Phase 6 | Planned |
 | VGLB-10 | Phase 6 | Planned |
 | VGLB-11 | Phase 6 | Planned |
+| SGLB-01 | Phase 7 | Planned |
+| SGLB-02 | Phase 7 | Planned |
+| SGLB-03 | Phase 7 | Planned |
+| SGLB-04 | Phase 7 | Planned |
+| SGLB-05 | Phase 7 | Planned |
+| SGLB-06 | Phase 7 | Planned |
+| SGLB-07 | Phase 7 | Planned |
 
 **Coverage:**
-- v1 requirements: 26 total
-- Mapped to phases: 26
+- v1 requirements: 33 total
+- Mapped to phases: 33
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-16 after Phase 6 planning*
+*Last updated: 2026-03-17 after Phase 7 planning*
