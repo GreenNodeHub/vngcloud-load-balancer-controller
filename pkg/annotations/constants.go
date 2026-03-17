@@ -65,4 +65,7 @@ const (
 
 	// for global load balancer
 	SuffixDescription = "description" // description for the resource
+
+	// for Service GLB (glb.vks.vngcloud.vn prefix)
+	SuffixGLBEnable = "enable" // glb.vks.vngcloud.vn/enable — enable GLB for this Service
 )
