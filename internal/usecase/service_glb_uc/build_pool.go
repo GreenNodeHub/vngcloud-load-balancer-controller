@@ -167,12 +167,9 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 	return &newPool, nil
 }
 
-// genPoolName returns a deterministic pool name based on port name/protocol/number.
+// genPoolName returns a deterministic pool name based on port number.
 func (t *defaultModelBuildTask) genPoolName(port corev1.ServicePort, protocol string) string {
-	if port.Name != "" {
-		return fmt.Sprintf("pool-%s-%s", port.Name, strings.ToLower(protocol))
-	}
-	return fmt.Sprintf("pool-%s-%d-%s", port.Protocol, port.Port, strings.ToLower(protocol))
+	return fmt.Sprintf("pool-%d-%s", port.Port, strings.ToLower(protocol))
 }
 
 // getPoolProtocol returns the GLB pool protocol (TCP or Proxy; no UDP support).

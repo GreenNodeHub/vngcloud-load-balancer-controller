@@ -19,12 +19,9 @@ func (t *defaultModelBuildTask) buildListener(_ context.Context, port corev1.Ser
 	}
 }
 
-// genListenerName returns a deterministic listener name based on port name/protocol/number.
+// genListenerName returns a deterministic listener name based on port number.
 func (t *defaultModelBuildTask) genListenerName(port corev1.ServicePort) string {
-	if port.Name != "" {
-		return "listener-" + port.Name
-	}
-	return fmt.Sprintf("listener-%s-%d", port.Protocol, port.Port)
+	return fmt.Sprintf("listener-%d", port.Port)
 }
 
 // getListenerProtocol returns the GLB listener protocol (GLB only supports TCP).
