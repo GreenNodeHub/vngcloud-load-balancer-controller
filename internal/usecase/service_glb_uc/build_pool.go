@@ -186,7 +186,7 @@ func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetTy
 	}
 
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixTargetType, &option, t.service.Annotations)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBTargetType, &option, t.service.Annotations)
 	if option == string(domain.TargetTypeIP) || option == string(domain.TargetTypeInstance) {
 		return domain.TargetType(option)
 	}
@@ -195,16 +195,16 @@ func (t *defaultModelBuildTask) getTargetType(_ context.Context) domain.TargetTy
 
 func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckPort, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBHealthcheckPort, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixHealthcheckPort)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBHealthcheckPort)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
-		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535.", annotations.SuffixHealthcheckPort, optionsInt64)
+		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535.", annotations.SuffixGLBHealthcheckPort, optionsInt64)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -212,7 +212,7 @@ func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 
 func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *global.GlobalPoolAlgorithm {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixPoolAlgorithm, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBPoolAlgorithm, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -224,7 +224,7 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *global.Gl
 		return ptr.To(global.GlobalPoolAlgorithm(option))
 	default:
 		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
-			annotations.SuffixPoolAlgorithm,
+			annotations.SuffixGLBPoolAlgorithm,
 			global.GlobalPoolAlgorithmRoundRobin,
 			global.GlobalPoolAlgorithmLeastConn,
 			global.GlobalPoolAlgorithmSourceIP)
@@ -234,12 +234,12 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *global.Gl
 
 func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutClient, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBIdleTimeoutClient, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixIdleTimeoutClient)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBIdleTimeoutClient)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -247,12 +247,12 @@ func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32
 
 func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutMember, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBIdleTimeoutMember, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixIdleTimeoutMember)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBIdleTimeoutMember)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -260,12 +260,12 @@ func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32
 
 func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *int32 {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixIdleTimeoutConnection, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBIdleTimeoutConnection, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixIdleTimeoutConnection)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBIdleTimeoutConnection)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -273,7 +273,7 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 
 func (t *defaultModelBuildTask) buildInboundCIDRs(_ context.Context) *string {
 	option := []string{}
-	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixInboundCIDRs, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixGLBInboundCIDRs, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -282,7 +282,7 @@ func (t *defaultModelBuildTask) buildInboundCIDRs(_ context.Context) *string {
 
 func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []string {
 	option := []string{}
-	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixEnableProxyProtocol, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixGLBEnableProxyProtocol, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -291,7 +291,7 @@ func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []st
 
 func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(_ context.Context, _ corev1.Protocol) global.GlobalPoolHealthCheckProtocol {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckProtocol, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBHealthcheckProtocol, &option, t.service.Annotations)
 	if !exist {
 		return global.GlobalPoolHealthCheckProtocolTCP
 	}
@@ -308,12 +308,12 @@ func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(_ context.Context, 
 
 func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context) *int {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthyThresholdCount, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBHealthyThresholdCount, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixHealthyThresholdCount)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBHealthyThresholdCount)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -321,12 +321,12 @@ func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context
 
 func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Context) *int {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixUnhealthyThresholdCount, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBUnhealthyThresholdCount, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixUnhealthyThresholdCount)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBUnhealthyThresholdCount)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -334,12 +334,12 @@ func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Conte
 
 func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Context) *int {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckIntervalSeconds, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBHealthcheckIntervalSeconds, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixHealthcheckIntervalSeconds)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBHealthcheckIntervalSeconds)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -347,12 +347,12 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Co
 
 func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Context) *int {
 	optionsInt64 := int64(0)
-	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixHealthcheckTimeoutSeconds, &optionsInt64, t.service.Annotations)
+	exists, err := t.annotationParser.ParseInt64Annotation(annotations.SuffixGLBHealthcheckTimeoutSeconds, &optionsInt64, t.service.Annotations)
 	if !exists {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixHealthcheckTimeoutSeconds)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.", annotations.SuffixGLBHealthcheckTimeoutSeconds)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -360,7 +360,7 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Con
 
 func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.Context) *global.GlobalPoolHealthCheckMethod {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpMethod, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBHealthcheckHttpMethod, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -371,7 +371,7 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.C
 		return ptr.To(global.GlobalPoolHealthCheckMethod(option))
 	default:
 		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
-			annotations.SuffixHealthcheckHttpMethod,
+			annotations.SuffixGLBHealthcheckHttpMethod,
 			global.GlobalPoolHealthCheckMethodGET,
 			global.GlobalPoolHealthCheckMethodPUT,
 			global.GlobalPoolHealthCheckMethodPOST)
@@ -381,7 +381,7 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.C
 
 func (t *defaultModelBuildTask) buildAnnotationHealthcheckPath(_ context.Context) *string {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckPath, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBHealthcheckPath, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -390,7 +390,7 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckPath(_ context.Context
 
 func (t *defaultModelBuildTask) buildAnnotationSuccessCodes(_ context.Context) *string {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixSuccessCodes, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBSuccessCodes, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -399,7 +399,7 @@ func (t *defaultModelBuildTask) buildAnnotationSuccessCodes(_ context.Context) *
 
 func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.Context) *global.GlobalPoolHealthCheckHttpVersion {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpVersion, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBHealthcheckHttpVersion, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}
@@ -409,7 +409,7 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.
 		return ptr.To(global.GlobalPoolHealthCheckHttpVersion(option))
 	default:
 		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
-			annotations.SuffixHealthcheckHttpVersion,
+			annotations.SuffixGLBHealthcheckHttpVersion,
 			global.GlobalPoolHealthCheckHttpVersionHttp1,
 			global.GlobalPoolHealthCheckHttpVersionHttp1Minor1)
 	}
@@ -418,7 +418,7 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.
 
 func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpDomainName(_ context.Context) *string {
 	option := ""
-	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpDomainName, &option, t.service.Annotations)
+	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBHealthcheckHttpDomainName, &option, t.service.Annotations)
 	if !exist {
 		return nil
 	}

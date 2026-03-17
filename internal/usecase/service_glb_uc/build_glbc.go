@@ -144,7 +144,7 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 
 func (t *defaultModelBuildTask) buildLoadBalancerId(_ context.Context) *string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerID, &option, t.service.Annotations)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBLoadBalancerID, &option, t.service.Annotations)
 	if option != "" {
 		return &option
 	}
@@ -153,7 +153,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerId(_ context.Context) *string {
 
 func (t *defaultModelBuildTask) buildLoadBalancerName(_ context.Context) string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixLoadBalancerName, &option, t.service.Annotations)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBLoadBalancerName, &option, t.service.Annotations)
 	if option != "" {
 		return option
 	}
@@ -169,7 +169,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerName(_ context.Context) string 
 
 func (t *defaultModelBuildTask) buildPackageId(_ context.Context) *string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixPackageID, &option, t.service.Annotations)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBPackageID, &option, t.service.Annotations)
 	if option != "" {
 		return &option
 	}
@@ -178,7 +178,7 @@ func (t *defaultModelBuildTask) buildPackageId(_ context.Context) *string {
 
 func (t *defaultModelBuildTask) buildDescription(_ context.Context) *string {
 	var option string
-	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixDescription, &option, t.service.Annotations)
+	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixGLBDescription, &option, t.service.Annotations)
 	if option != "" {
 		return &option
 	}
