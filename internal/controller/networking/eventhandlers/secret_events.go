@@ -39,7 +39,6 @@ type enqueueRequestsForSecretEvent struct {
 }
 
 func (h *enqueueRequestsForSecretEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Secret", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Secret))
 }
 
@@ -56,12 +55,10 @@ func (h *enqueueRequestsForSecretEvent) Update(ctx context.Context, e event.Upda
 		return
 	}
 
-	h.logger.V(1).Info("Update Secret", "namespace", newSec.GetNamespace(), "name", newSec.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, newSec)
 }
 
 func (h *enqueueRequestsForSecretEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Delete Secret", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Secret))
 }
 
@@ -85,16 +82,7 @@ func (h *enqueueRequestsForSecretEvent) enqueueImpactedIngresses(ctx context.Con
 			continue
 		}
 
-		h.logger.V(1).Info("enqueue ingress for secret event",
-			"ingress", types.NamespacedName{
-				Namespace: ing.Namespace,
-				Name:      ing.Name,
-			}.String(),
-			"secret", types.NamespacedName{
-				Namespace: sec.Namespace,
-				Name:      sec.Name,
-			}.String(),
-		)
+		h.logger.V(1).Info("Enqueue Ingress", "namespace", ing.Namespace, "name", ing.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: ing.Namespace,

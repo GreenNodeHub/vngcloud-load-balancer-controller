@@ -35,7 +35,6 @@ type enqueueRequestsForGlbcEvent struct {
 }
 
 func (h *enqueueRequestsForGlbcEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create GlobalLoadBalancerConfig", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedObject(ctx, queue, e.Object.(*v1alpha1.GlobalLoadBalancerConfig))
 }
 
@@ -52,7 +51,6 @@ func (h *enqueueRequestsForGlbcEvent) Update(ctx context.Context, e event.Update
 		return
 	}
 
-	h.logger.V(1).Info("Update GlobalLoadBalancerConfig", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
@@ -70,6 +68,7 @@ func (h *enqueueRequestsForGlbcEvent) enqueueManagedObject(_ context.Context, qu
 	if !h.glbcUtils.IsPendingFinalization(object) && !h.glbcUtils.IsSupported(object) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue GlobalLoadBalancerConfig", "namespace", object.Namespace, "name", object.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: object.Namespace,

@@ -35,7 +35,6 @@ type enqueueRequestsForIngressEvent struct {
 }
 
 func (h *enqueueRequestsForIngressEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Ingress", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedIngress(ctx, queue, e.Object.(*networkingv1.Ingress))
 }
 
@@ -52,7 +51,6 @@ func (h *enqueueRequestsForIngressEvent) Update(ctx context.Context, e event.Upd
 		return
 	}
 
-	h.logger.V(1).Info("Update Ingress", "namespace", newIng.GetNamespace(), "name", newIng.GetName())
 	h.enqueueManagedIngress(ctx, queue, newIng)
 }
 
@@ -71,6 +69,7 @@ func (h *enqueueRequestsForIngressEvent) enqueueManagedIngress(_ context.Context
 	if !h.ingressUtils.IsIngressPendingFinalization(ingress) && !h.ingressUtils.IsIngressSupported(ingress) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue Ingress", "namespace", ingress.Namespace, "name", ingress.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: ingress.Namespace,

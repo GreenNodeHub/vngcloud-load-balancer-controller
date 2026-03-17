@@ -35,7 +35,6 @@ type enqueueRequestsForVglbEvent struct {
 }
 
 func (h *enqueueRequestsForVglbEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create VngcloudGlobalLoadBalancer", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedObject(ctx, queue, e.Object.(*v1alpha1.VngcloudGlobalLoadBalancer))
 }
 
@@ -52,7 +51,6 @@ func (h *enqueueRequestsForVglbEvent) Update(ctx context.Context, e event.Update
 		return
 	}
 
-	h.logger.V(1).Info("Update VngcloudGlobalLoadBalancer", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
@@ -70,6 +68,7 @@ func (h *enqueueRequestsForVglbEvent) enqueueManagedObject(_ context.Context, qu
 	if !h.vglbUtils.IsPendingFinalization(object) && !h.vglbUtils.IsSupported(object) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue VngcloudGlobalLoadBalancer", "namespace", object.Namespace, "name", object.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: object.Namespace,

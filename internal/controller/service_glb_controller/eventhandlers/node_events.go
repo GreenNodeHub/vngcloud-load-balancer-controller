@@ -38,8 +38,6 @@ type enqueueRequestsForServiceGLBNodeEvent struct {
 }
 
 func (h *enqueueRequestsForServiceGLBNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.V(1).Info("Create Node", "name", node.Name)
 	h.enqueueAllGLBServices(ctx, queue)
 }
 
@@ -56,13 +54,10 @@ func (h *enqueueRequestsForServiceGLBNodeEvent) Update(ctx context.Context, e ev
 		return
 	}
 
-	h.logger.V(1).Info("Update Node", "name", newNode.Name)
 	h.enqueueAllGLBServices(ctx, queue)
 }
 
 func (h *enqueueRequestsForServiceGLBNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.V(1).Info("Delete Node", "name", node.Name)
 	h.enqueueAllGLBServices(ctx, queue)
 }
 
@@ -82,6 +77,7 @@ func (h *enqueueRequestsForServiceGLBNodeEvent) enqueueAllGLBServices(ctx contex
 		if !h.serviceGLBUtils.IsServiceGLBPendingFinalization(&svcCopy) && !h.serviceGLBUtils.IsServiceGLBSupported(&svcCopy) {
 			continue
 		}
+		h.logger.V(1).Info("Enqueue Service", "namespace", svcCopy.Namespace, "name", svcCopy.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: svcCopy.Namespace,

@@ -35,8 +35,6 @@ type enqueueRequestsForVglbNodeEvent struct {
 }
 
 func (h *enqueueRequestsForVglbNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.V(1).Info("Create Node", "name", node.Name)
 	h.enqueueAllVglbs(ctx, queue)
 }
 
@@ -53,13 +51,10 @@ func (h *enqueueRequestsForVglbNodeEvent) Update(ctx context.Context, e event.Up
 		return
 	}
 
-	h.logger.V(1).Info("Update Node", "name", newNode.Name)
 	h.enqueueAllVglbs(ctx, queue)
 }
 
 func (h *enqueueRequestsForVglbNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.V(1).Info("Delete Node", "name", node.Name)
 	h.enqueueAllVglbs(ctx, queue)
 }
 
@@ -79,6 +74,7 @@ func (h *enqueueRequestsForVglbNodeEvent) enqueueAllVglbs(ctx context.Context, q
 		if !h.vglbUtils.IsPendingFinalization(&item) && !h.vglbUtils.IsSupported(&item) {
 			continue
 		}
+		h.logger.V(1).Info("Enqueue VngcloudGlobalLoadBalancer", "namespace", item.Namespace, "name", item.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&item),
 		})

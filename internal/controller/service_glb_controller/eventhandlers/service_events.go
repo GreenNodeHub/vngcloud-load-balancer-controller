@@ -42,7 +42,6 @@ type enqueueRequestsForServiceGLBEvent struct {
 }
 
 func (h *enqueueRequestsForServiceGLBEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Service", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedService(ctx, queue, e.Object.(*corev1.Service))
 }
 
@@ -59,12 +58,11 @@ func (h *enqueueRequestsForServiceGLBEvent) Update(ctx context.Context, e event.
 		return
 	}
 
-	h.logger.V(1).Info("Update Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
-
 	// Enqueue if new state is GLB-relevant OR old had annotation (annotation removal triggers cleanup)
 	if h.serviceGLBUtils.IsServiceGLBPendingFinalization(newSvc) ||
 		h.serviceGLBUtils.IsServiceGLBSupported(newSvc) ||
 		h.hadGLBAnnotation(oldSvc) {
+		h.logger.V(1).Info("Enqueue Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
 		queue.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: newSvc.Namespace, Name: newSvc.Name}})
 	}
 }
@@ -82,6 +80,7 @@ func (h *enqueueRequestsForServiceGLBEvent) enqueueManagedService(_ context.Cont
 	if !h.serviceGLBUtils.IsServiceGLBPendingFinalization(svc) && !h.serviceGLBUtils.IsServiceGLBSupported(svc) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue Service", "namespace", svc.Namespace, "name", svc.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: svc.Namespace,

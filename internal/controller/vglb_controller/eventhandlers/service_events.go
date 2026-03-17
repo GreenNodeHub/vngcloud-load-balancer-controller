@@ -37,7 +37,6 @@ type enqueueRequestsForVglbServiceEvent struct {
 
 func (h *enqueueRequestsForVglbServiceEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	svc := e.Object.(*corev1.Service)
-	h.logger.V(1).Info("Create Service", "namespace", svc.GetNamespace(), "name", svc.GetName())
 	h.enqueueSameNameVglb(ctx, queue, svc)
 }
 
@@ -54,13 +53,11 @@ func (h *enqueueRequestsForVglbServiceEvent) Update(ctx context.Context, e event
 		return
 	}
 
-	h.logger.V(1).Info("Update Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
 	h.enqueueSameNameVglb(ctx, queue, newSvc)
 }
 
 func (h *enqueueRequestsForVglbServiceEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	svc := e.Object.(*corev1.Service)
-	h.logger.V(1).Info("Delete Service", "namespace", svc.GetNamespace(), "name", svc.GetName())
 	// Service deletion should trigger VGLB reconcile so it enters the "service not found" requeue path
 	h.enqueueSameNameVglb(ctx, queue, svc)
 }
@@ -80,6 +77,7 @@ func (h *enqueueRequestsForVglbServiceEvent) enqueueSameNameVglb(ctx context.Con
 	if !h.vglbUtils.IsPendingFinalization(vglbObj) && !h.vglbUtils.IsSupported(vglbObj) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue VngcloudGlobalLoadBalancer", "namespace", vglbObj.Namespace, "name", vglbObj.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: vglbObj.Namespace,
