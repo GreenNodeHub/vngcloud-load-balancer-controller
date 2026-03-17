@@ -139,10 +139,10 @@ func TestPtrIntEqual(t *testing.T) {
 
 func TestComparePoolMembers_PointerFields(t *testing.T) {
 	tests := []struct {
-		name    string
-		listA   []v1alpha1.GlobalMember
-		listB   []v1alpha1.GlobalMember
-		want    bool
+		name  string
+		listA []v1alpha1.GlobalMember
+		listB []v1alpha1.GlobalMember
+		want  bool
 	}{
 		{
 			name: "matching_with_different_pointer_allocations",

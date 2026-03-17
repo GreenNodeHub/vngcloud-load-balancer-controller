@@ -60,13 +60,13 @@ func NewServiceGLBReconciler(
 	maxConcurrentReconciles int,
 ) *ServiceGLBReconciler {
 	return &ServiceGLBReconciler{
-		k8sClient:        k8sClient,
-		Scheme:           scheme,
+		k8sClient:         k8sClient,
+		Scheme:            scheme,
 		serviceGLBUseCase: serviceGLBUseCase,
-		eventRecorder:    eventRecorder,
-		finalizerManager: finalizerManager,
-		serviceGLBUtils:  serviceGLBUtils,
-		annotationParser: annotations.NewSuffixAnnotationParser(domain.GLB_ANNOTATION_PREFIX),
+		eventRecorder:     eventRecorder,
+		finalizerManager:  finalizerManager,
+		serviceGLBUtils:   serviceGLBUtils,
+		annotationParser:  annotations.NewSuffixAnnotationParser(domain.GLB_ANNOTATION_PREFIX),
 
 		logger:            ctrl.Log.WithName("controllers").WithName(controllerName),
 		metricsCollector:  metricsCollector,
