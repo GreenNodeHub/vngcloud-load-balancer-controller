@@ -122,6 +122,12 @@ None yet.
 
 - `canDeleteWholeListener` returns `ErrorNotImplemented` — blocks all redundant listener cleanup (Phase 1 target)
 - `convertMember` drops `SubnetID` — causes infinite spurious member patches (Phase 1 target)
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260317-61v | Rename listener and pool to use port number instead of port name | 2026-03-17 | b4d9556 | [260317-61v-rename-listener-and-pool-to-use-port-num](./quick/260317-61v-rename-listener-and-pool-to-use-port-num/) |
 - Wrong API call in delete_lb.go (`DeleteLoadBalancer` should be `DeleteGlobalLoadBalancer`) — Phase 1 target
 - `validateCrossGLBCs` query pattern against informer cache needs confirmation during Phase 2 implementation
 
