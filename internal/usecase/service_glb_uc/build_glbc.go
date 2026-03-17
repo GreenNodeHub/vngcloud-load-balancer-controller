@@ -43,6 +43,15 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 		return err
 	}
 
+	// Skip Service status address update for type=LoadBalancer to avoid
+	// conflicting with the regular Service LB controller. The GLB address
+	// is still available through the GLBC CRD status.
+	if t.service.Spec.Type == corev1.ServiceTypeLoadBalancer {
+		t.logger.Debugf("skipping Service status address update for type=LoadBalancer Service %s/%s",
+			t.service.Namespace, t.service.Name)
+		return nil
+	}
+
 	// Update Service status address from GLBC status domains
 	address := t.getGLBCAddress(ctx)
 	if address != "" {
