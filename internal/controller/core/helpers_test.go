@@ -12,6 +12,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
+const testDefaultNamespace = "default"
+
 // ============================================================================
 // Helper functions to verify clean state
 // ============================================================================
@@ -60,7 +62,7 @@ func expectNoServices() {
 		// Filter out the default kubernetes service
 		filteredServices := []corev1.Service{}
 		for _, svc := range serviceList.Items {
-			if svc.Namespace == "default" && svc.Name == "kubernetes" {
+			if svc.Namespace == testDefaultNamespace && svc.Name == "kubernetes" {
 				continue
 			}
 			filteredServices = append(filteredServices, svc)
@@ -122,7 +124,7 @@ func expectNoEndpoints() {
 		// Filter out the default kubernetes endpoint
 		filteredEndpoints := []corev1.Endpoints{}
 		for _, ep := range endpointList.Items {
-			if ep.Namespace == "default" && ep.Name == "kubernetes" {
+			if ep.Namespace == testDefaultNamespace && ep.Name == "kubernetes" {
 				continue
 			}
 			filteredEndpoints = append(filteredEndpoints, ep)
@@ -149,10 +151,10 @@ func cleanupAllServices() {
 		return
 	}
 	for _, svc := range serviceList.Items {
-		if svc.Name == "kubernetes" && svc.Namespace == "default" {
+		if svc.Name == "kubernetes" && svc.Namespace == testDefaultNamespace {
 			continue
 		}
-		k8sClient.Delete(ctx, &svc)
+		_ = k8sClient.Delete(ctx, &svc)
 	}
 }
 
@@ -163,10 +165,10 @@ func cleanupAllEndpoints() {
 		return
 	}
 	for _, ep := range endpointList.Items {
-		if ep.Name == "kubernetes" && ep.Namespace == "default" {
+		if ep.Name == "kubernetes" && ep.Namespace == testDefaultNamespace {
 			continue
 		}
-		k8sClient.Delete(ctx, &ep)
+		_ = k8sClient.Delete(ctx, &ep)
 	}
 }
 
@@ -177,7 +179,7 @@ func cleanupAllLBCs() {
 		return
 	}
 	for _, lbc := range lbcList.Items {
-		k8sClient.Delete(ctx, &lbc)
+		_ = k8sClient.Delete(ctx, &lbc)
 	}
 }
 
@@ -188,7 +190,7 @@ func cleanupAllNSGs() {
 		return
 	}
 	for _, nsg := range nsgList.Items {
-		k8sClient.Delete(ctx, &nsg)
+		_ = k8sClient.Delete(ctx, &nsg)
 	}
 }
 

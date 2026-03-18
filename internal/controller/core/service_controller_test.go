@@ -37,8 +37,9 @@ import (
 )
 
 const (
-	timeout  = time.Second * 5
-	interval = time.Millisecond * 250
+	timeout          = time.Second * 5
+	interval         = time.Millisecond * 250
+	testServiceName  = "test-service"
 )
 
 var _ = Describe("Service Controller", func() {
@@ -59,8 +60,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating a LoadBalancer service", func() {
 		It("should create LBC, LoadBalancer and SecurityGroup", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -74,7 +75,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
@@ -141,7 +142,7 @@ var _ = Describe("Service Controller", func() {
 				// Verify Security Group was created
 				listNsg, err := getNSGListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(listNsg.Items)).Should(Equal(1))
+				g.Expect(listNsg.Items).Should(HaveLen(1))
 
 				nsg := &listNsg.Items[0]
 				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
@@ -300,8 +301,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with all normal annotations", func() {
 		It("should create LoadBalancer with correct attributes from annotations", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -334,7 +335,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -406,8 +407,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with target node label", func() {
 		It("should only add pool members from nodes matching the label", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -425,7 +426,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -506,7 +507,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -733,7 +734,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				updatedLbc := &v1alpha1.LoadBalancerConfig{}
@@ -862,7 +863,7 @@ var _ = Describe("Service Controller", func() {
 					}
 				}
 				return true
-			}, timeout, interval).Should(Equal(true), "should have updated tags after second update")
+			}, timeout, interval).Should(BeTrue(), "should have updated tags after second update")
 
 			// Verify servers have the security group attached
 			Eventually(func() int {
@@ -964,7 +965,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				updatedLbc := &v1alpha1.LoadBalancerConfig{}
@@ -1092,7 +1093,7 @@ var _ = Describe("Service Controller", func() {
 					}
 				}
 				return true
-			}, timeout, interval).Should(Equal(true), "should have updated tags after second update")
+			}, timeout, interval).Should(BeTrue(), "should have updated tags after second update")
 
 			// Verify servers have the security group attached
 			Eventually(func() int {
@@ -1163,13 +1164,13 @@ var _ = Describe("Service Controller", func() {
 				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(pools).ShouldNot(BeNil())
-				g.Expect(len(pools.Items)).Should(Equal(1))
+				g.Expect(pools.Items).Should(HaveLen(1))
 
 				// Check listener - should have 1
 				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(listeners).ShouldNot(BeNil())
-				g.Expect(len(listeners.Items)).Should(Equal(1))
+				g.Expect(listeners.Items).Should(HaveLen(1))
 			}, timeout*2, interval).Should(Succeed())
 
 			// Create second service with port 81 and same LB ID annotation
