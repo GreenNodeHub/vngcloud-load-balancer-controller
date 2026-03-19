@@ -9,10 +9,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
-func (t *defaultModelBuildTask) buildListeners(ctx context.Context) error {
-	return nil
-}
-
 func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.Context) *loadbalancerv2.HealthCheckMethod {
 	option := ""
 	exist := t.annotationParser.ParseStringAnnotation(annotations.SuffixHealthcheckHttpMethod, &option, t.service.Annotations)

@@ -744,7 +744,7 @@ func (m *MockProvider) CreateLoadBalancer(ctx context.Context, lbOptions loadbal
 	}
 
 	if lbOpt.Listener != nil {
-		m.CreateListener(ctx, lbID, lbOpt.Listener.WithLoadBalancerId(newLB.UUID).WithDefaultPoolId(defaultPoolID))
+		_, _ = m.CreateListener(ctx, lbID, lbOpt.Listener.WithLoadBalancerId(newLB.UUID).WithDefaultPoolId(defaultPoolID))
 	}
 
 	m.updatingStatus(newLB.UUID)

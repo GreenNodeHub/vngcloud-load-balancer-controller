@@ -93,6 +93,6 @@ func (h *enqueueRequestsForServiceGLBEvent) enqueueManagedService(_ context.Cont
 // Used to detect annotation removal so that cleanup (reconcileDelete) can be triggered.
 func (h *enqueueRequestsForServiceGLBEvent) hadGLBAnnotation(svc *corev1.Service) bool {
 	enabled := false
-	h.annotationParser.ParseBoolAnnotation(annotations.SuffixGLBEnable, &enabled, svc.Annotations)
+	_, _ = h.annotationParser.ParseBoolAnnotation(annotations.SuffixGLBEnable, &enabled, svc.Annotations)
 	return enabled
 }

@@ -36,7 +36,10 @@ func Get(order string) (*Metadata, error) {
 			case MetadataID:
 				md, err = getFromMetadataService(defaultMetadataVersion)
 			default:
-				err = fmt.Errorf("%s is not a valid metadata search order option. Supported options are %s and %s", id, ConfigDriveID, MetadataID)
+				err = fmt.Errorf(
+					"%s is not a valid metadata search order option. Supported options are %s and %s",
+					id, ConfigDriveID, MetadataID,
+				)
 			}
 
 			if err == nil {
@@ -57,7 +60,7 @@ func Get(order string) (*Metadata, error) {
 
 func getFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	mntdir := os.TempDir()
-	defer os.Remove(mntdir)
+	defer func() { _ = os.Remove(mntdir) }()
 
 	klog.V(4).Infof("getFromConfigDrive; attempting to mount configdrive on %s", mntdir)
 
@@ -67,7 +70,7 @@ func getFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getFromConfigDrive; error reading %s on config drive; ERR: %v", configDrivePath, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	return parseMetadata(f)
 }
@@ -98,10 +101,13 @@ func getFromMetadataService(metadataVersion string) (*Metadata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getFromMetadataService; error fetching metadata from URL %s; ERR: %v", metadataURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("getFromMetadataService; unexpected status code when reading metadata from %s with response status code %s", metadataURL, resp.Status)
+		err = fmt.Errorf(
+			"getFromMetadataService; unexpected status code when reading metadata from %s with response status code %s",
+			metadataURL, resp.Status,
+		)
 		return nil, err
 	}
 

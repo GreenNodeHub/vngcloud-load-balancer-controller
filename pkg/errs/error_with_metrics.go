@@ -12,7 +12,10 @@ type ErrorWithMetrics struct {
 	Err           error
 }
 
-func NewErrorWithMetrics(resourceType string, errorCategory string, err error, metricCollector lbcmetrics.MetricCollector) *ErrorWithMetrics {
+func NewErrorWithMetrics(
+	resourceType string, errorCategory string, err error,
+	metricCollector lbcmetrics.MetricCollector,
+) *ErrorWithMetrics {
 	reconcileErr := &ErrorWithMetrics{
 		ResourceType:  resourceType,
 		ErrorCategory: errorCategory,

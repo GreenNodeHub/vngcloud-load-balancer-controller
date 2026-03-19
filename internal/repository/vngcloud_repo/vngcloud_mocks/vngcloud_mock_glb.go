@@ -155,7 +155,7 @@ func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions 
 	}
 
 	if lbOpt.GlobalListener != nil {
-		m.CreateGlobalListener(ctx, lbID, lbOpt.GlobalListener.WithLoadBalancerId(newLB.ID).WithGlobalPoolId(defaultPoolID))
+		_, _ = m.CreateGlobalListener(ctx, lbID, lbOpt.GlobalListener.WithLoadBalancerId(newLB.ID).WithGlobalPoolId(defaultPoolID))
 	}
 
 	m.updatingGlobalStatus(newLB.ID)
@@ -429,7 +429,7 @@ func (m *MockProvider) PatchGlobalPoolMembers(ctx context.Context, glbID, poolID
 			key := fmt.Sprintf("%s:%d", member.Address, member.Port)
 			if _, exists := seenAddresses[key]; exists {
 				logger.Errorf("Duplicate address %s", key)
-				return fmt.Errorf("Duplicate address %s", key)
+				return fmt.Errorf("duplicate address %s", key)
 			}
 			seenAddresses[key] = struct{}{}
 		}
@@ -612,7 +612,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 	for _, l := range m.globalListeners {
 		if l.lbID == glbID && l.Port == listener.Port {
 			m.mu.Unlock()
-			return nil, fmt.Errorf("Global listener port %d already exists", listener.Port)
+			return nil, fmt.Errorf("global listener port %d already exists", listener.Port)
 		}
 	}
 	m.mu.Unlock()

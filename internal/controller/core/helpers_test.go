@@ -12,7 +12,10 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
-const testDefaultNamespace = "default"
+const (
+	testDefaultNamespace  = "default"
+	testKubernetesService = "kubernetes"
+)
 
 // ============================================================================
 // Helper functions to verify clean state
@@ -62,7 +65,7 @@ func expectNoServices() {
 		// Filter out the default kubernetes service
 		filteredServices := []corev1.Service{}
 		for _, svc := range serviceList.Items {
-			if svc.Namespace == testDefaultNamespace && svc.Name == "kubernetes" {
+			if svc.Namespace == testDefaultNamespace && svc.Name == testKubernetesService {
 				continue
 			}
 			filteredServices = append(filteredServices, svc)
@@ -124,7 +127,7 @@ func expectNoEndpoints() {
 		// Filter out the default kubernetes endpoint
 		filteredEndpoints := []corev1.Endpoints{}
 		for _, ep := range endpointList.Items {
-			if ep.Namespace == testDefaultNamespace && ep.Name == "kubernetes" {
+			if ep.Namespace == testDefaultNamespace && ep.Name == testKubernetesService {
 				continue
 			}
 			filteredEndpoints = append(filteredEndpoints, ep)
@@ -151,7 +154,7 @@ func cleanupAllServices() {
 		return
 	}
 	for _, svc := range serviceList.Items {
-		if svc.Name == "kubernetes" && svc.Namespace == testDefaultNamespace {
+		if svc.Name == testKubernetesService && svc.Namespace == testDefaultNamespace {
 			continue
 		}
 		_ = k8sClient.Delete(ctx, &svc)
@@ -165,7 +168,7 @@ func cleanupAllEndpoints() {
 		return
 	}
 	for _, ep := range endpointList.Items {
-		if ep.Name == "kubernetes" && ep.Namespace == testDefaultNamespace {
+		if ep.Name == testKubernetesService && ep.Namespace == testDefaultNamespace {
 			continue
 		}
 		_ = k8sClient.Delete(ctx, &ep)
@@ -223,32 +226,6 @@ func getNSGListForService(serviceName, namespace string) (*v1alpha1.NodeSecurity
 		domain.LabelOwnerResourceKind: "Service",
 	})
 	return nsgList, err
-}
-
-// ============================================================================
-// Helper functions to wait for resources
-// ============================================================================
-
-func waitForLoadBalancerId(lbcName, namespace string) (string, error) {
-	var loadbalancerId string
-
-	success := Eventually(func() bool {
-		lbc := &v1alpha1.LoadBalancerConfig{}
-		err := k8sClient.Get(ctx, client.ObjectKey{Name: lbcName, Namespace: namespace}, lbc)
-		if err != nil {
-			return false
-		}
-		if lbc.Status.LoadBalancerId != nil {
-			loadbalancerId = *lbc.Status.LoadBalancerId
-			return loadbalancerId != ""
-		}
-		return false
-	}, timeout, interval).Should(BeTrue())
-
-	if !success {
-		return "", nil
-	}
-	return loadbalancerId, nil
 }
 
 // ============================================================================

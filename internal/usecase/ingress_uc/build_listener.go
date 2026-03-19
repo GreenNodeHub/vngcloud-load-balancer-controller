@@ -12,7 +12,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
-func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool) (*v1alpha1.Listener, error) {
+func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool) (*v1alpha1.Listener, error) { //nolint:unparam
 	defaultIdleTimeoutClient := t.buildIdleTimeoutClient(ctx)
 	defaultIdleTimeoutMember := t.buildIdleTimeoutMember(ctx)
 	defaultIdleTimeoutConnection := t.buildIdleTimeoutConnection(ctx)
@@ -246,7 +246,7 @@ func (t *defaultModelBuildTask) buildAnnotationAutoReorderPolicies(_ context.Con
 }
 
 // buildAutoAddPolicyPosition sets the policy positions automatically based on their priorities.
-func (t *defaultModelBuildTask) buildAutoAddPolicyPosition(_ context.Context, listener *v1alpha1.Listener) error {
+func (t *defaultModelBuildTask) buildAutoAddPolicyPosition(_ context.Context, listener *v1alpha1.Listener) error { //nolint:unparam
 	if listener == nil || len(listener.Policies) == 0 {
 		return nil
 	}

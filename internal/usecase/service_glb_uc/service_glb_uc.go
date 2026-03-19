@@ -170,7 +170,7 @@ func (uc *serviceGLBUseCase) deleteGlobalLoadBalancerConfig(ctx context.Context,
 		return nil, nil
 	}
 
-	var stillExist []string
+	stillExist := make([]string, 0, len(glbcList.Items))
 	for _, glbc := range glbcList.Items {
 		if glbc.DeletionTimestamp.IsZero() {
 			err = uc.k8sRepo.DeleteGlobalLoadBalancerConfig(ctx, &glbc)

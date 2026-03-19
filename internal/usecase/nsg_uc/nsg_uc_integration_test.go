@@ -84,7 +84,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		// Test
 		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1", "sg-2"})
@@ -113,7 +113,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		// Test with error
 		testErr := errors.New("attachment failed")
@@ -142,7 +142,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		// Add initial status
 		err = useCase.statusUpdateNodeSecurityGroup(ctx, testNSG, "server-1", nil, []string{"sg-1"})
@@ -176,7 +176,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		// Add status with error
 		testErr := errors.New("previous error")
@@ -212,7 +212,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
 
@@ -268,7 +268,7 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		}
 		err := k8sClient.Create(ctx, testNSG)
 		require.NoError(t, err)
-		defer k8sClient.Delete(ctx, testNSG)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
 
 		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
 

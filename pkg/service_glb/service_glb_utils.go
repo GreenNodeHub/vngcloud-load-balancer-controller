@@ -45,6 +45,6 @@ func (u *defaultServiceGLBUtils) IsServiceGLBSupported(object *corev1.Service) b
 		return false
 	}
 	enabled := false
-	u.annotationParser.ParseBoolAnnotation(annotations.SuffixGLBEnable, &enabled, object.Annotations)
+	_, _ = u.annotationParser.ParseBoolAnnotation(annotations.SuffixGLBEnable, &enabled, object.Annotations)
 	return enabled
 }

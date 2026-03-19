@@ -13,7 +13,7 @@ import (
 
 // oldPools are in Status
 // newPools are in Spec
-// ensure them to portal. Don't delete old pool becasue some listener is using them
+// ensure them to portal. Don't delete old pool because some listener is using them
 func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) ([]v1alpha1.CreatedGlobalPool, error) {
 	currentPools, err := t.vngcloudRepo.ListGlobalPools(ctx, lbId)
 	if err != nil {
@@ -195,7 +195,7 @@ func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId 
 }
 
 // buildPoolUpdateRequest only compare pool's spec and heath monitor
-func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, poolSpec *v1alpha1.GlobalPool, currentPool *entityv2.GlobalPool) (global.IUpdateGlobalPoolRequest, []string) {
+func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, poolSpec *v1alpha1.GlobalPool, currentPool *entityv2.GlobalPool) (global.IUpdateGlobalPoolRequest, []string) { //nolint:gocyclo
 	isNeedUpdate := false
 	message := make([]string, 0)
 

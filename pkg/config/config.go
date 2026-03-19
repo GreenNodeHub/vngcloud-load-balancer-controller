@@ -40,39 +40,39 @@ type AuthOpts struct {
 }
 
 type LoadBalancerOpts struct {
-	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"`
-	DefaultL7PackageName string `gcfg:"default-l7-package-name" mapstructure:"defaultL7PackageName" name:"default-l7-package-name"`
-	DefaultScheme        string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`
+	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"` //nolint:lll
+	DefaultL7PackageName string `gcfg:"default-l7-package-name" mapstructure:"defaultL7PackageName" name:"default-l7-package-name"` //nolint:lll
+	DefaultScheme        string `gcfg:"default-scheme" mapstructure:"defaultScheme" name:"default-scheme"`                          //nolint:lll
 
 	// Pool defaults
-	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`
-	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`
-	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"`
-	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`
-	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`
+	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`                //nolint:lll
+	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`       //nolint:lll
+	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"` //nolint:lll
+	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`                                 //nolint:lll
+	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`                                    //nolint:lll
 
 	// Listener defaults
-	DefaultTimeoutClient     int    `gcfg:"default-timeout-client" mapstructure:"defaultTimeoutClient" name:"default-timeout-client"`
-	DefaultTimeoutMember     int    `gcfg:"default-timeout-member" mapstructure:"defaultTimeoutMember" name:"default-timeout-member"`
-	DefaultTimeoutConnection int    `gcfg:"default-timeout-connection" mapstructure:"defaultTimeoutConnection" name:"default-timeout-connection"`
-	DefaultAllowedCidrs      string `gcfg:"default-allowed-cidrs" mapstructure:"defaultAllowedCidrs" name:"default-allowed-cidrs"`
+	DefaultTimeoutClient     int    `gcfg:"default-timeout-client" mapstructure:"defaultTimeoutClient" name:"default-timeout-client"`             //nolint:lll
+	DefaultTimeoutMember     int    `gcfg:"default-timeout-member" mapstructure:"defaultTimeoutMember" name:"default-timeout-member"`             //nolint:lll
+	DefaultTimeoutConnection int    `gcfg:"default-timeout-connection" mapstructure:"defaultTimeoutConnection" name:"default-timeout-connection"` //nolint:lll
+	DefaultAllowedCidrs      string `gcfg:"default-allowed-cidrs" mapstructure:"defaultAllowedCidrs" name:"default-allowed-cidrs"`                //nolint:lll
 }
 
 type GlobalLoadBalancerOpts struct {
-	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"`
+	DefaultL4PackageName string `gcfg:"default-l4-package-name" mapstructure:"defaultL4PackageName" name:"default-l4-package-name"` //nolint:lll
 
 	// Pool defaults
-	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`
-	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`
-	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"`
-	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`
-	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`
+	DefaultPoolAlgorithm      string `gcfg:"default-pool-algorithm" mapstructure:"defaultPoolAlgorithm" name:"default-pool-algorithm"`                //nolint:lll
+	DefaultHealthyThreshold   int    `gcfg:"default-healthy-threshold" mapstructure:"defaultHealthyThreshold" name:"default-healthy-threshold"`       //nolint:lll
+	DefaultUnhealthyThreshold int    `gcfg:"default-unhealthy-threshold" mapstructure:"defaultUnhealthyThreshold" name:"default-unhealthy-threshold"` //nolint:lll
+	DefaultInterval           int    `gcfg:"default-interval" mapstructure:"defaultInterval" name:"default-interval"`                                 //nolint:lll
+	DefaultTimeout            int    `gcfg:"default-timeout" mapstructure:"defaultTimeout" name:"default-timeout"`                                    //nolint:lll
 
 	// Listener defaults
-	DefaultTimeoutClient     int    `gcfg:"default-timeout-client" mapstructure:"defaultTimeoutClient" name:"default-timeout-client"`
-	DefaultTimeoutMember     int    `gcfg:"default-timeout-member" mapstructure:"defaultTimeoutMember" name:"default-timeout-member"`
-	DefaultTimeoutConnection int    `gcfg:"default-timeout-connection" mapstructure:"defaultTimeoutConnection" name:"default-timeout-connection"`
-	DefaultAllowedCidrs      string `gcfg:"default-allowed-cidrs" mapstructure:"defaultAllowedCidrs" name:"default-allowed-cidrs"`
+	DefaultTimeoutClient     int    `gcfg:"default-timeout-client" mapstructure:"defaultTimeoutClient" name:"default-timeout-client"`             //nolint:lll
+	DefaultTimeoutMember     int    `gcfg:"default-timeout-member" mapstructure:"defaultTimeoutMember" name:"default-timeout-member"`             //nolint:lll
+	DefaultTimeoutConnection int    `gcfg:"default-timeout-connection" mapstructure:"defaultTimeoutConnection" name:"default-timeout-connection"` //nolint:lll
+	DefaultAllowedCidrs      string `gcfg:"default-allowed-cidrs" mapstructure:"defaultAllowedCidrs" name:"default-allowed-cidrs"`                //nolint:lll
 }
 
 func NewConfig() *Config {

@@ -37,9 +37,9 @@ import (
 )
 
 const (
-	timeout          = time.Second * 5
-	interval         = time.Millisecond * 250
-	testServiceName  = "test-service"
+	timeout         = time.Second * 5
+	interval        = time.Millisecond * 250
+	testServiceName = "test-service"
 )
 
 var _ = Describe("Service Controller", func() {
@@ -164,7 +164,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When updating service type from LoadBalancer to ClusterIP and revert", func() {
 		It("should cleanup resources when changing to ClusterIP and recreate when reverting", func() {
 			serviceName := "test-type-change-service"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -254,7 +254,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When creating a DNS LoadBalancer service with TCP and UDP on same port", func() {
 		It("should fail with error due to duplicate port (VNGCloud limitation)", func() {
 			serviceName := "test-dns-service"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create DNS endpoint first
 			endpoint := newDNSEndpointResource(serviceName, namespace)
@@ -490,7 +490,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When creating service with PROXY protocol annotation", func() {
 		It("should use PROXY protocol for pool even though service port is TCP", func() {
 			serviceName := "test-service-1"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -536,7 +536,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When updating service port", func() {
 		It("should delete old listener and pool, and create new ones with updated port", func() {
 			serviceName := "test-service-1"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -684,7 +684,7 @@ var _ = Describe("Service Controller", func() {
 			}()
 
 			serviceName := "test-service-gogsf"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create custom endpoint with two subsets, each with different port mappings
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -692,12 +692,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -707,12 +707,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -915,7 +915,7 @@ var _ = Describe("Service Controller", func() {
 			}()
 
 			serviceName := "test-service-gogsf"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create custom endpoint with two subsets, each with different port mappings
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -923,12 +923,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -938,12 +938,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -1120,7 +1120,7 @@ var _ = Describe("Service Controller", func() {
 			serviceName1 := "test-service-port-80"
 			serviceName2 := "test-service-port-81"
 			serviceName3 := "test-service-port-82"
-			namespace := "default"
+			namespace := testDefaultNamespace
 			var lbID string
 
 			// Create first service with port 80

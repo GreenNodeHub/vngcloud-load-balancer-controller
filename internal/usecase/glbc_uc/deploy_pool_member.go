@@ -130,7 +130,7 @@ func (t *defaultModelDeployTask) buildPatchGlobalPoolMemberRequest(ctx context.C
 	return global.NewPatchGlobalPoolMembersRequest(lbId, poolId).WithBulkAction(bulkRequests...), allActionMessages
 }
 
-func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context, lbId, poolId string, poolMemberSpec *v1alpha1.GlobalPoolMember) (global.ICreateGlobalPoolMemberRequest, []string) {
+func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context, _ string, poolId string, poolMemberSpec *v1alpha1.GlobalPoolMember) (global.ICreateGlobalPoolMemberRequest, []string) {
 
 	memberStrings := make([]string, len(poolMemberSpec.Members))
 	for i, member := range poolMemberSpec.Members {
@@ -176,6 +176,8 @@ func (t *defaultModelDeployTask) buildCreatePoolMemberRequest(_ context.Context,
 		poolMemberSpec.Type,
 	)
 	poolMemberRequest.WithMembers(globalMembersRequest...)
+
+	_ = poolId
 
 	return poolMemberRequest, []string{fmt.Sprintf("add %s [%s]", poolMemberSpec.Name, strings.Join(memberStrings, ", "))}
 }

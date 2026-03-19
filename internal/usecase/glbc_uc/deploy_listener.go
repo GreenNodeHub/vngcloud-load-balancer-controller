@@ -40,7 +40,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		return nil
 	}
 
-	currentListener := searchListenerByPort(int(listenerSpec.ProtocolPort))
+	currentListener := searchListenerByPort(listenerSpec.ProtocolPort)
 	if currentListener == nil {
 		createRequest, err := t.buildCreateListenerRequest(ctx, lbId, listenerSpec, newCreatedPools)
 		if err != nil {
@@ -51,7 +51,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			t.logger.Error("Failed to create listener: ", err)
 			return nil, err
 		}
-		if err := t.statusAddListener(ctx, _lis.ID, int(listenerSpec.ProtocolPort), listenerSpec.Name); err != nil {
+		if err := t.statusAddListener(ctx, _lis.ID, listenerSpec.ProtocolPort, listenerSpec.Name); err != nil {
 			return nil, err
 		}
 
@@ -99,11 +99,11 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	}, nil
 }
 
-func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.GlobalListener, newCreatedPools []v1alpha1.CreatedGlobalPool) (global.ICreateGlobalListenerRequest, error) {
+func (t *defaultModelDeployTask) buildCreateListenerRequest(_ context.Context, lbId string, listenerSpec v1alpha1.GlobalListener, newCreatedPools []v1alpha1.CreatedGlobalPool) (global.ICreateGlobalListenerRequest, error) { //nolint:unparam
 	createRequest := global.NewCreateGlobalListenerRequest(
 		lbId,
 		listenerSpec.Name,
-	).WithPort(int(listenerSpec.ProtocolPort)).
+	).WithPort(listenerSpec.ProtocolPort).
 		WithAllowedCidrs(t.cfg.GlobalLoadBalancerOpts.DefaultAllowedCidrs).
 		WithTimeoutClient(t.cfg.GlobalLoadBalancerOpts.DefaultTimeoutClient).
 		WithTimeoutMember(t.cfg.GlobalLoadBalancerOpts.DefaultTimeoutMember).
@@ -146,7 +146,7 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 	return createRequest, nil
 }
 
-func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.GlobalListener, currentListener *entityv2.GlobalListener, newCreatedPools []v1alpha1.CreatedGlobalPool) (global.IUpdateGlobalListenerRequest, []string, error) {
+func (t *defaultModelDeployTask) buildListenerUpdateRequest(_ context.Context, lbId string, listenerSpec v1alpha1.GlobalListener, currentListener *entityv2.GlobalListener, newCreatedPools []v1alpha1.CreatedGlobalPool) (global.IUpdateGlobalListenerRequest, []string, error) { //nolint:unparam
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &global.UpdateGlobalListenerRequest{

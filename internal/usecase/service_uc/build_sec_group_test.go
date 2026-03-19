@@ -443,9 +443,10 @@ func TestEnsureUniqueSecgroupRules(t *testing.T) {
 	tcpRules := 0
 	udpRules := 0
 	for _, rule := range result {
-		if rule.Protocol == v2.SecgroupRuleProtocolTCP {
+		switch rule.Protocol {
+		case v2.SecgroupRuleProtocolTCP:
 			tcpRules++
-		} else if rule.Protocol == v2.SecgroupRuleProtocolUDP {
+		case v2.SecgroupRuleProtocolUDP:
 			udpRules++
 		}
 	}

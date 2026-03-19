@@ -24,9 +24,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/versioncheck"
 )
 
-// subsysK8s is the value for logfields.LogSubsys
-const subsysK8s = "k8s"
-
 // log is the k8s package logger object.
 var log = logrus.New()
 
@@ -47,7 +44,7 @@ func CreateUpdateCRD(
 	v1CRDClient := clientset.ApiextensionsV1()
 	clusterCRD, err := v1CRDClient.CustomResourceDefinitions().Get(
 		context.TODO(),
-		crd.ObjectMeta.Name,
+		crd.Name,
 		metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		scopedLog.Info("Creating CRD (CustomResourceDefinition)...")
@@ -120,7 +117,7 @@ func updateV1CRD(
 			var err error
 			clusterCRD, err = client.CustomResourceDefinitions().Get(
 				context.TODO(),
-				crd.ObjectMeta.Name,
+				crd.Name,
 				metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -132,7 +129,7 @@ func updateV1CRD(
 			if needsUpdateV1(clusterCRD, crdSchemaVersionLabelKey, minCRDSchemaVersion) {
 				scopedLog.Debug("CRD validation is different, updating it...")
 
-				clusterCRD.ObjectMeta.Labels = crd.ObjectMeta.Labels
+				clusterCRD.Labels = crd.Labels
 				clusterCRD.Spec = crd.Spec
 
 				// Even though v1 CRDs omit this field by default (which also
@@ -197,7 +194,7 @@ func waitForV1CRD(
 		var err error
 		if crd, err = client.CustomResourceDefinitions().Get(
 			context.TODO(),
-			crd.ObjectMeta.Name,
+			crd.Name,
 			metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -227,5 +224,8 @@ func (p defaultPoll) Poll(
 	interval, duration time.Duration,
 	conditionFn func() (bool, error),
 ) error {
-	return wait.Poll(interval, duration, conditionFn)
+	return wait.PollUntilContextTimeout( //nolint:staticcheck
+		context.Background(), interval, duration, true,
+		func(_ context.Context) (bool, error) { return conditionFn() },
+	)
 }

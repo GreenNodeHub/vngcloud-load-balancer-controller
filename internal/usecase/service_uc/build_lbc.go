@@ -112,7 +112,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 
 	// check if have isIgnore annotation
 	var isIgnore bool
-	t.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, t.service.Annotations)
+	_, _ = t.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, t.service.Annotations)
 	if isIgnore {
 		t.logger.Info("Service has ignore load balancer config annotation, skip.")
 		return nil

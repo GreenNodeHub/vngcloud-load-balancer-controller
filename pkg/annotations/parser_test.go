@@ -93,7 +93,10 @@ func Test_annotationParser_ParseStringAnnotation(t *testing.T) {
 		{
 			name:   "multi option exact match",
 			suffix: "test-1",
-			opts:   []ParseOption{WithAlternativePrefixes("ab"), WithAlternativePrefixes("cd"), WithExact(), WithAlternativePrefixes("kk")},
+			opts: []ParseOption{
+				WithAlternativePrefixes("ab"), WithAlternativePrefixes("cd"),
+				WithExact(), WithAlternativePrefixes("kk"),
+			},
 			annotations: map[string]string{
 				"test-1":    "value-1",
 				"ab/test-1": "value-2",

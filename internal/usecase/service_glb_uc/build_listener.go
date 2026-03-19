@@ -1,23 +1,11 @@
 package service_glb_uc
 
 import (
-	"context"
 	"fmt"
 
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
-
-func (t *defaultModelBuildTask) buildListener(_ context.Context, port corev1.ServicePort, defaultPoolName string) *v1alpha1.GlobalListener {
-	return &v1alpha1.GlobalListener{
-		Name:            t.genListenerName(port),
-		Protocol:        t.getListenerProtocol(port.Protocol),
-		ProtocolPort:    int(port.Port),
-		DefaultPoolName: &defaultPoolName,
-	}
-}
 
 // genListenerName returns a deterministic listener name based on port number.
 func (t *defaultModelBuildTask) genListenerName(port corev1.ServicePort) string {

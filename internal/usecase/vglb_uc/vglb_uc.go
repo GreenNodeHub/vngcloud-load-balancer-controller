@@ -177,7 +177,7 @@ func (uc *vglbUseCase) deleteGlobalLoadBalancerConfig(ctx context.Context, vglb 
 	}
 
 	// Delete all GLBCs found (non-blocking)
-	var stillExist []string
+	stillExist := make([]string, 0, len(glbcList.Items))
 	for _, glbc := range glbcList.Items {
 		// If not already being deleted, initiate deletion
 		if glbc.DeletionTimestamp.IsZero() {

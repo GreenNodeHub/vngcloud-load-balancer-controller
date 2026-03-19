@@ -93,7 +93,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-func main() {
+func main() { //nolint:gocyclo
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -137,7 +137,8 @@ func main() {
 		"If set, the ServiceGLB controller will be disabled")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
-			"A lower period will correct entropy more quickly, but reduce responsiveness to change if there are many watched resources. "+
+			"A lower period will correct entropy more quickly, "+
+			"but reduce responsiveness to change if there are many watched resources. "+
 			"Examples: 5m, 1h, 30s. Defaults to 5 minutes.")
 	opts := zap.Options{
 		Development: true,
@@ -172,14 +173,17 @@ func main() {
 
 		// Create cluster API client and get the target cluster's rest config
 		clusterAPIClient := clusterapi.NewClusterClient(mgmtClient)
-		kubeRestConfig, err = clusterAPIClient.GetRestConfig(context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
+		kubeRestConfig, err = clusterAPIClient.GetRestConfig(
+			context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
 		if err != nil {
 			setupLog.Error(err, "unable to get target cluster rest config")
 			os.Exit(1)
 		}
 	}
 
-	setupLog.Info(fmt.Sprintf("The commit is [%s], version is [%s], chartVersion is [%s]", version.Commit, version.Version, conf.ChartVersion))
+	setupLog.Info(fmt.Sprintf(
+		"The commit is [%s], version is [%s], chartVersion is [%s]",
+		version.Commit, version.Version, conf.ChartVersion))
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -229,7 +233,9 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       fmt.Sprintf("n-%s-n.n-%s-n.lbc.vks.vngcloud.vn", conf.Cluster.ClusterID, conf.Cluster.Namespace),
+		LeaderElectionID: fmt.Sprintf(
+			"n-%s-n.n-%s-n.lbc.vks.vngcloud.vn",
+			conf.Cluster.ClusterID, conf.Cluster.Namespace),
 		Cache: cache.Options{
 			SyncPeriod: &syncPeriod,
 		},
@@ -273,11 +279,13 @@ func main() {
 	}
 
 	reconcileCounters := metricsutil.NewReconcileCounters()
-	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
+	lbcMetricsCollector := lbcmetrics.NewCollector(
+		metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
 	endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 
 	if !disableServiceController {
-		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+		annotationParser := annotations.NewSuffixAnnotationParser(
+			domain.SERVICE_ANNOTATION_PREFIX)
 		cniDetector := utils.NewDetector(mgr.GetClient())
 		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 		serviceUseCase := service_uc.NewServiceUseCase(

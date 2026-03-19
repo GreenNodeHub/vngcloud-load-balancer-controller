@@ -58,6 +58,6 @@ func (u *defaultServiceUtils) isLBEnabled(object *corev1.Service) bool {
 		return false
 	}
 	enabled := false
-	u.annotationParser.ParseBoolAnnotation(annotations.SuffixEnableLoadBalancer, &enabled, object.Annotations)
+	_, _ = u.annotationParser.ParseBoolAnnotation(annotations.SuffixEnableLoadBalancer, &enabled, object.Annotations)
 	return enabled
 }

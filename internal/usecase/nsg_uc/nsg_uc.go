@@ -225,7 +225,7 @@ func (uc *nsgUseCase) ensureServerSecurityGroups(ctx context.Context, nsgObject 
 	if nsgObject.Status.ManagedSecurityGroup.Id != nil && *nsgObject.Status.ManagedSecurityGroup.Id != "" {
 		isDeleted, err := uc.deleteManagedSecurityGroupIfUnused(ctx, *nsgObject.Status.ManagedSecurityGroup.Id)
 		if err != nil {
-			uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nsgObject.Status.ManagedSecurityGroup.Id, err)
+			_ = uc.statusAddStatusManagedSecurityGroup(ctx, nsgObject, nsgObject.Status.ManagedSecurityGroup.Id, err)
 			return nil, err
 		}
 		if isDeleted {
@@ -265,7 +265,7 @@ func (uc *nsgUseCase) findSecgroupByName(ctx context.Context, name string) (*ent
 
 // compareSecgroupRule compares current security group rules with new rules,
 // returns the rules that need to be deleted and created
-func (uc *nsgUseCase) compareSecgroupRule(_ context.Context, currentRules []*entityv2.SecgroupRule, newRules []v1alpha1.NodeSecurityGroupRule) ([]*entityv2.SecgroupRule, []v1alpha1.NodeSecurityGroupRule, error) {
+func (uc *nsgUseCase) compareSecgroupRule(_ context.Context, currentRules []*entityv2.SecgroupRule, newRules []v1alpha1.NodeSecurityGroupRule) ([]*entityv2.SecgroupRule, []v1alpha1.NodeSecurityGroupRule, error) { //nolint:unparam
 	needDelete := make([]*entityv2.SecgroupRule, 0)
 	needCreate := make([]v1alpha1.NodeSecurityGroupRule, 0)
 

@@ -54,13 +54,17 @@ type defaultEndpointResolver struct {
 	k8sClient client.Client
 	context   context.Context
 
-	// [NodePort Endpoint] if fail-open enabled, then nodes that have `Unknown` ready condition will be included if there is no other node with `True` ready condition.
-	// [Pod Endpoint] if fail-open enabled, then containerRead pods on nodes that have `Unknown` ready condition will be included if there is no other pods that are ready.
+	// [NodePort Endpoint] if fail-open enabled, then nodes that have `Unknown` ready
+	// condition will be included if there is no other node with `True` ready condition.
+	// [Pod Endpoint] if fail-open enabled, then containerRead pods on nodes that have
+	// `Unknown` ready condition will be included if there is no other pods that are ready.
 	failOpenEnabled bool
 }
 
-func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
-	opts ...EndpointResolveOption) ([]EndpointAddress, error) {
+func (r *defaultEndpointResolver) ResolvePodEndpoints(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+	opts ...EndpointResolveOption,
+) ([]EndpointAddress, error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	_, svcPort, err := r.findServiceAndServicePort(ctx, svcKey, port)
@@ -114,8 +118,10 @@ func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKe
 	return podEndpoints, nil
 }
 
-func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
-	opts ...EndpointResolveOption) ([]EndpointAddress, error) {
+func (r *defaultEndpointResolver) ResolveNodePortEndpoints(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+	opts ...EndpointResolveOption,
+) ([]EndpointAddress, error) {
 
 	logger := contexts.NewContext(ctx).Log()
 
@@ -131,7 +137,8 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 	}
 	svcNodePort := svcPort.NodePort
 	nodeList := &corev1.NodeList{}
-	if err := r.k8sClient.List(ctx, nodeList, client.MatchingLabelsSelector{Selector: resolveOpts.NodeSelector}); err != nil {
+	if err := r.k8sClient.List(ctx, nodeList,
+		client.MatchingLabelsSelector{Selector: resolveOpts.NodeSelector}); err != nil {
 		return nil, err
 	}
 
@@ -164,7 +171,9 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 	return endpoints, nil
 }
 
-func (r *defaultEndpointResolver) findServiceAndServicePort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) (*corev1.Service, corev1.ServicePort, error) {
+func (r *defaultEndpointResolver) findServiceAndServicePort(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+) (*corev1.Service, corev1.ServicePort, error) {
 	svc := &corev1.Service{}
 	if err := r.k8sClient.Get(ctx, svcKey, svc); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -182,7 +191,9 @@ func (r *defaultEndpointResolver) findServiceAndServicePort(ctx context.Context,
 }
 
 // lookupServicePort returns the ServicePort structure for specific port on service.
-func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port intstr.IntOrString) (corev1.ServicePort, error) {
+func (r *defaultEndpointResolver) lookupServicePort(
+	svc *corev1.Service, port intstr.IntOrString,
+) (corev1.ServicePort, error) {
 	if port.Type == intstr.String {
 		for _, p := range svc.Spec.Ports {
 			if p.Name == port.StrVal {
@@ -197,7 +208,9 @@ func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port in
 		}
 	}
 
-	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), k8s.NamespacedName(svc))
+	return corev1.ServicePort{}, errors.Errorf(
+		"unable to find port %s on service %s", port.String(), k8s.NamespacedName(svc),
+	)
 }
 
 func (r *defaultEndpointResolver) buildNodePortEndpoint(IP, instanceID string, nodePort int32) EndpointAddress {
@@ -223,7 +236,9 @@ func (r *defaultEndpointResolver) getNodeInternalIP(node *corev1.Node) (string, 
 	return "", ErrNodeDoesNotHaveInternalAddress
 }
 
-func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]int, error) {
+func (r *defaultEndpointResolver) GetListTargetPort(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+) ([]int, error) {
 	logger := contexts.NewContext(ctx).Log()
 
 	_, svcPort, err := r.findServiceAndServicePort(ctx, svcKey, port)
@@ -276,7 +291,8 @@ type EndpointResolveOptions struct {
 	// By default, no node will be selected.
 	NodeSelector labels.Selector
 
-	// [Pod Endpoint] if pod readinessGates is defined, then pods from unready addresses with any of these readinessGates and containersReady condition will be included as well.
+	// [Pod Endpoint] if pod readinessGates is defined, then pods from unready addresses
+	// with any of these readinessGates and containersReady condition will be included.
 	// By default, no readinessGate is specified.
 	PodReadinessGates []corev1.PodConditionType
 }

@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	vglbTimeout  = time.Second * 30
-	vglbInterval = time.Second * 1
+	vglbTimeout          = time.Second * 30
+	vglbInterval         = time.Second * 1
+	testDefaultNamespace = "default"
 )
 
 var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
@@ -39,7 +40,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 	Context("Create flow", func() {
 		It("should create GLBC from VGLB with matching NodePort Service", func() {
 			svcName := "vglb-create-test"
-			ns := "default"
+			ns := testDefaultNamespace
 
 			// Create NodePort Service with port 80
 			svc := newNodePortService(svcName, ns, []corev1.ServicePort{
@@ -116,7 +117,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 	Context("Delete flow", func() {
 		It("should delete GLBC when VGLB is deleted", func() {
 			svcName := "vglb-delete-test"
-			ns := "default"
+			ns := testDefaultNamespace
 
 			// Create Service and VGLB
 			svc := newNodePortService(svcName, ns, []corev1.ServicePort{
@@ -168,7 +169,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 						ownedByVglb = append(ownedByVglb, glbc)
 					}
 				}
-				g.Expect(ownedByVglb).To(HaveLen(0),
+				g.Expect(ownedByVglb).To(BeEmpty(),
 					"Expected GLBC owned by VGLB to be deleted")
 			}, vglbTimeout*2, vglbInterval).Should(Succeed())
 
@@ -183,7 +184,7 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 	Context("Update flow", func() {
 		It("should update GLBC when Service ports change", func() {
 			svcName := "vglb-update-test"
-			ns := "default"
+			ns := testDefaultNamespace
 
 			// Create Service with port 80
 			svc := newNodePortService(svcName, ns, []corev1.ServicePort{
