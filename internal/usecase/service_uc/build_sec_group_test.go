@@ -135,8 +135,8 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 				},
 				{
 					Protocol:    v2.SecgroupRuleProtocolICMP,
-					FromPort:    30053,
-					ToPort:      30053,
+					FromPort:    1,
+					ToPort:      255,
 					CIDR:        "192.168.1.0/24",
 					Description: "Allow ICMP for health check UDP port",
 					Direction:   v2.SecgroupRuleDirectionIngress,
