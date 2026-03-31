@@ -118,7 +118,11 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 		return nil
 	}
 
-	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx)
+	existingSubnetId := ""
+	if isCreated {
+		existingSubnetId = lbConfig.Spec.SubnetId
+	}
+	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx, existingSubnetId)
 	if err != nil {
 		return err
 	}
@@ -317,12 +321,13 @@ func (t *defaultModelBuildTask) buildPrivateZoneId(_ context.Context) *common.Zo
 	return nil
 }
 
-// buildSubnetAndZone tries to get subnet and zone from annotations.
-// It will try to get from load-balancer-id annotation.
-// If not found, it will try to get from prefer subnet id annotation.
-// If not found, it will try to get from prefer zone id annotation.
-// If not found, it will use default subnet and zone.
-func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone common.Zone, networkId string, subnetId string, subnetCIDR string, _err error) {
+// buildSubnetAndZone resolves subnet and zone with the following priority:
+// 1. load-balancer-id annotation (get subnet from that LB)
+// 2. existing LBC's SubnetId (source of truth after creation)
+// 3. prefer-subnet-id annotation
+// 4. prefer-zone-id annotation
+// 5. defaults (from first node)
+func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existingSubnetId string) (zone common.Zone, networkId string, subnetId string, subnetCIDR string, _err error) {
 	zone = t.defaultZone
 	networkId = t.defaultNetworkId
 	subnetId = t.defaultSubnetId
@@ -343,6 +348,16 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context) (zone co
 		if err != nil || subnet == nil {
 			t.logger.Errorf("Failed to get subnet: %s.", err)
 			return common.Zone(""), "", "", "", errors.New("failed to get subnet: " + err.Error())
+		}
+		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
+	}
+
+	// if LBC already exists, use its subnet as source of truth
+	if existingSubnetId != "" && existingSubnetId != t.defaultSubnetId {
+		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, existingSubnetId)
+		if err != nil || subnet == nil {
+			t.logger.Errorf("Failed to get existing subnet %s: %v", existingSubnetId, err)
+			return common.Zone(""), "", "", "", errors.New("failed to get existing subnet: " + existingSubnetId)
 		}
 		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
 	}
