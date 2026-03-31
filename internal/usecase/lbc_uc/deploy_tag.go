@@ -109,7 +109,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	// Don't compare lengths because portal may have extra tags we don't manage
 	isNeedUpdate := false
 	for k, v := range mergeTags {
-		if currentTags[k] != v {
+		if !strings.EqualFold(currentTags[k], v) {
 			r.logger.Infof("Tag diff: key=%s, current=%q, wanted=%q", k, currentTags[k], v)
 			isNeedUpdate = true
 			break
