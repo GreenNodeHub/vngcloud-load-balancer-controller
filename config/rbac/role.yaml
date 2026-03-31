@@ -123,6 +123,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - globalloadbalancerconfigs
   - loadbalancerconfigs
   - nodesecuritygroups
   - vngcloudgloballoadbalancers
@@ -137,6 +138,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - globalloadbalancerconfigs/finalizers
   - loadbalancerconfigs/finalizers
   - nodesecuritygroups/finalizers
   - vngcloudgloballoadbalancers/finalizers
@@ -145,6 +147,7 @@ rules:
 - apiGroups:
   - vks.vngcloud.vn
   resources:
+  - globalloadbalancerconfigs/status
   - loadbalancerconfigs/status
   - nodesecuritygroups/status
   - vngcloudgloballoadbalancers/status

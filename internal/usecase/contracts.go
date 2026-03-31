@@ -30,14 +30,22 @@ type IngressUseCase interface {
 	DeleteIngressUseCase(ctx context.Context, req ctrl.Request) error
 }
 
-// type VngcloudGlobalLoadBalancerUseCase interface {
-// 	InitVngcloudGlobalLoadBalancerUseCase(ctx context.Context) error
-// 	EnsureVngcloudGlobalLoadBalancerUseCase(ctx context.Context, req ctrl.Request) error
-// 	DeleteVngcloudGlobalLoadBalancerUseCase(ctx context.Context, req ctrl.Request) error
-// }
+type VngcloudGlobalLoadBalancerUseCase interface {
+	InitVngcloudGlobalLoadBalancerUseCase(ctx context.Context) error
+	EnsureVngcloudGlobalLoadBalancerUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteVngcloudGlobalLoadBalancerUseCase(ctx context.Context, req ctrl.Request) error
+}
 
-// type GlobalLoadBalancerConfigUseCase interface {
-// 	InitGlobalLoadBalancerConfigUseCase(ctx context.Context) error
-// 	EnsureGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
-// 	DeleteGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
-// }
+type GlobalLoadBalancerConfigUseCase interface {
+	InitGlobalLoadBalancerConfigUseCase(ctx context.Context) error
+	EnsureGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteGlobalLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error
+}
+
+// ServiceGLBUseCase handles reconciliation of Services with the glb.vks.vngcloud.vn/enable=true
+// annotation. It creates and manages GlobalLoadBalancerConfig resources owned by the Service.
+type ServiceGLBUseCase interface {
+	InitServiceGLBUseCase(ctx context.Context) error
+	EnsureServiceGLBUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteServiceGLBUseCase(ctx context.Context, req ctrl.Request) error
+}

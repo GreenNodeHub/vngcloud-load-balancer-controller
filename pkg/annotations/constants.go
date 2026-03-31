@@ -14,11 +14,11 @@ const (
 	SuffixInboundCIDRs               = "inbound-cidrs"                // inbound CIDRs
 	SuffixHealthcheckPort            = "healthcheck-port"             // healthcheck port
 	SuffixHealthcheckProtocol        = "healthcheck-protocol"         // healthcheck protocol
-	SuffixSuccessCodes               = "success-codes"                // success codes,                	only for http/https healthcheck protocol
-	SuffixHealthcheckPath            = "healthcheck-path"             // healthcheck path, 				only for http/https healthcheck protocol
-	SuffixHealthcheckHttpMethod      = "healthcheck-http-method"      // healthcheck http method, 		only for http/https healthcheck protocol
-	SuffixHealthcheckHttpVersion     = "healthcheck-http-version"     // healthcheck http version, 		only for http/https healthcheck protocol
-	SuffixHealthcheckHttpDomainName  = "healthcheck-http-domain-name" // healthcheck http domain name, 	only for http/https healthcheck protocol
+	SuffixSuccessCodes               = "success-codes"                // success codes, http/https only
+	SuffixHealthcheckPath            = "healthcheck-path"             // healthcheck path, http/https only
+	SuffixHealthcheckHttpMethod      = "healthcheck-http-method"      // http method, http/https only
+	SuffixHealthcheckHttpVersion     = "healthcheck-http-version"     // http version, http/https only
+	SuffixHealthcheckHttpDomainName  = "healthcheck-http-domain-name" // http domain name, http/https only
 	SuffixHealthcheckIntervalSeconds = "healthcheck-interval-seconds" // healthcheck interval seconds
 	SuffixHealthcheckTimeoutSeconds  = "healthcheck-timeout-seconds"  // healthcheck timeout seconds
 	SuffixHealthyThresholdCount      = "healthy-threshold-count"      // healthy threshold count
@@ -63,4 +63,34 @@ const (
 
 	SuffixTrigger = "trigger" // trigger
 
+	// for global load balancer
+	SuffixDescription = "description" // description for the resource
+
+	// for Service GLB (glb.vks.vngcloud.vn prefix)
+	SuffixGLBEnable = "enable" // glb.vks.vngcloud.vn/enable — enable GLB for this Service
+
+	// for Service GLB annotation suffixes (glb.vks.vngcloud.vn prefix)
+	// These mirror shared suffixes but are dedicated to the GLB controller for clarity.
+	SuffixGLBLoadBalancerID             = "load-balancer-id"
+	SuffixGLBLoadBalancerName           = "load-balancer-name"
+	SuffixGLBPackageID                  = "package-id"
+	SuffixGLBDescription                = "description"
+	SuffixGLBTargetType                 = "target-type"
+	SuffixGLBHealthcheckPort            = "healthcheck-port"
+	SuffixGLBPoolAlgorithm              = "pool-algorithm"
+	SuffixGLBIdleTimeoutClient          = "idle-timeout-client"
+	SuffixGLBIdleTimeoutMember          = "idle-timeout-member"
+	SuffixGLBIdleTimeoutConnection      = "idle-timeout-connection"
+	SuffixGLBInboundCIDRs               = "inbound-cidrs"
+	SuffixGLBEnableProxyProtocol        = "enable-proxy-protocol"
+	SuffixGLBHealthcheckProtocol        = "healthcheck-protocol"
+	SuffixGLBHealthyThresholdCount      = "healthy-threshold-count"
+	SuffixGLBUnhealthyThresholdCount    = "unhealthy-threshold-count"
+	SuffixGLBHealthcheckIntervalSeconds = "healthcheck-interval-seconds"
+	SuffixGLBHealthcheckTimeoutSeconds  = "healthcheck-timeout-seconds"
+	SuffixGLBHealthcheckHttpMethod      = "healthcheck-http-method"
+	SuffixGLBHealthcheckPath            = "healthcheck-path"
+	SuffixGLBSuccessCodes               = "success-codes"
+	SuffixGLBHealthcheckHttpVersion     = "healthcheck-http-version"
+	SuffixGLBHealthcheckHttpDomainName  = "healthcheck-http-domain-name"
 )

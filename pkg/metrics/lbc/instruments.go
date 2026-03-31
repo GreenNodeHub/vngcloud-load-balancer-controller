@@ -92,7 +92,12 @@ func newInstruments(registerer prometheus.Registerer) *instruments {
 		Help:      "Counts the number of reconciliations triggered per resource",
 	}, []string{labelController, labelNamespace, labelName})
 
-	registerer.MustRegister(podReadinessFlipSeconds, controllerReconcileErrors, controllerReconcileStageDuration, webhookValidationFailure, webhookMutationFailure, controllerCacheObjectCount, controllerReconcileTopTalkers)
+	registerer.MustRegister(
+		podReadinessFlipSeconds, controllerReconcileErrors,
+		controllerReconcileStageDuration, webhookValidationFailure,
+		webhookMutationFailure, controllerCacheObjectCount,
+		controllerReconcileTopTalkers,
+	)
 	return &instruments{
 		podReadinessFlipSeconds:       podReadinessFlipSeconds,
 		controllerReconcileErrors:     controllerReconcileErrors,

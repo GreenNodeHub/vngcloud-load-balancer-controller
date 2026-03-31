@@ -82,7 +82,7 @@ func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listene
 	return &v1alpha1.CreatedPolicy{Id: currentPolicy.UUID}, nil
 }
 
-func (t *defaultModelDeployTask) buildPolicyCreateRequest(_ context.Context, lbId, listenerId string, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool) (loadbalancerv2.ICreatePolicyRequest, error) {
+func (t *defaultModelDeployTask) buildPolicyCreateRequest(_ context.Context, lbId, listenerId string, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool) (loadbalancerv2.ICreatePolicyRequest, error) { //nolint:unparam
 	request := loadbalancerv2.NewCreatePolicyRequest(lbId, listenerId).
 		WithAction(policySpec.Action).
 		WithName(policySpec.Name).
@@ -132,7 +132,7 @@ func (t *defaultModelDeployTask) buildPolicyCreateRequest(_ context.Context, lbI
 	return request, nil
 }
 
-func (t *defaultModelDeployTask) buildPolicyUpdateRequest(_ context.Context, lbId, listenerId string, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool, currentPolicy *entityv2.Policy) (loadbalancerv2.IUpdatePolicyRequest, []string, error) {
+func (t *defaultModelDeployTask) buildPolicyUpdateRequest(_ context.Context, lbId, listenerId string, policySpec v1alpha1.Policy, newCreatedPools []v1alpha1.CreatedPool, currentPolicy *entityv2.Policy) (loadbalancerv2.IUpdatePolicyRequest, []string, error) { //nolint:unparam
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &loadbalancerv2.UpdatePolicyRequest{

@@ -5,6 +5,7 @@ resources:
 - bases/vks.vngcloud.vn_vngcloudgloballoadbalancers.yaml
 - bases/vks.vngcloud.vn_nodesecuritygroups.yaml
 - bases/vks.vngcloud.vn_loadbalancerconfigs.yaml
+- bases/vks.vngcloud.vn_globalloadbalancerconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

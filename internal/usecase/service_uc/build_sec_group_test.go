@@ -135,8 +135,8 @@ func TestBuildDefaultSecurityGroupRule(t *testing.T) {
 				},
 				{
 					Protocol:    v2.SecgroupRuleProtocolICMP,
-					FromPort:    30053,
-					ToPort:      30053,
+					FromPort:    1,
+					ToPort:      255,
 					CIDR:        "192.168.1.0/24",
 					Description: "Allow ICMP for health check UDP port",
 					Direction:   v2.SecgroupRuleDirectionIngress,
@@ -443,9 +443,10 @@ func TestEnsureUniqueSecgroupRules(t *testing.T) {
 	tcpRules := 0
 	udpRules := 0
 	for _, rule := range result {
-		if rule.Protocol == v2.SecgroupRuleProtocolTCP {
+		switch rule.Protocol {
+		case v2.SecgroupRuleProtocolTCP:
 			tcpRules++
-		} else if rule.Protocol == v2.SecgroupRuleProtocolUDP {
+		case v2.SecgroupRuleProtocolUDP:
 			udpRules++
 		}
 	}

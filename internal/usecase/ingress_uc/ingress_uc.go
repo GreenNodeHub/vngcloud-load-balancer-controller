@@ -137,7 +137,7 @@ func (uc *ingressUseCase) DeleteIngressUseCase(ctx context.Context, req ctrl.Req
 
 	// check if have isIgnore annotation
 	var isIgnore bool
-	uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, ing.Annotations)
+	_, _ = uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, ing.Annotations)
 	if isIgnore {
 		logger.Info("Ingress has ignore load balancer config annotation, skip.")
 		return nil
@@ -190,7 +190,7 @@ func (uc *ingressUseCase) DeleteIngressUseCase(ctx context.Context, req ctrl.Req
 	return nil
 }
 
-////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////
 
 func (uc *ingressUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	ing, err := uc.k8sRepo.GetIngress(ctx, req.NamespacedName)

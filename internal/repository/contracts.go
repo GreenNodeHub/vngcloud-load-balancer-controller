@@ -92,6 +92,7 @@ type VngCloudRepository interface {
 	DeleteCertificate(ctx context.Context, certID string) error
 
 	// Global Load Balancer
+	ListGlobalPackages(ctx context.Context) (*entityv2.ListGlobalPackages, error)
 	ListGlobalLoadBalancers(ctx context.Context, tags []string) (*entityv2.ListGlobalLoadBalancers, error)
 	GetGlobalLoadBalancerByID(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
 	GetGlobalLoadBalancerByName(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error)
@@ -104,9 +105,10 @@ type VngCloudRepository interface {
 	DeleteGlobalPool(ctx context.Context, glbID, poolID string) error
 	UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error
 	ListGlobalPoolMembers(ctx context.Context, glbID, poolID string) (*entityv2.ListGlobalPoolMembers, error)
-	PatchGlobalPoolMember(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMemberRequest) error
+	PatchGlobalPoolMembers(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMembersRequest) error
 
 	ListGlobalListeners(ctx context.Context, glbID string) (*entityv2.ListGlobalListeners, error)
+	GetGlobalListener(ctx context.Context, glbID, listenerID string) (*entityv2.GlobalListener, error)
 	CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error)
 	DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error
 	UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error
@@ -138,4 +140,14 @@ type K8sRepository interface {
 	UpdateIngressStatusAddress(ctx context.Context, n types.NamespacedName, address string) error
 
 	GetSecret(ctx context.Context, n types.NamespacedName) (*corev1.Secret, error)
+
+	GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error)
+	ListGlobalLoadBalancerConfig(ctx context.Context, list *v1alpha1.GlobalLoadBalancerConfigList, opts ...client.ListOption) error
+	CreateGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, opts ...client.CreateOption) error
+	DeleteGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig) error
+	PatchGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error
+	PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool) error
+
+	GetVngcloudGlobalLoadBalancer(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudGlobalLoadBalancer, error)
+	PatchMutateStatusVngcloudGlobalLoadBalancer(ctx context.Context, vglb *v1alpha1.VngcloudGlobalLoadBalancer, mutateFunc func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) bool) error
 }

@@ -39,8 +39,10 @@ import (
 )
 
 const (
-	timeout  = time.Second * 5
-	interval = time.Millisecond * 250
+	timeout              = time.Second * 5
+	interval             = time.Millisecond * 250
+	testServiceNameGogsf = "test-service-gogsf"
+	testServiceFoo       = "service-foo"
 )
 
 var _ = Describe("Ingress Controller", func() {
@@ -65,9 +67,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with default annotation default", func() {
 		It("created load balancer should have specific attribute", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -97,7 +99,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -167,7 +169,7 @@ var _ = Describe("Ingress Controller", func() {
 
 				listNsg, err := listNsgByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(listNsg.Items)).Should(Equal(1))
+				g.Expect(listNsg.Items).Should(HaveLen(1))
 
 				nsg := &listNsg.Items[0]
 				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
@@ -190,9 +192,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress without default backend, only 1 rule", func() {
 		It("should create load balancer with correct attributes and update when rule changes", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -251,7 +253,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -330,7 +332,7 @@ var _ = Describe("Ingress Controller", func() {
 
 				listNsg, err := listNsgByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(listNsg.Items)).Should(Equal(1))
+				g.Expect(listNsg.Items).Should(HaveLen(1))
 
 				nsg := &listNsg.Items[0]
 				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
@@ -355,7 +357,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -443,9 +445,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with both default backend and rules using port names", func() {
 		It("should handle port name resolution and target type changes", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint with multiple subsets
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -525,7 +527,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -604,7 +606,7 @@ var _ = Describe("Ingress Controller", func() {
 
 				listNsg, err := listNsgByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(listNsg.Items)).Should(Equal(1))
+				g.Expect(listNsg.Items).Should(HaveLen(1))
 
 				nsg := &listNsg.Items[0]
 				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
@@ -630,7 +632,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -666,7 +668,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -704,7 +706,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -742,9 +744,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with default annotations of Cilium Native", func() {
 		It("should update load balancer tags and security groups correctly", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Configure CNI detector for Cilium Native
 			cniDetector.ExpectedCalls = nil
@@ -828,7 +830,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -908,7 +910,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -962,7 +964,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1003,7 +1005,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				// Check security groups (should delete default secgroup)
 				secgroups, err := vngcloudRepo.ListSecurityGroups(ctx)
@@ -1033,7 +1035,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1102,9 +1104,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with default annotations of calico overlay", func() {
 		It("should handle calico overlay CNI mode with nodeport-only security group rules and support tag/secgroup updates", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Configure CNI detector for Calico Overlay
 			cniDetector.ExpectedCalls = nil
@@ -1190,7 +1192,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1274,7 +1276,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1325,7 +1327,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1376,9 +1378,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When load balancer already exists and ingress is created with load-balancer-id annotation", func() {
 		It("should update the existing load balancer and preserve original resources after deletion", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create a load balancer manually with pool, listener, and policy
 			healthMonitorOpt := &loadbalancerv2.HealthMonitor{
@@ -1416,7 +1418,7 @@ var _ = Describe("Ingress Controller", func() {
 				DefaultCertificateAuthority: nil,
 			}
 			opt := &loadbalancerv2.CreateLoadBalancerRequest{
-				Name:         "test-service-gogsf",
+				Name:         testServiceNameGogsf,
 				PackageID:    vngcloud_mocks.MockL7PackageId,
 				Scheme:       "internal",
 				AutoScalable: true,
@@ -1431,7 +1433,7 @@ var _ = Describe("Ingress Controller", func() {
 			LB, err = vngcloudRepo.GetLoadBalancerByID(ctx, LB.UUID)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(LB).ShouldNot(BeNil())
-			Expect(LB.Name).Should(Equal("test-service-gogsf"))
+			Expect(LB.Name).Should(Equal(testServiceNameGogsf))
 
 			// Verify initial pool
 			pools, err := vngcloudRepo.ListPool(ctx, LB.UUID)
@@ -1594,11 +1596,11 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When 2 ingress resources use the same load balancer with default annotation", func() {
 		It("should add members to the same default pool and remove members after resource deletion", func() {
 
-			serviceName1 := "test-service-gogsf"
+			serviceName1 := testServiceNameGogsf
 			serviceName2 := "test-service-gogsf-2"
-			ingressName1 := "test-service-gogsf"
+			ingressName1 := testServiceNameGogsf
 			ingressName2 := "test-service-gogsf-2"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create first endpoint
 			endpoint1 := newEndpointResource(serviceName1, namespace)
@@ -1640,7 +1642,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName1, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1796,8 +1798,8 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create and update https listener", func() {
 		It("should create HTTPS listener with certificates and update correctly", func() {
 
-			serviceName := "service-foo"
-			namespace := "default"
+			serviceName := testServiceFoo
+			namespace := testDefaultNamespace
 			ingressName := "test-service-https"
 
 			// Create endpoint
@@ -1849,7 +1851,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1921,7 +1923,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -1984,9 +1986,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with prefer subnet ID annotation", func() {
 		It("should create load balancer in the specified subnet", func() {
 
-			serviceName := "service-foo"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceFoo
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -2017,7 +2019,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2042,9 +2044,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with prefer zone ID annotation", func() {
 		It("should create load balancer in the specified zone", func() {
 
-			serviceName := "service-foo"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceFoo
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -2075,7 +2077,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2100,9 +2102,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When node status changes from not ready to ready", func() {
 		It("should update pool members when node becomes ready", func() {
 
-			serviceName := "service-foo"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceFoo
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Set node1 and node2 to NotReady state
 			node1 := &corev1.Node{}
@@ -2147,7 +2149,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2200,7 +2202,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2260,8 +2262,8 @@ var _ = Describe("Ingress Controller", func() {
 	// Context("When create ingress with ImplementationSpecific path type", func() {
 	// 	It("should handle different policy actions correctly", func() {
 
-	// 		serviceName := "service-foo"
-	// 		namespace := "default"
+	// 		serviceName := testServiceFoo
+	// 		namespace := testDefaultNamespace
 	// 		ingressName := "test-ingress-implement-specific"
 
 	// 		// Create endpoint
@@ -2310,7 +2312,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 		Eventually(func(g Gomega) {
 	// 			lbcList, err := listLbcByIngress(ingressName, namespace)
 	// 			g.Expect(err).ShouldNot(HaveOccurred())
-	// 			g.Expect(len(lbcList.Items)).Should(Equal(1))
+	// 			g.Expect(lbcList.Items).Should(HaveLen(1))
 
 	// 			lbc := &lbcList.Items[0]
 	// 			g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2374,7 +2376,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 		Eventually(func(g Gomega) {
 	// 			lbcList, err := listLbcByIngress(ingressName, namespace)
 	// 			g.Expect(err).ShouldNot(HaveOccurred())
-	// 			g.Expect(len(lbcList.Items)).Should(Equal(1))
+	// 			g.Expect(lbcList.Items).Should(HaveLen(1))
 
 	// 			lbc := &lbcList.Items[0]
 	// 			g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2439,7 +2441,7 @@ var _ = Describe("Ingress Controller", func() {
 	// 		Eventually(func(g Gomega) {
 	// 			lbcList, err := listLbcByIngress(ingressName, namespace)
 	// 			g.Expect(err).ShouldNot(HaveOccurred())
-	// 			g.Expect(len(lbcList.Items)).Should(Equal(1))
+	// 			g.Expect(lbcList.Items).Should(HaveLen(1))
 
 	// 			lbc := &lbcList.Items[0]
 	// 			g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -2499,9 +2501,9 @@ var _ = Describe("Ingress Controller", func() {
 	Context("When create ingress with auto-reorder-policies annotation", func() {
 		It("should automatically reorder policies when annotation is added", func() {
 
-			serviceName := "test-service-gogsf"
-			namespace := "default"
-			ingressName := "test-service-gogsf"
+			serviceName := testServiceNameGogsf
+			namespace := testDefaultNamespace
+			ingressName := testServiceNameGogsf
 
 			// Create endpoint
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -2560,7 +2562,7 @@ var _ = Describe("Ingress Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := listLbcByIngress(ingressName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())

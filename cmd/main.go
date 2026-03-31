@@ -44,21 +44,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/nsg_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/service_glb_controller"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/vglb_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/glbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/nsg_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_glb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vglb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/glbc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ingress"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	vksvngcloudvn "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s/apis/vks.vngcloud.vn"
@@ -67,10 +73,11 @@ import (
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/provider"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/service_glb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vglb"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -86,7 +93,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-func main() {
+func main() { //nolint:gocyclo
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -96,7 +103,10 @@ func main() {
 	var disableServiceController bool
 	var disableIngressController bool
 	var disableLoadBalancerConfigController bool
+	var disableGlobalLoadBalancerConfigController bool
 	var disableNodeSecurityGroupController bool
+	var disableVngcloudGlobalLoadBalancerController bool
+	var disableServiceGLBController bool
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -117,11 +127,18 @@ func main() {
 		"If set, the ingress controller will be disabled")
 	flag.BoolVar(&disableLoadBalancerConfigController, "disable-load-balancer-config-controller", false,
 		"If set, the LoadBalancerConfig controller will be disabled")
+	flag.BoolVar(&disableGlobalLoadBalancerConfigController, "disable-global-load-balancer-config-controller", false,
+		"If set, the GlobalLoadBalancerConfig controller will be disabled")
 	flag.BoolVar(&disableNodeSecurityGroupController, "disable-node-security-group-controller", false,
 		"If set, the NodeSecurityGroup controller will be disabled")
+	flag.BoolVar(&disableVngcloudGlobalLoadBalancerController, "disable-vngcloud-global-load-balancer-controller", false,
+		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
+	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
+		"If set, the ServiceGLB controller will be disabled")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
-			"A lower period will correct entropy more quickly, but reduce responsiveness to change if there are many watched resources. "+
+			"A lower period will correct entropy more quickly, "+
+			"but reduce responsiveness to change if there are many watched resources. "+
 			"Examples: 5m, 1h, 30s. Defaults to 5 minutes.")
 	opts := zap.Options{
 		Development: true,
@@ -156,14 +173,17 @@ func main() {
 
 		// Create cluster API client and get the target cluster's rest config
 		clusterAPIClient := clusterapi.NewClusterClient(mgmtClient)
-		kubeRestConfig, err = clusterAPIClient.GetRestConfig(context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
+		kubeRestConfig, err = clusterAPIClient.GetRestConfig(
+			context.Background(), conf.Cluster.Namespace, conf.Cluster.ClusterID)
 		if err != nil {
 			setupLog.Error(err, "unable to get target cluster rest config")
 			os.Exit(1)
 		}
 	}
 
-	setupLog.Info(fmt.Sprintf("The commit is [%s], version is [%s], chartVersion is [%s]", version.Commit, version.Version, conf.ChartVersion))
+	setupLog.Info(fmt.Sprintf(
+		"The commit is [%s], version is [%s], chartVersion is [%s]",
+		version.Commit, version.Version, conf.ChartVersion))
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -213,7 +233,9 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       fmt.Sprintf("n-%s-n.n-%s-n.lbc.vks.vngcloud.vn", conf.Cluster.ClusterID, conf.Cluster.Namespace),
+		LeaderElectionID: fmt.Sprintf(
+			"n-%s-n.n-%s-n.lbc.vks.vngcloud.vn",
+			conf.Cluster.ClusterID, conf.Cluster.Namespace),
 		Cache: cache.Options{
 			SyncPeriod: &syncPeriod,
 		},
@@ -257,12 +279,14 @@ func main() {
 	}
 
 	reconcileCounters := metricsutil.NewReconcileCounters()
-	lbcMetricsCollector := lbcmetrics.NewCollector(metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
+	lbcMetricsCollector := lbcmetrics.NewCollector(
+		metrics.Registry, mgr, reconcileCounters, ctrl.Log.WithName("controller_metrics"))
+	endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 
 	if !disableServiceController {
-		annotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX) // TODO: change prefix if needed
+		annotationParser := annotations.NewSuffixAnnotationParser(
+			domain.SERVICE_ANNOTATION_PREFIX)
 		cniDetector := utils.NewDetector(mgr.GetClient())
-		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 		serviceUtils := service.NewServiceUtils(domain.ServiceFinalizer, annotationParser)
 		serviceUseCase := service_uc.NewServiceUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, serviceUtils, cniDetector, endpointResolver)
@@ -292,7 +316,6 @@ func main() {
 
 		annotationParser := annotations.NewSuffixAnnotationParser(domain.INGRESS_ANNOTATION_PREFIX)
 		cniDetector := utils.NewDetector(mgr.GetClient())
-		endpointResolver := utils.NewDefaultEndpointResolver(ctx, mgr.GetClient())
 		ingressUtils := ingress.NewIngressUtils(domain.IngressFinalizer)
 		ingressUseCase := ingress_uc.NewIngressUseCase(
 			conf.Cluster.ClusterID, k8sRepo, vngcloudRepo, annotationParser, ingressUtils, cniDetector, endpointResolver)
@@ -335,6 +358,27 @@ func main() {
 		}
 	}
 
+	if !disableGlobalLoadBalancerConfigController {
+		glbcUtils := glbc.NewGlobalLoadBalancerConfigUtils(domain.GlbcFinalizer)
+		glbcUseCase := glbc_uc.NewGlobalLoadBalancerConfigUseCase(
+			conf, k8sRepo, vngcloudRepo,
+		)
+		reconciler := glbc_controller.NewGlobalLoadBalancerConfigReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			glbcUseCase,
+			mgr.GetEventRecorderFor("global-load-balancer-config-controller"),
+			finalizerManager,
+			glbcUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
+		)
+		if err = reconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GlobalLoadBalancerConfig")
+			os.Exit(1)
+		}
+	}
+
 	if !disableNodeSecurityGroupController {
 		nsgUtils := nsg.NewNodeSecurityGroupUtils(domain.NsgFinalizer)
 		nsgUseCase := nsg_uc.NewNodeSecurityGroupUseCase(
@@ -357,20 +401,52 @@ func main() {
 		}
 	}
 
-	vngProvider := &provider.VNGCLOUD_Provider{
-		Config: conf,
+	if !disableVngcloudGlobalLoadBalancerController {
+		annotationParser := annotations.NewSuffixAnnotationParser(domain.VGLB_ANNOTATION_PREFIX)
+		vglbUtils := vglb.NewVngcloudGlobalLoadBalancerUtils(domain.VglbFinalizer)
+		vglbUseCase := vglb_uc.NewVngcloudGlobalLoadBalancerUseCase(
+			conf, k8sRepo, vngcloudRepo, annotationParser, endpointResolver,
+		)
+		reconciler := vglb_controller.NewVngcloudGlobalLoadBalancerReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			vglbUseCase,
+			mgr.GetEventRecorderFor("vngcloud-global-load-balancer-controller"),
+			finalizerManager,
+			vglbUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
+			conf.MaxConcurrentReconciles,
+		)
+		if err := reconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
+			os.Exit(1)
+		}
 	}
-	if err = (&controller.VngcloudGlobalLoadBalancerReconciler{
-		Client:           mgr.GetClient(),
-		Scheme:           mgr.GetScheme(),
-		Recorder:         mgr.GetEventRecorderFor("vngcloud-load-balancer-controller"),
-		Config:           conf,
-		Provider:         vngProvider,
-		FinalizerManager: finalizerManager,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VngcloudGlobalLoadBalancer")
-		os.Exit(1)
+
+	if !disableServiceGLBController {
+		glbAnnotationParser := annotations.NewSuffixAnnotationParser(domain.GLB_ANNOTATION_PREFIX)
+		serviceGLBUtils := service_glb.NewServiceGLBUtils(domain.ServiceGLBFinalizer, glbAnnotationParser)
+		serviceGLBUseCase := service_glb_uc.NewServiceGLBUseCase(
+			conf, k8sRepo, vngcloudRepo, glbAnnotationParser, endpointResolver,
+		)
+		serviceGLBReconciler := service_glb_controller.NewServiceGLBReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			serviceGLBUseCase,
+			mgr.GetEventRecorderFor("service-glb-controller"),
+			finalizerManager,
+			serviceGLBUtils,
+			lbcMetricsCollector,
+			reconcileCounters,
+			conf.MaxConcurrentReconciles,
+		)
+		if err := serviceGLBReconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceGLB")
+			os.Exit(1)
+		}
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

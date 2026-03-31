@@ -197,7 +197,7 @@ func verifySecurityGroupAttachedToServers(g Gomega, secgroupId string, expectedS
 	servers, err := vngcloudRepo.ListServerBySecgroupID(ctx, secgroupId)
 	g.Expect(err).ShouldNot(HaveOccurred())
 	g.Expect(servers).ShouldNot(BeNil())
-	g.Expect(len(servers.Items)).Should(Equal(len(expectedServerIds)), "security group should be attached to %d nodes", len(expectedServerIds))
+	g.Expect(servers.Items).Should(HaveLen(len(expectedServerIds)), "security group should be attached to %d nodes", len(expectedServerIds))
 
 	actualServerIds := make([]string, len(servers.Items))
 	for i, s := range servers.Items {

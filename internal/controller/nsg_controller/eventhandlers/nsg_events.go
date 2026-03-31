@@ -35,7 +35,6 @@ type enqueueRequestsForNsgEvent struct {
 }
 
 func (h *enqueueRequestsForNsgEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create NSG", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueManagedObject(ctx, queue, e.Object.(*v1alpha1.NodeSecurityGroup))
 }
 
@@ -52,7 +51,6 @@ func (h *enqueueRequestsForNsgEvent) Update(ctx context.Context, e event.UpdateE
 		return
 	}
 
-	h.logger.V(1).Info("Update NSG", "namespace", newObj.GetNamespace(), "name", newObj.GetName())
 	h.enqueueManagedObject(ctx, queue, newObj)
 }
 
@@ -70,6 +68,7 @@ func (h *enqueueRequestsForNsgEvent) enqueueManagedObject(_ context.Context, que
 	if !h.nsgUtils.IsPendingFinalization(obj) && !h.nsgUtils.IsSupported(obj) {
 		return
 	}
+	h.logger.V(1).Info("Enqueue NodeSecurityGroup", "namespace", obj.Namespace, "name", obj.Name)
 	queue.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Namespace: obj.Namespace,

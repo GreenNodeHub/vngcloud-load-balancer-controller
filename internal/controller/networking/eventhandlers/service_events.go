@@ -39,7 +39,6 @@ type enqueueRequestsForServiceEvent struct {
 }
 
 func (h *enqueueRequestsForServiceEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Service", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Service))
 }
 
@@ -57,12 +56,10 @@ func (h *enqueueRequestsForServiceEvent) Update(ctx context.Context, e event.Upd
 		return
 	}
 
-	h.logger.V(1).Info("Update Service", "namespace", newSvc.GetNamespace(), "name", newSvc.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, newSvc)
 }
 
 func (h *enqueueRequestsForServiceEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Delete Service", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	h.enqueueImpactedIngresses(ctx, queue, e.Object.(*corev1.Service))
 }
 
@@ -86,16 +83,7 @@ func (h *enqueueRequestsForServiceEvent) enqueueImpactedIngresses(ctx context.Co
 			continue
 		}
 
-		h.logger.V(1).Info("enqueue ingress for service event",
-			"ingress", types.NamespacedName{
-				Namespace: ing.Namespace,
-				Name:      ing.Name,
-			}.String(),
-			"service", types.NamespacedName{
-				Namespace: svc.Namespace,
-				Name:      svc.Name,
-			}.String(),
-		)
+		h.logger.V(1).Info("Enqueue Ingress", "namespace", ing.Namespace, "name", ing.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Namespace: ing.Namespace,

@@ -136,7 +136,7 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 
 	// check if have isIgnore annotation
 	var isIgnore bool
-	uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, svc.Annotations)
+	_, _ = uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, svc.Annotations)
 	if isIgnore {
 		logger.Info("Service has ignore load balancer config annotation, skip.")
 		return nil
@@ -189,7 +189,7 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 	return nil
 }
 
-////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////
 
 func (uc *serviceUseCase) ensure(ctx context.Context, req ctrl.Request) error {
 	svc, err := uc.k8sRepo.GetService(ctx, req.NamespacedName)

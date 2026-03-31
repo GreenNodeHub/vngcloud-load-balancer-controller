@@ -52,11 +52,13 @@ type Parser interface {
 
 	// ParseJSONAnnotation parses json value into the given interface
 	// returns true if the annotation exists and parser error if any
-	ParseJSONAnnotation(annotation string, value interface{}, annotations map[string]string, opts ...ParseOption) (bool, error)
+	ParseJSONAnnotation(annotation string, value interface{},
+		annotations map[string]string, opts ...ParseOption) (bool, error)
 
 	// ParseStringMapAnnotation parses comma separated key=value pairs into a map
 	// returns true if the annotation exists
-	ParseStringMapAnnotation(annotation string, value *map[string]string, annotations map[string]string, opts ...ParseOption) (bool, error)
+	ParseStringMapAnnotation(annotation string, value *map[string]string,
+		annotations map[string]string, opts ...ParseOption) (bool, error)
 }
 
 // NewSuffixAnnotationParser returns new suffixAnnotationParser based on specified prefix.
@@ -79,12 +81,16 @@ func (p *suffixAnnotationParser) GetPrefix() string {
 	return p.annotationPrefix
 }
 
-func (p *suffixAnnotationParser) ParseStringAnnotation(annotation string, value *string, annotations map[string]string, opts ...ParseOption) bool {
+func (p *suffixAnnotationParser) ParseStringAnnotation(
+	annotation string, value *string, annotations map[string]string, opts ...ParseOption,
+) bool {
 	ret, _ := p.parseStringAnnotation(annotation, value, annotations, opts...)
 	return ret
 }
 
-func (p *suffixAnnotationParser) ParseBoolAnnotation(annotation string, value *bool, annotations map[string]string, opts ...ParseOption) (bool, error) {
+func (p *suffixAnnotationParser) ParseBoolAnnotation(
+	annotation string, value *bool, annotations map[string]string, opts ...ParseOption,
+) (bool, error) {
 	raw := ""
 	exists, matchedKey := p.parseStringAnnotation(annotation, &raw, annotations, opts...)
 	if !exists {
@@ -98,7 +104,9 @@ func (p *suffixAnnotationParser) ParseBoolAnnotation(annotation string, value *b
 	return true, nil
 }
 
-func (p *suffixAnnotationParser) ParseInt64Annotation(annotation string, value *int64, annotations map[string]string, opts ...ParseOption) (bool, error) {
+func (p *suffixAnnotationParser) ParseInt64Annotation(
+	annotation string, value *int64, annotations map[string]string, opts ...ParseOption,
+) (bool, error) {
 	raw := ""
 	exists, matchedKey := p.parseStringAnnotation(annotation, &raw, annotations, opts...)
 	if !exists {
@@ -112,7 +120,9 @@ func (p *suffixAnnotationParser) ParseInt64Annotation(annotation string, value *
 	return true, nil
 }
 
-func (p *suffixAnnotationParser) ParseStringSliceAnnotation(annotation string, value *[]string, annotations map[string]string, opts ...ParseOption) bool {
+func (p *suffixAnnotationParser) ParseStringSliceAnnotation(
+	annotation string, value *[]string, annotations map[string]string, opts ...ParseOption,
+) bool {
 	raw := ""
 	if exists, _ := p.parseStringAnnotation(annotation, &raw, annotations, opts...); !exists {
 		return false
@@ -121,7 +131,9 @@ func (p *suffixAnnotationParser) ParseStringSliceAnnotation(annotation string, v
 	return true
 }
 
-func (p *suffixAnnotationParser) ParseJSONAnnotation(annotation string, value interface{}, annotations map[string]string, opts ...ParseOption) (bool, error) {
+func (p *suffixAnnotationParser) ParseJSONAnnotation(
+	annotation string, value interface{}, annotations map[string]string, opts ...ParseOption,
+) (bool, error) {
 	raw := ""
 	exists, matchedKey := p.parseStringAnnotation(annotation, &raw, annotations, opts...)
 	if !exists {
@@ -133,7 +145,9 @@ func (p *suffixAnnotationParser) ParseJSONAnnotation(annotation string, value in
 	return true, nil
 }
 
-func (p *suffixAnnotationParser) ParseStringMapAnnotation(annotation string, value *map[string]string, annotations map[string]string, opts ...ParseOption) (bool, error) {
+func (p *suffixAnnotationParser) ParseStringMapAnnotation(
+	annotation string, value *map[string]string, annotations map[string]string, opts ...ParseOption,
+) (bool, error) {
 	raw := ""
 	exists, matchedKey := p.parseStringAnnotation(annotation, &raw, annotations, opts...)
 	if !exists {
@@ -159,7 +173,9 @@ func (p *suffixAnnotationParser) ParseStringMapAnnotation(annotation string, val
 	return true, nil
 }
 
-func (p *suffixAnnotationParser) parseStringAnnotation(annotation string, value *string, annotations map[string]string, opts ...ParseOption) (bool, string) {
+func (p *suffixAnnotationParser) parseStringAnnotation(
+	annotation string, value *string, annotations map[string]string, opts ...ParseOption,
+) (bool, string) {
 	keys := p.buildAnnotationKeys(annotation, opts...)
 	for _, key := range keys {
 		if raw, ok := annotations[key]; ok {

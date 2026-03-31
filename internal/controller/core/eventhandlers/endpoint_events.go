@@ -30,7 +30,6 @@ type enqueueRequestsForEndpointEvent struct {
 }
 
 func (h *enqueueRequestsForEndpointEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Endpoint", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	endpoint := e.Object.(*corev1.Endpoints)
 	h.enqueueServiceForEndpoint(ctx, queue, endpoint)
 }
@@ -41,13 +40,11 @@ func (h *enqueueRequestsForEndpointEvent) Update(ctx context.Context, e event.Up
 
 	// Only reconcile if the endpoint subsets have changed
 	if !equality.Semantic.DeepEqual(oldEndpoint.Subsets, newEndpoint.Subsets) {
-		h.logger.V(1).Info("Update Endpoint", "namespace", newEndpoint.GetNamespace(), "name", newEndpoint.GetName())
 		h.enqueueServiceForEndpoint(ctx, queue, newEndpoint)
 	}
 }
 
 func (h *enqueueRequestsForEndpointEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Delete Endpoint", "namespace", e.Object.GetNamespace(), "name", e.Object.GetName())
 	endpoint := e.Object.(*corev1.Endpoints)
 	h.enqueueServiceForEndpoint(ctx, queue, endpoint)
 }
@@ -73,9 +70,7 @@ func (h *enqueueRequestsForEndpointEvent) enqueueServiceForEndpoint(ctx context.
 
 	// Only enqueue if the service is of type LoadBalancer
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
-		h.logger.Info("endpoint changed, enqueuing service for reconciliation",
-			"service", svcKey.String(),
-			"endpointSubsets", len(endpoint.Subsets))
+		h.logger.V(1).Info("Enqueue Service", "namespace", svcKey.Namespace, "name", svcKey.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: svcKey,
 		})

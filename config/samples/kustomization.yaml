@@ -3,4 +3,5 @@ resources:
 - v1alpha1_vngcloudgloballoadbalancer.yaml
 - v1alpha1_nodesecuritygroup.yaml
 - v1alpha1_loadbalancerconfig.yaml
+- v1alpha1_globalloadbalancerconfig.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

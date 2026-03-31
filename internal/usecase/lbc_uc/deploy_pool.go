@@ -212,7 +212,7 @@ func (t *defaultModelDeployTask) buildCreatePoolRequest(_ context.Context, lbId 
 }
 
 // return UpdateRequest and messages
-func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, pool *v1alpha1.Pool, current *entityv2.Pool) (*loadbalancerv2.UpdatePoolRequest, []string) {
+func (t *defaultModelDeployTask) buildPoolUpdateRequest(_ context.Context, lbID string, pool *v1alpha1.Pool, current *entityv2.Pool) (*loadbalancerv2.UpdatePoolRequest, []string) { //nolint:gocyclo
 	isNeedUpdate := false
 	message := make([]string, 0)
 

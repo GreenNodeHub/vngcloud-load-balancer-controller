@@ -35,8 +35,6 @@ type enqueueRequestsForNodeEvent struct {
 }
 
 func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.Info("node created, enqueuing all ingresss", "node", node.Name)
 	h.enqueueAllSupportedIngresss(ctx, queue)
 }
 
@@ -53,13 +51,10 @@ func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.Update
 		return
 	}
 
-	h.logger.Info("node updated, enqueuing all ingresss", "node", newNode.Name)
 	h.enqueueAllSupportedIngresss(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	node := e.Object.(*corev1.Node)
-	h.logger.Info("node deleted, enqueuing all ingresss", "node", node.Name)
 	h.enqueueAllSupportedIngresss(ctx, queue)
 }
 
@@ -79,6 +74,7 @@ func (h *enqueueRequestsForNodeEvent) enqueueAllSupportedIngresss(ctx context.Co
 		if !h.ingressUtils.IsIngressPendingFinalization(&svc) && !h.ingressUtils.IsIngressSupported(&svc) {
 			continue
 		}
+		h.logger.V(1).Info("Enqueue Ingress", "namespace", svc.Namespace, "name", svc.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&svc),
 		})

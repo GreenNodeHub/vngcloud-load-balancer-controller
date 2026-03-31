@@ -37,8 +37,9 @@ import (
 )
 
 const (
-	timeout  = time.Second * 5
-	interval = time.Millisecond * 250
+	timeout         = time.Second * 5
+	interval        = time.Millisecond * 250
+	testServiceName = "test-service"
 )
 
 var _ = Describe("Service Controller", func() {
@@ -59,8 +60,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating a LoadBalancer service", func() {
 		It("should create LBC, LoadBalancer and SecurityGroup", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -74,7 +75,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Spec.Type).Should(Equal(loadbalancerv2.LoadBalancerTypeLayer4))
@@ -141,7 +142,7 @@ var _ = Describe("Service Controller", func() {
 				// Verify Security Group was created
 				listNsg, err := getNSGListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(listNsg.Items)).Should(Equal(1))
+				g.Expect(listNsg.Items).Should(HaveLen(1))
 
 				nsg := &listNsg.Items[0]
 				g.Expect(nsg.Status.ManagedSecurityGroup).ShouldNot(BeNil())
@@ -163,7 +164,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When updating service type from LoadBalancer to ClusterIP and revert", func() {
 		It("should cleanup resources when changing to ClusterIP and recreate when reverting", func() {
 			serviceName := "test-type-change-service"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -253,7 +254,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When creating a DNS LoadBalancer service with TCP and UDP on same port", func() {
 		It("should fail with error due to duplicate port (VNGCloud limitation)", func() {
 			serviceName := "test-dns-service"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create DNS endpoint first
 			endpoint := newDNSEndpointResource(serviceName, namespace)
@@ -300,8 +301,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with all normal annotations", func() {
 		It("should create LoadBalancer with correct attributes from annotations", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -334,7 +335,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -406,8 +407,8 @@ var _ = Describe("Service Controller", func() {
 
 	Context("When creating service with target node label", func() {
 		It("should only add pool members from nodes matching the label", func() {
-			serviceName := "test-service"
-			namespace := "default"
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -425,7 +426,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -489,7 +490,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When creating service with PROXY protocol annotation", func() {
 		It("should use PROXY protocol for pool even though service port is TCP", func() {
 			serviceName := "test-service-1"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -506,7 +507,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
@@ -535,7 +536,7 @@ var _ = Describe("Service Controller", func() {
 	Context("When updating service port", func() {
 		It("should delete old listener and pool, and create new ones with updated port", func() {
 			serviceName := "test-service-1"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create endpoint first
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -683,7 +684,7 @@ var _ = Describe("Service Controller", func() {
 			}()
 
 			serviceName := "test-service-gogsf"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create custom endpoint with two subsets, each with different port mappings
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -691,12 +692,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -706,12 +707,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -733,7 +734,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				updatedLbc := &v1alpha1.LoadBalancerConfig{}
@@ -862,7 +863,7 @@ var _ = Describe("Service Controller", func() {
 					}
 				}
 				return true
-			}, timeout, interval).Should(Equal(true), "should have updated tags after second update")
+			}, timeout, interval).Should(BeTrue(), "should have updated tags after second update")
 
 			// Verify servers have the security group attached
 			Eventually(func() int {
@@ -914,7 +915,7 @@ var _ = Describe("Service Controller", func() {
 			}()
 
 			serviceName := "test-service-gogsf"
-			namespace := "default"
+			namespace := testDefaultNamespace
 
 			// Create custom endpoint with two subsets, each with different port mappings
 			endpoint := newEndpointResource(serviceName, namespace)
@@ -922,12 +923,12 @@ var _ = Describe("Service Controller", func() {
 				// First subset - Deployment pods with ports 80 and 443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "100.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "100.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "mock-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 80},
@@ -937,12 +938,12 @@ var _ = Describe("Service Controller", func() {
 				// Second subset - Different pods with ports 8080 and 6443
 				{
 					Addresses: []corev1.EndpointAddress{
-						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.1.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode1.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-1", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.2.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode2.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-2", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					NotReadyAddresses: []corev1.EndpointAddress{
-						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: "default"}},
-						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: "default"}},
+						{IP: "200.0.3.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode3.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-3", Kind: "Pod", Namespace: testDefaultNamespace}},
+						{IP: "200.0.4.0", Hostname: "", NodeName: &vngcloud_mocks.MockNode4.Name, TargetRef: &corev1.ObjectReference{Name: "fake-pod-4", Kind: "Pod", Namespace: testDefaultNamespace}},
 					},
 					Ports: []corev1.EndpointPort{
 						{Name: "http", Port: 8080},
@@ -964,7 +965,7 @@ var _ = Describe("Service Controller", func() {
 			Eventually(func(g Gomega) {
 				lbcList, err := getLBCListForService(serviceName, namespace)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(len(lbcList.Items)).Should(Equal(1))
+				g.Expect(lbcList.Items).Should(HaveLen(1))
 
 				lbc := &lbcList.Items[0]
 				updatedLbc := &v1alpha1.LoadBalancerConfig{}
@@ -1092,7 +1093,7 @@ var _ = Describe("Service Controller", func() {
 					}
 				}
 				return true
-			}, timeout, interval).Should(Equal(true), "should have updated tags after second update")
+			}, timeout, interval).Should(BeTrue(), "should have updated tags after second update")
 
 			// Verify servers have the security group attached
 			Eventually(func() int {
@@ -1119,7 +1120,7 @@ var _ = Describe("Service Controller", func() {
 			serviceName1 := "test-service-port-80"
 			serviceName2 := "test-service-port-81"
 			serviceName3 := "test-service-port-82"
-			namespace := "default"
+			namespace := testDefaultNamespace
 			var lbID string
 
 			// Create first service with port 80
@@ -1163,13 +1164,13 @@ var _ = Describe("Service Controller", func() {
 				pools, err := vngcloudRepo.ListPool(ctx, loadbalancerUUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(pools).ShouldNot(BeNil())
-				g.Expect(len(pools.Items)).Should(Equal(1))
+				g.Expect(pools.Items).Should(HaveLen(1))
 
 				// Check listener - should have 1
 				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, loadbalancerUUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(listeners).ShouldNot(BeNil())
-				g.Expect(len(listeners.Items)).Should(Equal(1))
+				g.Expect(listeners.Items).Should(HaveLen(1))
 			}, timeout*2, interval).Should(Succeed())
 
 			// Create second service with port 81 and same LB ID annotation

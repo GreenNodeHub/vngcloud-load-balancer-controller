@@ -17,8 +17,8 @@ import (
 )
 
 type MetricCollector interface {
-	// ObservePodReadinessGateReady this metric is useful to determine how fast pods are becoming ready in the load balancer.
-	// Due to some architectural constraints, we can only emit this metric for pods that are using readiness gates.
+	// ObservePodReadinessGateReady tracks how fast pods become ready in the LB.
+	// Only emitted for pods using readiness gates.
 	ObservePodReadinessGateReady(namespace string, tgbName string, duration time.Duration)
 	ObserveControllerReconcileError(controller string, errorType string)
 	ObserveControllerReconcileLatency(controller string, stage string, fn func())
@@ -61,7 +61,10 @@ func (n *noOpCollector) StartCollectTopTalkers(_ context.Context) {
 func (n *noOpCollector) StartCollectCacheSize(_ context.Context) {
 }
 
-func NewCollector(registerer prometheus.Registerer, mgr ctrl.Manager, reconcileCounters *util.ReconcileCounters, logger logr.Logger) MetricCollector {
+func NewCollector(
+	registerer prometheus.Registerer, mgr ctrl.Manager,
+	reconcileCounters *util.ReconcileCounters, logger logr.Logger,
+) MetricCollector {
 	if registerer == nil {
 		return &noOpCollector{}
 	}

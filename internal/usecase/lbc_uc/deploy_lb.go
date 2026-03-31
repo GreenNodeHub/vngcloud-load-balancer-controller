@@ -262,7 +262,7 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	return nil
 }
 
-func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateLoadBalancerRequest, error) {
+func (t *defaultModelDeployTask) buildCreateLoadBalancerRequest(ctx context.Context, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateLoadBalancerRequest, error) { //nolint:gocyclo
 	packageId := ""
 	if t.lbConfig.Spec.PackageId != nil && *t.lbConfig.Spec.PackageId != "" {
 		packageId = *t.lbConfig.Spec.PackageId
@@ -431,7 +431,7 @@ func (t *defaultModelDeployTask) buildCreateInterVpcLoadBalancerRequest(ctx cont
 		*t.lbConfig.Spec.PrivateSubnetId,
 	).WithZoneId(privateZoneId)
 
-	// TODO: add more fields (ignore listener and pool for now becasue have to create inter.ListenerRequest and inter.CreatePoolRequest)
+	// TODO: add more fields (ignore listener and pool for now because have to create inter.ListenerRequest and inter.CreatePoolRequest)
 	// WithListener(plistener ICreateListenerRequest) ICreateLoadBalancerRequest
 	// WithPool(ppool ICreatePoolRequest) ICreateLoadBalancerRequest
 

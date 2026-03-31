@@ -10,7 +10,7 @@
 
 ### Prerequisites
 
-- go version v1.24.0+
+- go version v1.25.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
@@ -190,6 +190,11 @@ make generate
 make manifests kustomize helm
 
 kubebuilder create api --version v1alpha1 --kind NodeSecurityGroup --controller=true --resource=true --namespaced=true
+go mod tidy
+make generate
+make manifests kustomize helm
+
+kubebuilder create api --version v1alpha1 --kind GlobalLoadBalancerConfig --controller=true --resource=true --namespaced=true
 go mod tidy
 make generate
 make manifests kustomize helm

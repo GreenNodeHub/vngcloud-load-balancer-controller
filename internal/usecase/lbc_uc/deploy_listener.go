@@ -201,7 +201,7 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 	return createRequest, nil
 }
 
-func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.IUpdateListenerRequest, []string, error) {
+func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.IUpdateListenerRequest, []string, error) { //nolint:gocyclo
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &loadbalancerv2.UpdateListenerRequest{

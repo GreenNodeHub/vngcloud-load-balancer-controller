@@ -32,7 +32,7 @@ type MockCounterMetric struct {
 	labelName          string
 	resource           string
 	webhookName        string
-	errorType          string
+	// errorType          string
 }
 
 func (m *MockCollector) ObservePodReadinessGateReady(namespace string, tgbName string, d time.Duration) {
@@ -40,24 +40,27 @@ func (m *MockCollector) ObservePodReadinessGateReady(namespace string, tgbName s
 }
 
 func (m *MockCollector) ObserveControllerReconcileError(controller string, errorCategory string) {
-	m.Invocations[MetricControllerReconcileErrors] = append(m.Invocations[MetricControllerReconcileErrors], MockCounterMetric{
-		labelController:    controller,
-		labelErrorCategory: errorCategory,
-	})
+	m.Invocations[MetricControllerReconcileErrors] = append(
+		m.Invocations[MetricControllerReconcileErrors], MockCounterMetric{
+			labelController:    controller,
+			labelErrorCategory: errorCategory,
+		})
 }
 
 func (m *MockCollector) ObserveControllerReconcileLatency(controller string, stage string, fn func()) {
-	m.Invocations[MetricControllerReconcileStageDuration] = append(m.Invocations[MetricControllerReconcileStageDuration], MockCounterMetric{
-		labelController:    controller,
-		labelErrorCategory: stage,
-	})
+	m.Invocations[MetricControllerReconcileStageDuration] = append(
+		m.Invocations[MetricControllerReconcileStageDuration], MockCounterMetric{
+			labelController:    controller,
+			labelErrorCategory: stage,
+		})
 }
 
 func (m *MockCollector) ObserveWebhookValidationError(webhookName string, errorCategory string) {
-	m.Invocations[MetricWebhookValidationFailure] = append(m.Invocations[MetricWebhookValidationFailure], MockCounterMetric{
-		webhookName:        webhookName,
-		labelErrorCategory: errorCategory,
-	})
+	m.Invocations[MetricWebhookValidationFailure] = append(
+		m.Invocations[MetricWebhookValidationFailure], MockCounterMetric{
+			webhookName:        webhookName,
+			labelErrorCategory: errorCategory,
+		})
 }
 
 func (m *MockCollector) ObserveWebhookMutationError(webhookName string, errorCategory string) {
@@ -68,9 +71,10 @@ func (m *MockCollector) ObserveWebhookMutationError(webhookName string, errorCat
 }
 
 func (m *MockCollector) ObserveControllerCacheSize(resource string, count int) {
-	m.Invocations[MetricControllerCacheObjectCount] = append(m.Invocations[MetricControllerCacheObjectCount], MockCounterMetric{
-		resource: resource,
-	})
+	m.Invocations[MetricControllerCacheObjectCount] = append(
+		m.Invocations[MetricControllerCacheObjectCount], MockCounterMetric{
+			resource: resource,
+		})
 }
 
 func (m *MockCollector) ObserveControllerTopTalkers(controller, namespace string, name string) {
@@ -122,7 +126,7 @@ func (m *MockCollector) StartCollectCacheSize(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			m.CollectCacheSize(ctx)
+			_ = m.CollectCacheSize(ctx)
 		}
 	}
 

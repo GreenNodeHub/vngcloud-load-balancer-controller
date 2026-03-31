@@ -10,17 +10,29 @@ const (
 
 // Finalizers
 const (
-	ServiceFinalizer = "service.kubernetes.io/load-balancer-cleanup"
-	IngressFinalizer = "ingress.vngcloud.vn/resources"
-	GlbFinalizer     = "glb.vngcloud.vn/resources"
-	LbcFinalizer     = "lbc.vngcloud.vn/resources"
-	NsgFinalizer     = "nsg.vngcloud.vn/resources"
+	ServiceFinalizer    = "service.kubernetes.io/load-balancer-cleanup"
+	IngressFinalizer    = "ingress.vngcloud.vn/resources"
+	GlbFinalizer        = "glb.vngcloud.vn/resources"
+	GlbcFinalizer       = "glbc.vngcloud.vn/resources"
+	LbcFinalizer        = "lbc.vngcloud.vn/resources" // TODO: plan this finalizer name
+	NsgFinalizer        = "nsg.vngcloud.vn/resources"
+	VglbFinalizer       = "glb.vngcloud.vn/resources"
+	ServiceGLBFinalizer = "glb.vks.vngcloud.vn/resources"
 )
 
 // Annotations
 const (
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
 	INGRESS_ANNOTATION_PREFIX = "vks.vngcloud.vn"
+	VGLB_ANNOTATION_PREFIX    = "vks.vngcloud.vn"
+	GLB_ANNOTATION_PREFIX     = "glb.vks.vngcloud.vn"
+)
+
+// CRD kind names (K8s strips TypeMeta from objects returned by Get; use these constants
+// instead of obj.Kind when setting labels that must survive round-trips through the API server)
+const (
+	KindVngcloudGlobalLoadBalancer = "VngcloudGlobalLoadBalancer"
+	KindService                    = "Service"
 )
 
 // Labels

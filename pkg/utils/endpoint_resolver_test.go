@@ -127,7 +127,7 @@ func Test_defaultEndpointResolver_ResolvePodEndpoints(t *testing.T) {
 				Status: corev1.ConditionTrue,
 			},
 		},
-		NodeName: nodeC.ObjectMeta.Name,
+		NodeName: nodeC.Name,
 		PodIP:    "192.168.1.3",
 	}
 

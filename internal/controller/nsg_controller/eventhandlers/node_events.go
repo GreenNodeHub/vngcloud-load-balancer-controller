@@ -35,7 +35,6 @@ type enqueueRequestsForNodeEvent struct {
 }
 
 func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Create Node", "name", e.Object.GetName())
 	h.enqueueAllNsg(ctx, queue)
 }
 
@@ -52,12 +51,10 @@ func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.Update
 		return
 	}
 
-	h.logger.V(1).Info("Update Node", "name", newNode.Name)
 	h.enqueueAllNsg(ctx, queue)
 }
 
 func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	h.logger.V(1).Info("Delete Node", "name", e.Object.GetName())
 	h.enqueueAllNsg(ctx, queue)
 }
 
@@ -76,6 +73,7 @@ func (h *enqueueRequestsForNodeEvent) enqueueAllNsg(ctx context.Context, queue w
 		if !h.nsgUtils.IsPendingFinalization(&nsg) && !h.nsgUtils.IsSupported(&nsg) {
 			continue
 		}
+		h.logger.V(1).Info("Enqueue NodeSecurityGroup", "namespace", nsg.Namespace, "name", nsg.Name)
 		queue.Add(reconcile.Request{
 			NamespacedName: client.ObjectKeyFromObject(&nsg),
 		})

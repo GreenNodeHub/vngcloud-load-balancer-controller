@@ -307,3 +307,81 @@ func (r *k8sRepository) GetSecret(ctx context.Context, n types.NamespacedName) (
 	err := r.client.Get(ctx, n, secret)
 	return secret, err
 }
+
+// ------------------- global load balancer config ------------------
+
+func (r *k8sRepository) GetGlobalLoadBalancerConfig(ctx context.Context, n types.NamespacedName) (*v1alpha1.GlobalLoadBalancerConfig, error) {
+	glbc := &v1alpha1.GlobalLoadBalancerConfig{}
+	err := r.client.Get(ctx, n, glbc)
+	return glbc, err
+}
+
+func (r *k8sRepository) ListGlobalLoadBalancerConfig(ctx context.Context, list *v1alpha1.GlobalLoadBalancerConfigList, opts ...client.ListOption) error {
+	return r.client.List(ctx, list, opts...)
+}
+
+func (r *k8sRepository) CreateGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, opts ...client.CreateOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Creating GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+
+	err := r.client.Create(ctx, glbc, opts...)
+	if err != nil {
+		return err
+	}
+
+	// retry 3 times to ensure object is created (eventual consistency)
+	for i := 0; i < 3; i++ {
+		err = r.client.Get(ctx, types.NamespacedName{Namespace: glbc.GetNamespace(), Name: glbc.GetName()}, glbc)
+		if err == nil {
+			return nil
+		}
+		if client.IgnoreNotFound(err) != nil {
+			return err // non-NotFound error, return immediately
+		}
+		logger.Warn("Create returned nil but object not found, retrying...")
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
+}
+
+func (r *k8sRepository) DeleteGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Deleting GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	return r.client.Delete(ctx, glbc)
+}
+
+func (r *k8sRepository) PatchGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
+	logger := contexts.NewContext(ctx).Log()
+	logger.Infof("%s Patching GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	return r.client.Patch(ctx, glbc, patch, opts...)
+}
+
+func (r *k8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(
+	ctx context.Context,
+	glbc *v1alpha1.GlobalLoadBalancerConfig,
+	mutate func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool,
+) error {
+	return r.patchMutateStatusObject(ctx, glbc, func(ctx context.Context, obj client.Object) bool {
+		// type-assert so you can use strongly typed fields
+		return mutate(ctx, obj.(*v1alpha1.GlobalLoadBalancerConfig))
+	})
+}
+
+// ------------------- vngcloud global load balancer ------------------
+
+func (r *k8sRepository) GetVngcloudGlobalLoadBalancer(ctx context.Context, n types.NamespacedName) (*v1alpha1.VngcloudGlobalLoadBalancer, error) {
+	vglb := &v1alpha1.VngcloudGlobalLoadBalancer{}
+	err := r.client.Get(ctx, n, vglb)
+	return vglb, err
+}
+
+func (r *k8sRepository) PatchMutateStatusVngcloudGlobalLoadBalancer(
+	ctx context.Context,
+	vglb *v1alpha1.VngcloudGlobalLoadBalancer,
+	mutate func(ctx context.Context, obj *v1alpha1.VngcloudGlobalLoadBalancer) bool,
+) error {
+	return r.patchMutateStatusObject(ctx, vglb, func(ctx context.Context, obj client.Object) bool {
+		// type-assert so you can use strongly typed fields
+		return mutate(ctx, obj.(*v1alpha1.VngcloudGlobalLoadBalancer))
+	})
+}

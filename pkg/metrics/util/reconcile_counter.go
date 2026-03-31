@@ -11,7 +11,9 @@ type ReconcileCounters struct {
 	serviceReconciles map[types.NamespacedName]int
 	ingressReconciles map[types.NamespacedName]int
 	lbcReconciles     map[types.NamespacedName]int
+	glbcReconciles    map[types.NamespacedName]int
 	nsgReconciles     map[types.NamespacedName]int
+	vglbReconciles    map[types.NamespacedName]int
 	mutex             sync.Mutex
 }
 
@@ -25,7 +27,9 @@ func NewReconcileCounters() *ReconcileCounters {
 		serviceReconciles: make(map[types.NamespacedName]int),
 		ingressReconciles: make(map[types.NamespacedName]int),
 		lbcReconciles:     make(map[types.NamespacedName]int),
+		glbcReconciles:    make(map[types.NamespacedName]int),
 		nsgReconciles:     make(map[types.NamespacedName]int),
+		vglbReconciles:    make(map[types.NamespacedName]int),
 		mutex:             sync.Mutex{},
 	}
 }
@@ -48,10 +52,22 @@ func (c *ReconcileCounters) IncrementLbc(namespaceName types.NamespacedName) {
 	c.lbcReconciles[namespaceName]++
 }
 
+func (c *ReconcileCounters) IncrementGlbc(namespaceName types.NamespacedName) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.glbcReconciles[namespaceName]++
+}
+
 func (c *ReconcileCounters) IncrementNsg(namespaceName types.NamespacedName) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.nsgReconciles[namespaceName]++
+}
+
+func (c *ReconcileCounters) IncrementVglb(namespaceName types.NamespacedName) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.vglbReconciles[namespaceName]++
 }
 
 func (c *ReconcileCounters) GetTopReconciles(n int) map[string][]ResourceReconcileCount {
@@ -85,5 +101,7 @@ func (c *ReconcileCounters) ResetCounter() {
 	c.serviceReconciles = make(map[types.NamespacedName]int)
 	c.ingressReconciles = make(map[types.NamespacedName]int)
 	c.lbcReconciles = make(map[types.NamespacedName]int)
+	c.glbcReconciles = make(map[types.NamespacedName]int)
 	c.nsgReconciles = make(map[types.NamespacedName]int)
+	c.vglbReconciles = make(map[types.NamespacedName]int)
 }
