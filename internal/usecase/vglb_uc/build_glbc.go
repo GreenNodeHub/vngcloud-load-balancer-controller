@@ -18,6 +18,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -77,9 +78,19 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		return err
 	}
 
-	// ClusterIP services have no NodePort — reject and wait for type change
-	if svc.Spec.Type == corev1.ServiceTypeClusterIP {
-		return errs.NewRequeueNeededAfter("service "+svc.Namespace+"/"+svc.Name+" is ClusterIP (no NodePort), waiting for type change", 30*time.Second)
+	// Only LoadBalancer and NodePort services are supported
+	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer && svc.Spec.Type != corev1.ServiceTypeNodePort {
+		return errs.NewRequeueNeededAfter("service "+svc.Namespace+"/"+svc.Name+" is "+string(svc.Spec.Type)+" (not LoadBalancer or NodePort), waiting for type change", 30*time.Second)
+	}
+
+	// Config cluster annotation must be present
+	if t.vglb.Annotations == nil || t.vglb.Annotations[consts.ConfigClusterIdAnnotation] == "" {
+		return errs.NewRequeueNeededAfter("annotation "+consts.ConfigClusterIdAnnotation+" is empty on VGLB "+t.vglb.Namespace+"/"+t.vglb.Name+", waiting", 30*time.Second)
+	}
+
+	// Fleet ID label must be present
+	if t.vglb.Labels == nil || t.vglb.Labels[consts.FleetIDLabel] == "" {
+		return errs.NewRequeueNeededAfter("label "+consts.FleetIDLabel+" is empty on VGLB "+t.vglb.Namespace+"/"+t.vglb.Name+", waiting", 30*time.Second)
 	}
 
 	// list GLBC by label selector
@@ -143,6 +154,14 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 
 	// Create or update GLBC
 	if !isCreated {
+		// If no LB ID is set yet, only the config cluster should create the GLB.
+		// Other clusters skip and wait for the config cluster to provision it first.
+		if glbConfig.Spec.LoadBalancerId == nil {
+			if t.vglb.Annotations[consts.ConfigClusterIdAnnotation] != t.cfg.Cluster.ClusterID {
+				t.logger.Infof("No LB ID yet — waiting for config cluster %q to create the loadbalancer.", t.vglb.Annotations[consts.ConfigClusterIdAnnotation])
+				return nil
+			}
+		}
 		err = t.k8sRepo.CreateGlobalLoadBalancerConfig(ctx, glbConfig)
 		if err != nil {
 			t.logger.Errorf("failed to create GLBC: %v", err)

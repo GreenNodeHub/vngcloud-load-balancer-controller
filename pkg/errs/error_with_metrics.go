@@ -39,3 +39,7 @@ func NewErrorWithMetrics(
 func (e *ErrorWithMetrics) Error() string {
 	return e.Err.Error()
 }
+
+func (e *ErrorWithMetrics) Unwrap() error {
+	return e.Err
+}
