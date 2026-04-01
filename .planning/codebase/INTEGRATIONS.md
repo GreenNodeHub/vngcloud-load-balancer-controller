@@ -124,7 +124,6 @@
 
 **Helm Deployment:**
 - Chart located at `charts/vngcloud-load-balancer-controller/`
-- Current chart version: `0.3.21`, app version: `v0.3.21`
 - Published as OCI artifact to `vcr.vngcloud.vn/81-vks-public/vks-helm-charts` and HAN equivalent
 
 **Kubernetes Manifest Generation:**

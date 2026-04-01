@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller
-  newTag: v0.3.21
+  newTag: v0.3.22
