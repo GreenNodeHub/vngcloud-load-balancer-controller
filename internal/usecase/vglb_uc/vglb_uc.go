@@ -119,6 +119,7 @@ func (uc *vglbUseCase) ensure(ctx context.Context, vglb *v1alpha1.VngcloudGlobal
 		vngcloudRepo:     uc.vngcloudRepo,
 		annotationParser: uc.annotationParser,
 		endpointResolver: uc.endpointResolver,
+		nameHelper:       utils.NewNameHelper(uc.cfg.Cluster.ClusterID, "vglb", vglb.GetNamespace(), vglb.GetName()),
 
 		defaultRegion:     uc.defaultRegion,
 		defaultNetworkId:  uc.defaultNetworkId,

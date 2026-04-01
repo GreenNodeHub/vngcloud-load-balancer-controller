@@ -3,7 +3,6 @@ package service_glb_uc
 import (
 	"context"
 	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -29,6 +28,7 @@ type defaultModelBuildTask struct {
 	vngcloudRepo     repository.VngCloudRepository
 	annotationParser annotations.Parser
 	endpointResolver utils.EndpointResolver
+	nameHelper       utils.NameHelper
 
 	// Network info
 	defaultRegion     string
@@ -166,14 +166,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerName(_ context.Context) string 
 	if option != "" {
 		return option
 	}
-	// Default name based on Service namespace and name
-	// GLB name only allows a-z, A-Z, 0-9, '_', '.' and must be 5-50 characters
-	name := "vks_" + t.service.Namespace + "_" + t.service.Name
-	name = strings.ReplaceAll(name, "-", "_")
-	if len(name) > 50 {
-		name = name[:50]
-	}
-	return name
+	return t.nameHelper.GetLoadBalancerDefaultName()
 }
 
 func (t *defaultModelBuildTask) buildPackageId(_ context.Context) *string {

@@ -115,6 +115,7 @@ func (uc *serviceGLBUseCase) EnsureServiceGLBUseCase(ctx context.Context, req ct
 		vngcloudRepo:     uc.vngcloudRepo,
 		annotationParser: uc.annotationParser,
 		endpointResolver: uc.endpointResolver,
+		nameHelper:       utils.NewNameHelper(uc.cfg.Cluster.ClusterID, "service-glb", svc.GetNamespace(), svc.GetName()),
 
 		defaultRegion:     uc.defaultRegion,
 		defaultNetworkId:  uc.defaultNetworkId,

@@ -3,7 +3,6 @@ package vglb_uc
 import (
 	"context"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,6 +31,7 @@ type defaultModelBuildTask struct {
 	vngcloudRepo     repository.VngCloudRepository
 	annotationParser annotations.Parser
 	endpointResolver utils.EndpointResolver
+	nameHelper       utils.NameHelper
 
 	// Network info
 	defaultRegion     string
@@ -177,14 +177,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerName(_ context.Context) string 
 	if option != "" {
 		return option
 	}
-	// Default name based on VGLB name
-	// GLB name only allows a-z, A-Z, 0-9, '_', '.' and must be 5-50 characters
-	name := "vks_" + t.vglb.Namespace + "_" + t.vglb.Name
-	name = strings.ReplaceAll(name, "-", "_")
-	if len(name) > 50 {
-		name = name[:50]
-	}
-	return name
+	return t.nameHelper.GetLoadBalancerDefaultName()
 }
 
 func (t *defaultModelBuildTask) buildPackageId(_ context.Context) *string {
