@@ -19,6 +19,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
+      affinity: {{- toYaml .Values.manager.affinity | nindent 8 }}
       containers:
       - args: {{- toYaml .Values.manager.manager.args | nindent 8 }}
         command:
@@ -52,12 +53,14 @@ spec:
         - mountPath: /etc/hosts
           name: add-hosts
           readOnly: true
-      securityContext:
-        runAsNonRoot: true
-      serviceAccountName: {{ include "vngcloud-load-balancer-controller.fullname" . }}-manager
+      nodeSelector: {{- toYaml .Values.manager.nodeSelector | nindent 8 }}
+      securityContext: {{- toYaml .Values.manager.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "vngcloud-load-balancer-controller.serviceAccountName"
+        . }}
       terminationGracePeriodSeconds: 10
-      tolerations:
-      - operator: Exists
+      tolerations: {{- toYaml .Values.manager.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.manager.topologySpreadConstraints |
+        nindent 8 }}
       volumes:
       - name: secret
         secret:

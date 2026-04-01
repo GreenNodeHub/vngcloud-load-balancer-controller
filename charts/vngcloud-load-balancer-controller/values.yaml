@@ -23,9 +23,37 @@ manager:
       requests:
         cpu: 10m
         memory: 64Mi
+  nodeSelector: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              control-plane: manager
+          topologyKey: kubernetes.io/hostname
+  podSecurityContext:
+    runAsNonRoot: true
   replicas: 1
-  serviceAccount:
-    annotations: {}
+  tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - key: components.vks.vngcloud.vn/vks-managed-components
+    operator: Exists
+  - effect: NoSchedule
+    key: kubernetes.io/arch
+    operator: Equal
+    value: arm64
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  topologySpreadConstraints: []
 metricsService:
   ports:
   - name: https
@@ -60,3 +88,8 @@ mysecret:
     defaultTimeoutMember: 50
     defaultTimeoutConnection: 5
     defaultAllowedCidrs: 0.0.0.0/0
+serviceAccount:
+  annotations: {}
+  automount: true
+  create: true
+  name: ""

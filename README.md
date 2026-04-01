@@ -123,9 +123,9 @@ limitations under the License.
 To install dev version through helm:
 
 ```sh
-helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/60108-annd2-ingress/vks-helm-charts/vngcloud-load-balancer-controller \
+helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller \
   --namespace kube-system \
-  --set manager.manager.image.repository=vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller \
+  --set manager.manager.image.repository=vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller \
   --set manager.manager.image.tag=v0.0.0 \
   --version 0.0.1 \
   --set mysecret.global.clientID="____________________" \

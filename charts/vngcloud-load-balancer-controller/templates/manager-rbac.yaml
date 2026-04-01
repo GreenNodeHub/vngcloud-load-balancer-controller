@@ -169,5 +169,5 @@ roleRef:
   name: '{{ include "vngcloud-load-balancer-controller.fullname" . }}-manager-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "vngcloud-load-balancer-controller.fullname" . }}-manager'
+  name: '{{ include "vngcloud-load-balancer-controller.serviceAccountName" . }}'
   namespace: '{{ .Release.Namespace }}'
