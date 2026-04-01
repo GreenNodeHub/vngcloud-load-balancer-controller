@@ -25,6 +25,7 @@ import (
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +42,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/lbc"
 	lbcmetrics "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/lbc"
 	metricsutil "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/metrics/util"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/ownerevents"
 )
 
 const (
@@ -86,6 +88,7 @@ type LoadBalancerConfigReconciler struct {
 	eventRecorder    record.EventRecorder
 	finalizerManager k8s.FinalizerManager
 	lbcUtils         lbc.LoadBalancerConfigUtils
+	restMapper       apimeta.RESTMapper
 
 	reconcileCounters *metricsutil.ReconcileCounters
 	metricsCollector  lbcmetrics.MetricCollector
@@ -137,10 +140,12 @@ func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.R
 			if err != nil {
 				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 				r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
+				ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				return err
 			}
 			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
 			r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
+			ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeNormal, "Deleted", key)
 			return nil
 		}
 		return nil
@@ -150,10 +155,12 @@ func (r *LoadBalancerConfigReconciler) reconcile(ctx context.Context, req ctrl.R
 	if err != nil {
 		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
+		ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
 	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
 	r.eventRecorder.Event(object, corev1.EventTypeNormal, "Ensured", key)
+	ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeNormal, "Ensured", key)
 	return nil
 }
 
@@ -202,6 +209,8 @@ func (r *LoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req 
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *LoadBalancerConfigReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	r.restMapper = mgr.GetRESTMapper()
+
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 		log := ctrl.Log.WithName("init")
 		log.Info("Running initialization...")
