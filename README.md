@@ -123,10 +123,10 @@ limitations under the License.
 To install dev version through helm:
 
 ```sh
-helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller \
+helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/60108-annd2-ingress/vks-helm-charts/vngcloud-load-balancer-controller \
   --namespace kube-system \
-  --set manager.manager.image.repository=vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller \
-  --set manager.manager.image.tag=v0.0.0 \
+  --set manager.manager.image.repository=vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller \
+  --set manager.manager.image.tag=v0.0.1 \
   --version 0.0.1 \
   --set mysecret.global.clientID="____________________" \
   --set mysecret.global.clientSecret="____________________" \
@@ -212,7 +212,7 @@ mockery
 
 - [ ] end to end test
 - [ ] global load balancer
-- [ ] linting
+- [x] linting
 - [ ] review CRD field
 - [ ] documentations
 - [x] metrics
@@ -222,3 +222,5 @@ mockery
 - [x] client manager for running remote
 - [ ] create lb with pool and lis then delete immediatelly (pool and lis not manage yet -> delete not done)
 - [x] status conditions
+- [ ] `W0401 06:27:07.604444       1 warnings.go:70] v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice`
+- [ ] Add resourceRef to CRD, then create events with reference to the resourceRef, so that kubectl describe can show the events related to the resourceRef
