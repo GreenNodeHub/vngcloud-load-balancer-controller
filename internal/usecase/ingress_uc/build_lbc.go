@@ -349,7 +349,11 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 	}
 
 	// if LBC already exists, use its subnet as source of truth
-	if existingSubnetId != "" && existingSubnetId != t.defaultSubnetId {
+	if existingSubnetId != "" {
+		if existingSubnetId == t.defaultSubnetId {
+			return zone, networkId, subnetId, subnetCIDR, _err
+		}
+
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, existingSubnetId)
 		if err != nil || subnet == nil {
 			t.logger.Errorf("Failed to get existing subnet %s: %v", existingSubnetId, err)

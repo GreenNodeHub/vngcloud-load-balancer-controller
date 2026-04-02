@@ -197,6 +197,56 @@ func (r *k8sRepository) patchMutateStatusObject(
 	})
 }
 
+func (r *k8sRepository) PatchMutateLoadBalancerConfig(
+	ctx context.Context,
+	lbc *v1alpha1.LoadBalancerConfig,
+	mutate func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool,
+) error {
+	return r.patchMutateObject(ctx, lbc, func(ctx context.Context, obj client.Object) bool {
+		return mutate(ctx, obj.(*v1alpha1.LoadBalancerConfig))
+	})
+}
+
+func (r *k8sRepository) patchMutateObject(
+	ctx context.Context,
+	obj client.Object,
+	mutate func(ctx context.Context, obj client.Object) bool,
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// get fresh copy
+		objGet := obj.DeepCopyObject().(client.Object)
+		if err := r.client.Get(ctx, types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.GetName(),
+		}, objGet); err != nil {
+			return err
+		}
+
+		// deep copy for diff/patch base
+		oldObject := objGet.DeepCopyObject().(client.Object)
+
+		// mutate the fetched object (not the input), skip patch if no change needed
+		if !mutate(ctx, objGet) {
+			return nil
+		}
+
+		diff := cmp.Diff(oldObject, objGet,
+			cmpopts.IgnoreTypes(metav1.ObjectMeta{}, metav1.TypeMeta{}),
+			cmpopts.IgnoreFields(v1alpha1.LoadBalancerConfig{}, "Status"),
+			cmpopts.IgnoreFields(v1alpha1.NodeSecurityGroup{}, "Status"),
+		)
+		if diff != "" && logrus.IsLevelEnabled(logrus.DebugLevel) {
+			fmt.Fprintf(os.Stderr, "\n%s  spec diff (before mutation -> after mutation):\n%s\n", domain.DebugIcon, diff)
+		}
+
+		// patch the main object (spec), with optimistic lock
+		logger := contexts.NewContext(ctx).Log()
+		logger.Infof("%s Patching spec %s/%s", domain.RequestIcon, objGet.GetNamespace(), objGet.GetName())
+		return r.client.Patch(ctx, objGet,
+			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
+	})
+}
+
 func (r *k8sRepository) ListLoadBalancerConfig(ctx context.Context, list *v1alpha1.LoadBalancerConfigList, opts ...client.ListOption) error {
 	return r.client.List(ctx, list, opts...)
 }

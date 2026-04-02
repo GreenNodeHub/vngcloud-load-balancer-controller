@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
@@ -206,10 +207,14 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 	if lbEntity == nil {
 		var err error
-		_, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
+		lbEntity, err = t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId)
 		if err != nil {
 			return "", err
 		}
+	}
+
+	if err := t.syncLBCSpecFromLoadBalancer(ctx, lbEntity); err != nil {
+		return "", err
 	}
 
 	var err error
@@ -231,6 +236,51 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	}
 
 	return lbId, nil
+}
+
+// syncLBCSpecFromLoadBalancer compares the actual load balancer state with the LBC spec
+// and patches the spec if any fields have drifted. This ensures the LBC spec stays in sync
+// with the real load balancer after creation or when using an existing LB.
+func (t *defaultModelDeployTask) syncLBCSpecFromLoadBalancer(ctx context.Context, lbEntity *entity.LoadBalancer) error {
+	if lbEntity == nil {
+		return nil
+	}
+
+	return t.k8sRepo.PatchMutateLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		changed := false
+
+		if lbEntity.Name != "" && lbEntity.Name != obj.Spec.LoadBalancerName {
+			t.logger.Infof("Syncing LBC LoadBalancerName: %s -> %s", obj.Spec.LoadBalancerName, lbEntity.Name)
+			obj.Spec.LoadBalancerName = lbEntity.Name
+			changed = true
+		}
+
+		// For InterVPC LBs, BackendSubnetID is the backend subnet (maps to Spec.SubnetId).
+		// For normal LBs, BackendSubnetID is empty; PrivateSubnetID is the subnet (maps to Spec.SubnetId).
+		subnetId := lbEntity.PrivateSubnetID
+		if lbEntity.BackendSubnetID != "" {
+			subnetId = lbEntity.BackendSubnetID
+		}
+		if subnetId != "" && subnetId != obj.Spec.SubnetId {
+			t.logger.Infof("Syncing LBC SubnetId: %s -> %s", obj.Spec.SubnetId, subnetId)
+			obj.Spec.SubnetId = subnetId
+			changed = true
+		}
+
+		if lbEntity.Type != "" && loadbalancerv2.LoadBalancerType(lbEntity.Type) != obj.Spec.Type {
+			t.logger.Infof("Syncing LBC Type: %s -> %s", obj.Spec.Type, lbEntity.Type)
+			obj.Spec.Type = loadbalancerv2.LoadBalancerType(lbEntity.Type)
+			changed = true
+		}
+
+		if lbEntity.ZoneID != "" && common.Zone(lbEntity.ZoneID) != obj.Spec.ZoneId {
+			t.logger.Infof("Syncing LBC ZoneId: %s -> %s", obj.Spec.ZoneId, lbEntity.ZoneID)
+			obj.Spec.ZoneId = common.Zone(lbEntity.ZoneID)
+			changed = true
+		}
+
+		return changed
+	})
 }
 
 // resize load balancer if packageID in spec is different from current one

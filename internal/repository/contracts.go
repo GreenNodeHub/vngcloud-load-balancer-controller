@@ -127,6 +127,7 @@ type K8sRepository interface {
 	PatchLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error
 	UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.UpdateOption) error
 	PatchMutateStatusLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error
+	PatchMutateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error
 	ListLoadBalancerConfig(ctx context.Context, list *v1alpha1.LoadBalancerConfigList, opts ...client.ListOption) error
 
 	GetNodeSecurityGroup(ctx context.Context, n types.NamespacedName) (*v1alpha1.NodeSecurityGroup, error)
