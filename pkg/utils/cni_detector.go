@@ -71,16 +71,18 @@ func (d *detector) DetectCNIType(ctx context.Context) (CNIType, error) {
 func (d *detector) isCalicoOverlay(ctx context.Context) bool {
 	logger := contexts.NewContext(ctx).Log()
 
-	calicoNodeDaemonSet := &appsv1.DaemonSet{}
-	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
-
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logger.Warnf("Failed to get calico-node daemonset: %v", err)
+	// Calico can be installed in kube-system or calico-system namespace
+	for _, ns := range []string{"kube-system", "calico-system"} {
+		calicoNodeDaemonSet := &appsv1.DaemonSet{}
+		err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: ns, Name: "calico-node"}, calicoNodeDaemonSet)
+		if err == nil {
+			return true
 		}
-		return false
+		if !apierrors.IsNotFound(err) {
+			logger.Warnf("Failed to get calico-node daemonset in %s: %v", ns, err)
+		}
 	}
-	return true
+	return false
 }
 
 // Check if Cilium Overlay is running
