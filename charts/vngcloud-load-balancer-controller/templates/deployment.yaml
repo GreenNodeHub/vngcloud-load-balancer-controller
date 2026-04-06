@@ -54,6 +54,7 @@ spec:
           name: add-hosts
           readOnly: true
       nodeSelector: {{- toYaml .Values.manager.nodeSelector | nindent 8 }}
+      priorityClassName: {{ .Values.manager.priorityClassName }}
       securityContext: {{- toYaml .Values.manager.podSecurityContext | nindent 8 }}
       serviceAccountName: {{ include "vngcloud-load-balancer-controller.serviceAccountName"
         . }}

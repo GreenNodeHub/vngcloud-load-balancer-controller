@@ -46,6 +46,7 @@ spec:
       labels:
         control-plane: manager
     spec:
+      priorityClassName: system-cluster-critical
       nodeSelector: {}
       tolerations:
         - key: CriticalAddonsOnly
