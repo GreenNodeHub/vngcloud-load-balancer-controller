@@ -346,6 +346,171 @@ func TestStatusAddNodeSecurityGroupIntegration(t *testing.T) {
 		err = k8sClient.Update(ctx, testNSG)
 		require.NoError(t, err)
 	})
+
+	t.Run("should set selected nodes when there are none", func(t *testing.T) {
+		testNSG := &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nsg-7",
+				Namespace: "default",
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{
+				SelectNodeLabels: map[string]string{"test": "true"},
+			},
+		}
+		err := k8sClient.Create(ctx, testNSG)
+		require.NoError(t, err)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
+
+		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
+
+		// Initially no selected nodes
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Empty(t, testNSG.Status.SelectedNodes)
+
+		// Set selected nodes
+		nodes := []v1alpha1.NodeInfo{
+			{Name: "node-1", ServerId: "server-1"},
+			{Name: "node-2", ServerId: "server-2"},
+		}
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, nodes)
+		require.NoError(t, err)
+
+		// Verify
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.SelectedNodes, 2)
+		assert.Equal(t, "node-1", testNSG.Status.SelectedNodes[0].Name)
+		assert.Equal(t, "server-1", testNSG.Status.SelectedNodes[0].ServerId)
+		assert.Equal(t, "node-2", testNSG.Status.SelectedNodes[1].Name)
+		assert.Equal(t, "server-2", testNSG.Status.SelectedNodes[1].ServerId)
+	})
+
+	t.Run("should overwrite selected nodes when nodes change", func(t *testing.T) {
+		testNSG := &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nsg-8",
+				Namespace: "default",
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{
+				SelectNodeLabels: map[string]string{"test": "true"},
+			},
+		}
+		err := k8sClient.Create(ctx, testNSG)
+		require.NoError(t, err)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
+
+		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
+
+		// Set initial nodes
+		initial := []v1alpha1.NodeInfo{
+			{Name: "node-1", ServerId: "server-1"},
+			{Name: "node-2", ServerId: "server-2"},
+		}
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, initial)
+		require.NoError(t, err)
+
+		// Refresh local copy
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.SelectedNodes, 2)
+
+		// Node-1 removed, node-3 added
+		updated := []v1alpha1.NodeInfo{
+			{Name: "node-2", ServerId: "server-2"},
+			{Name: "node-3", ServerId: "server-3"},
+		}
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, updated)
+		require.NoError(t, err)
+
+		// Verify the list is fully replaced, not appended
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.SelectedNodes, 2)
+		serverIds := []string{
+			testNSG.Status.SelectedNodes[0].ServerId,
+			testNSG.Status.SelectedNodes[1].ServerId,
+		}
+		assert.Contains(t, serverIds, "server-2")
+		assert.Contains(t, serverIds, "server-3")
+		assert.NotContains(t, serverIds, "server-1")
+	})
+
+	t.Run("should clear selected nodes when all nodes are removed", func(t *testing.T) {
+		testNSG := &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nsg-9",
+				Namespace: "default",
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{
+				SelectNodeLabels: map[string]string{"test": "true"},
+			},
+		}
+		err := k8sClient.Create(ctx, testNSG)
+		require.NoError(t, err)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
+
+		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
+
+		// Set some nodes first
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, []v1alpha1.NodeInfo{
+			{Name: "node-1", ServerId: "server-1"},
+		})
+		require.NoError(t, err)
+
+		// Refresh and verify they exist
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Len(t, testNSG.Status.SelectedNodes, 1)
+
+		// Clear all nodes (selector matches nothing)
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, []v1alpha1.NodeInfo{})
+		require.NoError(t, err)
+
+		// Verify cleared
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Empty(t, testNSG.Status.SelectedNodes)
+	})
+
+	t.Run("should not patch when selected nodes are unchanged", func(t *testing.T) {
+		testNSG := &v1alpha1.NodeSecurityGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-nsg-10",
+				Namespace: "default",
+			},
+			Spec: v1alpha1.NodeSecurityGroupSpec{
+				SelectNodeLabels: map[string]string{"test": "true"},
+			},
+		}
+		err := k8sClient.Create(ctx, testNSG)
+		require.NoError(t, err)
+		defer func() { _ = k8sClient.Delete(ctx, testNSG) }()
+
+		nsName := types.NamespacedName{Name: testNSG.Name, Namespace: testNSG.Namespace}
+
+		nodes := []v1alpha1.NodeInfo{
+			{Name: "node-1", ServerId: "server-1"},
+		}
+
+		// Set nodes
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, nodes)
+		require.NoError(t, err)
+
+		// Record resource version before second call
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		rvBefore := testNSG.ResourceVersion
+
+		// Call again with identical nodes — should be a no-op
+		err = useCase.statusSetSelectedNodes(ctx, testNSG, nodes)
+		require.NoError(t, err)
+
+		// ResourceVersion must not change (no patch was issued)
+		err = k8sClient.Get(ctx, nsName, testNSG)
+		require.NoError(t, err)
+		assert.Equal(t, rvBefore, testNSG.ResourceVersion)
+	})
 }
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.

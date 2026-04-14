@@ -247,6 +247,25 @@ func getFirstFoundEnvTestBinaryDir() string {
 }
 ```
 
+**Running `nsg_uc` Integration Tests Directly (without `make test`):**
+
+`nsg_uc_integration_test.go` uses envtest and requires the kubebuilder binaries. The test
+locates them via `KUBEBUILDER_ASSETS` — it must be an **absolute path**, not a relative one.
+
+```bash
+# Step 1: download envtest binaries (one-time, idempotent)
+./bin/setup-envtest use 1.31.0 --bin-dir ./bin/k8s
+
+# Step 2: run the test with the absolute asset path
+KUBEBUILDER_ASSETS="$(pwd)/bin/k8s/k8s/1.31.0-linux-amd64" \
+  go test ./internal/usecase/nsg_uc/... -v
+```
+
+The binaries land at `bin/k8s/k8s/1.31.0-linux-amd64/{etcd,kube-apiserver,kubectl}`.
+Using a relative path (e.g. the output of `setup-envtest ... -p path` without `$(pwd)`) causes
+envtest to fail with `fork/exec bin/k8s/.../etcd: no such file or directory` because the test
+binary changes its working directory at startup.
+
 **Commented-Out Tests:**
 Many test files in `internal/usecase/lbc_uc/` contain fully-written tests that are commented out (e.g., `lbc_uc_test.go`, `deploy_listener_test.go`, `deploy_pool_test.go`). These are valid testify tests that were disabled, likely due to API changes. When re-enabling them, uncomment and verify import paths still match current interfaces.
 

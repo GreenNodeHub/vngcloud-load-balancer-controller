@@ -72,34 +72,22 @@ func (m *nsgUseCase) statusUpdateNodeSecurityGroup(ctx context.Context, nsgObjec
 		})
 }
 
-func (m *nsgUseCase) statusServerSecurityGroupStatus(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, ssgs []v1alpha1.ServerSecurityGroupStatus) error {
+// statusRemoveServerSecurityGroup removes a server entry from status.serverSecurityGroups
+func (m *nsgUseCase) statusRemoveServerSecurityGroup(ctx context.Context, nsgObject *v1alpha1.NodeSecurityGroup, serverId string) error {
 	return m.k8sRepo.PatchMutateStatusNodeSecurityGroup(ctx, nsgObject,
 		func(ctx context.Context, obj *v1alpha1.NodeSecurityGroup) bool {
-			// check on fresh copy if already equal
-			if serverSecurityGroupStatusesEqual(obj.Status.ServerSecurityGroups, ssgs) {
-				return false // no change needed
+			for i, ssg := range obj.Status.ServerSecurityGroups {
+				if ssg.ServerId == serverId {
+					obj.Status.ServerSecurityGroups = slices.Delete(obj.Status.ServerSecurityGroups, i, i+1)
+					return true
+				}
 			}
-			obj.Status.ServerSecurityGroups = ssgs
-			return true
+			return false // not found — nothing to do
 		})
 }
 
 // nodeInfosEqual compares two slices of NodeInfo (order-independent)
 func nodeInfosEqual(a, b []v1alpha1.NodeInfo) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	// Check that every item in a exists in b
-	for _, itemA := range a {
-		if !slices.ContainsFunc(b, itemA.Equal) {
-			return false
-		}
-	}
-	return true
-}
-
-// serverSecurityGroupStatusesEqual compares two slices of ServerSecurityGroupStatus (order-independent)
-func serverSecurityGroupStatusesEqual(a, b []v1alpha1.ServerSecurityGroupStatus) bool {
 	if len(a) != len(b) {
 		return false
 	}
