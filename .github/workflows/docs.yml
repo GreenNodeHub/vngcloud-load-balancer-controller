@@ -51,6 +51,9 @@ jobs:
 
       - name: Deploy docs with mike
         run: |
-          pipenv run mike deploy ${{ steps.version.outputs.version }} latest \
-            --update-aliases \
-            --push
+          VERSION="${{ steps.version.outputs.version }}"
+          if [ "$VERSION" = "latest" ]; then
+            pipenv run mike deploy latest --push
+          else
+            pipenv run mike deploy "$VERSION" latest --update-aliases --push
+          fi
