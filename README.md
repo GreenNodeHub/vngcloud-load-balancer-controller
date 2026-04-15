@@ -203,7 +203,8 @@ make manifests kustomize helm
 Mockery generation:
 
 ```bash
-go install github.com/vektra/mockery/v3@v3.5.5
+# Must use GOTOOLCHAIN=go1.25.8 so the binary can parse go1.25 packages
+GOTOOLCHAIN=go1.25.8 go install github.com/vektra/mockery/v3@v3.5.5
 mockery init "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 mockery
 ```
@@ -223,4 +224,5 @@ mockery
 - [ ] create lb with pool and lis then delete immediatelly (pool and lis not manage yet -> delete not done)
 - [x] status conditions
 - [ ] `W0401 06:27:07.604444       1 warnings.go:70] v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice`
-- [ ] Add resourceRef to CRD, then create events with reference to the resourceRef, so that kubectl describe can show the events related to the resourceRef
+- [x] Add resourceRef to CRD, then create events with reference to the resourceRef, so that kubectl describe can show the events related to the resourceRef
+- [ ] support gateway api
