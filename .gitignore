@@ -29,6 +29,9 @@ go.work
 /manager
 /vendor
 
+# MkDocs build output
+/site/
+
 charts/vngcloud-load-balancer-controller/templates/loadbalancerconfig-crd.yaml
 charts/vngcloud-load-balancer-controller/templates/nodesecuritygroup-crd.yaml
 charts/vngcloud-load-balancer-controller/templates/vngcloudgloballoadbalancer-crd.yaml

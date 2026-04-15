@@ -79,6 +79,20 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+##@ Documentation
+
+.PHONY: docs-preview
+docs-preview: ## Preview documentation locally (requires: pip install pipenv && pipenv install)
+	pipenv run mkdocs serve
+
+.PHONY: docs-build
+docs-build: ## Build documentation static site into site/
+	pipenv run mkdocs build
+
+.PHONY: docs-publish
+docs-publish: ## Publish versioned docs to GitHub Pages (VERSION defaults to 'latest')
+	pipenv run mike deploy $(or $(VERSION),latest) latest --update-aliases --push
+
 ##@ Build
 
 .PHONY: build

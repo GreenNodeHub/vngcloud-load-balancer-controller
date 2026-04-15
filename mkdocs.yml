@@ -1,0 +1,93 @@
+site_name: VNGCloud Load Balancer Controller
+site_description: VNGCloud Load Balancer Controller for Kubernetes
+site_url: https://vngcloud.github.io/vngcloud-load-balancer-controller/
+repo_name: vngcloud/vngcloud-load-balancer-controller
+repo_url: https://github.com/vngcloud/vngcloud-load-balancer-controller
+edit_uri: edit/v3/docs/
+
+docs_dir: docs
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.tabs.link
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search
+  - mike:
+      version_selector: true
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/vngcloud/vngcloud-load-balancer-controller
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Deploy:
+    - Installation: deploy/installation.md
+    - Configuration: deploy/configuration.md
+    - Upgrade: deploy/upgrade.md
+  - Guide:
+    - Ingress: guide/ingress.md
+    - Service (L4): guide/service.md
+    - LoadBalancerConfig CRD: guide/load-balancer-config.md
+    - NodeSecurityGroup CRD: guide/node-security-group.md
+    - Global Load Balancer: guide/global-load-balancer.md
+  - Annotations:
+    - Service Annotations: annotations/service.md
+    - Ingress Annotations: annotations/ingress.md
+  - Examples:
+    - TLS Termination: examples/tls-termination.md
+    - Internal Load Balancer: examples/internal-lb.md
+    - Custom Health Check: examples/custom-healthcheck.md
+  - Contributing: contributing.md

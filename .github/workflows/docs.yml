@@ -1,0 +1,56 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - v3
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'Pipfile'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g. v0.1.0, latest)'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git credentials
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pipenv && pipenv install
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy docs with mike
+        run: |
+          pipenv run mike deploy ${{ steps.version.outputs.version }} latest \
+            --update-aliases \
+            --push
