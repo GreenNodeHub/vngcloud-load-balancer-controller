@@ -57,3 +57,4 @@ jobs:
           else
             pipenv run mike deploy "$VERSION" latest --update-aliases --push
           fi
+          pipenv run mike set-default latest --push
