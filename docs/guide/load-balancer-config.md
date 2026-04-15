@@ -115,7 +115,7 @@ spec:
 |---|---|---|
 | `name` | Yes | Pool name (unique within this LBC) |
 | `protocol` | Yes | `HTTP`, `HTTPS`, `TCP`, `UDP`, `PROXY` |
-| `algorithm` | No | `RoundRobin`, `LeastConnections`, `SourceIP` |
+| `algorithm` | No | `ROUND_ROBIN`, `LEAST_CONNECTIONS`, `SOURCE_IP` |
 | `stickiness` | No | Enable sticky sessions |
 | `tlsEncryption` | No | Enable TLS encryption for pool members |
 | `healthMonitor` | No | Health check configuration |

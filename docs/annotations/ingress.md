@@ -68,7 +68,7 @@ All Ingress annotations use the prefix `vks.vngcloud.vn`. Ingress resources must
 
 | Annotation | Values | Description |
 |---|---|---|
-| `vks.vngcloud.vn/pool-algorithm` | `RoundRobin` \| `LeastConnections` \| `SourceIP` | Pool load balancing algorithm |
+| `vks.vngcloud.vn/pool-algorithm` | `ROUND_ROBIN` \| `LEAST_CONNECTIONS` \| `SOURCE_IP` | Pool load balancing algorithm |
 
 ## Management
 

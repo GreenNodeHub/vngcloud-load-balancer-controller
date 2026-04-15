@@ -64,7 +64,7 @@ Controls whether traffic is routed to node ports or directly to pod IPs:
 | Value | Description |
 |---|---|
 | `instance` (default) | Routes to `NodePort` on each node |
-| `ip` | Routes directly to pod IPs (requires Cilium native routing) |
+| `ip` | Routes directly to pod IPs (requires Cilium native routing or similar CNI) |
 
 ```yaml
 metadata:

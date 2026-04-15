@@ -19,7 +19,7 @@ All annotations use the prefix `vks.vngcloud.vn`.
 | `vks.vngcloud.vn/enable-autoscale` | `"true"` | Enable autoscaling for the load balancer |
 | `vks.vngcloud.vn/prefer-zone-id` | zone string | Preferred availability zone |
 | `vks.vngcloud.vn/prefer-subnet-id` | string | Preferred subnet ID |
-| `vks.vngcloud.vn/isPOC` | `"true"` | Mark as proof-of-concept deployment |
+| `vks.vngcloud.vn/isPOC` | `"true"` | Mark as proof-of-concept deployment (`is-poc` is a deprecated alias) |
 
 ## Timeouts
 
@@ -50,7 +50,7 @@ All annotations use the prefix `vks.vngcloud.vn`.
 
 | Annotation | Values | Description |
 |---|---|---|
-| `vks.vngcloud.vn/pool-algorithm` | `RoundRobin` \| `LeastConnections` \| `SourceIP` | Pool load balancing algorithm |
+| `vks.vngcloud.vn/pool-algorithm` | `ROUND_ROBIN` \| `LEAST_CONNECTIONS` \| `SOURCE_IP` | Pool load balancing algorithm |
 
 ## L4 (Network LB) Only
 

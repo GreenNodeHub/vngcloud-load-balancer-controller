@@ -20,7 +20,7 @@ global:
 
   # Optional: override project/user ID (skips metadata service lookup)
   projectID: ""
-  userID: ""
+  userID: 0
 
   # Optional: super-client credentials for InterVPC load balancers
   superClientID: ""
@@ -40,28 +40,55 @@ cluster:
   isRunRemote: false
 
 loadBalancerOpts:
-  # Default package for Network Load Balancers
-  packageName: "lbp-f5f8a5d2-46d5-4c2b-8f37-6cf8c65b9a83"
+  # Default package for Network (L4) Load Balancers
+  defaultL4PackageName: "NLB_Small"
 
-  # Default pool algorithm: RoundRobin | LeastConnections | SourceIP
-  defaultPoolAlgorithm: "RoundRobin"
+  # Default package for Application (L7) Load Balancers
+  defaultL7PackageName: "ALB_Small"
+
+  # Default scheme: Internal | Internet | InterVPC
+  defaultScheme: "Internet"
+
+  # Default pool algorithm: ROUND_ROBIN | LEAST_CONNECTIONS | SOURCE_IP
+  defaultPoolAlgorithm: "ROUND_ROBIN"
 
   # Default health check thresholds
-  healthCheckHealthyThreshold: 3
-  healthCheckUnhealthyThreshold: 3
-  healthCheckIntervalSeconds: 30
-  healthCheckTimeoutSeconds: 5
+  defaultHealthyThreshold: 3
+  defaultUnhealthyThreshold: 3
+  defaultInterval: 30
+  defaultTimeout: 5
 
   # Default listener timeouts (seconds)
-  defaultIdleTimeoutClient: 50
-  defaultIdleTimeoutMember: 50
-  defaultIdleTimeoutConnection: 5
+  defaultTimeoutClient: 50
+  defaultTimeoutMember: 50
+  defaultTimeoutConnection: 5
+
+  # Default allowed CIDRs for listeners
+  defaultAllowedCidrs: "0.0.0.0/0"
 
 globalLoadBalancerOpts:
-  packageName: ""
+  # Default package for Global Load Balancers
+  defaultL4PackageName: ""
+
+  # Default pool algorithm
+  defaultPoolAlgorithm: "ROUND_ROBIN"
+
+  # Default health check thresholds
+  defaultHealthyThreshold: 3
+  defaultUnhealthyThreshold: 3
+  defaultInterval: 30
+  defaultTimeout: 5
+
+  # Default listener timeouts (seconds)
+  defaultTimeoutClient: 50
+  defaultTimeoutMember: 50
+  defaultTimeoutConnection: 5
+
+  # Default allowed CIDRs
+  defaultAllowedCidrs: ""
 
 # Maximum number of parallel reconcile loops per controller
-maxConcurrentReconciles: 1
+maxConcurrentReconciles: 5
 ```
 
 ## Helm Values
@@ -93,13 +120,16 @@ The controller binary supports the following flags:
 | `--health-probe-bind-address` | `:8081` | Address for liveness/readiness probes |
 | `--leader-elect` | `false` | Enable leader election for HA deployments |
 | `--metrics-secure` | `true` | Serve metrics over HTTPS |
+| `--enable-http2` | `false` | Enable HTTP/2 on the metrics and webhook servers |
 | `--log-level` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 | `--sync-period` | `5m` | Resync period for the informer cache |
 | `--disable-service-controller` | `false` | Disable the Service reconciler |
 | `--disable-ingress-controller` | `false` | Disable the Ingress reconciler |
-| `--disable-lbc-controller` | `false` | Disable the LoadBalancerConfig reconciler |
-| `--disable-nsg-controller` | `false` | Disable the NodeSecurityGroup reconciler |
-| `--disable-vglb-controller` | `false` | Disable the VngcloudGlobalLoadBalancer reconciler |
+| `--disable-load-balancer-config-controller` | `false` | Disable the LoadBalancerConfig reconciler |
+| `--disable-global-load-balancer-config-controller` | `false` | Disable the GlobalLoadBalancerConfig reconciler |
+| `--disable-node-security-group-controller` | `false` | Disable the NodeSecurityGroup reconciler |
+| `--disable-vngcloud-global-load-balancer-controller` | `false` | Disable the VngcloudGlobalLoadBalancer reconciler |
+| `--disable-service-glb-controller` | `false` | Disable the Service GLB reconciler |
 
 ## Environment Variables
 
