@@ -771,10 +771,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#example-attach-existing-security-groups" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Example: Attach Existing Security Groups
       
     </span>
   </a>
@@ -782,10 +782,71 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example-create-and-manage-a-security-group" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        Example: Create and Manage a Security Group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spec Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodesecuritygroupspec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeSecurityGroupSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managedsecuritygroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManagedSecurityGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodesecuritygrouprule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeSecurityGroupRule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
       
     </span>
   </a>
@@ -797,17 +858,6 @@
     <span class="md-ellipsis">
       
         How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status
       
     </span>
   </a>
@@ -1174,10 +1224,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#example-attach-existing-security-groups" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Example: Attach Existing Security Groups
       
     </span>
   </a>
@@ -1185,10 +1235,71 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example-create-and-manage-a-security-group" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example
+        Example: Create and Manage a Security Group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spec Reference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Spec Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nodesecuritygroupspec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeSecurityGroupSpec
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#managedsecuritygroup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManagedSecurityGroup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodesecuritygrouprule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NodeSecurityGroupRule
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
       
     </span>
   </a>
@@ -1200,17 +1311,6 @@
     <span class="md-ellipsis">
       
         How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Status
       
     </span>
   </a>
@@ -1243,40 +1343,185 @@
 
 
 <h1 id="nodesecuritygroup-crd">NodeSecurityGroup CRD<a class="headerlink" href="#nodesecuritygroup-crd" title="Permanent link">&para;</a></h1>
-<p>The <code>NodeSecurityGroup</code> custom resource allows you to manage VNGCloud security group rules for the nodes in your Kubernetes cluster.</p>
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>This feature is currently in alpha (<code>v1alpha1</code>). The API may change in future releases.</p>
-</div>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>When a load balancer is created, the controller automatically manages the security group rules on cluster nodes to allow health check and traffic flows. The <code>NodeSecurityGroup</code> CRD gives you visibility and fine-grained control over these rules.</p>
+<p>The <code>NodeSecurityGroup</code> CRD lets you manage VNGCloud security groups for Kubernetes cluster nodes declaratively. You can attach existing security groups to nodes or create and manage a new security group with custom rules.</p>
+<p>Short name: <code>nsg</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>kubectl<span class="w"> </span>get<span class="w"> </span>nodesecuritygroup<span class="w"> </span>-A
 </code></pre></div>
-<p>Short name: <code>nsg</code></p>
-<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<h2 id="example-attach-existing-security-groups">Example: Attach Existing Security Groups<a class="headerlink" href="#example-attach-existing-security-groups" title="Permanent link">&para;</a></h2>
+<p>Attach one or more existing VNGCloud security groups to nodes that match a label selector:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vks.vngcloud.vn/v1alpha1</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NodeSecurityGroup</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">metadata</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-nsg</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">attach-existing-sg</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nt">spec</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="c1"># Security group rules are managed by the controller</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="c1"># based on active load balancers in the cluster</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">selectNodeLabels</span><span class="p">:</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">attachSecurityGroups</span><span class="p">:</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;secg-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx&quot;</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;secg-yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy&quot;</span>
+</code></pre></div>
+<h2 id="example-create-and-manage-a-security-group">Example: Create and Manage a Security Group<a class="headerlink" href="#example-create-and-manage-a-security-group" title="Permanent link">&para;</a></h2>
+<p>Let the controller create a new security group with specific rules:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vks.vngcloud.vn/v1alpha1</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NodeSecurityGroup</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">metadata</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">managed-sg</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kube-system</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nt">spec</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">selectNodeLabels</span><span class="p">:</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">managedSecurityGroup</span><span class="p">:</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-node-security-group&quot;</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Managed</span><span class="nv"> </span><span class="s">by</span><span class="nv"> </span><span class="s">vngcloud-load-balancer-controller&quot;</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">fromPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30000</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">toPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32767</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="nt">cidr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.0.0/8&quot;</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">direction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">        </span><span class="nt">etherType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">IPv4</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Allow</span><span class="nv"> </span><span class="s">NodePort</span><span class="nv"> </span><span class="s">traffic</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">internal</span><span class="nv"> </span><span class="s">network&quot;</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="nt">fromPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">        </span><span class="nt">toPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">        </span><span class="nt">cidr</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.0.0.0/0&quot;</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">        </span><span class="nt">direction</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">        </span><span class="nt">etherType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">IPv4</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Allow</span><span class="nv"> </span><span class="s">HTTPS&quot;</span>
+</code></pre></div>
+<h2 id="spec-reference">Spec Reference<a class="headerlink" href="#spec-reference" title="Permanent link">&para;</a></h2>
+<h3 id="nodesecuritygroupspec">NodeSecurityGroupSpec<a class="headerlink" href="#nodesecuritygroupspec" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>selectNodeLabels</code></td>
+<td>No</td>
+<td>Label selector — only nodes with all matching labels are managed</td>
+</tr>
+<tr>
+<td><code>attachSecurityGroups</code></td>
+<td>No</td>
+<td>List of existing VNGCloud security group IDs to attach to selected nodes</td>
+</tr>
+<tr>
+<td><code>managedSecurityGroup</code></td>
+<td>No</td>
+<td>A security group to create and fully manage (rules, members)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="managedsecuritygroup">ManagedSecurityGroup<a class="headerlink" href="#managedsecuritygroup" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Yes</td>
+<td>Name of the security group to create in VNGCloud</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>No</td>
+<td>Description for the security group</td>
+</tr>
+<tr>
+<td><code>rules</code></td>
+<td>No</td>
+<td>List of security group rules</td>
+</tr>
+</tbody>
+</table>
+<h3 id="nodesecuritygrouprule">NodeSecurityGroupRule<a class="headerlink" href="#nodesecuritygrouprule" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>protocol</code></td>
+<td>Yes</td>
+<td>Protocol: <code>TCP</code>, <code>UDP</code>, <code>ICMP</code>, <code>ANY</code></td>
+</tr>
+<tr>
+<td><code>fromPort</code></td>
+<td>Yes</td>
+<td>Start of port range</td>
+</tr>
+<tr>
+<td><code>toPort</code></td>
+<td>Yes</td>
+<td>End of port range</td>
+</tr>
+<tr>
+<td><code>cidr</code></td>
+<td>Yes</td>
+<td>Source/destination CIDR block</td>
+</tr>
+<tr>
+<td><code>direction</code></td>
+<td>No</td>
+<td><code>ingress</code> or <code>egress</code> (default: <code>ingress</code>)</td>
+</tr>
+<tr>
+<td><code>etherType</code></td>
+<td>No</td>
+<td><code>IPv4</code> or <code>IPv6</code> (default: <code>IPv4</code>)</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>No</td>
+<td>Human-readable description for the rule</td>
+</tr>
+</tbody>
+</table>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p>The controller updates the status after each reconcile:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">status</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">observedGeneration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">lastReconcileTime</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2026-04-15T10:00:00Z&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">lastReconcileMessage</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;NodeSecurityGroup</span><span class="nv"> </span><span class="s">reconciled</span><span class="nv"> </span><span class="s">successfully&quot;</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">selectedNodes</span><span class="p">:</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker-node-1</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span><span class="nt">serverId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ins-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx&quot;</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">worker-node-2</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="nt">serverId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ins-yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy&quot;</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">managedSecurityGroup</span><span class="p">:</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;secg-zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz&quot;</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">serverSecurityGroups</span><span class="p">:</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">serverId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ins-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx&quot;</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">      </span><span class="nt">attachedSecurityGroupIds</span><span class="p">:</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;secg-zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz&quot;</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="nt">conditions</span><span class="p">:</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ready</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;True&quot;</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ReconcileSuccess</span>
 </code></pre></div>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
 <ol>
-<li>When a <code>Service</code> of type <code>LoadBalancer</code> (or <code>LoadBalancerConfig</code>) is reconciled, the controller identifies the VNGCloud security groups attached to cluster nodes.</li>
-<li>It creates or updates inbound rules to allow traffic from the load balancer's subnet and health check probes.</li>
-<li>When the service is deleted, the controller removes the corresponding rules.</li>
+<li>The controller watches <code>NodeSecurityGroup</code> resources and the nodes in the cluster.</li>
+<li>It filters nodes by <code>selectNodeLabels</code> to find the target set.</li>
+<li>If <code>managedSecurityGroup</code> is set, the controller creates/updates that security group in VNGCloud with the declared rules.</li>
+<li>It attaches all security groups (from <code>attachSecurityGroups</code> + the managed one) to the VNGCloud server instances backing the selected nodes.</li>
+<li>When the <code>NodeSecurityGroup</code> is deleted, the controller detaches and (if managed) deletes the security group.</li>
 </ol>
-<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
-<p>The <code>NodeSecurityGroup</code> status reflects the current security group rules managed by the controller:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">status</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">conditions</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ready</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;True&quot;</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ReconcileSuccess</span>
-</code></pre></div>
 
 
 
