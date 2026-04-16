@@ -2,62 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/contributing/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/annotations/ingress/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/annotations/service/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/deploy/configuration/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/deploy/installation/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/deploy/upgrade/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/examples/custom-healthcheck/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/examples/internal-lb/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/examples/tls-termination/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/guide/global-load-balancer/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/guide/ingress/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/guide/load-balancer-config/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/guide/node-security-group/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/latest/guide/service/</loc>
-         <lastmod>2026-04-15</lastmod>
+         <lastmod>2026-04-16</lastmod>
     </url>
 </urlset>
