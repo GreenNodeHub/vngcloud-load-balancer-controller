@@ -2,7 +2,7 @@ module github.com/vngcloud/vngcloud-load-balancer-controller
 
 go 1.25.0
 
-toolchain go1.25.8
+toolchain go1.25.9
 
 require (
 	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c

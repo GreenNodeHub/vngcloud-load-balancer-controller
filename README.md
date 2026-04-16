@@ -203,8 +203,8 @@ make manifests kustomize helm
 Mockery generation:
 
 ```bash
-# Must use GOTOOLCHAIN=go1.25.8 so the binary can parse go1.25 packages
-GOTOOLCHAIN=go1.25.8 go install github.com/vektra/mockery/v3@v3.5.5
+# Must use GOTOOLCHAIN=go1.25.9 so the binary can parse go1.25 packages
+GOTOOLCHAIN=go1.25.9 go install github.com/vektra/mockery/v3@v3.5.5
 mockery init "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 mockery
 ```

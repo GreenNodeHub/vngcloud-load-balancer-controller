@@ -5,7 +5,7 @@
 ## Languages
 
 **Primary:**
-- Go 1.25.0 (toolchain go1.25.8) - All application code, controllers, use-cases, repositories
+- Go 1.25.0 (toolchain go1.25.9) - All application code, controllers, use-cases, repositories
 
 **Secondary:**
 - YAML - Kubernetes manifests, Helm chart templates, configuration files
@@ -108,7 +108,7 @@
 ## Platform Requirements
 
 **Development:**
-- Go 1.25+ (toolchain 1.25.8)
+- Go 1.25+ (toolchain 1.25.9)
 - Docker (or compatible container tool) for image builds
 - `kubectl` for deployment operations
 - `kustomize` / `helm` for manifest generation

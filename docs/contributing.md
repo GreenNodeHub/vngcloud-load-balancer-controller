@@ -6,7 +6,7 @@ We welcome contributions to the VNGCloud Load Balancer Controller!
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.25.9+
 - Docker
 - `kubectl` and access to a Kubernetes cluster
 - `make`
