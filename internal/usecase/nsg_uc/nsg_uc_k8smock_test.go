@@ -88,11 +88,11 @@ func TestDoEnsureManagedSecurityGroup(t *testing.T) {
 		nsg := nsgWith(nil)
 		nsg.Spec.ManagedSecurityGroup = &v1alpha1.ManagedSecurityGroup{
 			Name:  "sg-test",
-			Rules: []v1alpha1.NodeSecurityGroupRule{desiredRule("tcp", "0.0.0.0/0", 80, 80)},
+			Rules: []v1alpha1.NodeSecurityGroupRule{desiredRule("0.0.0.0/0", 80, 80)},
 		}
 		vng.EXPECT().ListSecurityGroups(ctx).Return(listSecgroups(makeSG("sg-1", "sg-test")), nil)
 		vng.EXPECT().ListSecurityGroupRules(ctx, "sg-1").Return(
-			listRules(ingressRule("r1", "tcp", "0.0.0.0/0", 80, 80)), nil)
+			listRules(ingressRule("r1", 80, 80)), nil)
 		// no DeleteSecurityGroupRule or CreateSecurityGroupRule expected
 
 		status, err := uc.doEnsureManagedSecurityGroup(ctx, nsg)
@@ -147,7 +147,7 @@ func TestDoEnsureManagedSecurityGroup(t *testing.T) {
 		}
 		vng.EXPECT().ListSecurityGroups(ctx).Return(listSecgroups(makeSG("sg-1", "sg-test")), nil)
 		vng.EXPECT().ListSecurityGroupRules(ctx, "sg-1").Return(
-			listRules(ingressRule("r1", "tcp", "0.0.0.0/0", 22, 22)), nil)
+			listRules(ingressRule("r1", 22, 22)), nil)
 		vng.EXPECT().DeleteSecurityGroupRule(ctx, "sg-1", "r1").Return(nil)
 
 		status, err := uc.doEnsureManagedSecurityGroup(ctx, nsg)
@@ -160,7 +160,7 @@ func TestDoEnsureManagedSecurityGroup(t *testing.T) {
 		nsg := nsgWith(nil)
 		nsg.Spec.ManagedSecurityGroup = &v1alpha1.ManagedSecurityGroup{
 			Name:  "sg-test",
-			Rules: []v1alpha1.NodeSecurityGroupRule{desiredRule("tcp", "0.0.0.0/0", 443, 443)},
+			Rules: []v1alpha1.NodeSecurityGroupRule{desiredRule("0.0.0.0/0", 443, 443)},
 		}
 		vng.EXPECT().ListSecurityGroups(ctx).Return(listSecgroups(makeSG("sg-1", "sg-test")), nil)
 		vng.EXPECT().ListSecurityGroupRules(ctx, "sg-1").Return(listRules(), nil)

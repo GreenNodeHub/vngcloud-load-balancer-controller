@@ -183,13 +183,13 @@ func TestMergeStringArray(t *testing.T) {
 
 // ── compareSecgroupRule ─────────────────────────────────────────────────────
 
-func ingressRule(id, protocol, cidr string, from, to int) *entityv2.SecgroupRule {
+func ingressRule(id string, from, to int) *entityv2.SecgroupRule {
 	return &entityv2.SecgroupRule{
 		Id:             id,
 		Direction:      "ingress",
 		EtherType:      "IPv4",
-		Protocol:       protocol,
-		RemoteIPPrefix: cidr,
+		Protocol:       "tcp",
+		RemoteIPPrefix: "0.0.0.0/0",
 		PortRangeMin:   from,
 		PortRangeMax:   to,
 	}
@@ -206,11 +206,11 @@ func egressRule(id string) *entityv2.SecgroupRule {
 	}
 }
 
-func desiredRule(protocol, cidr string, from, to int32) v1alpha1.NodeSecurityGroupRule {
+func desiredRule(cidr string, from, to int32) v1alpha1.NodeSecurityGroupRule {
 	return v1alpha1.NodeSecurityGroupRule{
 		Direction: networkv2.SecgroupRuleDirectionIngress,
 		EtherType: networkv2.SecgroupRuleEtherTypeIPv4,
-		Protocol:  networkv2.SecgroupRuleProtocol(protocol),
+		Protocol:  networkv2.SecgroupRuleProtocol("tcp"),
 		CIDR:      cidr,
 		FromPort:  from,
 		ToPort:    to,
@@ -237,14 +237,14 @@ func TestCompareSecgroupRule(t *testing.T) {
 		},
 		{
 			name:       "desired rule already exists — no-op",
-			current:    []*entityv2.SecgroupRule{ingressRule("r1", "tcp", "0.0.0.0/0", 80, 80)},
-			desired:    []v1alpha1.NodeSecurityGroupRule{desiredRule("tcp", "0.0.0.0/0", 80, 80)},
+			current:    []*entityv2.SecgroupRule{ingressRule("r1", 80, 80)},
+			desired:    []v1alpha1.NodeSecurityGroupRule{desiredRule("0.0.0.0/0", 80, 80)},
 			wantDelete: []string{},
 			wantCreate: 0,
 		},
 		{
 			name:       "current rule not in desired — should delete",
-			current:    []*entityv2.SecgroupRule{ingressRule("r1", "tcp", "0.0.0.0/0", 80, 80)},
+			current:    []*entityv2.SecgroupRule{ingressRule("r1", 80, 80)},
 			desired:    []v1alpha1.NodeSecurityGroupRule{},
 			wantDelete: []string{"r1"},
 			wantCreate: 0,
@@ -252,19 +252,19 @@ func TestCompareSecgroupRule(t *testing.T) {
 		{
 			name:       "desired rule missing from current — should create",
 			current:    []*entityv2.SecgroupRule{},
-			desired:    []v1alpha1.NodeSecurityGroupRule{desiredRule("tcp", "0.0.0.0/0", 443, 443)},
+			desired:    []v1alpha1.NodeSecurityGroupRule{desiredRule("0.0.0.0/0", 443, 443)},
 			wantDelete: []string{},
 			wantCreate: 1,
 		},
 		{
 			name: "mixed: keep one, delete one, create one",
 			current: []*entityv2.SecgroupRule{
-				ingressRule("r1", "tcp", "0.0.0.0/0", 80, 80),
-				ingressRule("r2", "tcp", "0.0.0.0/0", 22, 22),
+				ingressRule("r1", 80, 80),
+				ingressRule("r2", 22, 22),
 			},
 			desired: []v1alpha1.NodeSecurityGroupRule{
-				desiredRule("tcp", "0.0.0.0/0", 80, 80),   // matches r1 — keep
-				desiredRule("tcp", "0.0.0.0/0", 443, 443), // no match — create
+				desiredRule("0.0.0.0/0", 80, 80),   // matches r1 — keep
+				desiredRule("0.0.0.0/0", 443, 443), // no match — create
 			},
 			wantDelete: []string{"r2"},
 			wantCreate: 1,
@@ -272,12 +272,12 @@ func TestCompareSecgroupRule(t *testing.T) {
 		{
 			name: "egress rules not in desired are deleted — controller owns all rules",
 			current: []*entityv2.SecgroupRule{
-				ingressRule("r1", "tcp", "0.0.0.0/0", 80, 80),
+				ingressRule("r1", 80, 80),
 				egressRule("egress-1"),
 				egressRule("egress-2"),
 			},
 			desired: []v1alpha1.NodeSecurityGroupRule{
-				desiredRule("tcp", "0.0.0.0/0", 80, 80),
+				desiredRule("0.0.0.0/0", 80, 80),
 			},
 			wantDelete: []string{"egress-1", "egress-2"}, // unmatched egress rules are removed
 			wantCreate: 0,
@@ -305,7 +305,7 @@ func TestCompareSecgroupRule(t *testing.T) {
 				},
 			},
 			desired: []v1alpha1.NodeSecurityGroupRule{
-				desiredRule("tcp", "10.0.0.0/8", 8080, 8080),
+				desiredRule("10.0.0.0/8", 8080, 8080),
 			},
 			wantDelete: []string{},
 			wantCreate: 0,
