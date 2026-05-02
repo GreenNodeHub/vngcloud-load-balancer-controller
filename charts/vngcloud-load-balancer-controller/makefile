@@ -14,4 +14,4 @@ template:
 		--namespace kube-system \
 		--set mysecret.global.clientID="bbbb" \
 		--set mysecret.global.clientSecret="cccc" \
-		--debug --output-dir helm
+		--debug --output-dir helm -f custom-value.yaml
