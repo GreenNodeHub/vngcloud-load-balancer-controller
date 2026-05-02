@@ -7,10 +7,9 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -45,7 +44,6 @@ func NewDefaultEndpointResolver(context context.Context, k8sClient client.Client
 	return &defaultEndpointResolver{
 		k8sClient: k8sClient,
 		context:   context,
-		logger:    contexts.NewContext(context).Log(),
 	}
 }
 
@@ -55,15 +53,19 @@ var _ EndpointResolver = &defaultEndpointResolver{}
 type defaultEndpointResolver struct {
 	k8sClient client.Client
 	context   context.Context
-	logger    *logrus.Entry
 
-	// [NodePort Endpoint] if fail-open enabled, then nodes that have `Unknown` ready condition will be included if there is no other node with `True` ready condition.
-	// [Pod Endpoint] if fail-open enabled, then containerRead pods on nodes that have `Unknown` ready condition will be included if there is no other pods that are ready.
+	// [NodePort Endpoint] if fail-open enabled, then nodes that have `Unknown` ready
+	// condition will be included if there is no other node with `True` ready condition.
+	// [Pod Endpoint] if fail-open enabled, then containerRead pods on nodes that have
+	// `Unknown` ready condition will be included if there is no other pods that are ready.
 	failOpenEnabled bool
 }
 
-func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
-	opts ...EndpointResolveOption) ([]EndpointAddress, error) {
+func (r *defaultEndpointResolver) ResolvePodEndpoints(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+	opts ...EndpointResolveOption,
+) ([]EndpointAddress, error) {
+	logger := contexts.NewContext(ctx).Log()
 
 	_, svcPort, err := r.findServiceAndServicePort(ctx, svcKey, port)
 	if err != nil {
@@ -111,13 +113,17 @@ func (r *defaultEndpointResolver) ResolvePodEndpoints(ctx context.Context, svcKe
 		}
 	}
 
-	r.logger.Debugf("found %d endpoints for service %s: %v", len(podEndpoints), svcKey, podEndpoints)
+	logger.Debugf("found %d endpoints for service %s: %v", len(podEndpoints), svcKey, podEndpoints)
 
 	return podEndpoints, nil
 }
 
-func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
-	opts ...EndpointResolveOption) ([]EndpointAddress, error) {
+func (r *defaultEndpointResolver) ResolveNodePortEndpoints(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+	opts ...EndpointResolveOption,
+) ([]EndpointAddress, error) {
+
+	logger := contexts.NewContext(ctx).Log()
 
 	resolveOpts := defaultEndpointResolveOptions()
 	resolveOpts.ApplyOptions(opts)
@@ -131,11 +137,12 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 	}
 	svcNodePort := svcPort.NodePort
 	nodeList := &corev1.NodeList{}
-	if err := r.k8sClient.List(ctx, nodeList, client.MatchingLabelsSelector{Selector: resolveOpts.NodeSelector}); err != nil {
+	if err := r.k8sClient.List(ctx, nodeList,
+		client.MatchingLabelsSelector{Selector: resolveOpts.NodeSelector}); err != nil {
 		return nil, err
 	}
 
-	r.logger.Debugf("found %d nodes with selector: %v.", len(nodeList.Items), resolveOpts.NodeSelector)
+	logger.Debugf("found %d nodes with selector: %v.", len(nodeList.Items), resolveOpts.NodeSelector)
 
 	candidateNodes := make([]*corev1.Node, 0)
 	for i := range nodeList.Items {
@@ -148,7 +155,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 		targetNodes = filterNodesByReadyConditionStatus(candidateNodes, corev1.ConditionUnknown)
 	}
 
-	r.logger.Debugf("found %d nodes after filtering by ready condition.", len(targetNodes))
+	logger.Debugf("found %d nodes after filtering by ready condition.", len(targetNodes))
 
 	endpoints := make([]EndpointAddress, 0)
 	for _, node := range targetNodes {
@@ -159,12 +166,14 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(ctx context.Context, 
 		endpoints = append(endpoints, r.buildNodePortEndpoint(nodeIP, node.Name, svcNodePort))
 	}
 
-	r.logger.Debugf("found %d endpoints for service %s: %v", len(endpoints), svcKey, endpoints)
+	logger.Debugf("found %d endpoints for service %s: %v", len(endpoints), svcKey, endpoints)
 
 	return endpoints, nil
 }
 
-func (r *defaultEndpointResolver) findServiceAndServicePort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) (*corev1.Service, corev1.ServicePort, error) {
+func (r *defaultEndpointResolver) findServiceAndServicePort(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+) (*corev1.Service, corev1.ServicePort, error) {
 	svc := &corev1.Service{}
 	if err := r.k8sClient.Get(ctx, svcKey, svc); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -182,7 +191,9 @@ func (r *defaultEndpointResolver) findServiceAndServicePort(ctx context.Context,
 }
 
 // lookupServicePort returns the ServicePort structure for specific port on service.
-func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port intstr.IntOrString) (corev1.ServicePort, error) {
+func (r *defaultEndpointResolver) lookupServicePort(
+	svc *corev1.Service, port intstr.IntOrString,
+) (corev1.ServicePort, error) {
 	if port.Type == intstr.String {
 		for _, p := range svc.Spec.Ports {
 			if p.Name == port.StrVal {
@@ -197,7 +208,9 @@ func (r *defaultEndpointResolver) lookupServicePort(svc *corev1.Service, port in
 		}
 	}
 
-	return corev1.ServicePort{}, errors.Errorf("unable to find port %s on service %s", port.String(), namespacedName(svc))
+	return corev1.ServicePort{}, errors.Errorf(
+		"unable to find port %s on service %s", port.String(), k8s.NamespacedName(svc),
+	)
 }
 
 func (r *defaultEndpointResolver) buildNodePortEndpoint(IP, instanceID string, nodePort int32) EndpointAddress {
@@ -223,7 +236,11 @@ func (r *defaultEndpointResolver) getNodeInternalIP(node *corev1.Node) (string, 
 	return "", ErrNodeDoesNotHaveInternalAddress
 }
 
-func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString) ([]int, error) {
+func (r *defaultEndpointResolver) GetListTargetPort(
+	ctx context.Context, svcKey types.NamespacedName, port intstr.IntOrString,
+) ([]int, error) {
+	logger := contexts.NewContext(ctx).Log()
+
 	_, svcPort, err := r.findServiceAndServicePort(ctx, svcKey, port)
 	if err != nil {
 		return nil, err
@@ -262,16 +279,8 @@ func (r *defaultEndpointResolver) GetListTargetPort(ctx context.Context, svcKey 
 		}
 	}
 
-	r.logger.Debugf("found %d target ports for service %s: %v", len(ports), svcKey, ports)
+	logger.Debugf("found %d target ports for service %s: %v", len(ports), svcKey, ports)
 	return ports, nil
-}
-
-// namespacedName returns the namespaced name for k8s objects
-func namespacedName(obj metav1.Object) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
 }
 
 // ----------------------------------------------------------------------------
@@ -282,7 +291,8 @@ type EndpointResolveOptions struct {
 	// By default, no node will be selected.
 	NodeSelector labels.Selector
 
-	// [Pod Endpoint] if pod readinessGates is defined, then pods from unready addresses with any of these readinessGates and containersReady condition will be included as well.
+	// [Pod Endpoint] if pod readinessGates is defined, then pods from unready addresses
+	// with any of these readinessGates and containersReady condition will be included.
 	// By default, no readinessGate is specified.
 	PodReadinessGates []corev1.PodConditionType
 }

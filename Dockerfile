@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.22 AS builder
+FROM golang:1.25 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION
@@ -18,7 +18,7 @@ COPY Makefile ./
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY pkg/ pkg/
-COPY internal/controller/ internal/controller/
+COPY internal/ internal/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod make build-pro CGO_ENABLED=0 GOOS=${TA
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY ./config/crd/bases ./config/crd/bases
+
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]

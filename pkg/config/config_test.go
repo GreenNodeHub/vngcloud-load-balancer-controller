@@ -36,7 +36,7 @@ func TestConfig_Init(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name()) // Clean up after test
+	defer func() { _ = os.Remove(tmpFile.Name()) }() // Clean up after test
 
 	// Write some content to the config file
 	configContent := `
@@ -86,7 +86,7 @@ func TestConfig_Init_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name()) // Clean up after test
+	defer func() { _ = os.Remove(tmpFile.Name()) }() // Clean up after test
 
 	// Write valid content to the config file
 	configContent := `
@@ -104,7 +104,7 @@ global:
 	if _, err := tmpFile.Write([]byte(configContent)); err != nil {
 		t.Fatalf("Failed to write to temp config file: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config := NewConfig()
 	err = config.Init(setupLog, tmpFile.Name())
@@ -140,7 +140,7 @@ func TestConfig_Init_UnmarshalError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name()) // Clean up after test
+	defer func() { _ = os.Remove(tmpFile.Name()) }() // Clean up after test
 
 	// Write some invalid YAML content (to trigger unmarshal error)
 	invalidConfigContent := `
@@ -149,7 +149,7 @@ func TestConfig_Init_UnmarshalError(t *testing.T) {
 	if _, err := tmpFile.Write([]byte(invalidConfigContent)); err != nil {
 		t.Fatalf("Failed to write to temp config file: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	config := NewConfig()
 	err = config.Init(setupLog, tmpFile.Name())

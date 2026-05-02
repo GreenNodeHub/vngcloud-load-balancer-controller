@@ -49,7 +49,8 @@ func (e *RequeueNeeded) Error() string {
 
 var _ error = &RequeueNeededAfter{}
 
-// An error to instruct controller-runtime to requeue the processing item after specified duration without been logged as error.
+// An error to instruct controller-runtime to requeue the processing item
+// after specified duration without been logged as error.
 // This should be used when a "error condition" occurrence is sort of expected and can be resolved by retry.
 // e.g. a dependency haven't been fulfilled yet, and expected it to be fulfilled after duration.
 // Note: use this with care,a simple wait might suits your use case better.

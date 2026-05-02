@@ -1,170 +1,192 @@
-# vngcloud-load-balancer-controller
+# VNGCloud Load Balancer Controller
 
-// TODO(user): Add simple overview of use/purpose
+[![Go Version](https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Helm Chart](https://img.shields.io/badge/helm-OCI-0F1689?logo=helm)](https://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-526CFE?logo=materialformkdocs)](https://vngcloud.github.io/vngcloud-load-balancer-controller/)
 
-## Description
+A Kubernetes controller that provisions and manages [VNGCloud](https://vngcloud.vn/) load balancers
+for clusters running on **VNGCloud Kubernetes Service (VKS)**. It watches `Service` (type
+`LoadBalancer`) and `Ingress` resources and reconciles the corresponding VNGCloud Network and
+Application Load Balancers automatically.
 
-// TODO(user): An in-depth paragraph about your project and overview of use
+> **Status:** General availability. Latest release: see [`charts/vngcloud-load-balancer-controller/Chart.yaml`](charts/vngcloud-load-balancer-controller/Chart.yaml).
 
-## Getting Started
+---
 
-### Prerequisites
+## Features
 
-- go version v1.22.0+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- **L4 Load Balancing** — Network Load Balancers for `Service` resources of type `LoadBalancer`.
+- **L7 Load Balancing** — Application Load Balancers driven by Kubernetes `Ingress` resources.
+- **`LoadBalancerConfig` CRD** — Fine-grained control over listeners, pools, policies, and TLS certificates.
+- **`NodeSecurityGroup` CRD** — Declarative management of node security-group rules.
+- **`GlobalLoadBalancerConfig` / `VngcloudGlobalLoadBalancer` CRDs** — Multi-region traffic distribution.
+- **Annotation-driven configuration** — Tune behaviour via `vks.vngcloud.vn/*` annotations on `Service` / `Ingress`.
+- **Status conditions and Kubernetes events** — Surfaces reconcile state on the owning resource for `kubectl describe`.
+- **Prometheus metrics** — Built-in `/metrics` endpoint for observability.
+- **Leader election & graceful shutdown** — Safe to run in HA deployments.
 
-### To Deploy on the cluster
+## Architecture
 
-**Build and push your image to the location specified by `IMG`:**
+The controller follows a layered **Controller → UseCase → Repository** architecture:
 
-```sh
-make docker-build docker-push IMG=<some-registry>/vngcloud-load-balancer-controller:tag
+```
+Kubernetes Event
+      │
+      ▼
+ EventHandler
+      │
+      ▼
+  Controller (Reconciler)
+      │
+      ▼
+  UseCase Layer ◄── Annotation Parser
+      │
+      ├── K8s Repository ──► Kubernetes API
+      │
+      └── VNGCloud Repository ──► VNGCloud VLB API
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
+| Layer | Responsibility |
+|---|---|
+| Controller | Watches Kubernetes resources, enqueues reconcile requests |
+| UseCase | Business logic — desired state computation and reconciliation |
+| Repository | I/O abstraction — Kubernetes API and VNGCloud API |
+| Domain | Shared constants, finalizers, error types |
 
-**Install the CRDs into the cluster:**
+See the [architecture overview](https://vngcloud.github.io/vngcloud-load-balancer-controller/) in the documentation for a deeper dive.
 
-```sh
-make install
-```
+## Prerequisites
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+- A running VKS (VNGCloud Kubernetes Service) cluster.
+- Kubernetes **v1.20+** (tested on current VKS-supported versions).
+- `kubectl` and `helm` v3+.
+- VNGCloud IAM credentials (`Client ID` and `Client Secret`) with permission to manage VLB resources.
 
-```sh
-make deploy IMG=<some-registry>/vngcloud-load-balancer-controller:tag
-```
+## Quick Start
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+Install via Helm from the official OCI registry:
 
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
-
-```sh
-kubectl apply -k config/samples/
-```
-
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-
-**Delete the instances (CRs) from the cluster:**
-
-```sh
-kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
-make undeploy
-```
-
-## Project Distribution
-
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/vngcloud-load-balancer-controller:tag
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/vngcloud-load-balancer-controller/<tag or branch>/dist/install.yaml
-```
-
-## Contributing
-
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
-
-## License
-
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-## Developing guide
-
-To install dev version through helm:
-
-```sh
-helm install -n kube-system vngcloud-load-balancer-controller oci://vcr.vngcloud.vn/60108-annd2-ingress/vks-helm-charts/vngcloud-load-balancer-controller \
+```bash
+# HCM region
+helm install vngcloud-load-balancer-controller \
+  oci://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller \
   --namespace kube-system \
-  --set manager.manager.image.repository=vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller \
-  --set manager.manager.image.tag=v0.0.0 \
-  --version 0.0.1 \
-  --set mysecret.global.clientID="____________________" \
-  --set mysecret.global.clientSecret="____________________" \
+  --set mysecret.global.clientID="<YOUR_CLIENT_ID>" \
+  --set mysecret.global.clientSecret="<YOUR_CLIENT_SECRET>" \
+  --set mysecret.global.vserverURL="https://hcm-3.api.vngcloud.vn/vserver"
+```
+
+```bash
+# HAN region
+helm install vngcloud-load-balancer-controller \
+  oci://vcr-han.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller \
+  --namespace kube-system \
+  --set mysecret.global.clientID="<YOUR_CLIENT_ID>" \
+  --set mysecret.global.clientSecret="<YOUR_CLIENT_SECRET>" \
   --set mysecret.global.vserverURL="https://han-1.api.vngcloud.vn/vserver"
 ```
 
-To run locally, make sure you have this file `/etc/vngcloud-load-balancer-controller/config.yaml` with the following content:
+Verify the install:
+
+```bash
+kubectl get pods -n kube-system -l app.kubernetes.io/name=vngcloud-load-balancer-controller
+```
+
+For raw-manifest installation, upgrade procedures, and the full configuration reference, see the
+[Installation guide](docs/deploy/installation.md), [Configuration reference](docs/deploy/configuration.md),
+and [Upgrade guide](docs/deploy/upgrade.md).
+
+## Usage
+
+### Service (L4)
 
 ```yaml
-chartVersion: 0.0.0
-global:
-  clientID: ____________________________________
-  clientSecret: ____________________________________
-  identityURL: https://iamapis.vngcloud.vn/accounts-api
-  vserverURL: https://hcm-3.api.vngcloud.vn/vserver
-  projectID: pro-___________________________________ # should be the real project ID of cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  annotations:
+    vks.vngcloud.vn/load-balancer-name: my-app-lb
+spec:
+  type: LoadBalancer
+  selector:
+    app: my-app
+  ports:
+    - port: 80
+      targetPort: 8080
 ```
 
-Then run:
+### Ingress (L7)
 
-```sh
-make install run
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-app
+  annotations:
+    vks.vngcloud.vn/load-balancer-name: my-app-alb
+spec:
+  ingressClassName: vngcloud
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-app
+                port:
+                  number: 80
 ```
 
-To resync the helm chart:
+More guides:
 
-```sh
-make manifests kustomize helm
+- [Service (L4)](docs/guide/service.md) · [Ingress (L7)](docs/guide/ingress.md)
+- [`LoadBalancerConfig` CRD](docs/guide/load-balancer-config.md)
+- [`NodeSecurityGroup` CRD](docs/guide/node-security-group.md)
+- [Global Load Balancer](docs/guide/global-load-balancer.md)
+- Annotations: [Service](docs/annotations/service.md) · [Ingress](docs/annotations/ingress.md)
+- Examples: [TLS termination](docs/examples/tls-termination.md) · [Internal LB](docs/examples/internal-lb.md) · [Custom health check](docs/examples/custom-healthcheck.md)
+
+## Documentation
+
+Full docs are published at <https://vngcloud.github.io/vngcloud-load-balancer-controller/> and the
+sources live under [`docs/`](docs/).
+
+## Roadmap
+
+- [ ] Gateway API support (design phase)
+- [ ] End-to-end test suite
+- [ ] Validating / mutating webhooks
+- [ ] Out-of-band drift reconciliation (detect external load-balancer changes)
+- [ ] Migration from `EndpointSlice` (deprecated `v1.Endpoints` watchers)
+
+## Contributing
+
+Contributions are welcome. See [`docs/contributing.md`](docs/contributing.md) for the full
+development setup, local-run instructions, code-generation workflow, and PR guidelines.
+
+Quick reference:
+
+```bash
+make help           # list all make targets
+make test           # run unit and integration tests
+make lint lint-fix  # static analysis
+make install run    # run the controller locally against the current kubeconfig
 ```
 
-To run the tests:
+## Support
 
-```sh
-make test
-```
+- **Issues / bug reports:** <https://github.com/vngcloud/vngcloud-load-balancer-controller/issues>
+- **VNGCloud support:** <https://support.vngcloud.vn/>
 
-To deploy the controller with new changes, fill secret in `config/manager/manager.yaml` to your own secret, then run:
+## License
 
-```sh
-make docker-build docker-push undeploy deploy
-```
+Copyright 2024 VNGCloud.
+
+Licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Unless required by applicable law or agreed to in writing, software distributed under the License
+is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+or implied.

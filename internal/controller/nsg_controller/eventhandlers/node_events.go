@@ -1,0 +1,90 @@
+package eventhandlers
+
+import (
+	"context"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/go-logr/logr"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/nsg"
+)
+
+// NewEnqueueRequestForNodeEvent constructs new enqueueRequestsForNodeEvent.
+func NewEnqueueRequestForNodeEvent(k8sClient client.Client,
+	nsgUtils nsg.NodeSecurityGroupUtils, logger logr.Logger) *enqueueRequestsForNodeEvent {
+	return &enqueueRequestsForNodeEvent{
+		k8sClient: k8sClient,
+		nsgUtils:  nsgUtils,
+		logger:    logger,
+	}
+}
+
+var _ handler.EventHandler = (*enqueueRequestsForNodeEvent)(nil)
+
+type enqueueRequestsForNodeEvent struct {
+	k8sClient client.Client
+	nsgUtils  nsg.NodeSecurityGroupUtils
+	logger    logr.Logger
+}
+
+func (h *enqueueRequestsForNodeEvent) Create(ctx context.Context, e event.CreateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.enqueueAllNsg(ctx, queue)
+}
+
+func (h *enqueueRequestsForNodeEvent) Update(ctx context.Context, e event.UpdateEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	oldNode := e.ObjectOld.(*corev1.Node)
+	newNode := e.ObjectNew.(*corev1.Node)
+
+	// Skip reconciliation if only unimportant fields changed
+	// Only reconcile if labels, spec, addresses, or ready condition changed
+	if equality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) &&
+		equality.Semantic.DeepEqual(oldNode.Spec, newNode.Spec) &&
+		equality.Semantic.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses) &&
+		getNodeReadyCondition(oldNode) == getNodeReadyCondition(newNode) {
+		return
+	}
+
+	h.enqueueAllNsg(ctx, queue)
+}
+
+func (h *enqueueRequestsForNodeEvent) Delete(ctx context.Context, e event.DeleteEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	h.enqueueAllNsg(ctx, queue)
+}
+
+func (h *enqueueRequestsForNodeEvent) Generic(ctx context.Context, e event.GenericEvent, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+}
+
+func (h *enqueueRequestsForNodeEvent) enqueueAllNsg(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	// List all
+	nsgList := &v1alpha1.NodeSecurityGroupList{}
+	if err := h.k8sClient.List(ctx, nsgList); err != nil {
+		return
+	}
+
+	// Enqueue all supported nsgs
+	for _, nsg := range nsgList.Items {
+		if !h.nsgUtils.IsPendingFinalization(&nsg) && !h.nsgUtils.IsSupported(&nsg) {
+			continue
+		}
+		h.logger.V(1).Info("Enqueue NodeSecurityGroup", "namespace", nsg.Namespace, "name", nsg.Name)
+		queue.Add(reconcile.Request{
+			NamespacedName: client.ObjectKeyFromObject(&nsg),
+		})
+	}
+}
+
+func getNodeReadyCondition(node *corev1.Node) corev1.ConditionStatus {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status
+		}
+	}
+	return corev1.ConditionUnknown
+}

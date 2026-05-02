@@ -3,6 +3,8 @@ manager:
   manager:
     args:
     - --metrics-bind-address=:8443
+    - --metrics-secure=false
+    - --log-level=info
     - --leader-elect
     - --health-probe-bind-address=:8081
     containerSecurityContext:
@@ -12,7 +14,7 @@ manager:
         - ALL
     image:
       repository: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller
-      tag: "v0.2.15" # release
+      tag: "v0.3.23" # release
     imagePullPolicy: Always
     resources:
       limits:
@@ -21,25 +23,38 @@ manager:
       requests:
         cpu: 10m
         memory: 64Mi
-  replicas: 1
-  serviceAccount:
-    annotations: {}
-  # -- Affinity configuration for pod scheduling
-  affinity: {}
-    # Example pod anti-affinity to prevent pods from being scheduled on the same host as cilium
-    # podAntiAffinity:
-    #   requiredDuringSchedulingIgnoredDuringExecution:
-    #     - topologyKey: kubernetes.io/hostname
-    #       labelSelector:
-    #         matchLabels:
-    #           k8s-app: cilium
-  # -- Node selector for pod scheduling
+  priorityClassName: system-cluster-critical
   nodeSelector: {}
-    # Example: schedule only on Linux nodes
-    # kubernetes.io/os: linux
-  # -- Tolerations for pod scheduling to nodes with taints
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              control-plane: manager
+          topologyKey: kubernetes.io/hostname
+  podSecurityContext:
+    runAsNonRoot: true
+  replicas: 1
   tolerations:
-    - operator: Exists
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - key: components.vks.vngcloud.vn/vks-managed-components
+    operator: Exists
+  - effect: NoSchedule
+    key: kubernetes.io/arch
+    operator: Equal
+    value: arm64
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  topologySpreadConstraints: []
 metricsService:
   ports:
   - name: https
@@ -59,3 +74,23 @@ mysecret:
     clientSecret: ""
     identityURL: https://iamapis.vngcloud.vn/accounts-api
     vserverURL: https://hcm-3.api.vngcloud.vn/vserver
+  loadBalancerOpts:
+    defaultL4PackageName: "NLB_Small"
+    defaultL7PackageName: "ALB_Small"
+    defaultScheme: "Internet"
+
+    defaultPoolAlgorithm: "ROUND_ROBIN"
+    defaultHealthyThreshold: 3
+    defaultUnhealthyThreshold: 3
+    defaultInterval: 30
+    defaultTimeout: 5
+
+    defaultTimeoutClient: 50
+    defaultTimeoutMember: 50
+    defaultTimeoutConnection: 5
+    defaultAllowedCidrs: 0.0.0.0/0
+serviceAccount:
+  annotations: {}
+  automount: true
+  create: true
+  name: ""

@@ -3,10 +3,11 @@ package utils
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
+	"github.com/anngdinh/operator-helper/contexts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,57 +21,80 @@ const (
 	UnknownCNI          CNIType = "Unknown CNI"
 )
 
-// Detector detects the CNI type used in the Kubernetes cluster.
-type Detector struct {
-	client.Client
+type CniDetector interface {
+	DetectCNIType(ctx context.Context) (CNIType, error)
 }
 
-// NewDetector creates a new instance of the CNI Detector.
-func NewDetector(kubeClient client.Client) *Detector {
-	return &Detector{Client: kubeClient}
+type detector struct {
+	k8sClient client.Client
+
+	result *CNIType
+}
+
+// NewDetector creates a new instance of the CNI detector.
+func NewDetector(k8sClient client.Client) CniDetector {
+	return &detector{
+		k8sClient: k8sClient,
+		result:    nil,
+	}
 }
 
 // DetectCNIType detects the CNI type in the cluster.
-func (d *Detector) DetectCNIType() (CNIType, error) {
+func (d *detector) DetectCNIType(ctx context.Context) (CNIType, error) {
+	if d.result != nil {
+		return *d.result, nil
+	}
+
 	// Check for Calico
-	if d.isCalicoOverlay() {
+	if d.isCalicoOverlay(ctx) {
+		d.result = ptr.To(CalicoOverlay)
 		return CalicoOverlay, nil
 	}
 
 	// Check for Cilium
-	if d.isCiliumNativeRouting() {
+	if d.isCiliumNativeRouting(ctx) {
+		d.result = ptr.To(CiliumNativeRouting)
 		return CiliumNativeRouting, nil
 	}
 
-	if d.isCiliumOverlay() {
+	if d.isCiliumOverlay(ctx) {
+		d.result = ptr.To(CiliumOverlay)
 		return CiliumOverlay, nil
 	}
 
+	// Unknown CNI
+	d.result = ptr.To(UnknownCNI)
 	return UnknownCNI, nil
 }
 
 // Check if Calico Overlay is running
-func (d *Detector) isCalicoOverlay() bool {
-	calicoNodeDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "calico-node"}, calicoNodeDaemonSet)
+func (d *detector) isCalicoOverlay(ctx context.Context) bool {
+	logger := contexts.NewContext(ctx).Log()
 
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get calico-node daemonset: %v", err)
+	// Calico can be installed in kube-system or calico-system namespace
+	for _, ns := range []string{"kube-system", "calico-system"} {
+		calicoNodeDaemonSet := &appsv1.DaemonSet{}
+		err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: ns, Name: "calico-node"}, calicoNodeDaemonSet)
+		if err == nil {
+			return true
 		}
-		return false
+		if !apierrors.IsNotFound(err) {
+			logger.Warnf("Failed to get calico-node daemonset in %s: %v", ns, err)
+		}
 	}
-	return true
+	return false
 }
 
 // Check if Cilium Overlay is running
-func (d *Detector) isCiliumOverlay() bool {
+func (d *detector) isCiliumOverlay(ctx context.Context) bool {
+	logger := contexts.NewContext(ctx).Log()
+
 	ciliumDaemonSet := &appsv1.DaemonSet{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
+	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium"}, ciliumDaemonSet)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get cilium daemonset: %v", err)
+			logger.Warnf("Failed to get cilium daemonset: %v", err)
 		}
 		return false
 	}
@@ -78,18 +102,20 @@ func (d *Detector) isCiliumOverlay() bool {
 }
 
 // Check if Cilium Native Routing is running
-func (d *Detector) isCiliumNativeRouting() bool {
-	if !d.isCiliumOverlay() {
+func (d *detector) isCiliumNativeRouting(ctx context.Context) bool {
+	if !d.isCiliumOverlay(ctx) {
 		return false
 	}
 
+	logger := contexts.NewContext(ctx).Log()
+
 	// get cilium-config config map
 	ciliumConfigMap := &corev1.ConfigMap{}
-	err := d.Client.Get(context.TODO(), client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
+	err := d.k8sClient.Get(ctx, client.ObjectKey{Namespace: "kube-system", Name: "cilium-config"}, ciliumConfigMap)
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			logrus.Warnf("Failed to get cilium-config configmap: %v", err)
+			logger.Warnf("Failed to get cilium-config configmap: %v", err)
 		}
 		return false
 	}

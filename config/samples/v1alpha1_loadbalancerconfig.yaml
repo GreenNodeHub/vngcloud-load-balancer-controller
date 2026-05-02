@@ -1,0 +1,9 @@
+apiVersion: vks.vngcloud.vn/v1alpha1
+kind: LoadBalancerConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: vngcloud-load-balancer-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: loadbalancerconfig-sample
+spec:
+  # TODO(user): Add fields here

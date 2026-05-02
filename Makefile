@@ -1,8 +1,8 @@
-VERSION ?= v0.0.0
-COMMIT  := ""
-LDFLAGS := "-w -s -X 'github.com/anngdinh/operator-helper/version.Commit=$(COMMIT)' -X 'github.com/anngdinh/operator-helper/version.Version=$(VERSION)'"
+VERSION ?= dev
+COMMIT  := "devvv"
+LDFLAGS := "-w -s -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Commit=$(COMMIT)' -X 'github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version=$(VERSION)'"
 # Image URL to use all building/pushing image targets
-IMG ?= vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:$(VERSION)
+IMG ?= vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:$(VERSION)
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -79,6 +79,20 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+##@ Documentation
+
+.PHONY: docs-preview
+docs-preview: ## Preview documentation locally (requires: pip install pipenv && pipenv install)
+	pipenv run mkdocs serve
+
+.PHONY: docs-build
+docs-build: ## Build documentation static site into site/
+	pipenv run mkdocs build
+
+.PHONY: docs-publish
+docs-publish: ## Publish versioned docs to GitHub Pages (VERSION defaults to 'latest')
+	pipenv run mike deploy $(or $(VERSION),latest) latest --update-aliases --push
+
 ##@ Build
 
 .PHONY: build
@@ -92,14 +106,19 @@ build-pro:
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go --dev-mode
+	go run ./cmd/main.go --log-level=debug \
+	--metrics-bind-address=:8080 --metrics-secure=false
+# 	--disable-service-controller \
+# 	--disable-load-balancer-config-controller \
+# 	--disable-ingress-controller \
+# 	--disable-node-security-group-controller \
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT="dev" -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -213,7 +232,7 @@ HELMIFY ?= $(LOCALBIN)/helmify
 .PHONY: helmify
 helmify: $(HELMIFY) ## Download helmify locally if necessary.
 $(HELMIFY): $(LOCALBIN)
-	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.4.5
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@v0.4.19
 
 helm: manifests kustomize helmify
 	$(KUSTOMIZE) build config/default | $(HELMIFY) charts/vngcloud-load-balancer-controller

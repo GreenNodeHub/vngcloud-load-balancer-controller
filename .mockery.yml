@@ -1,0 +1,23 @@
+all: false
+dir: '{{.InterfaceDir}}'
+filename: mocks.go
+force-file-write: true
+formatter: goimports
+include-auto-generated: false
+log-level: info
+structname: '{{.Mock}}{{.InterfaceName}}'
+pkgname: '{{.SrcPackageName}}'
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: '{{.Template}}.schema.json'
+packages:
+  github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils:
+    config:
+      all: true
+  github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository:
+    config:
+      all: true
+  github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase:
+    config:
+      all: true

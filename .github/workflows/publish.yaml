@@ -63,12 +63,14 @@ jobs:
           # platforms: linux/amd64
           # outputs: type=registry
           tags: |
-            ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ github.sha }}
+            ghcr.io/vngcloud/vngcloud-load-balancer-controller:${{ env.COMMIT_SHORT_SHA }}
             ghcr.io/vngcloud/vngcloud-load-balancer-controller:v${{ github.ref_name }}
-            ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:${{ github.sha }}
-            ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:${{ github.sha }}
+            ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:${{ env.COMMIT_SHORT_SHA }}
+            ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:${{ env.COMMIT_SHORT_SHA }}
             ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
             ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:v${{ github.ref_name }}
+            ${{ env.REPO_HCM }}/vngcloud-load-balancer-controller:latest
+            ${{ env.REPO_HAN }}/vngcloud-load-balancer-controller:latest
           # target: vngcloud-load-balancer-controller
 
       - name: Push charts
