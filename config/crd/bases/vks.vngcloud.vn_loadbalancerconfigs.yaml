@@ -640,11 +640,29 @@ spec:
                 description: LoadBalancerId is the actual ID of the load balancer
                   in VNG Cloud
                 type: string
+              loadBalancerName:
+                description: |-
+                  LoadBalancerName is the actual name of the load balancer in VNG Cloud,
+                  observed from the cloud after creation/adoption. May differ from Spec.LoadBalancerName
+                  when an existing load balancer is adopted via the load-balancer-id annotation.
+                type: string
               observedGeneration:
                 description: ObservedGeneration reflects the generation of the most
                   recently observed spec
                 format: int64
                 type: integer
+              subnetId:
+                description: SubnetId is the actual subnet of the load balancer in
+                  VNG Cloud, observed from the cloud.
+                type: string
+              type:
+                description: Type is the actual type of the load balancer in VNG Cloud,
+                  observed from the cloud.
+                type: string
+              zoneId:
+                description: ZoneId is the actual zone of the load balancer in VNG
+                  Cloud, observed from the cloud.
+                type: string
             type: object
         required:
         - spec

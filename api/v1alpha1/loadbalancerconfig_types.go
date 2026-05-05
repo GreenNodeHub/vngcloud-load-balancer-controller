@@ -425,6 +425,24 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
+	// LoadBalancerName is the actual name of the load balancer in VNG Cloud,
+	// observed from the cloud after creation/adoption. May differ from Spec.LoadBalancerName
+	// when an existing load balancer is adopted via the load-balancer-id annotation.
+	// +optional
+	LoadBalancerName *string `json:"loadBalancerName,omitempty"`
+
+	// Type is the actual type of the load balancer in VNG Cloud, observed from the cloud.
+	// +optional
+	Type *loadbalancerv2.LoadBalancerType `json:"type,omitempty"`
+
+	// SubnetId is the actual subnet of the load balancer in VNG Cloud, observed from the cloud.
+	// +optional
+	SubnetId *string `json:"subnetId,omitempty"`
+
+	// ZoneId is the actual zone of the load balancer in VNG Cloud, observed from the cloud.
+	// +optional
+	ZoneId *common.Zone `json:"zoneId,omitempty"`
+
 	// CreatedTags is the map of tags created on the load balancer
 	// +optional
 	CreatedTags map[string]string `json:"createdTags,omitempty"`

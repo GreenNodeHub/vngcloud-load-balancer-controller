@@ -136,10 +136,17 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Labels[domain.LabelOwnerResourceName] = t.service.Name
 	lbConfig.Labels[domain.LabelOwnerResourceKind] = t.service.Kind
 	lbConfig.Labels[domain.LabelOwnerResourceUid] = string(t.service.GetUID())
-	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
-	lbConfig.Spec.SubnetId = subnetId
 	lbConfig.Spec.VpcId = networkId
-	lbConfig.Spec.ZoneId = zoneId
+
+	// Type, SubnetId, ZoneId, LoadBalancerName are mirrored from the cloud LB by the
+	// LBC controller (syncLBCSpecFromLoadBalancer); the cloud LB name is also immutable
+	// after creation. Writing them on every reconcile would fight that sync and cause
+	// an infinite reconcile loop, so we only set them at create time.
+	if !isCreated {
+		lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
+		lbConfig.Spec.SubnetId = subnetId
+		lbConfig.Spec.ZoneId = zoneId
+	}
 
 	// should not set owner reference because sometimes user want to keep LBC after service is deleted
 	// lbConfig.OwnerReferences = []metav1.OwnerReference{...}
@@ -155,7 +162,10 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
-	lbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+
+	if !isCreated {
+		lbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+	}
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	if pools, listeners, err := t.buildPoolsAndListeners(ctx, targetNodeLabels); err != nil {

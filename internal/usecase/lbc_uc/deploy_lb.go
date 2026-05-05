@@ -213,7 +213,7 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 		}
 	}
 
-	if err := t.syncLBCSpecFromLoadBalancer(ctx, lbEntity); err != nil {
+	if err := t.syncLBCStatusFromLoadBalancer(ctx, lbEntity); err != nil {
 		return "", err
 	}
 
@@ -238,45 +238,48 @@ func (t *defaultModelDeployTask) ensureExistLoadBalancer(ctx context.Context, lb
 	return lbId, nil
 }
 
-// syncLBCSpecFromLoadBalancer compares the actual load balancer state with the LBC spec
-// and patches the spec if any fields have drifted. This ensures the LBC spec stays in sync
-// with the real load balancer after creation or when using an existing LB.
-func (t *defaultModelDeployTask) syncLBCSpecFromLoadBalancer(ctx context.Context, lbEntity *entity.LoadBalancer) error {
+// syncLBCStatusFromLoadBalancer records the cloud LB's actual name, type, subnet, and zone
+// in the LBC Status. The LBC controller never writes to Spec — Spec is the user/owner-controller
+// desired state, Status is the controller's observed state.
+func (t *defaultModelDeployTask) syncLBCStatusFromLoadBalancer(ctx context.Context, lbEntity *entity.LoadBalancer) error {
 	if lbEntity == nil {
 		return nil
 	}
 
-	return t.k8sRepo.PatchMutateLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+	// For InterVPC LBs, BackendSubnetID is the backend subnet.
+	// For normal LBs, BackendSubnetID is empty; PrivateSubnetID is the subnet.
+	subnetId := lbEntity.PrivateSubnetID
+	if lbEntity.BackendSubnetID != "" {
+		subnetId = lbEntity.BackendSubnetID
+	}
+
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		changed := false
 
-		if lbEntity.Name != "" && lbEntity.Name != obj.Spec.LoadBalancerName {
-			t.logger.Infof("Syncing LBC LoadBalancerName: %s -> %s", obj.Spec.LoadBalancerName, lbEntity.Name)
-			obj.Spec.LoadBalancerName = lbEntity.Name
+		if lbEntity.Name != "" && (obj.Status.LoadBalancerName == nil || *obj.Status.LoadBalancerName != lbEntity.Name) {
+			obj.Status.LoadBalancerName = &lbEntity.Name
 			changed = true
 		}
 
-		// For InterVPC LBs, BackendSubnetID is the backend subnet (maps to Spec.SubnetId).
-		// For normal LBs, BackendSubnetID is empty; PrivateSubnetID is the subnet (maps to Spec.SubnetId).
-		subnetId := lbEntity.PrivateSubnetID
-		if lbEntity.BackendSubnetID != "" {
-			subnetId = lbEntity.BackendSubnetID
-		}
-		if subnetId != "" && subnetId != obj.Spec.SubnetId {
-			t.logger.Infof("Syncing LBC SubnetId: %s -> %s", obj.Spec.SubnetId, subnetId)
-			obj.Spec.SubnetId = subnetId
+		if subnetId != "" && (obj.Status.SubnetId == nil || *obj.Status.SubnetId != subnetId) {
+			obj.Status.SubnetId = &subnetId
 			changed = true
 		}
 
-		if lbEntity.Type != "" && loadbalancerv2.LoadBalancerType(lbEntity.Type) != obj.Spec.Type {
-			t.logger.Infof("Syncing LBC Type: %s -> %s", obj.Spec.Type, lbEntity.Type)
-			obj.Spec.Type = loadbalancerv2.LoadBalancerType(lbEntity.Type)
-			changed = true
+		if lbEntity.Type != "" {
+			lbType := loadbalancerv2.LoadBalancerType(lbEntity.Type)
+			if obj.Status.Type == nil || *obj.Status.Type != lbType {
+				obj.Status.Type = &lbType
+				changed = true
+			}
 		}
 
-		if lbEntity.ZoneID != "" && common.Zone(lbEntity.ZoneID) != obj.Spec.ZoneId {
-			t.logger.Infof("Syncing LBC ZoneId: %s -> %s", obj.Spec.ZoneId, lbEntity.ZoneID)
-			obj.Spec.ZoneId = common.Zone(lbEntity.ZoneID)
-			changed = true
+		if lbEntity.ZoneID != "" {
+			zone := common.Zone(lbEntity.ZoneID)
+			if obj.Status.ZoneId == nil || *obj.Status.ZoneId != zone {
+				obj.Status.ZoneId = &zone
+				changed = true
+			}
 		}
 
 		return changed
