@@ -118,11 +118,11 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 		return nil
 	}
 
-	existingSubnetId := ""
+	var existingLBC *v1alpha1.LoadBalancerConfig
 	if isCreated {
-		existingSubnetId = lbConfig.Spec.SubnetId
+		existingLBC = lbConfig
 	}
-	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx, existingSubnetId)
+	zoneId, networkId, subnetId, subnetCidr, err := t.buildSubnetAndZone(ctx, existingLBC)
 	if err != nil {
 		return err
 	}
@@ -136,10 +136,17 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Labels[domain.LabelOwnerResourceName] = t.service.Name
 	lbConfig.Labels[domain.LabelOwnerResourceKind] = t.service.Kind
 	lbConfig.Labels[domain.LabelOwnerResourceUid] = string(t.service.GetUID())
-	lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
-	lbConfig.Spec.SubnetId = subnetId
 	lbConfig.Spec.VpcId = networkId
-	lbConfig.Spec.ZoneId = zoneId
+
+	// Type, SubnetId, ZoneId, LoadBalancerName are mirrored from the cloud LB by the
+	// LBC controller (syncLBCSpecFromLoadBalancer); the cloud LB name is also immutable
+	// after creation. Writing them on every reconcile would fight that sync and cause
+	// an infinite reconcile loop, so we only set them at create time.
+	if !isCreated {
+		lbConfig.Spec.Type = v2.LoadBalancerTypeLayer4
+		lbConfig.Spec.SubnetId = subnetId
+		lbConfig.Spec.ZoneId = zoneId
+	}
 
 	// should not set owner reference because sometimes user want to keep LBC after service is deleted
 	// lbConfig.OwnerReferences = []metav1.OwnerReference{...}
@@ -155,7 +162,10 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	lbConfig.Spec.EnableAutoscale = t.buildAutoscale(ctx)
 	lbConfig.Spec.Tags = t.buildTags(ctx)
 	lbConfig.Spec.IsPoc = t.buildIsPoc(ctx)
-	lbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+
+	if !isCreated {
+		lbConfig.Spec.LoadBalancerName = t.buildLoadBalancerName(ctx)
+	}
 
 	targetNodeLabels := t.buildTargetNodeLabels(ctx)
 	if pools, listeners, err := t.buildPoolsAndListeners(ctx, targetNodeLabels); err != nil {
@@ -323,11 +333,12 @@ func (t *defaultModelBuildTask) buildPrivateZoneId(_ context.Context) *common.Zo
 
 // buildSubnetAndZone resolves subnet and zone with the following priority:
 // 1. load-balancer-id annotation (get subnet from that LB)
-// 2. existing LBC's SubnetId (source of truth after creation)
-// 3. prefer-subnet-id annotation
-// 4. prefer-zone-id annotation
-// 5. defaults (from first node)
-func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existingSubnetId string) (zone common.Zone, networkId string, subnetId string, subnetCIDR string, _err error) {
+// 2. existing LBC's Status.SubnetId (cloud-observed truth, set by LBC controller)
+// 3. existing LBC's Spec.SubnetId (initial computed value)
+// 4. prefer-subnet-id annotation
+// 5. prefer-zone-id annotation
+// 6. defaults (from first node)
+func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existingLBC *v1alpha1.LoadBalancerConfig) (zone common.Zone, networkId string, subnetId string, subnetCIDR string, _err error) {
 	zone = t.defaultZone
 	networkId = t.defaultNetworkId
 	subnetId = t.defaultSubnetId
@@ -352,7 +363,18 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
 	}
 
-	// if LBC already exists, use its subnet as source of truth
+	// resolve subnet from existing LBC: prefer Status.SubnetId (cloud-observed) over
+	// Spec.SubnetId. Status reflects what the LBC controller has actually verified
+	// against the cloud — Spec is the original computed value and may be stale for
+	// LBs adopted by name.
+	existingSubnetId := ""
+	if existingLBC != nil {
+		if existingLBC.Status.SubnetId != nil && *existingLBC.Status.SubnetId != "" {
+			existingSubnetId = *existingLBC.Status.SubnetId
+		} else {
+			existingSubnetId = existingLBC.Spec.SubnetId
+		}
+	}
 	if existingSubnetId != "" {
 		if existingSubnetId == t.defaultSubnetId {
 			return zone, networkId, subnetId, subnetCIDR, _err

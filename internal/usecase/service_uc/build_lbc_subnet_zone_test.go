@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
@@ -24,14 +25,15 @@ func TestBuildSubnetAndZone(t *testing.T) {
 	defaultSubnetCIDR := "10.0.0.0/24"
 
 	tests := []struct {
-		name             string
-		annotations      map[string]string
-		existingSubnetId string
-		setupMocks       func(vngcloud *repository.MockVngCloudRepository, k8s *repository.MockK8sRepository)
-		expectedZone     common.Zone
-		expectedSubnetId string
-		expectedCIDR     string
-		expectError      bool
+		name                   string
+		annotations            map[string]string
+		existingSubnetId       string // populates Spec.SubnetId on existing LBC
+		existingStatusSubnetId string // populates Status.SubnetId on existing LBC (cloud-observed)
+		setupMocks             func(vngcloud *repository.MockVngCloudRepository, k8s *repository.MockK8sRepository)
+		expectedZone           common.Zone
+		expectedSubnetId       string
+		expectedCIDR           string
+		expectError            bool
 	}{
 		{
 			name:             "no_annotations_no_existing_lbc_returns_defaults",
@@ -117,6 +119,25 @@ func TestBuildSubnetAndZone(t *testing.T) {
 			expectError:      false,
 		},
 		{
+			name:                   "status_subnet_takes_priority_over_spec_subnet",
+			annotations:            map[string]string{},
+			existingSubnetId:       "subnet-spec-stale",
+			existingStatusSubnetId: "subnet-cloud-observed",
+			setupMocks: func(vngcloud *repository.MockVngCloudRepository, k8s *repository.MockK8sRepository) {
+				vngcloud.EXPECT().
+					GetSubnetByID(mock.Anything, defaultNetworkId, "subnet-cloud-observed").
+					Return(&entity.Subnet{
+						Id:     "subnet-cloud-observed",
+						ZoneID: "zone-cloud-observed",
+						Cidr:   "10.0.32.0/24",
+					}, nil)
+			},
+			expectedZone:     common.Zone("zone-cloud-observed"),
+			expectedSubnetId: "subnet-cloud-observed",
+			expectedCIDR:     "10.0.32.0/24",
+			expectError:      false,
+		},
+		{
 			name: "prefer_subnet_annotation_used_when_no_existing_lbc",
 			annotations: map[string]string{
 				domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixPreferSubnetID: "subnet-prefer",
@@ -165,7 +186,16 @@ func TestBuildSubnetAndZone(t *testing.T) {
 				defaultSubnetCIDR: defaultSubnetCIDR,
 			}
 
-			zone, _, subnetId, cidr, err := task.buildSubnetAndZone(context.Background(), tt.existingSubnetId)
+			var existingLBC *v1alpha1.LoadBalancerConfig
+			if tt.existingSubnetId != "" || tt.existingStatusSubnetId != "" {
+				existingLBC = &v1alpha1.LoadBalancerConfig{
+					Spec: v1alpha1.LoadBalancerConfigSpec{SubnetId: tt.existingSubnetId},
+				}
+				if tt.existingStatusSubnetId != "" {
+					existingLBC.Status.SubnetId = &tt.existingStatusSubnetId
+				}
+			}
+			zone, _, subnetId, cidr, err := task.buildSubnetAndZone(context.Background(), existingLBC)
 
 			if tt.expectError {
 				assert.Error(t, err)

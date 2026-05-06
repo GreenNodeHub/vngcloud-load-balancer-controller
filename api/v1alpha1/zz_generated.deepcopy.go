@@ -890,6 +890,26 @@ func (in *LoadBalancerConfigStatus) DeepCopyInto(out *LoadBalancerConfigStatus) 
 		*out = new(string)
 		**out = **in
 	}
+	if in.LoadBalancerName != nil {
+		in, out := &in.LoadBalancerName, &out.LoadBalancerName
+		*out = new(string)
+		**out = **in
+	}
+	if in.Type != nil {
+		in, out := &in.Type, &out.Type
+		*out = new(v2.LoadBalancerType)
+		**out = **in
+	}
+	if in.SubnetId != nil {
+		in, out := &in.SubnetId, &out.SubnetId
+		*out = new(string)
+		**out = **in
+	}
+	if in.ZoneId != nil {
+		in, out := &in.ZoneId, &out.ZoneId
+		*out = new(common.Zone)
+		**out = **in
+	}
 	if in.CreatedTags != nil {
 		in, out := &in.CreatedTags, &out.CreatedTags
 		*out = make(map[string]string, len(*in))

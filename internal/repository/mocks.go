@@ -5792,69 +5792,6 @@ func (_c *MockK8sRepository_PatchLoadBalancerConfig_Call) RunAndReturn(run func(
 	return _c
 }
 
-// PatchMutateLoadBalancerConfig provides a mock function for the type MockK8sRepository
-func (_mock *MockK8sRepository) PatchMutateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error {
-	ret := _mock.Called(ctx, lbc, mutateFunc)
-
-	if len(ret) == 0 {
-		panic("no return value specified for PatchMutateLoadBalancerConfig")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v1alpha1.LoadBalancerConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error); ok {
-		r0 = returnFunc(ctx, lbc, mutateFunc)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockK8sRepository_PatchMutateLoadBalancerConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PatchMutateLoadBalancerConfig'
-type MockK8sRepository_PatchMutateLoadBalancerConfig_Call struct {
-	*mock.Call
-}
-
-// PatchMutateLoadBalancerConfig is a helper method to define mock.On call
-//   - ctx context.Context
-//   - lbc *v1alpha1.LoadBalancerConfig
-//   - mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool
-func (_e *MockK8sRepository_Expecter) PatchMutateLoadBalancerConfig(ctx interface{}, lbc interface{}, mutateFunc interface{}) *MockK8sRepository_PatchMutateLoadBalancerConfig_Call {
-	return &MockK8sRepository_PatchMutateLoadBalancerConfig_Call{Call: _e.mock.On("PatchMutateLoadBalancerConfig", ctx, lbc, mutateFunc)}
-}
-
-func (_c *MockK8sRepository_PatchMutateLoadBalancerConfig_Call) Run(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool)) *MockK8sRepository_PatchMutateLoadBalancerConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *v1alpha1.LoadBalancerConfig
-		if args[1] != nil {
-			arg1 = args[1].(*v1alpha1.LoadBalancerConfig)
-		}
-		var arg2 func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool
-		if args[2] != nil {
-			arg2 = args[2].(func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockK8sRepository_PatchMutateLoadBalancerConfig_Call) Return(err error) *MockK8sRepository_PatchMutateLoadBalancerConfig_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockK8sRepository_PatchMutateLoadBalancerConfig_Call) RunAndReturn(run func(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool) error) *MockK8sRepository_PatchMutateLoadBalancerConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // PatchMutateStatusGlobalLoadBalancerConfig provides a mock function for the type MockK8sRepository
 func (_mock *MockK8sRepository) PatchMutateStatusGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, mutateFunc func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool) error {
 	ret := _mock.Called(ctx, glbc, mutateFunc)
