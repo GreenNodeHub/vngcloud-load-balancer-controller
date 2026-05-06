@@ -51,7 +51,7 @@ spec:
       tolerations:
         - key: CriticalAddonsOnly
           operator: Exists
-        - key: components.vks.vngcloud.vn/vks-managed-components
+        - key: components.vks.greennode.ai/vks-managed-components
           operator: Exists
         - effect: NoSchedule
           key: kubernetes.io/arch
@@ -89,7 +89,7 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:v0.3.23
+        image: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:v0.3.24
         imagePullPolicy: Always
         name: manager
         securityContext:

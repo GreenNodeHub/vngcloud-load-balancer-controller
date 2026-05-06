@@ -14,7 +14,7 @@ manager:
         - ALL
     image:
       repository: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller
-      tag: "v0.3.23" # release
+      tag: "v0.3.24" # release
     imagePullPolicy: Always
     resources:
       limits:
@@ -40,7 +40,7 @@ manager:
   tolerations:
   - key: CriticalAddonsOnly
     operator: Exists
-  - key: components.vks.vngcloud.vn/vks-managed-components
+  - key: components.vks.greennode.ai/vks-managed-components
     operator: Exists
   - effect: NoSchedule
     key: kubernetes.io/arch
