@@ -27,8 +27,8 @@ type defaultGatewayBuildTask struct {
 	gw     *gwv1.Gateway
 
 	// Resolved at translation time.
-	unscopedPolicy   *gwv1alpha1.VKSGatewayPolicy             // for LB-level fields and listener defaults
-	listenerPolicies map[string]*gwv1alpha1.VKSGatewayPolicy  // by Gateway listener name
+	unscopedPolicy   *gwv1alpha1.VKSGatewayPolicy            // for LB-level fields and listener defaults
+	listenerPolicies map[string]*gwv1alpha1.VKSGatewayPolicy // by Gateway listener name
 }
 
 // run is the per-reconcile entry. Phase A only translates LB-level fields;
@@ -160,11 +160,31 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 	}
 	lbc.Spec.Pools = pools
 
-	// Fold per-listener policies onto the matching listener entry.
+	// Fold per-listener policies onto the matching listener entry. The
+	// listenerPolicies map is keyed by the *Gateway* listener name (Gateway
+	// listeners and the LBC listener slice share the same i — both are
+	// emitted in Gateway.Spec.Listeners order, with unsupported-protocol
+	// entries skipped from the LBC slice but preserved here in the map for
+	// later phases). Iterating against the Gateway listeners keeps the
+	// pairing correct even when the LBC listener name was renamed (e.g.
+	// short names get a "gw_<uid>_" prefix to satisfy the cloud API's
+	// 5-char minimum).
+	gwIdx := 0
 	for i := range listeners {
-		if pol, ok := listenerPolicies[listeners[i].Name]; ok {
+		// Advance gwIdx to the next supported-protocol Gateway listener.
+		for gwIdx < len(t.gw.Spec.Listeners) {
+			if _, ok := mapListenerProtocol(t.gw.Spec.Listeners[gwIdx].Protocol); ok {
+				break
+			}
+			gwIdx++
+		}
+		if gwIdx >= len(t.gw.Spec.Listeners) {
+			break
+		}
+		if pol, ok := listenerPolicies[string(t.gw.Spec.Listeners[gwIdx].Name)]; ok {
 			listeners[i].Policies = pol
 		}
+		gwIdx++
 	}
 	lbc.Spec.Listeners = listeners
 

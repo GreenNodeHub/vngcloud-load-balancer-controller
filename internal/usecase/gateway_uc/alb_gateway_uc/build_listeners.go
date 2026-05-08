@@ -34,7 +34,7 @@ func (t *defaultGatewayBuildTask) buildListeners() ([]v1alpha1.Listener, error) 
 			continue
 		}
 		entry := v1alpha1.Listener{
-			Name:         string(l.Name),
+			Name:         t.cloudListenerName(l),
 			Protocol:     proto,
 			ProtocolPort: int32(l.Port),
 		}
@@ -109,6 +109,24 @@ func (t *defaultGatewayBuildTask) applyListenerPolicy(entry *v1alpha1.Listener, 
 	}); id != nil {
 		entry.ClientCertificateId = id
 	}
+}
+
+// cloudListenerName derives a vngcloud-acceptable listener name from the
+// Gateway listener. The API enforces 5-50 chars and only `a-zA-Z0-9_.-`.
+// Gateway listener names already satisfy the charset (Gateway-API rule), but
+// can be as short as a single character (e.g. "http"). We prefix with the
+// Gateway UID's first 8 chars + "_" so the result is always >=5 chars,
+// stable across reconciles, and uniquely scoped to this Gateway.
+func (t *defaultGatewayBuildTask) cloudListenerName(l *gwv1.Listener) string {
+	uid := string(t.gw.UID)
+	if len(uid) > 8 {
+		uid = uid[:8]
+	}
+	name := fmt.Sprintf("gw_%s_%s", uid, l.Name)
+	if len(name) > 50 {
+		name = name[:50]
+	}
+	return name
 }
 
 // flattenInsertHeaders returns headers in deterministic order so spec-equality
