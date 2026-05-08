@@ -113,7 +113,8 @@ build-pro:
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go --log-level=debug \
-	--metrics-bind-address=:8080 --metrics-secure=false
+	--metrics-bind-address=:8080 --metrics-secure=false \
+	--disable-alb-gateway-controller=false
 # 	--disable-service-controller \
 # 	--disable-load-balancer-config-controller \
 # 	--disable-ingress-controller \
