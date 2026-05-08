@@ -54,6 +54,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: sync-embedded-crds
 sync-embedded-crds: ## Copy generated vks.vngcloud.vn CRDs into the binary-embedded location (pkg/k8s/apis/.../crds).
 	cp config/crd/bases/vks.vngcloud.vn_*.yaml pkg/k8s/apis/vks.vngcloud.vn/crds/
+	cp config/crd/bases/gateway.vks.vngcloud.vn_*.yaml pkg/k8s/apis/vks.vngcloud.vn/crds/ 2>/dev/null || true
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
