@@ -1,0 +1,129 @@
+package alb_gateway_uc
+
+import (
+	"context"
+	"fmt"
+	"sort"
+
+	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
+)
+
+// synthesizePool builds one v1alpha1.Pool from one HTTPRoute rule. Members
+// are pod-IPs (target type: ip), resolved via EndpointResolver; weights are
+// computed via pkggw.ScaleWeights so that a 1:99 traffic split with an
+// uneven readyEndpoints count still lands in the API's accepted [1..100]
+// range. Pool name is deterministic via pkggw.SynthPoolName.
+//
+// Phase E (initial): plain HTTPRoute → Pool. VKSBackendPolicy and
+// VKSHealthCheckPolicy overlays are a separate follow-up commit so the
+// per-policy translation can be reviewed independently.
+//
+// Same-namespace backendRefs only. Cross-namespace via ReferenceGrant lands
+// in the same follow-up.
+func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule) (*v1alpha1.Pool, error) {
+	if len(rule.BackendRefs) == 0 {
+		return nil, fmt.Errorf("rule %d on HTTPRoute %s/%s has no backendRefs", ruleIdx, route.Namespace, route.Name)
+	}
+
+	keys := make([]pkggw.BackendKey, 0, len(rule.BackendRefs))
+	weights := make([]pkggw.BackendWeight, 0, len(rule.BackendRefs))
+	memberAddrs := make([][]utils.EndpointAddress, 0, len(rule.BackendRefs))
+
+	for i := range rule.BackendRefs {
+		br := &rule.BackendRefs[i].BackendRef
+		ns := route.Namespace
+		if br.Namespace != nil {
+			ns = string(*br.Namespace)
+		}
+		if ns != route.Namespace {
+			// Cross-namespace deferred to follow-up; skip silently with a
+			// warning so the rest of the pool still functions.
+			t.logger.Warnf("backendRef %s/%s on HTTPRoute %s/%s is cross-namespace; "+
+				"skipping (ReferenceGrant evaluation lands in a follow-up)",
+				ns, br.Name, route.Namespace, route.Name)
+			continue
+		}
+		port := int32(0)
+		if br.Port != nil {
+			port = int32(*br.Port)
+		}
+		weight := int32(1)
+		if br.Weight != nil {
+			weight = *br.Weight
+		}
+		// Skip explicit-zero-weight backends (Gateway-API spec convention for
+		// "kept in spec but no traffic").
+		if weight == 0 {
+			continue
+		}
+
+		addrs, err := t.uc.endpointResolver.ResolvePodEndpoints(ctx,
+			types.NamespacedName{Namespace: ns, Name: string(br.Name)},
+			intstr.FromInt(int(port)),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("resolve endpoints for backendRef %s/%s: %w", ns, br.Name, err)
+		}
+
+		ready := int32(len(addrs))
+		if ready == 0 {
+			// 0 ready endpoints would set ScaleWeights's denominator to 1
+			// (its own internal floor); leaving it at 0 here is fine and lets
+			// the pool still be created, members come back when pods become
+			// Ready. Avoids reconcile churn during rollouts.
+			ready = 0
+		}
+		keys = append(keys, pkggw.BackendKey{Namespace: ns, Name: string(br.Name), Port: port, Weight: weight})
+		weights = append(weights, pkggw.BackendWeight{Weight: weight, Ready: ready})
+		memberAddrs = append(memberAddrs, addrs)
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("rule %d on HTTPRoute %s/%s: all backends were dropped (cross-ns or zero-weight)",
+			ruleIdx, route.Namespace, route.Name)
+	}
+
+	scaled := pkggw.ScaleWeights(weights)
+
+	// Build Members. Each backend's resolved addresses share the backend's
+	// scaled weight. Ports come from the resolved EndpointAddress (covers
+	// named-port resolution by EndpointResolver).
+	members := make([]v1alpha1.PoolMember, 0)
+	for i, addrs := range memberAddrs {
+		w := int(scaled[i])
+		for _, a := range addrs {
+			members = append(members, v1alpha1.PoolMember{
+				Name:        a.Name,
+				IP:          a.IP,
+				Port:        a.Port,
+				MonitorPort: a.Port,
+				Weight:      &w,
+			})
+		}
+	}
+	// Stable order so DeepEqual on Spec is meaningful between reconciles.
+	sort.SliceStable(members, func(i, j int) bool {
+		if members[i].IP != members[j].IP {
+			return members[i].IP < members[j].IP
+		}
+		return members[i].Port < members[j].Port
+	})
+
+	return &v1alpha1.Pool{
+		Name:     pkggw.SynthPoolName(string(route.UID), ruleIdx, keys),
+		Protocol: v2.PoolProtocolHTTP,
+		Members:  members,
+		HealthMonitor: v1alpha1.PoolHealthMonitor{
+			// Default conservative TCP health monitor — Phase E follow-up
+			// replaces this with VKSHealthCheckPolicy resolution.
+			Protocol: v2.HealthCheckProtocolTCP,
+		},
+	}, nil
+}

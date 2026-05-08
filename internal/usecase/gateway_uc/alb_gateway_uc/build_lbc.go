@@ -152,10 +152,21 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 	if err != nil {
 		return err
 	}
-	lbc.Spec.Listeners = listeners
 	lbc.Spec.CreateCertificates = t.buildCreateCertificates()
-	// Pools land in Phase E with HTTPRoute translation.
-	lbc.Spec.Pools = nil
+
+	pools, listenerPolicies, err := t.buildPoolsAndPolicies(ctx)
+	if err != nil {
+		return err
+	}
+	lbc.Spec.Pools = pools
+
+	// Fold per-listener policies onto the matching listener entry.
+	for i := range listeners {
+		if pol, ok := listenerPolicies[listeners[i].Name]; ok {
+			listeners[i].Policies = pol
+		}
+	}
+	lbc.Spec.Listeners = listeners
 
 	if !isCreated {
 		if err := t.uc.k8sRepo.CreateLoadBalancerConfig(ctx, lbc); err != nil {

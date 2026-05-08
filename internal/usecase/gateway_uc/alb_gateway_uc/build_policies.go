@@ -1,0 +1,287 @@
+package alb_gateway_uc
+
+import (
+	"context"
+	"fmt"
+	"hash/fnv"
+	"sort"
+
+	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"k8s.io/utils/ptr"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+)
+
+// buildPoolsAndPolicies walks attached HTTPRoutes and produces
+//   - a flat []Pool (deduped by pool name)
+//   - the slice of (listenerName → []Policy) ready to fold into LBC.Listeners.
+//
+// Per the design spec §1.6, the vngcloud LB API supports only HOST_NAME and
+// PATH at the L7 rule level. HTTPRoute matches that use header / queryParam /
+// method are dropped here with a warning; Phase F status work surfaces this
+// as Accepted=False on the affected route's parent status.
+//
+// Phase E (initial): no VKSRoutePolicy overlay, no VKSBackendPolicy /
+// VKSHealthCheckPolicy on pools. Those land in a follow-up commit.
+func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]v1alpha1.Pool, map[string][]v1alpha1.Policy, error) {
+	routes, err := t.listAttachedHTTPRoutes(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pools := make([]v1alpha1.Pool, 0)
+	seenPool := make(map[string]struct{})
+	appendPool := func(p *v1alpha1.Pool) {
+		if _, ok := seenPool[p.Name]; ok {
+			return
+		}
+		seenPool[p.Name] = struct{}{}
+		pools = append(pools, *p)
+	}
+
+	listenerPolicies := make(map[string][]v1alpha1.Policy)
+
+	for ri := range routes {
+		route := &routes[ri]
+		parentRefs := parentRefsForGateway(route, t.gw)
+		if len(parentRefs) == 0 {
+			continue
+		}
+
+		for ruleIdx, rule := range route.Spec.Rules {
+			if hasUnsupportedMatchDimension(rule.Matches) {
+				t.logger.Warnf("HTTPRoute %s/%s rule %d uses match dimensions VNGCloud LB doesn't support "+
+					"(headers/queryParams/method); skipping rule. Phase F will mark route Accepted=False.",
+					route.Namespace, route.Name, ruleIdx)
+				continue
+			}
+			if len(rule.BackendRefs) == 0 {
+				continue
+			}
+			pool, err := t.synthesizePool(ctx, route, ruleIdx, rule)
+			if err != nil {
+				t.logger.Warnf("HTTPRoute %s/%s rule %d: %v; skipping rule",
+					route.Namespace, route.Name, ruleIdx, err)
+				continue
+			}
+			appendPool(pool)
+
+			for _, parent := range parentRefs {
+				for li := range t.gw.Spec.Listeners {
+					l := &t.gw.Spec.Listeners[li]
+					if l.Protocol != gwv1.HTTPProtocolType && l.Protocol != gwv1.HTTPSProtocolType {
+						continue
+					}
+					if !listenerAcceptsRoute(l, route, &parent) {
+						continue
+					}
+					hostnames := matchingRouteHostnames(l, route)
+					policies := buildListenerPolicies(route, ruleIdx, rule, hostnames, pool.Name)
+					listenerPolicies[string(l.Name)] = append(listenerPolicies[string(l.Name)], policies...)
+				}
+			}
+		}
+	}
+
+	// Dedup policy names within a listener (deterministic) and order pools
+	// by name so DeepEqual on LBC.Spec is meaningful.
+	for k, v := range listenerPolicies {
+		listenerPolicies[k] = dedupPoliciesByName(v)
+	}
+	sort.SliceStable(pools, func(i, j int) bool { return pools[i].Name < pools[j].Name })
+
+	return pools, listenerPolicies, nil
+}
+
+// hasUnsupportedMatchDimension returns true if any HTTPRouteMatch uses a
+// dimension VNGCloud LB doesn't translate (header / queryParam / method).
+// This is checked at the rule level — one such match invalidates the whole
+// rule, since rejecting per-match would silently drop traffic.
+func hasUnsupportedMatchDimension(matches []gwv1.HTTPRouteMatch) bool {
+	for _, m := range matches {
+		if len(m.Headers) > 0 || len(m.QueryParams) > 0 || m.Method != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// buildListenerPolicies emits one v1alpha1.Policy per (hostname × match)
+// combo. With no hostnames, one policy per match (no HOST_NAME rule).
+// Action is REDIRECT_TO_POOL pointing at the synthesized pool unless a
+// RequestRedirect filter is present (which routes through the cloud's
+// REDIRECT_TO_URL action).
+func buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
+	matches := rule.Matches
+	if len(matches) == 0 {
+		// Default-empty match → match all on this listener.
+		matches = []gwv1.HTTPRouteMatch{{}}
+	}
+	hostList := hostnames
+	if len(hostList) == 0 {
+		hostList = []string{""}
+	}
+
+	out := make([]v1alpha1.Policy, 0, len(matches)*len(hostList))
+	for _, m := range matches {
+		for _, host := range hostList {
+			rules := buildL7Rules(host, m)
+			policy := v1alpha1.Policy{
+				Name:    policyName(route, ruleIdx, host, m),
+				Action:  v2.PolicyActionREDIRECTTOPOOL,
+				L7Rules: rules,
+			}
+			policy.RedirectPoolName = ptr.To(poolName)
+
+			if applyRequestRedirectFilter(&policy, rule.Filters) {
+				policy.RedirectPoolName = nil
+			}
+			out = append(out, policy)
+		}
+	}
+	return out
+}
+
+// buildL7Rules emits a HOST_NAME rule (literal → EQUAL_TO, wildcard → REGEX)
+// when host is non-empty, and a PATH rule from the match's path. Other match
+// dimensions (header / queryParam / method) are guaranteed empty by
+// hasUnsupportedMatchDimension having returned false earlier.
+func buildL7Rules(host string, m gwv1.HTTPRouteMatch) []v1alpha1.L7Rule {
+	rules := make([]v1alpha1.L7Rule, 0, 2)
+	if host != "" {
+		compare := v2.PolicyCompareTypeEQUALS
+		value := host
+		if isWildcardHost(host) {
+			compare = v2.PolicyCompareTypeREGEX
+			value = wildcardHostToRegex(host)
+		}
+		rules = append(rules, v1alpha1.L7Rule{
+			RuleType:    v2.PolicyRuleTypeHOSTNAME,
+			CompareType: compare,
+			RuleValue:   value,
+		})
+	}
+	if m.Path != nil && m.Path.Value != nil && *m.Path.Value != "" {
+		compare := v2.PolicyCompareTypeSTARTSWITH
+		if m.Path.Type != nil {
+			switch *m.Path.Type {
+			case gwv1.PathMatchExact:
+				compare = v2.PolicyCompareTypeEQUALS
+			case gwv1.PathMatchRegularExpression:
+				compare = v2.PolicyCompareTypeREGEX
+			case gwv1.PathMatchPathPrefix:
+				compare = v2.PolicyCompareTypeSTARTSWITH
+			}
+		}
+		rules = append(rules, v1alpha1.L7Rule{
+			RuleType:    v2.PolicyRuleTypePATH,
+			CompareType: compare,
+			RuleValue:   *m.Path.Value,
+		})
+	}
+	return rules
+}
+
+// applyRequestRedirectFilter handles the Gateway-API RequestRedirect filter.
+// Returns true when the filter was applied (caller drops RedirectPoolName).
+func applyRequestRedirectFilter(p *v1alpha1.Policy, filters []gwv1.HTTPRouteFilter) bool {
+	for _, f := range filters {
+		if f.Type != gwv1.HTTPRouteFilterRequestRedirect || f.RequestRedirect == nil {
+			continue
+		}
+		r := f.RequestRedirect
+		p.Action = v2.PolicyActionREDIRECTTOURL
+		p.RedirectUrl = ptr.To(buildRedirectURL(r))
+		if r.StatusCode != nil {
+			code := int32(*r.StatusCode)
+			p.RedirectHttpCode = &code
+		}
+		return true
+	}
+	return false
+}
+
+func buildRedirectURL(r *gwv1.HTTPRequestRedirectFilter) string {
+	scheme := "https"
+	if r.Scheme != nil {
+		scheme = *r.Scheme
+	}
+	host := ""
+	if r.Hostname != nil {
+		host = string(*r.Hostname)
+	}
+	url := scheme + "://" + host
+	if r.Port != nil {
+		url = fmt.Sprintf("%s:%d", url, *r.Port)
+	}
+	if r.Path != nil && r.Path.ReplaceFullPath != nil {
+		url += *r.Path.ReplaceFullPath
+	}
+	return url
+}
+
+// policyName generates a deterministic LBC.Policy name keyed by route UID,
+// rule index, hostname, and a hash of the match. Mirrors the synth-pool
+// approach so two reconciles converge on the same policy name.
+func policyName(route *gwv1.HTTPRoute, ruleIdx int, host string, m gwv1.HTTPRouteMatch) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(host))
+	if m.Path != nil {
+		if m.Path.Value != nil {
+			_, _ = h.Write([]byte(*m.Path.Value))
+		}
+		if m.Path.Type != nil {
+			_, _ = h.Write([]byte(*m.Path.Type))
+		}
+	}
+	uid := string(route.UID)
+	if len(uid) > 8 {
+		uid = uid[:8]
+	}
+	name := fmt.Sprintf("gw_%s_%d_%x", uid, ruleIdx, h.Sum32())
+	if len(name) > 50 {
+		name = name[:50]
+	}
+	return name
+}
+
+// dedupPoliciesByName drops second-and-later occurrences of any policy with
+// a duplicate name. Sorts by name afterwards so the listener's policy slice
+// is comparable across reconciles.
+func dedupPoliciesByName(in []v1alpha1.Policy) []v1alpha1.Policy {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]v1alpha1.Policy, 0, len(in))
+	for i := range in {
+		if _, ok := seen[in[i].Name]; ok {
+			continue
+		}
+		seen[in[i].Name] = struct{}{}
+		out = append(out, in[i])
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+func isWildcardHost(h string) bool {
+	return len(h) > 2 && h[0] == '*' && h[1] == '.'
+}
+
+func wildcardHostToRegex(h string) string {
+	// "*.example.com" → "^[^.]+\.example\.com$" — pkg/gateway has the same
+	// shape; we re-implement here to keep the LBC.L7Rule.RuleValue self-
+	// contained without an extra import dance.
+	regexed := make([]byte, 0, len(h)+8)
+	regexed = append(regexed, '^', '[', '^', '.', ']', '+', '\\', '.')
+	for i := 2; i < len(h); i++ {
+		c := h[i]
+		switch c {
+		case '.', '+', '?', '^', '$', '|', '(', ')', '{', '}', '[', ']', '\\':
+			regexed = append(regexed, '\\', c)
+		default:
+			regexed = append(regexed, c)
+		}
+	}
+	regexed = append(regexed, '$')
+	return string(regexed)
+}
