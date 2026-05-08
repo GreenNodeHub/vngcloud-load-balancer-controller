@@ -57,16 +57,27 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 					route.Namespace, route.Name, ruleIdx)
 				continue
 			}
-			if len(rule.BackendRefs) == 0 {
+
+			// A rule with no backendRefs is valid Gateway-API when it carries
+			// a RequestRedirect filter (or, in future phases, FixedResponse-
+			// equivalent — not supported by VNGCloud, see §1.6). For those
+			// filter-only rules we don't synthesize a pool; the policy will
+			// emit REDIRECT_TO_URL straight from the filter.
+			poolName := ""
+			if len(rule.BackendRefs) > 0 {
+				pool, err := t.synthesizePool(ctx, route, ruleIdx, rule)
+				if err != nil {
+					t.logger.Warnf("HTTPRoute %s/%s rule %d: %v; skipping rule",
+						route.Namespace, route.Name, ruleIdx, err)
+					continue
+				}
+				appendPool(pool)
+				poolName = pool.Name
+			} else if !hasRedirectFilter(rule.Filters) {
+				t.logger.Warnf("HTTPRoute %s/%s rule %d has no backendRefs and no RequestRedirect filter; skipping",
+					route.Namespace, route.Name, ruleIdx)
 				continue
 			}
-			pool, err := t.synthesizePool(ctx, route, ruleIdx, rule)
-			if err != nil {
-				t.logger.Warnf("HTTPRoute %s/%s rule %d: %v; skipping rule",
-					route.Namespace, route.Name, ruleIdx, err)
-				continue
-			}
-			appendPool(pool)
 
 			ruleName := ""
 			if rule.Name != nil {
@@ -83,7 +94,7 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 						continue
 					}
 					hostnames := matchingRouteHostnames(l, route)
-					policies := buildListenerPolicies(route, ruleIdx, rule, hostnames, pool.Name)
+					policies := buildListenerPolicies(route, ruleIdx, rule, hostnames, poolName)
 					policies, err := t.applyRoutePolicyToPolicies(ctx, policies, route, ruleName)
 					if err != nil {
 						return nil, nil, err
@@ -117,11 +128,24 @@ func hasUnsupportedMatchDimension(matches []gwv1.HTTPRouteMatch) bool {
 	return false
 }
 
+// hasRedirectFilter reports whether any filter is a RequestRedirect — used to
+// keep filter-only HTTPRoute rules (no backendRefs) alive so they can emit a
+// REDIRECT_TO_URL policy.
+func hasRedirectFilter(filters []gwv1.HTTPRouteFilter) bool {
+	for _, f := range filters {
+		if f.Type == gwv1.HTTPRouteFilterRequestRedirect && f.RequestRedirect != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // buildListenerPolicies emits one v1alpha1.Policy per (hostname × match)
 // combo. With no hostnames, one policy per match (no HOST_NAME rule).
-// Action is REDIRECT_TO_POOL pointing at the synthesized pool unless a
-// RequestRedirect filter is present (which routes through the cloud's
-// REDIRECT_TO_URL action).
+// Action is REDIRECT_TO_POOL when poolName is non-empty; if poolName is
+// empty (filter-only rule) the action stays REDIRECT_TO_POOL until the
+// RequestRedirect filter — guaranteed present by the caller in that case —
+// flips it to REDIRECT_TO_URL.
 func buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
 	matches := rule.Matches
 	if len(matches) == 0 {
@@ -142,7 +166,9 @@ func buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRou
 				Action:  v2.PolicyActionREDIRECTTOPOOL,
 				L7Rules: rules,
 			}
-			policy.RedirectPoolName = ptr.To(poolName)
+			if poolName != "" {
+				policy.RedirectPoolName = ptr.To(poolName)
+			}
 
 			if applyRequestRedirectFilter(&policy, rule.Filters) {
 				policy.RedirectPoolName = nil

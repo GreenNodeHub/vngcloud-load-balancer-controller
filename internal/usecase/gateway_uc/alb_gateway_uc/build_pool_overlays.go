@@ -74,9 +74,33 @@ func (t *defaultGatewayBuildTask) applyHealthCheckPolicyToPool(ctx context.Conte
 	if s.UnhealthyThreshold != nil {
 		mon.UnhealthyThreshold = ptrInt(int(*s.UnhealthyThreshold))
 	}
+	// HTTP/HTTPS probes need healthCheckMethod + httpVersion set or the
+	// vngcloud API rejects CreatePool. Default to GET / 1.1 — same defaults
+	// the Ingress controller falls back to when annotations are absent.
+	if mon.Protocol == v2.HealthCheckProtocolHTTP || mon.Protocol == v2.HealthCheckProtocolHTTPs {
+		method := v2.HealthCheckMethodGET
+		mon.HealthCheckMethod = &method
+		ver := v2.HealthCheckHttpVersionHttp1Minor1
+		mon.HttpVersion = &ver
+		// successCode is also required by the API; default to "200" when the
+		// user didn't supply ExpectedCodes.
+		if mon.SuccessCode == nil {
+			defaultCode := "200"
+			mon.SuccessCode = &defaultCode
+		}
+		// healthCheckPath is required too; default to "/".
+		if mon.HealthCheckPath == nil {
+			defaultPath := "/"
+			mon.HealthCheckPath = &defaultPath
+		}
+	}
 	if s.HTTPHealthCheck != nil {
-		mon.HealthCheckPath = s.HTTPHealthCheck.Path
-		mon.DomainName = s.HTTPHealthCheck.Host
+		if s.HTTPHealthCheck.Path != nil {
+			mon.HealthCheckPath = s.HTTPHealthCheck.Path
+		}
+		if s.HTTPHealthCheck.Host != nil {
+			mon.DomainName = s.HTTPHealthCheck.Host
+		}
 		if len(s.HTTPHealthCheck.ExpectedCodes) > 0 {
 			// LBC stores SuccessCode as a single string. Join with commas to
 			// preserve any multi-value expression the user wrote (e.g. "200-299,301").
