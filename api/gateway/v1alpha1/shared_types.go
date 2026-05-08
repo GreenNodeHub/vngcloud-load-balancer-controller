@@ -6,12 +6,15 @@ import (
 )
 
 // LocalPolicyTargetReference is re-exported for convenience.
+// +kubebuilder:object:generate=false
 type LocalPolicyTargetReference = gwv1alpha2.LocalPolicyTargetReference
 
 // LocalPolicyTargetReferenceWithSectionName is re-exported for convenience.
+// +kubebuilder:object:generate=false
 type LocalPolicyTargetReferenceWithSectionName = gwv1alpha2.LocalPolicyTargetReferenceWithSectionName
 
 // PolicyAncestorStatus is re-exported for convenience.
+// +kubebuilder:object:generate=false
 type PolicyAncestorStatus = gwv1alpha2.PolicyAncestorStatus
 
 // CommonPolicyStatus is the embedded ancestor-status block carried by every VKS policy CRD.
