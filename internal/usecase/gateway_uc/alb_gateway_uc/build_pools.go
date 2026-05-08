@@ -116,14 +116,26 @@ func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv
 		return members[i].Port < members[j].Port
 	})
 
-	return &v1alpha1.Pool{
+	pool := &v1alpha1.Pool{
 		Name:     pkggw.SynthPoolName(string(route.UID), ruleIdx, keys),
 		Protocol: v2.PoolProtocolHTTP,
 		Members:  members,
 		HealthMonitor: v1alpha1.PoolHealthMonitor{
-			// Default conservative TCP health monitor — Phase E follow-up
-			// replaces this with VKSHealthCheckPolicy resolution.
 			Protocol: v2.HealthCheckProtocolTCP,
 		},
-	}, nil
+	}
+
+	// Apply VKSBackendPolicy / VKSHealthCheckPolicy overlays for the first
+	// backend. When a rule has multiple backendRefs targeting different
+	// Services, this picks the policy attached to the first one — Phase F's
+	// status work will surface a "conflicting per-backend policies" warning
+	// when other backendRefs would have produced a different overlay.
+	first := keys[0]
+	if err := t.applyBackendPolicyToPool(ctx, pool, first.Namespace, first.Name); err != nil {
+		return nil, err
+	}
+	if err := t.applyHealthCheckPolicyToPool(ctx, pool, first.Namespace, first.Name); err != nil {
+		return nil, err
+	}
+	return pool, nil
 }

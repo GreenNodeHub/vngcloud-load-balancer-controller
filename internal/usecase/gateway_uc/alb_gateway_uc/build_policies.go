@@ -67,6 +67,11 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 			}
 			appendPool(pool)
 
+			ruleName := ""
+			if rule.Name != nil {
+				ruleName = string(*rule.Name)
+			}
+
 			for _, parent := range parentRefs {
 				for li := range t.gw.Spec.Listeners {
 					l := &t.gw.Spec.Listeners[li]
@@ -78,6 +83,10 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 					}
 					hostnames := matchingRouteHostnames(l, route)
 					policies := buildListenerPolicies(route, ruleIdx, rule, hostnames, pool.Name)
+					policies, err := t.applyRoutePolicyToPolicies(ctx, policies, route, ruleName)
+					if err != nil {
+						return nil, nil, err
+					}
 					listenerPolicies[string(l.Name)] = append(listenerPolicies[string(l.Name)], policies...)
 				}
 			}
