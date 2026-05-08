@@ -27,6 +27,13 @@ const (
 
 	OwnerKindGateway = "Gateway"
 
+	// VKSResourceNamePrefix is the prefix every cloud-side resource the
+	// VKS controllers create must start with — load balancers, listeners,
+	// pools, policies, and member names. Matches the existing Ingress-style
+	// vks_default_pool / vks_http_listener convention. The vngcloud LB API
+	// limits names to [a-zA-Z0-9_.-]{5,50}.
+	VKSResourceNamePrefix = "vks_"
+
 	OwnerLabelGatewayUID = "gateway.vks.vngcloud.vn/owner-uid"
 	OwnerLabelKind       = "vks.vngcloud.vn/owner-resource-kind"
 )

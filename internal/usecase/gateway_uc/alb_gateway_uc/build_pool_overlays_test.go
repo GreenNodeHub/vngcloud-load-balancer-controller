@@ -184,10 +184,10 @@ func TestApplyHealthCheckPolicyToPool_WithPolicy(t *testing.T) {
 	hp := &gwv1alpha1.VKSHealthCheckPolicy{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "hcp"},
 		Spec: gwv1alpha1.VKSHealthCheckPolicySpec{
-			TargetRefs: []gwv1alpha2.LocalPolicyTargetReference{{Group: "", Kind: "Service", Name: "svc-hc"}},
-			Protocol:   "HTTP",
-			Interval:   &interval,
-			Timeout:    &timeout,
+			TargetRefs:         []gwv1alpha2.LocalPolicyTargetReference{{Group: "", Kind: "Service", Name: "svc-hc"}},
+			Protocol:           "HTTP",
+			Interval:           &interval,
+			Timeout:            &timeout,
 			HealthyThreshold:   &hThresh,
 			UnhealthyThreshold: &uThresh,
 			HTTPHealthCheck: &gwv1alpha1.VKSHTTPHealthCheck{

@@ -87,21 +87,21 @@ func TestCloudListenerName(t *testing.T) {
 			gwUID:        "abcd1234-dead-beef-0000-111122223333",
 			listenerName: "http",
 			maxLen:       50,
-			checkPrefix:  "gw_abcd1234_http",
+			checkPrefix:  "vks_gw_abcd1234_http",
 		},
 		{
 			name:         "long name truncated to 50 chars",
 			gwUID:        "abcd1234-dead-beef-0000-111122223333",
 			listenerName: "this-is-a-very-long-listener-name-that-exceeds-limit",
 			maxLen:       50,
-			checkPrefix:  "gw_abcd1234_",
+			checkPrefix:  "vks_gw_abcd1234_",
 		},
 		{
 			name:         "uid shorter than 8 chars used as is",
 			gwUID:        "short",
 			listenerName: "http",
 			maxLen:       50,
-			checkPrefix:  "gw_short_http",
+			checkPrefix:  "vks_gw_short_http",
 		},
 	}
 	for _, tt := range tests {

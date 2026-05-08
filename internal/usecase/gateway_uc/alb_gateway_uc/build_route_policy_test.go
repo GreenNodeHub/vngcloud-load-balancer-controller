@@ -47,7 +47,7 @@ func makeRoutePolicy(ns, name, routeName string, ruleName string, actionType str
 
 func TestApplyOneRouteOverlay_Reject(t *testing.T) {
 	p := &v1alpha1.Policy{
-		Action:          v2.PolicyActionREDIRECTTOPOOL,
+		Action:           v2.PolicyActionREDIRECTTOPOOL,
 		RedirectPoolName: ptr.To("pool-1"),
 	}
 	rp := &gwv1alpha1.VKSRoutePolicy{
@@ -63,7 +63,7 @@ func TestApplyOneRouteOverlay_Reject(t *testing.T) {
 
 func TestApplyOneRouteOverlay_Redirect(t *testing.T) {
 	p := &v1alpha1.Policy{
-		Action:          v2.PolicyActionREDIRECTTOPOOL,
+		Action:           v2.PolicyActionREDIRECTTOPOOL,
 		RedirectPoolName: ptr.To("pool-1"),
 	}
 	code := int32(301)

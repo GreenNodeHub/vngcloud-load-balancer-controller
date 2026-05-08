@@ -11,6 +11,7 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // buildPoolsAndPolicies walks attached HTTPRoutes and produces
@@ -248,7 +249,7 @@ func policyName(route *gwv1.HTTPRoute, ruleIdx int, host string, m gwv1.HTTPRout
 	if len(uid) > 8 {
 		uid = uid[:8]
 	}
-	name := fmt.Sprintf("gw_%s_%d_%x", uid, ruleIdx, h.Sum32())
+	name := fmt.Sprintf("%sgw_%s_%d_%x", domain.VKSResourceNamePrefix, uid, ruleIdx, h.Sum32())
 	if len(name) > 50 {
 		name = name[:50]
 	}

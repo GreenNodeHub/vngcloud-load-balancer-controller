@@ -150,7 +150,7 @@ func TestApplyListenerCertificates_CrossNsSkipped(t *testing.T) {
 	// Cross-namespace ref should be skipped, same-ns ref should be kept
 	l := makeHTTPSListener("https", []gwv1.SecretObjectReference{
 		makeSecretRef("other-ns", "cross-secret"), // skipped
-		makeSecretRef("", "same-ns-secret"),        // kept
+		makeSecretRef("", "same-ns-secret"),       // kept
 	})
 	entry := makeListenerEntry("https")
 	task.applyListenerCertificates(&entry, &l)

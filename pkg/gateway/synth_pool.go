@@ -24,6 +24,9 @@ type BackendWeight struct {
 
 // SynthPoolName returns a deterministic pool name <= 50 chars derived from the
 // route UID, rule index, and backend set. Backend ordering is normalized.
+// The name starts with the project-wide "vks_" prefix so every cloud-side
+// resource the controller creates is greppable; mirrors domain.VKSResourceNamePrefix
+// without depending on the internal domain package from this pure helper pkg.
 func SynthPoolName(routeUID string, ruleIdx int, backends []BackendKey) string {
 	sorted := append([]BackendKey(nil), backends...)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -47,7 +50,7 @@ func SynthPoolName(routeUID string, ruleIdx int, backends []BackendKey) string {
 	if len(prefix) > 8 {
 		prefix = prefix[:8]
 	}
-	name := fmt.Sprintf("gw_%s_%d_%s", prefix, ruleIdx, digest[:5])
+	name := fmt.Sprintf("vks_gw_%s_%d_%s", prefix, ruleIdx, digest[:5])
 	if len(name) > 50 {
 		name = name[:50]
 	}

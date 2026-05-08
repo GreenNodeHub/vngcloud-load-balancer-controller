@@ -34,7 +34,7 @@ func testScheme() *runtime.Scheme {
 	return s
 }
 
-func kindPtr(s string) *gwv1.Kind { v := gwv1.Kind(s); return &v }
+func kindPtr(s string) *gwv1.Kind    { v := gwv1.Kind(s); return &v }
 func nsPtr(s string) *gwv1.Namespace { v := gwv1.Namespace(s); return &v }
 
 // routeWithParents constructs an HTTPRoute that declares the given parent Gateway names.

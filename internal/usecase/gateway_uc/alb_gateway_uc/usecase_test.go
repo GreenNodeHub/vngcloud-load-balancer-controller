@@ -3,6 +3,7 @@ package alb_gateway_uc
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,6 @@ func makeNode(name, providerID string) *corev1.Node {
 		Spec:       corev1.NodeSpec{ProviderID: providerID},
 	}
 }
-
 
 // --- NewALBGatewayUseCase tests ---
 
@@ -323,7 +323,7 @@ func TestBuildLoadBalancerName(t *testing.T) {
 	task := newTestTask(t, gw)
 	name := task.buildLoadBalancerName()
 	assert.LessOrEqual(t, len(name), 50)
-	assert.Contains(t, name, "vks-gw")
+	assert.True(t, strings.HasPrefix(name, "vks_gw_"), "expected vks_gw_ prefix in %q", name)
 	// Deterministic
 	assert.Equal(t, name, task.buildLoadBalancerName())
 }

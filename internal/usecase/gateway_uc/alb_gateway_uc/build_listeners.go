@@ -9,6 +9,7 @@ import (
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // buildListeners translates Gateway.Spec.Listeners into v1alpha1.Listener entries.
@@ -114,15 +115,16 @@ func (t *defaultGatewayBuildTask) applyListenerPolicy(entry *v1alpha1.Listener, 
 // cloudListenerName derives a vngcloud-acceptable listener name from the
 // Gateway listener. The API enforces 5-50 chars and only `a-zA-Z0-9_.-`.
 // Gateway listener names already satisfy the charset (Gateway-API rule), but
-// can be as short as a single character (e.g. "http"). We prefix with the
-// Gateway UID's first 8 chars + "_" so the result is always >=5 chars,
-// stable across reconciles, and uniquely scoped to this Gateway.
+// can be as short as a single character (e.g. "http"). The result starts
+// with the project-wide "vks_" prefix so every cloud resource is greppable;
+// the Gateway UID's first 8 chars keep the name unique across Gateways
+// even when listener names collide.
 func (t *defaultGatewayBuildTask) cloudListenerName(l *gwv1.Listener) string {
 	uid := string(t.gw.UID)
 	if len(uid) > 8 {
 		uid = uid[:8]
 	}
-	name := fmt.Sprintf("gw_%s_%s", uid, l.Name)
+	name := fmt.Sprintf("%sgw_%s_%s", domain.VKSResourceNamePrefix, uid, l.Name)
 	if len(name) > 50 {
 		name = name[:50]
 	}

@@ -110,13 +110,15 @@ func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv
 
 	// Build Members. Each backend's resolved addresses share the backend's
 	// scaled weight. Ports come from the resolved EndpointAddress (covers
-	// named-port resolution by EndpointResolver).
+	// named-port resolution by EndpointResolver). Member names get the
+	// project-wide "vks_" prefix so every cloud-side resource is greppable;
+	// truncated to 50 chars to satisfy the cloud's name limit.
 	members := make([]v1alpha1.PoolMember, 0)
 	for i, addrs := range memberAddrs {
 		w := int(scaled[i])
 		for _, a := range addrs {
 			members = append(members, v1alpha1.PoolMember{
-				Name:        a.Name,
+				Name:        memberName(a.Name),
 				IP:          a.IP,
 				Port:        a.Port,
 				MonitorPort: a.Port,

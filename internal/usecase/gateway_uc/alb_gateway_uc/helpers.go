@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // durationLike is a tiny wrapper so callers can express "is this set?" without
@@ -76,3 +77,17 @@ func firstNonEmptyStringMap(policies []*gwv1alpha1.VKSGatewayPolicy, get func(*g
 func ptr32(v int32) *int32 { return &v }
 
 func sortStrings(s []string) { sort.Strings(s) }
+
+// memberName returns the cloud-side pool-member name for a resolved endpoint.
+// Adds the project-wide "vks_" prefix so every cloud-side resource the
+// controller creates is greppable; truncates to the cloud's 50-char limit.
+// Empty input falls back to the prefix alone (the cloud will reject it as
+// too short, surfacing the unusual case rather than silently masking it).
+func memberName(raw string) string {
+	const max = 50
+	out := domain.VKSResourceNamePrefix + raw
+	if len(out) > max {
+		out = out[:max]
+	}
+	return out
+}

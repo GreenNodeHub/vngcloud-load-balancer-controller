@@ -236,13 +236,15 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 }
 
 // buildLoadBalancerName generates a deterministic, length-bounded LB name from
-// the Gateway identity. The cloud-side limit is 50 chars (consts.DEFAULT_PORTAL_NAME_LENGTH).
+// the Gateway identity. The cloud-side limit is 50 chars
+// (consts.DEFAULT_PORTAL_NAME_LENGTH); names must start with the shared
+// "vks_" prefix per the project's resource-naming convention.
 func (t *defaultGatewayBuildTask) buildLoadBalancerName() string {
 	uidPrefix := string(t.gw.UID)
 	if len(uidPrefix) > 8 {
 		uidPrefix = uidPrefix[:8]
 	}
-	name := fmt.Sprintf("vks-gw-%s-%s", t.gw.Name, uidPrefix)
+	name := domain.VKSResourceNamePrefix + "gw_" + t.gw.Name + "_" + uidPrefix
 	if len(name) > 50 {
 		name = name[:50]
 	}

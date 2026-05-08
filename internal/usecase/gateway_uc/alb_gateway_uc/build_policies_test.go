@@ -78,7 +78,7 @@ func TestHasUnsupportedMatchDimension(t *testing.T) {
 }
 
 func ptrPathType(pt gwv1.PathMatchType) *gwv1.PathMatchType { return &pt }
-func ptrMethod(m gwv1.HTTPMethod) *gwv1.HTTPMethod           { return &m }
+func ptrMethod(m gwv1.HTTPMethod) *gwv1.HTTPMethod          { return &m }
 
 func TestIsWildcardHost(t *testing.T) {
 	tests := []struct {
