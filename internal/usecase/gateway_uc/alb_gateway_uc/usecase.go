@@ -12,8 +12,8 @@ import (
 
 	"github.com/anngdinh/operator-helper/contexts"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"k8s.io/apimachinery/pkg/api/meta"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,37 +62,37 @@ func NewALBGatewayUseCase(
 // InitALBGatewayUseCase prepares cluster-scoped state — same shape as the
 // other use cases. We discover default network info from a node so that
 // VKSGatewayPolicy.LoadBalancerSpec doesn't need to spell it out.
+//
+// Returns an error when the data isn't fully populated yet so the gateway
+// controller's init retry loop will keep firing until the controller-runtime
+// cache is ready and the cloud probe succeeds. This avoids a one-shot init
+// that "succeeds" against a not-yet-ready cache and then never retries.
 func (uc *albGatewayUseCase) InitALBGatewayUseCase(ctx context.Context) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	// Mirror ingressUseCase.InitIngressUseCase (only the bits the Gateway
-	// path actually needs). Errors are non-fatal at startup; a missing
-	// default subnet means a Gateway without an explicit VKSGatewayPolicy
-	// LoadBalancerSpec.SubnetID will be rejected with Accepted=False.
 	if uc.defaultNetworkId != "" && uc.defaultSubnetId != "" && uc.defaultSubnetCIDR != "" && uc.defaultZone != "" {
 		return nil
 	}
 
 	nodes, err := uc.listNodesForNetworkProbe(ctx)
 	if err != nil {
-		logger.Warnf("ALB Gateway init: failed to list nodes: %v", err)
-		return nil
+		// Cache-not-ready is expected during the first few seconds of
+		// startup. Returning an error tells the caller to retry.
+		return fmt.Errorf("ALB Gateway init: list nodes: %w", err)
 	}
 	if len(nodes) == 0 {
-		logger.Warn("ALB Gateway init: no nodes available; default network info will be lazy-populated on first reconcile")
-		return nil
+		return errors.New("ALB Gateway init: cluster has no nodes yet")
 	}
 	providerID := utils.GetProviderIdFromNode(nodes[0])
 	if providerID == "" {
-		logger.Warn("ALB Gateway init: first node has no providerID")
-		return nil
+		return errors.New("ALB Gateway init: first node has no providerID")
 	}
 	zone, networkID, subnetID, cidr, err := uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerID)
 	if err != nil {
-		logger.Warnf("ALB Gateway init: failed to read default network info: %v", err)
-		return nil
+		return fmt.Errorf("ALB Gateway init: probe vngcloud network info: %w", err)
 	}
 	uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR = zone, networkID, subnetID, cidr
+	logger.Infof("ALB Gateway init: defaults zone=%s network=%s subnet=%s cidr=%s", zone, networkID, subnetID, cidr)
 	return nil
 }
 
