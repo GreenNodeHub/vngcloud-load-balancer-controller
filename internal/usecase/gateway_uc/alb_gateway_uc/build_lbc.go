@@ -170,19 +170,21 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 
 	if !isCreated {
 		if err := t.uc.k8sRepo.CreateLoadBalancerConfig(ctx, lbc); err != nil {
+			// Status reflects the failure so the user sees Programmed=False.
+			_ = t.writeGatewayStatus(ctx, nil, err)
 			return fmt.Errorf("create LBC for Gateway %s/%s: %w", t.gw.Namespace, t.gw.Name, err)
 		}
 		t.logger.Infof("created LBC %s/%s", lbc.Namespace, lbc.Name)
-		return nil
+		return t.writeGatewayStatus(ctx, lbc, nil)
 	}
-	if reflect.DeepEqual(oldLBC.Spec, lbc.Spec) && reflect.DeepEqual(oldLBC.Labels, lbc.Labels) {
-		return nil
+	if !reflect.DeepEqual(oldLBC.Spec, lbc.Spec) || !reflect.DeepEqual(oldLBC.Labels, lbc.Labels) {
+		if err := t.uc.k8sRepo.PatchLoadBalancerConfig(ctx, lbc, client.MergeFrom(oldLBC)); err != nil {
+			_ = t.writeGatewayStatus(ctx, oldLBC, err)
+			return fmt.Errorf("patch LBC %s/%s: %w", lbc.Namespace, lbc.Name, err)
+		}
+		t.logger.Infof("patched LBC %s/%s", lbc.Namespace, lbc.Name)
 	}
-	if err := t.uc.k8sRepo.PatchLoadBalancerConfig(ctx, lbc, client.MergeFrom(oldLBC)); err != nil {
-		return fmt.Errorf("patch LBC %s/%s: %w", lbc.Namespace, lbc.Name, err)
-	}
-	t.logger.Infof("patched LBC %s/%s", lbc.Namespace, lbc.Name)
-	return nil
+	return t.writeGatewayStatus(ctx, lbc, nil)
 }
 
 // applyLoadBalancerSpec writes the LB-level fields the unscoped
