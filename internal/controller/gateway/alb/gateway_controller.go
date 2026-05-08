@@ -118,6 +118,9 @@ func (r *GatewayReconciler) SetupWithManager(ctx context.Context, mgr manager.Ma
 		For(&gwv1.Gateway{}, builder.WithPredicates(albClassPredicate(r.k8sClient))).
 		Watches(&gwv1.HTTPRoute{}, gwhandlers.RouteToGateway()).
 		Watches(&gwv1alpha1.VKSGatewayPolicy{}, gwhandlers.VKSGatewayPolicyToGateway()).
+		Watches(&gwv1alpha1.VKSBackendPolicy{}, gwhandlers.VKSBackendPolicyToGateway(r.k8sClient)).
+		Watches(&gwv1alpha1.VKSHealthCheckPolicy{}, gwhandlers.VKSHealthCheckPolicyToGateway(r.k8sClient)).
+		Watches(&gwv1alpha1.VKSRoutePolicy{}, gwhandlers.VKSRoutePolicyToGateway(r.k8sClient)).
 		Watches(&v1alpha1.LoadBalancerConfig{}, lbcOwnerToGateway()).
 		Watches(&corev1.Service{}, gwhandlers.ServiceToRouteParents(r.k8sClient)).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.maxConcurrentReconciles}).
