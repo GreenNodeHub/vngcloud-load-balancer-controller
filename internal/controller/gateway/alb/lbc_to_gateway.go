@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"k8s.io/client-go/util/workqueue"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -19,8 +19,9 @@ import (
 // (Phase F); this watch is what triggers that mirroring.
 //
 // Match criterion: LBC has the labels we set during creation
-//   vks.vngcloud.vn/owner-resource-kind=Gateway
-//   vks.vngcloud.vn/owner-resource-name=<gw-name>
+//
+//	vks.vngcloud.vn/owner-resource-kind=Gateway
+//	vks.vngcloud.vn/owner-resource-name=<gw-name>
 //
 // We use the labels (not ownerReferences) because the existing pattern in
 // ingress_uc explicitly omits ownerReferences so that users can keep the LBC

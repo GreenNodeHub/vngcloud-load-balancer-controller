@@ -12,7 +12,7 @@ type RankedMatch struct {
 
 type byMatchSpecificity []RankedMatch
 
-func (s byMatchSpecificity) Len() int     { return len(s) }
+func (s byMatchSpecificity) Len() int      { return len(s) }
 func (s byMatchSpecificity) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s byMatchSpecificity) Less(i, j int) bool {
 	a, b := s[i], s[j]

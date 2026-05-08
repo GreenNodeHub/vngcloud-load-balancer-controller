@@ -65,8 +65,6 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_glb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vglb_uc"
-	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -84,6 +82,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/vglb"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
 
