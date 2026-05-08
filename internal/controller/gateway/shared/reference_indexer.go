@@ -21,28 +21,28 @@ const (
 )
 
 func RegisterIndexes(ctx context.Context, mgr manager.Manager) error {
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1.HTTPRoute{}, IndexHTTPRouteByService, indexHTTPRouteByService); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1.HTTPRoute{}, IndexHTTPRouteByService, IndexHTTPRouteByServiceFunc); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1.HTTPRoute{}, IndexHTTPRouteByParentGateway, indexHTTPRouteByParent); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &gwv1.HTTPRoute{}, IndexHTTPRouteByParentGateway, IndexHTTPRouteByParentFunc); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSGatewayPolicy{}, IndexVKSGatewayPolicyByGateway, indexVKSGatewayPolicyByGateway); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSGatewayPolicy{}, IndexVKSGatewayPolicyByGateway, IndexVKSGatewayPolicyByGatewayFunc); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSBackendPolicy{}, IndexVKSBackendPolicyByService, indexVKSBackendPolicyByService); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSBackendPolicy{}, IndexVKSBackendPolicyByService, IndexVKSBackendPolicyByServiceFunc); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSHealthCheckPolicy{}, IndexVKSHealthCheckPolicyByService, indexVKSHealthCheckPolicyByService); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSHealthCheckPolicy{}, IndexVKSHealthCheckPolicyByService, IndexVKSHealthCheckPolicyByServiceFunc); err != nil {
 		return err
 	}
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSRoutePolicy{}, IndexVKSRoutePolicyByRoute, indexVKSRoutePolicyByRoute); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &vksv1.VKSRoutePolicy{}, IndexVKSRoutePolicyByRoute, IndexVKSRoutePolicyByRouteFunc); err != nil {
 		return err
 	}
 	return nil
 }
 
-func indexHTTPRouteByService(obj client.Object) []string {
+func IndexHTTPRouteByServiceFunc(obj client.Object) []string {
 	r := obj.(*gwv1.HTTPRoute)
 	var keys []string
 	for _, rule := range r.Spec.Rules {
@@ -57,7 +57,7 @@ func indexHTTPRouteByService(obj client.Object) []string {
 	return keys
 }
 
-func indexHTTPRouteByParent(obj client.Object) []string {
+func IndexHTTPRouteByParentFunc(obj client.Object) []string {
 	r := obj.(*gwv1.HTTPRoute)
 	var keys []string
 	for _, p := range r.Spec.ParentRefs {
@@ -72,7 +72,7 @@ func indexHTTPRouteByParent(obj client.Object) []string {
 	return keys
 }
 
-func indexVKSGatewayPolicyByGateway(obj client.Object) []string {
+func IndexVKSGatewayPolicyByGatewayFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSGatewayPolicy)
 	var keys []string
 	for _, t := range p.Spec.TargetRefs {
@@ -81,7 +81,7 @@ func indexVKSGatewayPolicyByGateway(obj client.Object) []string {
 	return keys
 }
 
-func indexVKSBackendPolicyByService(obj client.Object) []string {
+func IndexVKSBackendPolicyByServiceFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSBackendPolicy)
 	var keys []string
 	for _, t := range p.Spec.TargetRefs {
@@ -90,7 +90,7 @@ func indexVKSBackendPolicyByService(obj client.Object) []string {
 	return keys
 }
 
-func indexVKSHealthCheckPolicyByService(obj client.Object) []string {
+func IndexVKSHealthCheckPolicyByServiceFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSHealthCheckPolicy)
 	var keys []string
 	for _, t := range p.Spec.TargetRefs {
@@ -99,7 +99,7 @@ func indexVKSHealthCheckPolicyByService(obj client.Object) []string {
 	return keys
 }
 
-func indexVKSRoutePolicyByRoute(obj client.Object) []string {
+func IndexVKSRoutePolicyByRouteFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSRoutePolicy)
 	var keys []string
 	for _, t := range p.Spec.TargetRefs {
