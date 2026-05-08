@@ -55,7 +55,7 @@ metadata:
 | `VKSGatewayPolicy` | Frontend / listener properties on the LB: SSL policy, ALPN, allowed CIDRs, listener timeouts, vngcloud cert IDs, mTLS cert IDs, header injection. Optional `sectionName` scopes to one Gateway listener. | `Gateway` |
 | `VKSBackendPolicy` | Backend pool properties: pool algorithm, sticky session, TLS encryption, PROXY protocol, target type (instance / ip), node-label filter. | `Service`, `ServiceImport` |
 | `VKSHealthCheckPolicy` | Health check on a backend pool: protocol (HTTP/HTTPS/TCP), interval, timeout, thresholds, request path, expected codes. | `Service`, `ServiceImport` |
-| `VKSRoutePolicy` | Per-rule overlay: vngcloud-specific additional matches (Header / QueryParam / Method / SourceIP with vngcloud compare ops) and alt actions (FixedResponse / Reject / Redirect). Targets a route's `sectionName` (rule name). | `HTTPRoute` (later: `GRPCRoute`, `TCPRoute`, `UDPRoute`, `TLSRoute`) |
+| `VKSRoutePolicy` | Per-rule overlay: alt actions (`Reject` / `Redirect`) and explicit position. Targets a route's `sectionName` (rule name). The vngcloud LB API supports only `HOST_NAME` and `PATH` policy rules, so additional match dimensions (header / queryParam / method / source-IP) are not exposed here. | `HTTPRoute` (later: `GRPCRoute`, `TCPRoute`, `UDPRoute`, `TLSRoute`) |
 
 `VKSRoutePolicy` is a vngcloud-specific extension; GKE has no equivalent because GCP's LB doesn't expose those features. We model it the same way GCP would have if it did: a Direct policy with `targetRefs` pointing at the route, scoped by `sectionName` to a specific `HTTPRoute.spec.rules[].name`. **No HTTPRoute filter is involved.**
 
@@ -90,6 +90,34 @@ Reconcilers stay thin (request → useCase). UseCases use the existing `K8sRepos
 ### 1.5 Coexistence boundary
 
 Gateway-controller-owned vngcloud LBs carry the owner label `vks.vngcloud.vn/owner-resource-kind=Gateway`. Existing Ingress / Service controllers ignore non-matching owners. No shared-LB code paths in v1.
+
+### 1.6 VNGCloud LB API — supported feature surface
+
+The CRD schemas and translation rules below are **bounded by what the vngcloud LB v2 API actually exposes**. Verified against `github.com/vngcloud/vngcloud-go-sdk/v2` request schemas (latest available SDK as of design date).
+
+**Supported on Listener:** `protocol` (TCP/UDP/HTTP/HTTPS), `protocolPort`, `allowedCidrs` (single comma-joined string), `defaultPoolId`, `timeoutClient/Connection/Member`, `certificateAuthorities[]` (server-cert IDs), `defaultCertificateAuthority`, `clientCertificate` (mTLS CA ID), `insertHeaders[{headerName, headerValue}]`.
+
+**Supported on Pool:** `poolName`, `poolProtocol` (TCP/UDP/HTTP/PROXY), `algorithm` (`ROUND_ROBIN`/`LEAST_CONNECTIONS`/`SOURCE_IP`), `stickiness *bool`, `tlsEncryption *bool`, `healthMonitor`, `members[{ipAddress, port, monitorPort, weight, backup}]`.
+
+**Supported on HealthMonitor:** `healthCheckProtocol` (TCP/HTTP/HTTPS/PING-UDP), thresholds, `interval`, `timeout`, `healthCheckMethod` (GET/PUT/POST), `httpVersion` (1.0/1.1), `healthCheckPath`, `domainName`, `successCode`.
+
+**Supported on L7 Policy:** `action` ∈ {`REJECT`, `REDIRECT_TO_URL`, `REDIRECT_TO_POOL`}. `rules[]` of `{compareType, ruleType, ruleValue}` where `compareType` ∈ {`EQUAL_TO`, `STARTS_WITH`, `ENDS_WITH`, `CONTAINS`, `REGEX`} and `ruleType` ∈ {`HOST_NAME`, `PATH`}. Plus `redirectPoolId` / `redirectUrl` / `redirectHttpCode` / `keepQueryString`.
+
+**Confirmed not in the API (would need vngcloud upstream changes):**
+
+| Feature | Surface | Phase 1 handling |
+|---|---|---|
+| SSL policy / TLS-version / cipher hardening | Listener | not exposed in `VKSGatewayPolicy` |
+| ALPN policy | Listener | not exposed in `VKSGatewayPolicy` |
+| Cookie-name + TTL session affinity | Pool | `VKSBackendPolicy.Stickiness` is `*bool` only |
+| Custom request headers on health checks | HealthMonitor | not exposed in `VKSHealthCheckPolicy` |
+| Header / queryParam / method / source-IP at policy rules | L7 Policy | HTTPRoute matches with these → route `Accepted=False, reason=UnsupportedMatch` |
+| `FIXED_RESPONSE` action | L7 Policy | not exposed in `VKSRoutePolicy.Actions` |
+| `instance` vs `ip` target type | Members | members are always IP-based |
+| ProxyProtocol toggle on a pool | Pool | use `PoolProtocol=PROXY` instead |
+| Per-listener health-check port override | HealthMonitor | uses member's `monitorPort`; not exposed in `VKSHealthCheckPolicy` |
+
+**Implication for HTTPRoute conformance:** `HTTPRouteMatch` has 4 dimensions — path, headers, queryParams, method. Only `path` (plus `HTTPRoute.Spec.Hostnames`) maps to a vngcloud policy rule. Routes using header / queryParam / method matching are rejected with `UnsupportedMatch`. The supported canary mechanism is weighted `backendRefs` (handled by the synth-pool weight scaler in `pkg/gateway/synth_pool.go`), not header-based routing.
 
 ---
 
@@ -147,13 +175,11 @@ type VKSGatewayPolicySpec struct {
     // If SectionName is unset on the targetRef, these apply as the Gateway's listener defaults
     // (every listener on the target Gateway uses them unless a more specific policy attaches
     // to that listener via SectionName).
-    SSLPolicy        *string            `json:"sslPolicy,omitempty"`
-    ALPNPolicy       *string            `json:"alpnPolicy,omitempty"`     // e.g. HTTP2Optional
-    AllowedCIDRs     []string           `json:"allowedCidrs,omitempty"`
-    InsertHeaders    map[string]string  `json:"insertHeaders,omitempty"`
-    TimeoutClient    *metav1.Duration   `json:"timeoutClient,omitempty"`
-    TimeoutMember    *metav1.Duration   `json:"timeoutMember,omitempty"`
-    TimeoutConnection *metav1.Duration  `json:"timeoutConnection,omitempty"`
+    AllowedCIDRs      []string           `json:"allowedCidrs,omitempty"`
+    InsertHeaders     map[string]string  `json:"insertHeaders,omitempty"`
+    TimeoutClient     *metav1.Duration   `json:"timeoutClient,omitempty"`
+    TimeoutMember     *metav1.Duration   `json:"timeoutMember,omitempty"`
+    TimeoutConnection *metav1.Duration   `json:"timeoutConnection,omitempty"`
 
     // Vngcloud cert ID overrides. When set, override Secret-based certificateRefs on the
     // matching listener; otherwise certificateRefs continue to be honored (existing import path).
@@ -203,25 +229,16 @@ type VKSBackendPolicySpec struct {
     // +kubebuilder:validation:MaxItems=16
     TargetRefs []gwv1alpha2.LocalPolicyTargetReference `json:"targetRefs"`
 
-    // +kubebuilder:validation:Enum=instance;ip
-    TargetType *string `json:"targetType,omitempty"`
-
     // +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
     PoolAlgorithm *string `json:"poolAlgorithm,omitempty"`
 
-    SessionAffinity *VKSSessionAffinity `json:"sessionAffinity,omitempty"`
+    // Stickiness enables sticky sessions. The vngcloud LB API exposes only an
+    // on/off flag; cookie name and TTL are not configurable.
+    Stickiness *bool `json:"stickiness,omitempty"`
 
     EnableTLSEncryption *bool             `json:"enableTLSEncryption,omitempty"`
-    EnableProxyProtocol *bool             `json:"enableProxyProtocol,omitempty"`
     TargetNodeLabels    map[string]string `json:"targetNodeLabels,omitempty"`
     ManageDFPMembers    *bool             `json:"manageDFPMembers,omitempty"`
-}
-
-type VKSSessionAffinity struct {
-    // +kubebuilder:validation:Enum=None;ClientIP;Cookie
-    Type       string  `json:"type"`
-    CookieName *string `json:"cookieName,omitempty"`     // when Type=Cookie
-    TTL        *metav1.Duration `json:"ttl,omitempty"`
 }
 
 type VKSBackendPolicyStatus struct {
@@ -254,7 +271,6 @@ type VKSHealthCheckPolicySpec struct {
 
     // +kubebuilder:validation:Enum=HTTP;HTTPS;TCP
     Protocol           string             `json:"protocol"`
-    Port               *int32             `json:"port,omitempty"`         // default: backend traffic port
     Interval           *metav1.Duration   `json:"interval,omitempty"`
     Timeout            *metav1.Duration   `json:"timeout,omitempty"`
     HealthyThreshold   *int32             `json:"healthyThreshold,omitempty"`
@@ -264,10 +280,9 @@ type VKSHealthCheckPolicySpec struct {
 }
 
 type VKSHTTPHealthCheck struct {
-    Path           *string  `json:"path,omitempty"`
-    Host           *string  `json:"host,omitempty"`
-    ExpectedCodes  []string `json:"expectedCodes,omitempty"`   // e.g. ["200-299","301"]
-    RequestHeaders map[string]string `json:"requestHeaders,omitempty"`
+    Path          *string  `json:"path,omitempty"`
+    Host          *string  `json:"host,omitempty"`
+    ExpectedCodes []string `json:"expectedCodes,omitempty"`   // e.g. ["200-299","301"]
 }
 ```
 
@@ -292,11 +307,8 @@ type VKSRoutePolicySpec struct {
     // +kubebuilder:validation:MaxItems=16
     TargetRefs []gwv1alpha2.LocalPolicyTargetReferenceWithSectionName `json:"targetRefs"`
 
-    // AdditionalMatches are AND'd with the rule's standard matches.
-    // +optional
-    AdditionalMatches []VKSAdditionalMatch `json:"additionalMatches,omitempty"`
-
     // Actions, when set, supersede the rule's default REDIRECT_TO_POOL action.
+    // The vngcloud LB API supports REJECT and REDIRECT_TO_URL only.
     // +optional
     Actions []VKSRuleAction `json:"actions,omitempty"`
 
@@ -306,26 +318,10 @@ type VKSRoutePolicySpec struct {
     Position *int32 `json:"position,omitempty"`
 }
 
-type VKSAdditionalMatch struct {
-    // +kubebuilder:validation:Enum=Header;QueryParam;Method;SourceIP
-    Type    string  `json:"type"`
-    Name    *string `json:"name,omitempty"`     // header / query name
-    // +kubebuilder:validation:Enum=EQUAL_TO;STARTS_WITH;ENDS_WITH;CONTAINS;REGEX
-    Compare string  `json:"compare"`
-    Value   string  `json:"value"`
-}
-
 type VKSRuleAction struct {
-    // +kubebuilder:validation:Enum=FixedResponse;Reject;Redirect
-    Type          string                  `json:"type"`
-    FixedResponse *VKSFixedResponseAction `json:"fixedResponse,omitempty"`
-    Redirect      *VKSRedirectAction      `json:"redirect,omitempty"`
-}
-
-type VKSFixedResponseAction struct {
-    StatusCode  int32   `json:"statusCode"`
-    ContentType *string `json:"contentType,omitempty"`
-    Body        *string `json:"body,omitempty"`
+    // +kubebuilder:validation:Enum=Reject;Redirect
+    Type     string             `json:"type"`
+    Redirect *VKSRedirectAction `json:"redirect,omitempty"`
 }
 
 type VKSRedirectAction struct {
@@ -339,7 +335,7 @@ type VKSRedirectAction struct {
 
 **Required route schema:** users must give every targeted rule a `name` in `HTTPRoute.spec.rules[].name`. The controller writes `Accepted=False, reason=TargetNotFound` if a `sectionName` doesn't match any rule.
 
-**Forward-compat note.** When vngcloud LB later adds native header / query / method matching, those `AdditionalMatch` types start emitting a `Deprecated` condition pointing users at the now-supported `HTTPRoute.matches` fields. No breakage.
+**Forward-compat note.** When vngcloud LB later adds native header / query / method matching, the controller will start honoring those dimensions of `HTTPRoute.matches` instead of rejecting routes with `UnsupportedMatch`. No breakage.
 
 ### 2.6 RBAC additions
 
@@ -380,7 +376,7 @@ type VKSRedirectAction struct {
 | `VKSGatewayPolicy` (`targetRefs.kind=Gateway`) | LB + listener config | Direct; per-listener via `sectionName` |
 | `VKSBackendPolicy` (`targetRefs.kind=Service`) | Pool config | Direct; one per Service |
 | `VKSHealthCheckPolicy` (`targetRefs.kind=Service`) | Pool health check | Direct; one per Service |
-| `VKSRoutePolicy` (`targetRefs.kind=HTTPRoute`) | Policy match overlay + alt action | Direct; per-rule via `sectionName` |
+| `VKSRoutePolicy` (`targetRefs.kind=HTTPRoute`) | Alt policy action (Reject / Redirect) + position override | Direct; per-rule via `sectionName`. No additional-match dimensions — vngcloud rules support only `HOST_NAME` and `PATH`. |
 
 ### 3.2 Controller graph
 
@@ -426,7 +422,7 @@ Reconcile order per Gateway:
    - protocol / port from Gateway listener
    - TLS: prefer `VKSGatewayPolicy.CertificateIDs` if present, else import Secrets from `tls.certificateRefs` (existing import path)
    - mTLS: `VKSGatewayPolicy.ClientCertificateID` if set, else import from `tls.frontendValidation.caCertificateRefs`
-   - other fields (timeouts, allowedCidrs, sslPolicy, alpnPolicy, insertHeaders) from the resolved listener policy
+   - other fields (timeouts, allowedCidrs, insertHeaders) from the resolved listener policy
    - default pool: synthetic "default-forwarding-pool" with no members (fed by route layer)
 6. **Diff against vngcloud.** Reuse existing per-listener helpers in `internal/usecase/lbc_uc/deploy_listener.go`.
 7. **Trigger route layer.** Emit policy / pool sync for every accepted route attached to this Gateway.
@@ -448,15 +444,16 @@ for each rule in route.spec.rules:
             policies.append(policy)
 ```
 
-**One policy per (hostname × match × resolved-action).** L7 rules:
+**One policy per (hostname × match × resolved-action).** L7 rules — only the dimensions the vngcloud API supports:
 
 - `HOST_NAME` per hostname (literal → `EQUAL_TO`; wildcard → `REGEX`)
 - `PATH` per `match.path`
-- any `VKSRoutePolicy.AdditionalMatches` AND'd in
 - Action precedence:
-  - `VKSRoutePolicy.Actions[FixedResponse|Reject|Redirect]` → respective vngcloud action (FixedResponse marked `Programmed=False, reason=UnsupportedAction` until vngcloud LB exposes it; `Reject` and `Redirect` work)
+  - `VKSRoutePolicy.Actions[Reject|Redirect]` → respective vngcloud action (`REJECT` / `REDIRECT_TO_URL`)
   - `RequestRedirect` filter → `REDIRECT_TO_URL`
   - default → `REDIRECT_TO_POOL` pointing at the synthetic pool
+
+**Match-dimension rejection.** If any `HTTPRouteMatch` in the route uses `headers`, `queryParams`, or `method`, the route is rejected with `Accepted=False, reason=UnsupportedMatch` per parent — these dimensions don't have a vngcloud rule equivalent, and silently dropping them produces traffic surprises. Path + hostname matching alone is honored; weighted `backendRefs` are the supported canary mechanism.
 
 **Policy ordering.** Gateway API spec: most-specific path first, then header count, then route creation timestamp. `VKSRoutePolicy.Position` overrides this order if set. Existing `auto-reorder-policies` machinery is reused.
 
@@ -794,7 +791,7 @@ Existing `make generate manifests test` covers all generation. Same `gateway-con
 
 ### 5.5 Backward-compat / rollout safety
 
-- **No reuse of `LoadBalancerConfig` for Gateway API.** The existing CRD continues to serve Ingress / Service controllers exactly as today; no `mergingMode` / SSLPolicy / ALPNPolicy fields are added. This keeps the Ingress code paths bit-identical.
+- **No new fields on `LoadBalancerConfig` for vngcloud features that don't exist** (e.g. `SSLPolicy`, `ALPNPolicy`, cookie-name session affinity). Phase 1 rolls out the Gateway translator on the LBC schema as it stands today. If the underlying vngcloud LB API later gains those features, the LBC schema and Gateway translator extend together.
 - **Feature gates default-off initially** — opt-in upgrade. ALB flips to `true` after one minor cycle in production.
 - **CRD bundle versioning** — Helm chart's `Chart.yaml` minor-version bumped per phase. Policy CRDs ship at `v1alpha1` only initially; promotion to `v1beta1`/`v1` deferred until conformance (Phase 4).
 - **Webhook conversion** — none required in v1alpha1.
@@ -908,7 +905,7 @@ Existing `make generate manifests test` covers all generation. Same `gateway-con
 | **Reference-Grant denial silently drops a backend** | Med | High | `ResolvedRefs=False, reason=RefNotPermitted` + Warning event + Prometheus counter `gateway_api_refgrant_denied_total`. |
 | **Concurrent endpoint churn during weight rescaling causes pool flapping** | Low | Med | 2 s coalescing window when triggered by EndpointSlice change. |
 | **Listener cert-ID in policy conflicts with Secret-imported cert** | Low | Low | Policy wins; document precedence; emit Warning event. |
-| **Unsupported-feature requests pile up** (URLRewrite, mirror, FixedResponse, etc.) | Med | Med | `gateway_api_unsupported_feature_total` metric → product feedback to vngcloud LB team; documented capability matrix sets expectations. |
+| **Unsupported-feature requests pile up** (URLRewrite, mirror, header / queryParam / method matching, FixedResponse, SSL / ALPN policies, cookie session affinity, custom HC headers, etc.) | Med | Med | `gateway_api_unsupported_feature_total` metric → product feedback to vngcloud LB team; documented capability matrix (§1.6) sets expectations. |
 | **CRD conversion needed later** | Low | Med | Plan field additions only (no removals/renames) until v1beta1 promotion; webhook conversion deferred. |
 | **Gateway API spec churn** between releases | Low | Med | Pin SDK to a known-good Gateway API minor version (v1.2 for Phase 1); upgrade in a dedicated PR with conformance re-run. |
 | **Two LB types in one cluster eat budget** (no sharing per Q6) | Med | Low | Document clearly; cost guidance in `gateway-api.md`; Phase 4 migration path lets users switch without doubling cost. |

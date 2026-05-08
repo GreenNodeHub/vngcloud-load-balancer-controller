@@ -53,8 +53,6 @@ spec:
             type: object
           spec:
             properties:
-              enableProxyProtocol:
-                type: boolean
               enableTLSEncryption:
                 type: boolean
               manageDFPMembers:
@@ -65,21 +63,11 @@ spec:
                 - LEAST_CONNECTIONS
                 - SOURCE_IP
                 type: string
-              sessionAffinity:
-                properties:
-                  cookieName:
-                    type: string
-                  ttl:
-                    type: string
-                  type:
-                    enum:
-                    - None
-                    - ClientIP
-                    - Cookie
-                    type: string
-                required:
-                - type
-                type: object
+              stickiness:
+                description: |-
+                  Stickiness enables sticky sessions on the pool. The vngcloud LB API
+                  exposes only an on/off flag; cookie name and TTL are not configurable.
+                type: boolean
               targetNodeLabels:
                 additionalProperties:
                   type: string
@@ -117,11 +105,6 @@ spec:
                 maxItems: 16
                 minItems: 1
                 type: array
-              targetType:
-                enum:
-                - instance
-                - ip
-                type: string
             required:
             - targetRefs
             type: object

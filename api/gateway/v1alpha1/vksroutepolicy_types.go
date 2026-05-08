@@ -33,33 +33,14 @@ type VKSRoutePolicySpec struct {
 	// +kubebuilder:validation:MaxItems=16
 	TargetRefs []LocalPolicyTargetReferenceWithSectionName `json:"targetRefs"`
 
-	AdditionalMatches []VKSAdditionalMatch `json:"additionalMatches,omitempty"`
-	Actions           []VKSRuleAction      `json:"actions,omitempty"`
-	Position          *int32               `json:"position,omitempty"`
-}
-
-type VKSAdditionalMatch struct {
-	// +kubebuilder:validation:Enum=Header;QueryParam;Method;SourceIP
-	Type string  `json:"type"`
-	Name *string `json:"name,omitempty"`
-	// +kubebuilder:validation:Enum=EQUAL_TO;STARTS_WITH;ENDS_WITH;CONTAINS;REGEX
-	Compare string `json:"compare"`
-	Value   string `json:"value"`
+	Actions  []VKSRuleAction `json:"actions,omitempty"`
+	Position *int32          `json:"position,omitempty"`
 }
 
 type VKSRuleAction struct {
-	// +kubebuilder:validation:Enum=FixedResponse;Reject;Redirect
-	Type          string                  `json:"type"`
-	FixedResponse *VKSFixedResponseAction `json:"fixedResponse,omitempty"`
-	Redirect      *VKSRedirectAction      `json:"redirect,omitempty"`
-}
-
-type VKSFixedResponseAction struct {
-	// +kubebuilder:validation:Minimum=100
-	// +kubebuilder:validation:Maximum=599
-	StatusCode  int32   `json:"statusCode"`
-	ContentType *string `json:"contentType,omitempty"`
-	Body        *string `json:"body,omitempty"`
+	// +kubebuilder:validation:Enum=Reject;Redirect
+	Type     string             `json:"type"`
+	Redirect *VKSRedirectAction `json:"redirect,omitempty"`
 }
 
 type VKSRedirectAction struct {

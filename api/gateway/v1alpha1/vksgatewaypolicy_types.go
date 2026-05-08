@@ -33,8 +33,6 @@ type VKSGatewayPolicySpec struct {
 	// +kubebuilder:validation:MaxItems=16
 	TargetRefs []LocalPolicyTargetReferenceWithSectionName `json:"targetRefs"`
 
-	SSLPolicy         *string           `json:"sslPolicy,omitempty"`
-	ALPNPolicy        *string           `json:"alpnPolicy,omitempty"`
 	AllowedCIDRs      []string          `json:"allowedCidrs,omitempty"`
 	InsertHeaders     map[string]string `json:"insertHeaders,omitempty"`
 	TimeoutClient     *metav1.Duration  `json:"timeoutClient,omitempty"`

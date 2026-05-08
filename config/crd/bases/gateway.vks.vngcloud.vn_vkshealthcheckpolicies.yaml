@@ -69,16 +69,9 @@ spec:
                     type: string
                   path:
                     type: string
-                  requestHeaders:
-                    additionalProperties:
-                      type: string
-                    type: object
                 type: object
               interval:
                 type: string
-              port:
-                format: int32
-                type: integer
               protocol:
                 enum:
                 - HTTP

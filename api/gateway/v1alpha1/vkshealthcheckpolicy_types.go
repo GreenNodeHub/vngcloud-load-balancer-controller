@@ -36,7 +36,6 @@ type VKSHealthCheckPolicySpec struct {
 
 	// +kubebuilder:validation:Enum=HTTP;HTTPS;TCP
 	Protocol           string           `json:"protocol"`
-	Port               *int32           `json:"port,omitempty"`
 	Interval           *metav1.Duration `json:"interval,omitempty"`
 	Timeout            *metav1.Duration `json:"timeout,omitempty"`
 	HealthyThreshold   *int32           `json:"healthyThreshold,omitempty"`
@@ -46,10 +45,9 @@ type VKSHealthCheckPolicySpec struct {
 }
 
 type VKSHTTPHealthCheck struct {
-	Path           *string           `json:"path,omitempty"`
-	Host           *string           `json:"host,omitempty"`
-	ExpectedCodes  []string          `json:"expectedCodes,omitempty"`
-	RequestHeaders map[string]string `json:"requestHeaders,omitempty"`
+	Path          *string  `json:"path,omitempty"`
+	Host          *string  `json:"host,omitempty"`
+	ExpectedCodes []string `json:"expectedCodes,omitempty"`
 }
 
 type VKSHealthCheckPolicyStatus struct {

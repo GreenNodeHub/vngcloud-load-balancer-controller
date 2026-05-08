@@ -56,20 +56,6 @@ spec:
               actions:
                 items:
                   properties:
-                    fixedResponse:
-                      properties:
-                        body:
-                          type: string
-                        contentType:
-                          type: string
-                        statusCode:
-                          format: int32
-                          maximum: 599
-                          minimum: 100
-                          type: integer
-                      required:
-                      - statusCode
-                      type: object
                     redirect:
                       properties:
                         httpCode:
@@ -84,40 +70,11 @@ spec:
                       type: object
                     type:
                       enum:
-                      - FixedResponse
                       - Reject
                       - Redirect
                       type: string
                   required:
                   - type
-                  type: object
-                type: array
-              additionalMatches:
-                items:
-                  properties:
-                    compare:
-                      enum:
-                      - EQUAL_TO
-                      - STARTS_WITH
-                      - ENDS_WITH
-                      - CONTAINS
-                      - REGEX
-                      type: string
-                    name:
-                      type: string
-                    type:
-                      enum:
-                      - Header
-                      - QueryParam
-                      - Method
-                      - SourceIP
-                      type: string
-                    value:
-                      type: string
-                  required:
-                  - compare
-                  - type
-                  - value
                   type: object
                 type: array
               position:

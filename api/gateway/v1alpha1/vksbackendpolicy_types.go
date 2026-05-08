@@ -33,25 +33,16 @@ type VKSBackendPolicySpec struct {
 	// +kubebuilder:validation:MaxItems=16
 	TargetRefs []LocalPolicyTargetReference `json:"targetRefs"`
 
-	// +kubebuilder:validation:Enum=instance;ip
-	TargetType *string `json:"targetType,omitempty"`
-
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
 	PoolAlgorithm *string `json:"poolAlgorithm,omitempty"`
 
-	SessionAffinity *VKSSessionAffinity `json:"sessionAffinity,omitempty"`
+	// Stickiness enables sticky sessions on the pool. The vngcloud LB API
+	// exposes only an on/off flag; cookie name and TTL are not configurable.
+	Stickiness *bool `json:"stickiness,omitempty"`
 
 	EnableTLSEncryption *bool             `json:"enableTLSEncryption,omitempty"`
-	EnableProxyProtocol *bool             `json:"enableProxyProtocol,omitempty"`
 	TargetNodeLabels    map[string]string `json:"targetNodeLabels,omitempty"`
 	ManageDFPMembers    *bool             `json:"manageDFPMembers,omitempty"`
-}
-
-type VKSSessionAffinity struct {
-	// +kubebuilder:validation:Enum=None;ClientIP;Cookie
-	Type       string           `json:"type"`
-	CookieName *string          `json:"cookieName,omitempty"`
-	TTL        *metav1.Duration `json:"ttl,omitempty"`
 }
 
 type VKSBackendPolicyStatus struct {
