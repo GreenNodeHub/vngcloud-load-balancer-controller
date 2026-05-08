@@ -20,6 +20,17 @@ const (
 	ServiceGLBFinalizer = "glb.vks.vngcloud.vn/resources"
 )
 
+// Gateway API constants.
+const (
+	GatewayFinalizer   = "gateway.vks.vngcloud.vn/resources"
+	HTTPRouteFinalizer = "gateway.vks.vngcloud.vn/route"
+
+	OwnerKindGateway = "Gateway"
+
+	OwnerLabelGatewayUID = "gateway.vks.vngcloud.vn/owner-uid"
+	OwnerLabelKind       = "vks.vngcloud.vn/owner-resource-kind"
+)
+
 // Annotations
 const (
 	SERVICE_ANNOTATION_PREFIX = "vks.vngcloud.vn"
