@@ -39,6 +39,7 @@ func (t *defaultGatewayBuildTask) buildListeners() ([]v1alpha1.Listener, error) 
 			ProtocolPort: int32(l.Port),
 		}
 		t.applyListenerPolicy(&entry, l)
+		t.applyListenerCertificates(&entry, l)
 		out = append(out, entry)
 	}
 	if len(out) == 0 {
