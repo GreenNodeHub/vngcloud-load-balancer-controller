@@ -2,6 +2,8 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
 )
 
 // +kubebuilder:object:root=true
@@ -69,6 +71,16 @@ type VKSRedirectAction struct {
 type VKSRoutePolicyStatus struct {
 	CommonStatus       `json:",inline"`
 	CommonPolicyStatus `json:",inline"`
+}
+
+// Matches reports whether this policy targets the given PolicyTarget.
+func (p *VKSRoutePolicy) Matches(t pkggw.PolicyTarget) bool {
+	for _, ref := range p.Spec.TargetRefs {
+		if pkggw.TargetRefMatchesWithSection(ref, p.Namespace, t) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
