@@ -6,27 +6,28 @@ import (
 	"sort"
 
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // synthesizePool builds one v1alpha1.Pool from one HTTPRoute rule. Members
-// are pod-IPs (target type: ip), resolved via EndpointResolver; weights are
-// computed via pkggw.ScaleWeights so that a 1:99 traffic split with an
-// uneven readyEndpoints count still lands in the API's accepted [1..100]
-// range. Pool name is deterministic via pkggw.SynthPoolName.
-//
-// Phase E (initial): plain HTTPRoute → Pool. VKSBackendPolicy and
-// VKSHealthCheckPolicy overlays are a separate follow-up commit so the
-// per-policy translation can be reviewed independently.
+// resolve to pod IPs ("ip" target type) or node IPs + nodePort ("instance"
+// target type) per the backend's VKSBackendPolicy.TargetType, defaulting to
+// "instance" — matches the Ingress controller's default and works on overlay
+// CNIs where pod IPs aren't routable from the cloud LB. Weights are computed
+// via pkggw.ScaleWeights so that a 1:99 traffic split with an uneven
+// readyEndpoints count still lands in the API's accepted [1..100] range.
+// Pool name is deterministic via pkggw.SynthPoolName.
 //
 // Same-namespace backendRefs only. Cross-namespace via ReferenceGrant lands
-// in the same follow-up.
+// in a separate follow-up.
 func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule) (*v1alpha1.Pool, error) {
 	if len(rule.BackendRefs) == 0 {
 		return nil, fmt.Errorf("rule %d on HTTPRoute %s/%s has no backendRefs", ruleIdx, route.Namespace, route.Name)
@@ -64,12 +65,27 @@ func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv
 			continue
 		}
 
-		addrs, err := t.uc.endpointResolver.ResolvePodEndpoints(ctx,
-			types.NamespacedName{Namespace: ns, Name: string(br.Name)},
-			intstr.FromInt(int(port)),
-		)
+		targetType, err := t.resolveTargetType(ctx, ns, string(br.Name))
 		if err != nil {
-			return nil, fmt.Errorf("resolve endpoints for backendRef %s/%s: %w", ns, br.Name, err)
+			return nil, err
+		}
+		nodeLabels, err := t.resolveTargetNodeLabels(ctx, ns, string(br.Name))
+		if err != nil {
+			return nil, err
+		}
+		svcKey := types.NamespacedName{Namespace: ns, Name: string(br.Name)}
+		resolveOpts := []utils.EndpointResolveOption{
+			utils.WithNodeSelector(labels.SelectorFromSet(labels.Set(nodeLabels))),
+		}
+		var addrs []utils.EndpointAddress
+		switch targetType {
+		case domain.TargetTypeInstance:
+			addrs, err = t.uc.endpointResolver.ResolveNodePortEndpoints(ctx, svcKey, intstr.FromInt(int(port)), resolveOpts...)
+		default: // domain.TargetTypeIP
+			addrs, err = t.uc.endpointResolver.ResolvePodEndpoints(ctx, svcKey, intstr.FromInt(int(port)), resolveOpts...)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("resolve endpoints for backendRef %s/%s (mode=%s): %w", ns, br.Name, targetType, err)
 		}
 
 		ready := int32(len(addrs))

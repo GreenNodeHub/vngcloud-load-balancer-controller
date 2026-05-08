@@ -137,6 +137,11 @@ func (in *VKSBackendPolicySpec) DeepCopyInto(out *VKSBackendPolicySpec) {
 		*out = make([]v1alpha2.LocalPolicyTargetReference, len(*in))
 		copy(*out, *in)
 	}
+	if in.TargetType != nil {
+		in, out := &in.TargetType, &out.TargetType
+		*out = new(string)
+		**out = **in
+	}
 	if in.PoolAlgorithm != nil {
 		in, out := &in.PoolAlgorithm, &out.PoolAlgorithm
 		*out = new(string)

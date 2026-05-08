@@ -9,6 +9,7 @@ import (
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	sharedUC "github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/shared"
 	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
 )
@@ -85,6 +86,41 @@ func (t *defaultGatewayBuildTask) applyHealthCheckPolicyToPool(ctx context.Conte
 	}
 	pool.HealthMonitor = mon
 	return nil
+}
+
+// resolveTargetType returns the effective member-resolution mode for a
+// Service: VKSBackendPolicy.TargetType when set, else domain.TargetTypeInstance
+// (matches the Ingress controller's default — works on overlay CNIs where
+// pod IPs aren't routable from the cloud LB; user opts into "ip" mode if
+// pods are directly routable).
+func (t *defaultGatewayBuildTask) resolveTargetType(ctx context.Context, ns, svcName string) (domain.TargetType, error) {
+	bp, err := t.resolveBackendPolicy(ctx, ns, svcName)
+	if err != nil {
+		return "", err
+	}
+	if bp != nil && bp.Spec.TargetType != nil {
+		switch *bp.Spec.TargetType {
+		case string(domain.TargetTypeIP):
+			return domain.TargetTypeIP, nil
+		case string(domain.TargetTypeInstance):
+			return domain.TargetTypeInstance, nil
+		}
+	}
+	return domain.TargetTypeInstance, nil
+}
+
+// resolveTargetNodeLabels returns the VKSBackendPolicy.TargetNodeLabels for
+// the named Service. Empty map → "every node" (labels.Everything()) which
+// is the only sensible default when no policy is attached.
+func (t *defaultGatewayBuildTask) resolveTargetNodeLabels(ctx context.Context, ns, svcName string) (map[string]string, error) {
+	bp, err := t.resolveBackendPolicy(ctx, ns, svcName)
+	if err != nil {
+		return nil, err
+	}
+	if bp == nil {
+		return nil, nil
+	}
+	return bp.Spec.TargetNodeLabels, nil
 }
 
 func (t *defaultGatewayBuildTask) resolveBackendPolicy(ctx context.Context, ns, svcName string) (*gwv1alpha1.VKSBackendPolicy, error) {

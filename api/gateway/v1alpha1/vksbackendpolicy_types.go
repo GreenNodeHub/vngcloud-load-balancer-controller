@@ -33,6 +33,21 @@ type VKSBackendPolicySpec struct {
 	// +kubebuilder:validation:MaxItems=16
 	TargetRefs []LocalPolicyTargetReference `json:"targetRefs"`
 
+	// TargetType selects which addresses the controller resolves into pool
+	// members. "ip" puts pod IPs in the pool (works on flat networks /
+	// Cilium native routing). "instance" puts node IPs + nodePort in the
+	// pool (works on overlay networks where pod IPs aren't routable from
+	// the cloud LB). Default is auto-detected from the cluster CNI — same
+	// rule the Ingress controller uses today (Cilium overlay → instance,
+	// native routing → ip).
+	//
+	// This is a controller-side translation toggle, not a vngcloud LB API
+	// field; the resulting member IPs are what gets stored on the cloud
+	// pool. See design spec §1.6.
+	//
+	// +kubebuilder:validation:Enum=instance;ip
+	TargetType *string `json:"targetType,omitempty"`
+
 	// +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
 	PoolAlgorithm *string `json:"poolAlgorithm,omitempty"`
 

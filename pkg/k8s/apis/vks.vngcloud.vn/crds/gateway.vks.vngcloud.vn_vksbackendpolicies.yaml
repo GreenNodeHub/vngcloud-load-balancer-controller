@@ -105,6 +105,23 @@ spec:
                 maxItems: 16
                 minItems: 1
                 type: array
+              targetType:
+                description: |-
+                  TargetType selects which addresses the controller resolves into pool
+                  members. "ip" puts pod IPs in the pool (works on flat networks /
+                  Cilium native routing). "instance" puts node IPs + nodePort in the
+                  pool (works on overlay networks where pod IPs aren't routable from
+                  the cloud LB). Default is auto-detected from the cluster CNI — same
+                  rule the Ingress controller uses today (Cilium overlay → instance,
+                  native routing → ip).
+
+                  This is a controller-side translation toggle, not a vngcloud LB API
+                  field; the resulting member IPs are what gets stored on the cloud
+                  pool. See design spec §1.6.
+                enum:
+                - instance
+                - ip
+                type: string
             required:
             - targetRefs
             type: object

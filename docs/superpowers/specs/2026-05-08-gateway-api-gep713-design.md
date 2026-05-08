@@ -113,7 +113,7 @@ The CRD schemas and translation rules below are **bounded by what the vngcloud L
 | Custom request headers on health checks | HealthMonitor | not exposed in `VKSHealthCheckPolicy` |
 | Header / queryParam / method / source-IP at policy rules | L7 Policy | HTTPRoute matches with these → route `Accepted=False, reason=UnsupportedMatch` |
 | `FIXED_RESPONSE` action | L7 Policy | not exposed in `VKSRoutePolicy.Actions` |
-| `instance` vs `ip` target type | Members | members are always IP-based |
+| `instance` vs `ip` target type | Members | API stores IPs only; the distinction is which IPs the *controller* resolves (pod-IP vs node-IP+nodePort). Exposed as `VKSBackendPolicy.TargetType` (controller-side toggle, not an API field). |
 | ProxyProtocol toggle on a pool | Pool | use `PoolProtocol=PROXY` instead |
 | Per-listener health-check port override | HealthMonitor | uses member's `monitorPort`; not exposed in `VKSHealthCheckPolicy` |
 
@@ -228,6 +228,19 @@ type VKSBackendPolicySpec struct {
     // +kubebuilder:validation:MinItems=1
     // +kubebuilder:validation:MaxItems=16
     TargetRefs []gwv1alpha2.LocalPolicyTargetReference `json:"targetRefs"`
+
+    // TargetType selects which addresses the controller resolves into pool
+    // members. "ip" puts pod IPs in the pool (works on flat networks /
+    // Cilium native routing). "instance" puts node IPs + nodePort in the
+    // pool (works on overlay networks where pod IPs aren't routable from
+    // the cloud LB). Defaults to "instance" — same default the Ingress
+    // controller uses today.
+    //
+    // Controller-side translation toggle, not a vngcloud LB API field;
+    // the resolved member IPs are what land on the cloud pool. See §1.6.
+    //
+    // +kubebuilder:validation:Enum=instance;ip
+    TargetType *string `json:"targetType,omitempty"`
 
     // +kubebuilder:validation:Enum=ROUND_ROBIN;LEAST_CONNECTIONS;SOURCE_IP
     PoolAlgorithm *string `json:"poolAlgorithm,omitempty"`
