@@ -1,0 +1,215 @@
+# ===== Kitchen-sink smoke test =====
+# Exercises every customizable field across all 4 VKSPolicy CRDs + the
+# Gateway / HTTPRoute surface that translates to LBC.Spec entries.
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: kitchensink
+  namespace: gw-demo
+spec:
+  gatewayClassName: vngcloud-alb
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+  - name: api          # custom listener with overrides
+    protocol: HTTP
+    port: 8080
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kitchensink
+  namespace: gw-demo
+spec:
+  parentRefs:
+  - name: kitchensink
+  hostnames:
+  - kitchen.example.com
+  - "*.kitchen.example.com"   # wildcard
+  rules:
+  # 1. Exact-path canary across two Services with 90/10 weight
+  - name: exact-rule
+    matches:
+    - path:
+        type: Exact
+        value: /api/v1
+    backendRefs:
+    - name: echo
+      port: 80
+      weight: 90
+    - name: echo-v2
+      port: 80
+      weight: 10
+  # 2. PathPrefix rule overridden by VKSRoutePolicy → Redirect action
+  - name: prefix-rule
+    matches:
+    - path:
+        type: PathPrefix
+        value: /assets
+    backendRefs:
+    - name: echo
+      port: 80
+  # 3. Regex match overridden by VKSRoutePolicy → Reject action
+  - name: regex-rule
+    matches:
+    - path:
+        type: RegularExpression
+        value: ^/users/[0-9]+$
+    backendRefs:
+    - name: echo
+      port: 80
+  # 4. RequestRedirect filter — REDIRECT_TO_URL action straight from filter.
+  # Gateway-API forbids backendRefs alongside a RequestRedirect filter, so we
+  # omit them; our translator drops the redundant pool-redirect anyway.
+  - name: filter-redirect
+    matches:
+    - path:
+        type: PathPrefix
+        value: /old
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        hostname: new.kitchen.example.com
+        statusCode: 301
+---
+# Unscoped VKSGatewayPolicy → LB-level + listener-default fields
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata:
+  name: kitchensink-defaults
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: kitchensink
+  loadBalancerSpec:
+    scheme: Internet
+    tags:
+      env: smoke-test
+      kitchen: "yes"
+  allowedCidrs:
+  - 0.0.0.0/0
+  - 10.0.0.0/8
+  # vngcloud only accepts a fixed set of insertHeader names: X-Forwarded-For,
+  # X-Forwarded-Proto, X-Forwarded-Port. Custom names are rejected at the API.
+  insertHeaders:
+    X-Forwarded-For: "true"
+    X-Forwarded-Proto: "true"
+  timeoutClient: 30s
+  timeoutMember: 60s
+  timeoutConnection: 5s
+---
+# Per-listener override → "api" listener gets longer timeouts + extra header
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata:
+  name: kitchensink-api
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: kitchensink
+    sectionName: api
+  timeoutClient: 120s
+  timeoutMember: 120s
+  insertHeaders:
+    X-Forwarded-Port: "true"
+---
+# VKSBackendPolicy on the echo Service: instance mode + LEAST_CONNECTIONS + sticky
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata:
+  name: echo-policy
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: ""
+    kind: Service
+    name: echo
+  targetType: instance
+  poolAlgorithm: LEAST_CONNECTIONS
+  stickiness: true
+  enableTLSEncryption: false
+---
+# VKSBackendPolicy on the echo-v2 canary Service: different algorithm
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata:
+  name: echo-v2-policy
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: ""
+    kind: Service
+    name: echo-v2
+  targetType: instance
+  poolAlgorithm: ROUND_ROBIN
+---
+# Health-check overlay on echo
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSHealthCheckPolicy
+metadata:
+  name: echo-hc
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: ""
+    kind: Service
+    name: echo
+  protocol: HTTP
+  interval: 15s
+  timeout: 4s
+  healthyThreshold: 2
+  unhealthyThreshold: 3
+  httpHealthCheck:
+    path: /healthz
+    host: hc.kitchen.example.com
+    expectedCodes:
+    - "200"
+    - "201"
+---
+# Route policy: prefix-rule → Redirect to a fixed URL
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSRoutePolicy
+metadata:
+  name: prefix-redirect
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: kitchensink
+    sectionName: prefix-rule
+  position: 5
+  actions:
+  - type: Redirect
+    redirect:
+      url: https://prefix-only.example.com
+      httpCode: 302
+      keepQueryString: true
+---
+# Route policy: regex-rule → Reject
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSRoutePolicy
+metadata:
+  name: regex-reject
+  namespace: gw-demo
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: kitchensink
+    sectionName: regex-rule
+  actions:
+  - type: Reject
