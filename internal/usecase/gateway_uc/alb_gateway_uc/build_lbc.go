@@ -148,9 +148,12 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 	// unscoped policy contributes here per the design spec).
 	t.applyLoadBalancerSpec(lbc)
 
-	// Phase A: emit an empty Listeners/Pools set so the LBC is valid.
-	// Phases C-E will populate these.
-	lbc.Spec.Listeners = nil
+	listeners, err := t.buildListeners()
+	if err != nil {
+		return err
+	}
+	lbc.Spec.Listeners = listeners
+	// Pools + CreateCertificates land in Phases D and E.
 	lbc.Spec.Pools = nil
 	lbc.Spec.CreateCertificates = nil
 
