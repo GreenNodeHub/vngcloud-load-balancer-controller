@@ -47,6 +47,7 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	gatewayalbcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/alb"
+	gatewayshared "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
@@ -475,6 +476,19 @@ func main() { //nolint:gocyclo
 		)
 		if err := albGatewayReconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ALBGateway")
+			os.Exit(1)
+		}
+
+		gcReconciler := gatewayalbcontroller.NewGatewayClassReconciler(mgr.GetClient(), mgr.GetScheme())
+		if err := gcReconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ALBGatewayClass")
+			os.Exit(1)
+		}
+
+		// Register the field indexes used by the gateway reconciler's watches
+		// (HTTPRoute → parent Gateway, etc.).
+		if err := gatewayshared.RegisterIndexes(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to register gateway field indexes")
 			os.Exit(1)
 		}
 	}
