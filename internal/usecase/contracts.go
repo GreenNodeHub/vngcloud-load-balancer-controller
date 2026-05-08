@@ -49,3 +49,13 @@ type ServiceGLBUseCase interface {
 	EnsureServiceGLBUseCase(ctx context.Context, req ctrl.Request) error
 	DeleteServiceGLBUseCase(ctx context.Context, req ctrl.Request) error
 }
+
+// ALBGatewayUseCase handles reconciliation of Gateway-API Gateway objects under
+// the vngcloud-alb GatewayClass. It translates Gateway + attached HTTPRoutes +
+// VKSPolicy CRDs into a LoadBalancerConfig and lets the LBC controller drive
+// the actual cloud LB.
+type ALBGatewayUseCase interface {
+	InitALBGatewayUseCase(ctx context.Context) error
+	EnsureALBGatewayUseCase(ctx context.Context, req ctrl.Request) error
+	DeleteALBGatewayUseCase(ctx context.Context, req ctrl.Request) error
+}

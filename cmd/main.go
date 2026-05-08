@@ -43,8 +43,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
+	gatewayalbcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/alb"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
 	networkingcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/networking"
@@ -54,6 +56,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/alb_gateway_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/glbc_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/ingress_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/lbc_uc"
@@ -61,6 +64,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_glb_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/service_uc"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/vglb_uc"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/clusterapi"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -90,6 +95,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vksvngcloudvnv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gwv1.Install(scheme))
+	utilruntime.Must(gwv1beta1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -107,6 +115,7 @@ func main() { //nolint:gocyclo
 	var disableNodeSecurityGroupController bool
 	var disableVngcloudGlobalLoadBalancerController bool
 	var disableServiceGLBController bool
+	var disableALBGatewayController bool
 	var syncPeriod time.Duration
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -135,6 +144,9 @@ func main() { //nolint:gocyclo
 		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
 	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
 		"If set, the ServiceGLB controller will be disabled")
+	flag.BoolVar(&disableALBGatewayController, "disable-alb-gateway-controller", true,
+		"If set, the Gateway-API ALB controller (vngcloud-alb GatewayClass) will be disabled. "+
+			"Defaults to true while Phase 1 is under active development; set --disable-alb-gateway-controller=false to enable.")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
 			"A lower period will correct entropy more quickly, "+
@@ -443,6 +455,26 @@ func main() { //nolint:gocyclo
 		)
 		if err := serviceGLBReconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ServiceGLB")
+			os.Exit(1)
+		}
+	}
+
+	if !disableALBGatewayController {
+		albGatewayUseCase := alb_gateway_uc.NewALBGatewayUseCase(
+			conf.Cluster.ClusterID,
+			k8sRepo,
+			vngcloudRepo,
+			endpointResolver,
+			mgr.GetClient(),
+		)
+		albGatewayReconciler := gatewayalbcontroller.NewGatewayReconciler(
+			mgr.GetClient(),
+			mgr.GetScheme(),
+			albGatewayUseCase,
+			conf.MaxConcurrentReconciles,
+		)
+		if err := albGatewayReconciler.SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ALBGateway")
 			os.Exit(1)
 		}
 	}
