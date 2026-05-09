@@ -120,7 +120,7 @@ func (b *Batcher) flushObject(ctx context.Context, key objKey, e *entry) error {
 
 		// Spec patch
 		oldSpec := fresh.DeepCopyObject().(client.Object)
-		if anyChanged(fresh, e.specMutators) {
+		if applyMutators(fresh, e.specMutators) {
 			logDiff(oldSpec, fresh, "spec")
 			if err := b.client.Patch(ctx, fresh,
 				client.MergeFromWithOptions(oldSpec, client.MergeFromWithOptimisticLock{})); err != nil {
@@ -128,9 +128,12 @@ func (b *Batcher) flushObject(ctx context.Context, key objKey, e *entry) error {
 			}
 		}
 
-		// Status patch
+		// Status patch. client.Patch above writes the API server's response
+		// (including the bumped resourceVersion) back into fresh on success,
+		// so this snapshot is the post-Spec-patch state — the optimistic
+		// lock on the Status patch will use the correct resourceVersion.
 		oldStatus := fresh.DeepCopyObject().(client.Object)
-		if anyChanged(fresh, e.statusMutators) {
+		if applyMutators(fresh, e.statusMutators) {
 			logDiff(oldStatus, fresh, "status")
 			if err := b.client.Status().Patch(ctx, fresh,
 				client.MergeFromWithOptions(oldStatus, client.MergeFromWithOptimisticLock{})); err != nil {
@@ -141,9 +144,11 @@ func (b *Batcher) flushObject(ctx context.Context, key objKey, e *entry) error {
 	})
 }
 
-// anyChanged runs each mutator against fresh in order, returning true if
-// any mutator returned true. (A later false does not undo an earlier true.)
-func anyChanged(fresh client.Object, mutators []func(client.Object) bool) bool {
+// applyMutators runs each mutator against fresh in queue order — never
+// short-circuits, so later mutators always observe earlier mutators'
+// changes. Returns true if any mutator returned true (a later false does
+// not undo an earlier true), signalling the caller should issue a patch.
+func applyMutators(fresh client.Object, mutators []func(client.Object) bool) bool {
 	changed := false
 	for _, m := range mutators {
 		if m(fresh) {
