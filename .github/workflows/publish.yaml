@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Log in to the GHCR
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
@@ -96,3 +96,50 @@ jobs:
               --repo="$GITHUB_REPOSITORY" \
               --title="${{ github.ref_name }}" \
               --generate-notes
+
+  deploy_docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git credentials
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pipenv && pipenv install
+
+      - name: Extract minor version
+        id: ver
+        run: |
+          # 0.3.24 -> v0.3 — minor-only doc versioning (matches kubernetes-sigs/aws-load-balancer-controller).
+          # Patch releases update the existing minor folder in place; major.minor bumps publish a new entry.
+          MINOR=$(echo "${{ github.ref_name }}" | cut -d. -f1,2)
+          echo "minor=v${MINOR}" >> $GITHUB_OUTPUT
+
+      - name: Remove legacy "latest" version (one-time, idempotent)
+        run: |
+          # Before this workflow existed, main-pushes deployed "latest" as a top-level version
+          # (versions.json entry with no aliases). Now "latest" is supposed to be an alias for the
+          # newest minor. If the legacy version is still there, remove it so the deploy below can
+          # claim "latest" as an alias. After the first successful run this is a no-op.
+          if pipenv run mike list --json 2>/dev/null | jq -e '[.[].version] | index("latest")' >/dev/null; then
+            echo "Removing orphan 'latest' version from gh-pages..."
+            pipenv run mike delete latest --push
+          fi
+
+      - name: Deploy versioned docs
+        run: |
+          pipenv run mike deploy ${{ steps.ver.outputs.minor }} latest --update-aliases --push
+          pipenv run mike set-default latest --push
