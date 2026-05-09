@@ -1,6 +1,8 @@
 package k8sbatch_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -196,4 +198,59 @@ var _ = Describe("Batcher Flush — Spec mutator", func() {
 		Expect(got.Spec.AttachSecurityGroups).To(Equal([]string{"sg-1"}))
 		Expect(got.Status.LastReconcileMessage).To(Equal("applied:sg-1"))
 	})
+
+	It("skips Status when Spec patch fails and keeps both queued", func() {
+		nsg := newTestNSG(ns, "nsg-fail")
+		Expect(k8sClient.Create(ctx, nsg)).To(Succeed())
+
+		// Construct a batcher whose Spec patch always fails. retry.RetryOnConflict
+		// only retries on Conflict, so a non-conflict error returns immediately.
+		failingErr := errors.New("forced spec patch failure")
+		wrapped := &failingPatchClient{
+			Client:    k8sClient,
+			err:       failingErr,
+			remaining: 1000, // effectively forever
+		}
+		b := k8sbatch.New(wrapped)
+
+		statusCalled := false
+		k8sbatch.MutateSpec(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			o.Spec.AttachSecurityGroups = []string{"sg-new"}
+			return true
+		})
+		k8sbatch.MutateStatus(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			statusCalled = true
+			return true
+		})
+
+		err := b.Flush(ctx)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("forced spec patch failure"))
+		Expect(statusCalled).To(BeFalse(), "status mutator must not run when spec patch fails")
+		Expect(b.Pending()).To(Equal(1), "failed entry should remain queued")
+
+		// Sanity check: the live object's Spec is unchanged (zero-value, since
+		// newTestNSG doesn't set AttachSecurityGroups).
+		got := &v1alpha1.NodeSecurityGroup{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsg), got)).To(Succeed())
+		Expect(got.Spec.AttachSecurityGroups).To(BeEmpty())
+	})
 })
+
+// failingPatchClient wraps a client.Client and returns the configured
+// error from the next n calls to Patch (non-status). Status patches and
+// Get/Create/Delete pass through unchanged. Used in tests to force
+// deterministic Spec-patch failures.
+type failingPatchClient struct {
+	client.Client
+	err       error
+	remaining int
+}
+
+func (f *failingPatchClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+	if f.remaining > 0 {
+		f.remaining--
+		return f.err
+	}
+	return f.Client.Patch(ctx, obj, patch, opts...)
+}
