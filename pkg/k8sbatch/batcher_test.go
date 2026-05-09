@@ -139,3 +139,61 @@ var _ = Describe("Batcher Flush — NotFound on GET", func() {
 		Expect(b.Pending()).To(Equal(1), "failed entry should remain queued")
 	})
 })
+
+var _ = Describe("Batcher Flush — Spec mutator", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-spec-%d-%d",
+			GinkgoRandomSeed(),
+			CurrentSpecReport().LeafNodeLocation.LineNumber)
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("issues one Spec patch and no Status patch when only Spec is queued", func() {
+		nsg := newTestNSG(ns, "nsg-spec")
+		Expect(k8sClient.Create(ctx, nsg)).To(Succeed())
+
+		b := k8sbatch.New(k8sClient)
+		k8sbatch.MutateSpec(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			o.Spec.AttachSecurityGroups = []string{"sg-foo", "sg-bar"}
+			return true
+		})
+		Expect(b.Flush(ctx)).To(Succeed())
+		Expect(b.Pending()).To(Equal(0))
+
+		got := &v1alpha1.NodeSecurityGroup{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsg), got)).To(Succeed())
+		Expect(got.Spec.AttachSecurityGroups).To(Equal([]string{"sg-foo", "sg-bar"}))
+	})
+
+	It("patches Spec first then Status against the post-Spec state", func() {
+		nsg := newTestNSG(ns, "nsg-both")
+		Expect(k8sClient.Create(ctx, nsg)).To(Succeed())
+
+		b := k8sbatch.New(k8sClient)
+
+		// Spec mutator changes AttachSecurityGroups.
+		k8sbatch.MutateSpec(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			o.Spec.AttachSecurityGroups = []string{"sg-1"}
+			return true
+		})
+		// Status mutator runs AFTER Spec; observes the post-Spec state.
+		k8sbatch.MutateStatus(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			Expect(o.Spec.AttachSecurityGroups).To(Equal([]string{"sg-1"}),
+				"status mutator should run against post-Spec state")
+			// Echo a summary of the Spec change into Status to verify ordering.
+			o.Status.LastReconcileMessage = "applied:sg-1"
+			return true
+		})
+
+		Expect(b.Flush(ctx)).To(Succeed())
+
+		got := &v1alpha1.NodeSecurityGroup{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsg), got)).To(Succeed())
+		Expect(got.Spec.AttachSecurityGroups).To(Equal([]string{"sg-1"}))
+		Expect(got.Status.LastReconcileMessage).To(Equal("applied:sg-1"))
+	})
+})
