@@ -16,7 +16,7 @@ func TestSortMatches_ExactBeforePrefix(t *testing.T) {
 		{Match: gwv1.HTTPRouteMatch{Path: &gwv1.HTTPPathMatch{Type: &pathPrefix, Value: ptr("/api")}}},
 		{Match: gwv1.HTTPRouteMatch{Path: &gwv1.HTTPPathMatch{Type: &pathExact, Value: ptr("/api/v1")}}},
 	}
-	sort.Stable(byMatchSpecificity(items))
+	sort.Stable(ByMatchSpecificity(items))
 	if items[0].Match.Path.Type == nil || *items[0].Match.Path.Type != pathExact {
 		t.Fatalf("expected exact first; got %#v", items[0])
 	}
@@ -29,7 +29,7 @@ func TestSortMatches_TimestampTiebreak(t *testing.T) {
 		{RouteCreated: newer},
 		{RouteCreated: older},
 	}
-	sort.Stable(byMatchSpecificity(items))
+	sort.Stable(ByMatchSpecificity(items))
 	if !items[0].RouteCreated.Equal(&older) {
 		t.Fatalf("expected older first")
 	}

@@ -10,11 +10,17 @@ type RankedMatch struct {
 	RouteCreated metav1.Time
 }
 
-type byMatchSpecificity []RankedMatch
+// ByMatchSpecificity orders RankedMatches per the Gateway-API spec's match
+// precedence: Exact > Regex > Prefix paths, longer paths beat shorter,
+// more headers beat fewer, more query params beat fewer, then older route
+// creation timestamp wins ties. Mirrors how GCP's gke-gateway and AWS LBC's
+// Gateway controller order policies on a listener so that the most
+// specific match is evaluated first.
+type ByMatchSpecificity []RankedMatch
 
-func (s byMatchSpecificity) Len() int      { return len(s) }
-func (s byMatchSpecificity) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s byMatchSpecificity) Less(i, j int) bool {
+func (s ByMatchSpecificity) Len() int      { return len(s) }
+func (s ByMatchSpecificity) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s ByMatchSpecificity) Less(i, j int) bool {
 	a, b := s[i], s[j]
 	if r := pathRank(a.Match.Path) - pathRank(b.Match.Path); r != 0 {
 		return r < 0

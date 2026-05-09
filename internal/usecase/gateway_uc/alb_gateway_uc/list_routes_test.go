@@ -282,8 +282,8 @@ func TestBuildListenerPolicies_RedirectFilter(t *testing.T) {
 	policies := newTestTask(t, &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "gw"}}).buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
 	assert.Len(t, policies, 1)
 	// RedirectPoolName should be nil when redirect filter is applied
-	assert.Nil(t, policies[0].RedirectPoolName)
-	assert.NotNil(t, policies[0].RedirectUrl)
+	assert.Nil(t, policies[0].policy.RedirectPoolName)
+	assert.NotNil(t, policies[0].policy.RedirectUrl)
 }
 
 func TestBuildListenerPolicies_DefaultPoolRedirect(t *testing.T) {
@@ -298,8 +298,8 @@ func TestBuildListenerPolicies_DefaultPoolRedirect(t *testing.T) {
 
 	policies := newTestTask(t, &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "gw"}}).buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
 	assert.Len(t, policies, 1)
-	assert.NotNil(t, policies[0].RedirectPoolName)
-	assert.Equal(t, "pool-1", *policies[0].RedirectPoolName)
+	assert.NotNil(t, policies[0].policy.RedirectPoolName)
+	assert.Equal(t, "pool-1", *policies[0].policy.RedirectPoolName)
 }
 
 func TestBuildListenerPolicies_EmptyMatch(t *testing.T) {

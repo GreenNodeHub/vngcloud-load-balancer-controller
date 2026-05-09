@@ -42,6 +42,31 @@ func (t *defaultGatewayBuildTask) applyRoutePolicyToPolicies(ctx context.Context
 	return policies, nil
 }
 
+// applyRoutePolicyToRankedPolicies is the rankedPolicy-aware variant. Same
+// overlay rules; preserves the rank metadata so the caller can sort + assign
+// Position values afterwards. When a VKSRoutePolicy supplies Position, it's
+// recorded on rankedPolicy.userPosition so sortAndAssignPositions honors
+// the user's value verbatim instead of overwriting with the auto-assigned one.
+func (t *defaultGatewayBuildTask) applyRoutePolicyToRankedPolicies(ctx context.Context, items []rankedPolicy, route *gwv1.HTTPRoute, ruleName string) ([]rankedPolicy, error) {
+	overlays, err := t.resolveRoutePolicies(ctx, route, ruleName)
+	if err != nil {
+		return items, err
+	}
+	if len(overlays) == 0 {
+		return items, nil
+	}
+	for i := range items {
+		for _, p := range overlays {
+			applyOneRouteOverlay(&items[i].policy, p)
+			if p.Spec.Position != nil {
+				v := *p.Spec.Position
+				items[i].userPosition = &v
+			}
+		}
+	}
+	return items, nil
+}
+
 func applyOneRouteOverlay(p *v1alpha1.Policy, rp *gwv1alpha1.VKSRoutePolicy) {
 	if rp.Spec.Position != nil {
 		v := *rp.Spec.Position

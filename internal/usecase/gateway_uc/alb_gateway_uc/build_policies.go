@@ -11,6 +11,7 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
@@ -42,6 +43,7 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 	}
 
 	listenerPolicies := make(map[string][]v1alpha1.Policy)
+	listenerRanked := make(map[string][]rankedPolicy)
 
 	for ri := range routes {
 		route := &routes[ri]
@@ -94,21 +96,25 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 						continue
 					}
 					hostnames := matchingRouteHostnames(l, route)
-					policies := t.buildListenerPolicies(route, ruleIdx, rule, hostnames, poolName)
-					policies, err := t.applyRoutePolicyToPolicies(ctx, policies, route, ruleName)
+					ranked := t.buildListenerPolicies(route, ruleIdx, rule, hostnames, poolName)
+					ranked, err := t.applyRoutePolicyToRankedPolicies(ctx, ranked, route, ruleName)
 					if err != nil {
 						return nil, nil, err
 					}
-					listenerPolicies[string(l.Name)] = append(listenerPolicies[string(l.Name)], policies...)
+					listenerRanked[string(l.Name)] = append(listenerRanked[string(l.Name)], ranked...)
 				}
 			}
 		}
 	}
 
-	// Dedup policy names within a listener (deterministic) and order pools
-	// by name so DeepEqual on LBC.Spec is meaningful.
-	for k, v := range listenerPolicies {
-		listenerPolicies[k] = dedupPoliciesByName(v)
+	// Sort each listener's policies by Gateway-API match specificity
+	// (Exact > Regex > Prefix; longer paths first; more headers; older
+	// route timestamp tiebreak) and assign sequential Positions starting
+	// at 1 so the cloud LB evaluates the most specific match first.
+	// Mirrors how GCP gke-gateway / AWS LBC order rules on a URL map.
+	// VKSRoutePolicy.Position is honored verbatim if the user set it.
+	for k, items := range listenerRanked {
+		listenerPolicies[k] = sortAndAssignPositions(items)
 	}
 	sort.SliceStable(pools, func(i, j int) bool { return pools[i].Name < pools[j].Name })
 
@@ -140,7 +146,18 @@ func hasRedirectFilter(filters []gwv1.HTTPRouteFilter) bool {
 	return false
 }
 
-// buildListenerPolicies emits one v1alpha1.Policy per (hostname × match)
+// rankedPolicy pairs a generated v1alpha1.Policy with the metadata
+// sortAndAssignPositions needs to order it on the listener (more-specific
+// match first). userPosition is non-nil when a VKSRoutePolicy.Position
+// applied via overlay; sortAndAssignPositions honors it verbatim instead
+// of overwriting with the auto-assigned value.
+type rankedPolicy struct {
+	policy       v1alpha1.Policy
+	rank         shared.RankedMatch
+	userPosition *int32
+}
+
+// buildListenerPolicies emits one rankedPolicy per (hostname × match)
 // combo. With no hostnames, one policy per match (no HOST_NAME rule).
 // Action is REDIRECT_TO_POOL when poolName is non-empty; if poolName is
 // empty (filter-only rule) the action stays REDIRECT_TO_POOL until the
@@ -149,7 +166,7 @@ func hasRedirectFilter(filters []gwv1.HTTPRouteFilter) bool {
 //
 // policyName is keyed on (route.UID, ruleIdx, host, match) so multiple
 // HTTPRoutes attached to the same Gateway don't collide on a single name.
-func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
+func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []rankedPolicy {
 	matches := rule.Matches
 	if len(matches) == 0 {
 		// Default-empty match → match all on this listener.
@@ -160,7 +177,7 @@ func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, r
 		hostList = []string{""}
 	}
 
-	out := make([]v1alpha1.Policy, 0, len(matches)*len(hostList))
+	out := make([]rankedPolicy, 0, len(matches)*len(hostList))
 	for _, host := range hostList {
 		for _, m := range matches {
 			rules := buildL7Rules(host, m)
@@ -172,12 +189,66 @@ func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, r
 			if poolName != "" {
 				policy.RedirectPoolName = ptr.To(poolName)
 			}
-
 			if applyRequestRedirectFilter(&policy, rule.Filters) {
 				policy.RedirectPoolName = nil
 			}
-			out = append(out, policy)
+			out = append(out, rankedPolicy{
+				policy: policy,
+				rank: shared.RankedMatch{
+					Match:        m,
+					RouteCreated: route.CreationTimestamp,
+				},
+			})
 		}
+	}
+	return out
+}
+
+// sortAndAssignPositions orders the listener's policies by Gateway-API
+// match specificity and assigns sequential Position values 1..N so the
+// cloud LB evaluates the most-specific match first. User-set positions
+// from VKSRoutePolicy.Position are honored verbatim (not renumbered).
+// Sorting is stable so policies that compare equal stay in their original
+// relative order — important for deterministic Spec equality across
+// reconciles.
+func sortAndAssignPositions(items []rankedPolicy) []v1alpha1.Policy {
+	// Dedup by name first so two routes that hash to the same policy name
+	// don't emit a duplicate (defence in depth — names should already be
+	// unique because they include route.UID).
+	seen := make(map[string]struct{}, len(items))
+	deduped := make([]rankedPolicy, 0, len(items))
+	for i := range items {
+		if _, ok := seen[items[i].policy.Name]; ok {
+			continue
+		}
+		seen[items[i].policy.Name] = struct{}{}
+		deduped = append(deduped, items[i])
+	}
+
+	// Stable sort by match specificity. Lower index → higher priority on
+	// the cloud LB.
+	ranks := make(shared.ByMatchSpecificity, 0, len(deduped))
+	for _, rp := range deduped {
+		ranks = append(ranks, rp.rank)
+	}
+	indices := make([]int, len(deduped))
+	for i := range indices {
+		indices[i] = i
+	}
+	sort.SliceStable(indices, func(i, j int) bool {
+		return ranks.Less(indices[i], indices[j])
+	})
+
+	out := make([]v1alpha1.Policy, 0, len(deduped))
+	for newPos, oldIdx := range indices {
+		rp := deduped[oldIdx]
+		if rp.userPosition != nil {
+			rp.policy.Position = rp.userPosition
+		} else {
+			pos := int32(newPos + 1) // 1-based
+			rp.policy.Position = &pos
+		}
+		out = append(out, rp.policy)
 	}
 	return out
 }
