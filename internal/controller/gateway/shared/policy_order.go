@@ -6,16 +6,21 @@ import (
 )
 
 type RankedMatch struct {
-	Match        gwv1.HTTPRouteMatch
-	RouteCreated metav1.Time
+	Match          gwv1.HTTPRouteMatch
+	RouteCreated   metav1.Time
+	RouteNamespace string
+	RouteName      string
 }
 
 // ByMatchSpecificity orders RankedMatches per the Gateway-API spec's match
 // precedence: Exact > Regex > Prefix paths, longer paths beat shorter,
-// more headers beat fewer, more query params beat fewer, then older route
-// creation timestamp wins ties. Mirrors how GCP's gke-gateway and AWS LBC's
-// Gateway controller order policies on a listener so that the most
-// specific match is evaluated first.
+// more headers beat fewer, more query params beat fewer, older route
+// creation timestamp wins, then alphabetical "{namespace}/{name}" — the
+// final tiebreaker the Gateway-API conformance spec requires when two
+// routes were applied in the same metav1.Time-second window. Without it,
+// stable-sort falls through to input order, which depends on the cache's
+// non-deterministic map iteration and produces a Position-flip reconcile
+// loop.
 type ByMatchSpecificity []RankedMatch
 
 func (s ByMatchSpecificity) Len() int      { return len(s) }
@@ -34,7 +39,13 @@ func (s ByMatchSpecificity) Less(i, j int) bool {
 	if qi, qj := len(a.Match.QueryParams), len(b.Match.QueryParams); qi != qj {
 		return qi > qj
 	}
-	return a.RouteCreated.Before(&b.RouteCreated)
+	if !a.RouteCreated.Equal(&b.RouteCreated) {
+		return a.RouteCreated.Before(&b.RouteCreated)
+	}
+	if a.RouteNamespace != b.RouteNamespace {
+		return a.RouteNamespace < b.RouteNamespace
+	}
+	return a.RouteName < b.RouteName
 }
 
 func pathRank(p *gwv1.HTTPPathMatch) int {

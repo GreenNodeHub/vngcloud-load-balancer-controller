@@ -3,6 +3,7 @@ package alb_gateway_uc
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +31,16 @@ func (t *defaultGatewayBuildTask) listAttachedHTTPRoutes(ctx context.Context) ([
 		}
 		out = append(out, list.Items[i])
 	}
+	// Stable iteration order. controller-runtime cache returns List items in
+	// non-deterministic map order; without this, downstream stable-sort by
+	// match specificity inherits that order on ties, and Position assignments
+	// flip between reconciles → LBC.Spec churn → reorder loop.
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Namespace != out[j].Namespace {
+			return out[i].Namespace < out[j].Namespace
+		}
+		return out[i].Name < out[j].Name
+	})
 	return out, nil
 }
 

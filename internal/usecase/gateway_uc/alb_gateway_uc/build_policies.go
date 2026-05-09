@@ -195,8 +195,10 @@ func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, r
 			out = append(out, rankedPolicy{
 				policy: policy,
 				rank: shared.RankedMatch{
-					Match:        m,
-					RouteCreated: route.CreationTimestamp,
+					Match:          m,
+					RouteCreated:   route.CreationTimestamp,
+					RouteNamespace: route.Namespace,
+					RouteName:      route.Name,
 				},
 			})
 		}
