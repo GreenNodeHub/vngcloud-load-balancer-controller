@@ -61,7 +61,9 @@ func NewALBGatewayUseCase(
 
 // InitALBGatewayUseCase prepares cluster-scoped state — same shape as the
 // other use cases. We discover default network info from a node so that
-// VKSGatewayPolicy.LoadBalancerSpec doesn't need to spell it out.
+// VKSGatewayPolicy.LoadBalancerSpec doesn't need to spell it out, and fall
+// back to the node-label clusterID when one wasn't supplied at construction
+// (matches ingress_uc.InitIngressUseCase / service_uc.InitServiceUseCase).
 //
 // Returns an error when the data isn't fully populated yet so the gateway
 // controller's init retry loop will keep firing until the controller-runtime
@@ -70,7 +72,7 @@ func NewALBGatewayUseCase(
 func (uc *albGatewayUseCase) InitALBGatewayUseCase(ctx context.Context) error {
 	logger := contexts.NewContext(ctx).Log()
 
-	if uc.defaultNetworkId != "" && uc.defaultSubnetId != "" && uc.defaultSubnetCIDR != "" && uc.defaultZone != "" {
+	if uc.defaultNetworkId != "" && uc.defaultSubnetId != "" && uc.defaultSubnetCIDR != "" && uc.defaultZone != "" && uc.clusterId != "" {
 		return nil
 	}
 
@@ -83,16 +85,37 @@ func (uc *albGatewayUseCase) InitALBGatewayUseCase(ctx context.Context) error {
 	if len(nodes) == 0 {
 		return errors.New("ALB Gateway init: cluster has no nodes yet")
 	}
-	providerID := utils.GetProviderIdFromNode(nodes[0])
-	if providerID == "" {
-		return errors.New("ALB Gateway init: first node has no providerID")
+
+	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
+		providerID := utils.GetProviderIdFromNode(nodes[0])
+		if providerID == "" {
+			return errors.New("ALB Gateway init: first node has no providerID")
+		}
+		zone, networkID, subnetID, cidr, err := uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerID)
+		if err != nil {
+			return fmt.Errorf("ALB Gateway init: probe vngcloud network info: %w", err)
+		}
+		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR = zone, networkID, subnetID, cidr
+		logger.Infof("ALB Gateway init: defaults zone=%s network=%s subnet=%s cidr=%s", zone, networkID, subnetID, cidr)
 	}
-	zone, networkID, subnetID, cidr, err := uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerID)
-	if err != nil {
-		return fmt.Errorf("ALB Gateway init: probe vngcloud network info: %w", err)
+
+	// Same fallback ingress_uc / service_uc use: if --cluster-id wasn't
+	// supplied via config, read it off the first node carrying the
+	// vks.vngcloud.vn/cluster-id label.
+	if uc.clusterId == "" {
+		clusterID := ""
+		for _, n := range nodes {
+			if n != nil && n.Labels != nil && n.Labels["vks.vngcloud.vn/cluster-id"] != "" {
+				clusterID = n.Labels["vks.vngcloud.vn/cluster-id"]
+				break
+			}
+		}
+		if clusterID == "" {
+			return errors.New("ALB Gateway init: no clusterID found; specify --cluster-id or label a node with vks.vngcloud.vn/cluster-id")
+		}
+		uc.clusterId = clusterID
+		logger.Infof("ALB Gateway init: clusterID empty in config, picked up from node label: %s", uc.clusterId)
 	}
-	uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR = zone, networkID, subnetID, cidr
-	logger.Infof("ALB Gateway init: defaults zone=%s network=%s subnet=%s cidr=%s", zone, networkID, subnetID, cidr)
 	return nil
 }
 

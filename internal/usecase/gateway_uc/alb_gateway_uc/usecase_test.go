@@ -52,6 +52,7 @@ func TestInitALBGatewayUseCase_Idempotent(t *testing.T) {
 		k8sRepo:           mockK8s,
 		vngcloudRepo:      mockVng,
 		k8sClient:         fake.NewClientBuilder().WithScheme(newTestScheme()).Build(),
+		clusterId:         "cluster-1",
 		defaultZone:       "HCM03-1C",
 		defaultNetworkId:  "net-1",
 		defaultSubnetId:   "subnet-1",
@@ -142,6 +143,7 @@ func TestInitALBGatewayUseCase_Success(t *testing.T) {
 		k8sRepo:      mockK8s,
 		vngcloudRepo: mockVng,
 		k8sClient:    fake.NewClientBuilder().WithScheme(newTestScheme()).Build(),
+		clusterId:    "cluster-1",
 	}
 	err := uc.InitALBGatewayUseCase(context.Background())
 	assert.NoError(t, err)
@@ -149,6 +151,67 @@ func TestInitALBGatewayUseCase_Success(t *testing.T) {
 	assert.Equal(t, "net-abc", uc.defaultNetworkId)
 	assert.Equal(t, "subnet-abc", uc.defaultSubnetId)
 	assert.Equal(t, "10.0.0.0/24", uc.defaultSubnetCIDR)
+}
+
+// TestInitALBGatewayUseCase_ClusterIdFromNodeLabel verifies the same
+// fallback ingress_uc/service_uc do: when the controller wasn't given a
+// --cluster-id, it picks the value off the first node carrying the
+// vks.vngcloud.vn/cluster-id label.
+func TestInitALBGatewayUseCase_ClusterIdFromNodeLabel(t *testing.T) {
+	mockK8s := repository.NewMockK8sRepository(t)
+	mockVng := repository.NewMockVngCloudRepository(t)
+
+	node := makeNode("node-1", "vngcloud://ins-00000000-0000-0000-0000-000000000001")
+	node.Labels = map[string]string{"vks.vngcloud.vn/cluster-id": "cluster-from-label"}
+
+	mockK8s.EXPECT().
+		ListNode(mock.Anything, mock.AnythingOfType("*v1.NodeList")).
+		RunAndReturn(func(_ context.Context, list *corev1.NodeList, _ ...client.ListOption) error {
+			list.Items = []corev1.Node{*node}
+			return nil
+		})
+
+	mockVng.EXPECT().
+		GetServerNetworkInfo(mock.Anything, "ins-00000000-0000-0000-0000-000000000001").
+		Return(common.Zone("HCM03-1C"), "net-abc", "subnet-abc", "10.0.0.0/24", nil)
+
+	uc := &albGatewayUseCase{
+		k8sRepo:      mockK8s,
+		vngcloudRepo: mockVng,
+		k8sClient:    fake.NewClientBuilder().WithScheme(newTestScheme()).Build(),
+		// clusterId left empty intentionally
+	}
+	err := uc.InitALBGatewayUseCase(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "cluster-from-label", uc.clusterId)
+}
+
+// TestInitALBGatewayUseCase_NoClusterIdAvailable: if --cluster-id wasn't
+// passed AND no node carries the label, init must fail loudly so the user
+// sees the misconfiguration instead of getting silent name collisions.
+func TestInitALBGatewayUseCase_NoClusterIdAvailable(t *testing.T) {
+	mockK8s := repository.NewMockK8sRepository(t)
+	mockVng := repository.NewMockVngCloudRepository(t)
+
+	mockK8s.EXPECT().
+		ListNode(mock.Anything, mock.AnythingOfType("*v1.NodeList")).
+		RunAndReturn(func(_ context.Context, list *corev1.NodeList, _ ...client.ListOption) error {
+			list.Items = []corev1.Node{*makeNode("node-1", "vngcloud://ins-00000000-0000-0000-0000-000000000001")}
+			return nil
+		})
+
+	mockVng.EXPECT().
+		GetServerNetworkInfo(mock.Anything, "ins-00000000-0000-0000-0000-000000000001").
+		Return(common.Zone("HCM03-1C"), "net-abc", "subnet-abc", "10.0.0.0/24", nil)
+
+	uc := &albGatewayUseCase{
+		k8sRepo:      mockK8s,
+		vngcloudRepo: mockVng,
+		k8sClient:    fake.NewClientBuilder().WithScheme(newTestScheme()).Build(),
+	}
+	err := uc.InitALBGatewayUseCase(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no clusterID found")
 }
 
 // --- fetchGatewayClass tests ---
