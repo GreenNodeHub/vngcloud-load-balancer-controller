@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to deploy (e.g. v0.1.0, latest)'
+        description: 'Version to deploy (e.g. v0.1.0, dev)'
         required: false
-        default: 'latest'
+        default: 'dev'
 
 permissions:
   contents: write
@@ -43,18 +43,16 @@ jobs:
       - name: Determine version
         id: version
         run: |
+          # Push to main → "dev" (always overwritten, never aliased to "latest").
+          # workflow_dispatch with explicit version → that version (rare; tagged releases
+          # are auto-published via .github/workflows/publish.yaml).
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
             echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
           else
-            echo "version=latest" >> $GITHUB_OUTPUT
+            echo "version=dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Deploy docs with mike
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          if [ "$VERSION" = "latest" ]; then
-            pipenv run mike deploy latest --push
-          else
-            pipenv run mike deploy "$VERSION" latest --update-aliases --push
-          fi
-          pipenv run mike set-default latest --push
+          pipenv run mike deploy "$VERSION" --push
