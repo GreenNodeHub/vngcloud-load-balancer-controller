@@ -22,13 +22,26 @@ type objKey struct {
 }
 
 // entry holds the queued mutators for one logical object plus a template
-// pointer used to issue fresh GETs.
+// pointer used to issue fresh GETs at flush time.
 type entry struct {
-	template       client.Object
+	// template is the *T pointer captured from the first MutateSpec/
+	// MutateStatus call for this objKey. DeepCopyObject on it must return
+	// the same concrete type because the wrapped mutators below perform
+	// an unchecked o.(T) type assertion on the passed client.Object.
+	template client.Object
+
+	// specMutators and statusMutators are closures that wrap a typed
+	// func(*T) bool and perform an unchecked .(T) assertion on the
+	// passed client.Object. Two MutateSpec/MutateStatus calls with the
+	// same objKey but different concrete types would panic — but objKey
+	// includes GVK, so this can only happen via API misuse.
 	specMutators   []func(client.Object) bool
 	statusMutators []func(client.Object) bool
 }
 
+// New returns a Batcher backed by c. The returned Batcher is not safe for
+// concurrent use; reconciles are single-goroutine per object key in
+// controller-runtime.
 func New(c client.Client) *Batcher {
 	return &Batcher{
 		client:  c,
