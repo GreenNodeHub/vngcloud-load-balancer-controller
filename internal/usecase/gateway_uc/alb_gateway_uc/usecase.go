@@ -130,9 +130,10 @@ func (uc *albGatewayUseCase) EnsureALBGatewayUseCase(ctx context.Context, req ct
 	}
 
 	task := &defaultGatewayBuildTask{
-		uc:     uc,
-		logger: logger.WithField("gateway", req.Namespace+"/"+req.Name),
-		gw:     gw,
+		uc:         uc,
+		logger:     logger.WithField("gateway", req.Namespace+"/"+req.Name),
+		gw:         gw,
+		nameHelper: utils.NewNameHelper(uc.clusterId, "gateway", gw.Namespace, gw.Name),
 	}
 	return task.run(ctx)
 }

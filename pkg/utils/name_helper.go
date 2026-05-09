@@ -29,6 +29,7 @@ type NameHelper interface {
 
 	GenL7PoolName(serviceName string, port int) string
 	GenL7PolicyName(mode bool, ruleIndex, pathIndex int) string
+	GenL7ListenerName(listenerName string) string
 }
 
 var _ NameHelper = &nameHelper{}
@@ -103,6 +104,20 @@ func (t *nameHelper) GenL7PolicyName(mode bool, ruleIndex, pathIndex int) string
 	name := fmt.Sprintf("%s_%s_%t_r%d_p%d",
 		domain.DEFAULT_LB_PREFIX_NAME,
 		hash, mode, ruleIndex, pathIndex)
+	return ValidateName(name)
+}
+
+// GenL7ListenerName generates the name of an L7 listener whose K8s name comes
+// from a Gateway-API listener (e.g. "http", "api"). Mirrors the GenL4ListenerName
+// shape but keyed on the listener's Gateway-side identity instead of a
+// ServicePort. Used by the Gateway-API ALB controller; Ingress doesn't need
+// this because it uses fixed listener names (DEFAULT_HTTP_LISTENER_NAME etc.).
+func (t *nameHelper) GenL7ListenerName(listenerName string) string {
+	hash := t.GenerateHash()
+	name := fmt.Sprintf("%s_%s_%s",
+		domain.DEFAULT_LB_PREFIX_NAME,
+		hash,
+		TrimString(listenerName, 35))
 	return ValidateName(name)
 }
 

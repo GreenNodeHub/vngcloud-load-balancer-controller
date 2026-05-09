@@ -47,6 +47,7 @@ func newTaskWithEndpointResolver(
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 }
 
@@ -166,6 +167,7 @@ func TestBuildPoolsAndPolicies_NoRoutes(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	pools, policies, err := task.buildPoolsAndPolicies(context.Background())
@@ -223,6 +225,7 @@ func TestBuildPoolsAndPolicies_WithRoute(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	pools, policies, err := task.buildPoolsAndPolicies(context.Background())
@@ -263,6 +266,7 @@ func TestBuildPoolsAndPolicies_UnsupportedMatch(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	pools, policies, err := task.buildPoolsAndPolicies(context.Background())
@@ -307,6 +311,7 @@ func TestListAttachedHTTPRoutes_WithRoutes(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	routes, err := task.listAttachedHTTPRoutes(context.Background())

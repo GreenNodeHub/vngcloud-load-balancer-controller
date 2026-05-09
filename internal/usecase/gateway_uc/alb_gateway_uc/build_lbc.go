@@ -17,14 +17,16 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	sharedUC "github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/shared"
 	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // defaultGatewayBuildTask carries per-reconcile state and is the rough analogue
 // of ingress_uc's defaultModelBuildTask. One task per Gateway reconcile.
 type defaultGatewayBuildTask struct {
-	uc     *albGatewayUseCase
-	logger *logrus.Entry
-	gw     *gwv1.Gateway
+	uc         *albGatewayUseCase
+	logger     *logrus.Entry
+	gw         *gwv1.Gateway
+	nameHelper utils.NameHelper
 
 	// Resolved at translation time.
 	unscopedPolicy   *gwv1alpha1.VKSGatewayPolicy            // for LB-level fields and listener defaults
@@ -137,7 +139,7 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 		lbc.Spec.Type = v2.LoadBalancerTypeLayer7
 		lbc.Spec.SubnetId = subnetID
 		lbc.Spec.ZoneId = common.Zone(zone)
-		lbc.Spec.LoadBalancerName = t.buildLoadBalancerName()
+		lbc.Spec.LoadBalancerName = t.nameHelper.GetLoadBalancerDefaultName()
 	}
 
 	if t.uc.clusterId != "" {
@@ -233,22 +235,6 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 			lbc.Spec.Tags[k] = v
 		}
 	}
-}
-
-// buildLoadBalancerName generates a deterministic, length-bounded LB name from
-// the Gateway identity. The cloud-side limit is 50 chars
-// (consts.DEFAULT_PORTAL_NAME_LENGTH); names must start with the shared
-// "vks_" prefix per the project's resource-naming convention.
-func (t *defaultGatewayBuildTask) buildLoadBalancerName() string {
-	uidPrefix := string(t.gw.UID)
-	if len(uidPrefix) > 8 {
-		uidPrefix = uidPrefix[:8]
-	}
-	name := domain.VKSResourceNamePrefix + "gw_" + t.gw.Name + "_" + uidPrefix
-	if len(name) > 50 {
-		name = name[:50]
-	}
-	return name
 }
 
 // resolveSubnetAndZone returns (subnetID, networkID, zone, cidr). Phase A only

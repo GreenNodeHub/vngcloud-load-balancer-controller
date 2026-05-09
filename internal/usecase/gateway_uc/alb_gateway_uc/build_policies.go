@@ -94,7 +94,7 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 						continue
 					}
 					hostnames := matchingRouteHostnames(l, route)
-					policies := buildListenerPolicies(route, ruleIdx, rule, hostnames, poolName)
+					policies := t.buildListenerPolicies(route, ruleIdx, rule, hostnames, poolName)
 					policies, err := t.applyRoutePolicyToPolicies(ctx, policies, route, ruleName)
 					if err != nil {
 						return nil, nil, err
@@ -146,7 +146,10 @@ func hasRedirectFilter(filters []gwv1.HTTPRouteFilter) bool {
 // empty (filter-only rule) the action stays REDIRECT_TO_POOL until the
 // RequestRedirect filter — guaranteed present by the caller in that case —
 // flips it to REDIRECT_TO_URL.
-func buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
+//
+// Method on the build task so we can use the per-Gateway NameHelper for
+// policy names; matches the L4 service / L7 ingress controllers' shape.
+func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
 	matches := rule.Matches
 	if len(matches) == 0 {
 		// Default-empty match → match all on this listener.
@@ -158,11 +161,15 @@ func buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRou
 	}
 
 	out := make([]v1alpha1.Policy, 0, len(matches)*len(hostList))
-	for _, m := range matches {
-		for _, host := range hostList {
+	for hi, host := range hostList {
+		for mi, m := range matches {
 			rules := buildL7Rules(host, m)
+			// pathIndex encodes (hostIdx, matchIdx) into the helper's
+			// per-rule slot. 100 matches per host is plenty for any
+			// realistic route.
+			pathIdx := hi*100 + mi
 			policy := v1alpha1.Policy{
-				Name:    policyName(route, ruleIdx, host, m),
+				Name:    t.nameHelper.GenL7PolicyName(false, ruleIdx, pathIdx),
 				Action:  v2.PolicyActionREDIRECTTOPOOL,
 				L7Rules: rules,
 			}

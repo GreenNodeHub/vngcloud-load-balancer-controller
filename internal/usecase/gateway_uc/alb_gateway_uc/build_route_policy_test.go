@@ -16,6 +16,7 @@ import (
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 func makeRoutePolicy(ns, name, routeName string, ruleName string, actionType string, redirectURL string) *gwv1alpha1.VKSRoutePolicy {
@@ -143,7 +144,7 @@ func TestApplyRoutePolicyToPolicies_WithRouteScopedPolicy(t *testing.T) {
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
 	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 
 	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "my-route"},
@@ -168,7 +169,7 @@ func TestApplyRoutePolicyToPolicies_RuleScopedWins(t *testing.T) {
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
 	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 
 	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "my-route"},

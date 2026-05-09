@@ -313,30 +313,38 @@ func TestDeleteALBGatewayUseCase_ExistingGateway(t *testing.T) {
 
 // --- buildLoadBalancerName tests ---
 
-func TestBuildLoadBalancerName(t *testing.T) {
+// TestLoadBalancerName checks the LB name produced via NameHelper. The actual
+// name shape (vks_<cluster>_<ns>_<name>_<hash>) is owned by NameHelper —
+// this test verifies the Gateway use case feeds it the right inputs and the
+// result is deterministic + length-bounded.
+func TestLoadBalancerName(t *testing.T) {
 	gw := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-gateway",
-			UID:  "abcd1234-dead-beef-0000-111122223333",
+			Namespace: "prod",
+			Name:      "my-gateway",
+			UID:       "abcd1234-dead-beef-0000-111122223333",
 		},
 	}
 	task := newTestTask(t, gw)
-	name := task.buildLoadBalancerName()
+	name := task.nameHelper.GetLoadBalancerDefaultName()
 	assert.LessOrEqual(t, len(name), 50)
-	assert.True(t, strings.HasPrefix(name, "vks_gw_"), "expected vks_gw_ prefix in %q", name)
+	// NameHelper.ValidateName replaces underscores with dashes (cloud's
+	// loadBalancerName regex doesn't allow `_`), so we expect "vks-".
+	assert.True(t, strings.HasPrefix(name, "vks-"), "expected vks- prefix in %q", name)
 	// Deterministic
-	assert.Equal(t, name, task.buildLoadBalancerName())
+	assert.Equal(t, name, task.nameHelper.GetLoadBalancerDefaultName())
 }
 
-func TestBuildLoadBalancerName_LongGatewayName(t *testing.T) {
+func TestLoadBalancerName_LongGatewayName(t *testing.T) {
 	gw := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "this-is-a-very-long-gateway-name-that-exceeds-limits",
-			UID:  "abcd1234",
+			Namespace: "prod",
+			Name:      "this-is-a-very-long-gateway-name-that-exceeds-limits",
+			UID:       "abcd1234",
 		},
 	}
 	task := newTestTask(t, gw)
-	name := task.buildLoadBalancerName()
+	name := task.nameHelper.GetLoadBalancerDefaultName()
 	assert.LessOrEqual(t, len(name), 50)
 }
 

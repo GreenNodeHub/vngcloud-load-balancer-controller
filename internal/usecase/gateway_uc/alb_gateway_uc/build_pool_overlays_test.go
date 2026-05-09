@@ -18,6 +18,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 func newTestTaskWithObjs(t *testing.T, gw *gwv1.Gateway, objs ...runtime.Object) *defaultGatewayBuildTask {
@@ -44,6 +45,7 @@ func newTestTaskWithObjs(t *testing.T, gw *gwv1.Gateway, objs ...runtime.Object)
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
 	}
 }
 
@@ -95,7 +97,7 @@ func TestApplyBackendPolicyToPool_WithPolicy(t *testing.T) {
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
 	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 
 	pool := &v1alpha1.Pool{Protocol: v2.PoolProtocolHTTP}
 	err := task.applyBackendPolicyToPool(context.Background(), pool, "prod", "my-svc")
@@ -126,7 +128,7 @@ func TestResolveTargetType(t *testing.T) {
 		mockK8s := repository.NewMockK8sRepository(t)
 		mockVng := repository.NewMockVngCloudRepository(t)
 		uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 		tt, err := task.resolveTargetType(context.Background(), "prod", "svc-ip")
 		assert.NoError(t, err)
 		assert.Equal(t, domain.TargetTypeIP, tt)
@@ -140,7 +142,7 @@ func TestResolveTargetType(t *testing.T) {
 		mockK8s := repository.NewMockK8sRepository(t)
 		mockVng := repository.NewMockVngCloudRepository(t)
 		uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 		tt, err := task.resolveTargetType(context.Background(), "prod", "svc-inst")
 		assert.NoError(t, err)
 		assert.Equal(t, domain.TargetTypeInstance, tt)
@@ -154,7 +156,7 @@ func TestResolveTargetType(t *testing.T) {
 		mockK8s := repository.NewMockK8sRepository(t)
 		mockVng := repository.NewMockVngCloudRepository(t)
 		uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 		tt, err := task.resolveTargetType(context.Background(), "prod", "svc-bad")
 		assert.NoError(t, err)
 		assert.Equal(t, domain.TargetTypeInstance, tt)
@@ -203,7 +205,7 @@ func TestApplyHealthCheckPolicyToPool_WithPolicy(t *testing.T) {
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
 	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+	task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 
 	pool := &v1alpha1.Pool{HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP}}
 	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
@@ -239,7 +241,7 @@ func TestResolveTargetNodeLabels(t *testing.T) {
 		mockK8s := repository.NewMockK8sRepository(t)
 		mockVng := repository.NewMockVngCloudRepository(t)
 		uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
-		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy)}
+		task := &defaultGatewayBuildTask{uc: uc, gw: gw, logger: logrus.NewEntry(logrus.New()), listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy), nameHelper: utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name)}
 		labels, err := task.resolveTargetNodeLabels(context.Background(), "prod", "svc-with-labels")
 		assert.NoError(t, err)
 		assert.Equal(t, map[string]string{"node-role": "worker"}, labels)

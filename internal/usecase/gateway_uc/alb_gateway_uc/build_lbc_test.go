@@ -18,6 +18,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 // newFakeClientWithHTTPRouteIndex builds a fake client that has the HTTPRoute parent-gateway
@@ -70,6 +71,7 @@ func newFullTask(t *testing.T, gw *gwv1.Gateway, objs ...client.Object) (*defaul
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 	return task, mockK8s
 }
@@ -215,6 +217,7 @@ func TestBuildLoadBalancerConfig_CreatePath(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	err := task.buildLoadBalancerConfig(context.Background())
@@ -278,6 +281,7 @@ func TestBuildLoadBalancerConfig_PatchPath(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 
 	err := task.buildLoadBalancerConfig(context.Background())
@@ -316,6 +320,7 @@ func TestBuildLoadBalancerConfig_MultipleOwnedLBCsError(t *testing.T) {
 		uc: uc, gw: gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 	err := task.buildLoadBalancerConfig(context.Background())
 	assert.Error(t, err)
@@ -351,6 +356,7 @@ func TestRun_NoSubnet(t *testing.T) {
 		gw:               gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 	err := task.run(context.Background())
 	assert.Error(t, err)
@@ -387,6 +393,7 @@ func TestBuildLoadBalancerConfig_MissingSubnet(t *testing.T) {
 		uc: uc, gw: gw,
 		logger:           logrus.NewEntry(logrus.New()),
 		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
 	}
 	err := task.buildLoadBalancerConfig(context.Background())
 	assert.Error(t, err)

@@ -279,7 +279,7 @@ func TestBuildListenerPolicies_RedirectFilter(t *testing.T) {
 		}},
 	}
 
-	policies := buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
+	policies := newTestTask(t, &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "gw"}}).buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
 	assert.Len(t, policies, 1)
 	// RedirectPoolName should be nil when redirect filter is applied
 	assert.Nil(t, policies[0].RedirectPoolName)
@@ -296,7 +296,7 @@ func TestBuildListenerPolicies_DefaultPoolRedirect(t *testing.T) {
 		Matches: []gwv1.HTTPRouteMatch{{Path: &gwv1.HTTPPathMatch{Value: ptr.To("/api")}}},
 	}
 
-	policies := buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
+	policies := newTestTask(t, &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "gw"}}).buildListenerPolicies(route, 0, rule, []string{"example.com"}, "pool-1")
 	assert.Len(t, policies, 1)
 	assert.NotNil(t, policies[0].RedirectPoolName)
 	assert.Equal(t, "pool-1", *policies[0].RedirectPoolName)
@@ -307,7 +307,7 @@ func TestBuildListenerPolicies_EmptyMatch(t *testing.T) {
 	route.UID = "uid"
 	// empty Matches → treated as single default match
 	rule := gwv1.HTTPRouteRule{}
-	policies := buildListenerPolicies(route, 0, rule, []string{}, "my-pool")
+	policies := newTestTask(t, &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "gw"}}).buildListenerPolicies(route, 0, rule, []string{}, "my-pool")
 	// no hosts + no matches → 1 policy (empty host, empty match)
 	assert.Len(t, policies, 1)
 }
