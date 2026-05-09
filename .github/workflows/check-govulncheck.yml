@@ -18,5 +18,5 @@ jobs:
         # Switch back to a tagged release once upstream cuts v1.0.5+.
         uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd # master @ 2026-02-26
         with:
-          go-version-input: 1.25.9
+          go-version-input: 1.25.10
           go-package: ./...
