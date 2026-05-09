@@ -98,20 +98,46 @@ func (r *GatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 //     Status changes (Phase F status-mirroring hook).
 //   - Service: secondary, enqueue affected parent Gateways via reverse index.
 //
-// Init is asynchronous so the manager can come up even when vngcloud is
-// unreachable; reconciles requeue until init succeeds.
+// Init runs as a manager Runnable so it fires only after the controller-runtime
+// cache has synced — same pattern as ingress_controller.go and
+// service_controller.go. The previous bare-goroutine approach raced manager
+// startup (its first List failed because the cache wasn't started yet) and
+// paid a 10s sleep penalty before the retry succeeded.
+//
+// Note: this controller doesn't watch corev1.Node directly, so its Node
+// informer is created lazily on first List. That sync can take a couple
+// seconds, and a transient cloud-side error during cluster bootstrap is
+// also possible, so we tolerate a small number of retries before giving up
+// and crashing the pod (which is the same final outcome ingress and service
+// reach by returning the error directly).
 func (r *GatewayReconciler) SetupWithManager(ctx context.Context, mgr manager.Manager) error {
-	go func() {
-		for {
-			if err := r.useCase.InitALBGatewayUseCase(ctx); err != nil {
-				ctrl.Log.Error(err, "ALB Gateway init failed; retrying")
-				time.Sleep(10 * time.Second)
-				continue
+	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		log := ctrl.Log.WithName("init").WithName(albControllerName)
+		log.Info("Running initialization...")
+
+		const maxAttempts = 5
+		const backoff = 2 * time.Second
+		var lastErr error
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			lastErr = r.useCase.InitALBGatewayUseCase(ctx)
+			if lastErr == nil {
+				log.Info("Initialization complete", "attempt", attempt)
+				r.initDone.Store(true)
+				return nil
 			}
-			r.initDone.Store(true)
-			return
+			log.Error(lastErr, "Initialization failed; retrying",
+				"attempt", attempt, "max", maxAttempts)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
 		}
-	}()
+		log.Error(lastErr, "Fatal: initialization failed after retries")
+		return lastErr // returning error causes manager to stop => pod crash
+	})); err != nil {
+		return err
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(albControllerName).
