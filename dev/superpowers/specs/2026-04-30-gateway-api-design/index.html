@@ -1,0 +1,2957 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="VNGCloud Load Balancer Controller for Kubernetes">
+      
+      
+      
+        <link rel="canonical" href="https://vngcloud.github.io/vngcloud-load-balancer-controller/dev/superpowers/specs/2026-04-30-gateway-api-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Gateway API Support — Design - VNGCloud Load Balancer Controller</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#gateway-api-support-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="VNGCloud Load Balancer Controller" class="md-header__button md-logo" aria-label="VNGCloud Load Balancer Controller" data-md-component="logo">
+      
+  <img src="../../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            VNGCloud Load Balancer Controller
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Gateway API Support — Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/vngcloud/vngcloud-load-balancer-controller" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vngcloud/vngcloud-load-balancer-controller
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../deploy/installation/" class="md-tabs__link">
+          
+  
+  
+  Deploy
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guide/ingress/" class="md-tabs__link">
+          
+  
+  
+  Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../annotations/service/" class="md-tabs__link">
+          
+  
+  
+  Annotations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../examples/tls-termination/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="VNGCloud Load Balancer Controller" class="md-nav__button md-logo" aria-label="VNGCloud Load Balancer Controller" data-md-component="logo">
+      
+  <img src="../../../assets/logo.png" alt="logo">
+
+    </a>
+    VNGCloud Load Balancer Controller
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/vngcloud/vngcloud-load-balancer-controller" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    vngcloud/vngcloud-load-balancer-controller
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deploy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deploy/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deploy/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deploy/upgrade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/ingress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service (L4)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/load-balancer-config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LoadBalancerConfig CRD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/node-security-group/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NodeSecurityGroup CRD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guide/global-load-balancer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Global Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Annotations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../annotations/service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Service Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../annotations/ingress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ingress Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/tls-termination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TLS Termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/internal-lb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Internal Load Balancer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/custom-healthcheck/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Health Check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#decisions-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Architecture overview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Architecture overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-controllers-gatewayclasses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Controllers &amp; GatewayClasses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-crds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 CRDs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-package-layout-top-level-orientation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Package layout (top-level orientation)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-manager-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Manager wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-coexistence-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5 Coexistence boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-crd-schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. CRD schemas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. CRD schemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-loadbalancerconfig-extended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 LoadBalancerConfig (extended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-targetgroupconfig-new-namespaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 TargetGroupConfig (new, namespaced)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-listenerruleconfig-new-namespaced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 ListenerRuleConfig (new, namespaced)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-rbac-additions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 RBAC additions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-resource-mapping-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Resource mapping &amp; data flow
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Resource mapping &amp; data flow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-mapping-table-gateway-api-vngcloud-primitives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Mapping table — Gateway API → vngcloud primitives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-controller-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Controller graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-gateway-loadbalancer-listeners" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Gateway → LoadBalancer + Listeners
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-httproute-policies-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 HTTPRoute → Policies + Pools
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-synthetic-pool-naming-weight-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Synthetic pool — naming &amp; weight scaling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-listenerruleconfig-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 ListenerRuleConfig wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-targetgroupconfig-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 TargetGroupConfig wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#38-watch-reverse-index-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.8 Watch &amp; reverse-index map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#39-eventual-consistency-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.9 Eventual-consistency notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-status-conditions-events-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Status conditions, events, metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Status conditions, events, metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-status-conditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Status conditions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.1 Status conditions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gatewayclassstatusconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GatewayClass.status.conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gatewaystatusconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway.status.conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gatewaystatuslistenersconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateway.status.listeners[].conditions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#httproutestatusparentsconditions-per-parentref" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTPRoute.status.parents[].conditions (per parentRef)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#custom-crd-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom CRD status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-kubernetes-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Kubernetes Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-prometheus-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Prometheus metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Logging
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-finalizer-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Finalizer strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-readiness-liveness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Readiness / liveness
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-implementation-plan-file-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Implementation plan &amp; file layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Implementation plan &amp; file layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-full-package-layout-after-all-4-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Full package layout (after all 4 phases)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-new-go-module-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 New Go module dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-manager-wiring-cmdmaingo-deltas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Manager wiring (cmd/main.go deltas)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-mocking-test-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Mocking &amp; test strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-codegen-make-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Codegen / make targets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-backward-compat-rollout-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Backward-compat / rollout safety
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-phasing-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Phasing roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Phasing roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-l7-mvp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1 — L7 MVP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-l4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2 — L4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-extensions-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3 — Extensions &amp; advanced
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-migration-tool-conformance-polish" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4 — Migration tool, conformance, polish
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-risks-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Risks &amp; mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-open-items-deferred-to-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Open items deferred to implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-out-of-scope-explicitly-not-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Out of scope (explicitly not planned)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#references" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        References
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/vngcloud/vngcloud-load-balancer-controller/edit/v3/docs/superpowers/specs/2026-04-30-gateway-api-design.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="gateway-api-support-design">Gateway API Support — Design<a class="headerlink" href="#gateway-api-support-design" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-04-30
+<strong>Status:</strong> Approved (brainstorming complete; awaiting implementation plan)
+<strong>Scope:</strong> Add Kubernetes Gateway API (https://gateway-api.sigs.k8s.io) support to the vngcloud Load Balancer Controller, aligned with vngcloud LB product capabilities.</p>
+<hr />
+<h2 id="decisions-summary">Decisions summary<a class="headerlink" href="#decisions-summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Feature scope</td>
+<td>Plan all Gateway API features upfront; phase the implementation in 4 waves</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Gateway → LB mapping</td>
+<td>Two GatewayClasses (<code>vngcloud-alb</code>, <code>vngcloud-nlb</code>); 1 Gateway = 1 LB; mixed-protocol Gateways rejected</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Config CRD strategy</td>
+<td>Reuse <code>LoadBalancerConfig</code> at both <code>GatewayClass.parametersRef</code> and <code>Gateway.spec.infrastructure.parametersRef</code> with a <code>mergingMode</code> field. Add two new namespaced CRDs: <code>TargetGroupConfig</code> (per-Service / per-route) and <code>ListenerRuleConfig</code> (per-HTTPRoute filter). Mirrors AWS LBC's pattern</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Coexistence with existing Ingress / Service controllers</td>
+<td>Strict separation; no shared LBs; no LB-ID adoption on Gateway. Documented one-shot migration tool deferred to Phase 4. Matches AWS LBC's Gateway behavior</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Weighted backends in HTTPRoute</td>
+<td>Synthetic merged pool with weight-scaled members (single vngcloud Pool aggregates all backends in a route rule)</td>
+</tr>
+<tr>
+<td>6</td>
+<td>HTTPRoute match / filter coverage</td>
+<td>Strict reject for unsupported core features (<code>Accepted=False, reason=UnsupportedValue</code>) + <code>ListenerRuleConfig</code> ExtensionRef as the documented escape hatch for header/query/method matches and FixedResponse</td>
+</tr>
+<tr>
+<td>7</td>
+<td>TLS strategy</td>
+<td>Secrets via <code>certificateRefs</code> (auto-imported, existing path) <strong>plus</strong> vngcloud cert IDs via existing <code>LoadBalancerConfig.Listeners[].certificateDefault.id</code> / <code>certificateAuthorities[].id</code>. mTLS via <code>frontendValidation</code> or LBC <code>clientCertificateId</code>. TLS-Passthrough only on NLB GatewayClass (Phase 2)</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Phasing</td>
+<td>Phase 1 = L7 + extensions (LRC + TGC); Phase 2 = L4; Phase 3 = advanced (GRPCRoute, BackendTLSPolicy, optional URLRewrite/Mirror/etc.); Phase 4 = migration tool + conformance + polish</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-architecture-overview">1. Architecture overview<a class="headerlink" href="#1-architecture-overview" title="Permanent link">&para;</a></h2>
+<h3 id="11-controllers-gatewayclasses">1.1 Controllers &amp; GatewayClasses<a class="headerlink" href="#11-controllers-gatewayclasses" title="Permanent link">&para;</a></h3>
+<p>Two new controllers added to the existing manager binary, each watching a distinct GatewayClass:</p>
+<ul>
+<li><strong><code>vngcloud-alb</code> GatewayClass</strong> — <code>controllerName: gateway.vks.vngcloud.vn/alb</code>. Provisions vngcloud ALB. Accepts listeners with protocol <code>HTTP</code>, <code>HTTPS</code>, <code>TLS</code> (mode=Terminate). Routes: <code>HTTPRoute</code>, later <code>GRPCRoute</code>.</li>
+<li><strong><code>vngcloud-nlb</code> GatewayClass</strong> — <code>controllerName: gateway.vks.vngcloud.vn/nlb</code>. Provisions vngcloud NLB. Accepts listeners with protocol <code>TCP</code>, <code>UDP</code>, <code>TLS</code> (mode=Passthrough). Routes: <code>TCPRoute</code>, <code>UDPRoute</code>, <code>TLSRoute</code>.</li>
+</ul>
+<p>Mixed protocols on a single Gateway are rejected with <code>Accepted=False, reason=UnsupportedProtocol</code>. 1 Gateway = 1 vngcloud LoadBalancer; no sharing with Ingress / Service controllers.</p>
+<h3 id="12-crds">1.2 CRDs<a class="headerlink" href="#12-crds" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>CRD</th>
+<th>Status</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LoadBalancerConfig</code> (existing, extended)</td>
+<td>extended</td>
+<td>Referenced by both <code>GatewayClass.parametersRef</code> (template) and <code>Gateway.spec.infrastructure.parametersRef</code> (instance). Adds <code>mergingMode</code> and two new fields on the existing <code>Listener</code> struct (<code>sslPolicy</code>, <code>alpnPolicy</code>).</td>
+</tr>
+<tr>
+<td><code>TargetGroupConfig</code> (new, namespaced)</td>
+<td>new</td>
+<td>Attached per-Service via <code>targetReference</code>. Carries health-check, target-type, sticky-session, pool algorithm, TLS-encryption, PROXY protocol. Optional <code>routeConfigurations[]</code> overrides per route.</td>
+</tr>
+<tr>
+<td><code>ListenerRuleConfig</code> (new, namespaced)</td>
+<td>new</td>
+<td>Attached via <code>HTTPRoute.spec.rules[].filters[].extensionRef</code>. Holds non-Gateway-API features: header/query/method match, fixed-response, source-IP rules, regex compare overrides.</td>
+</tr>
+</tbody>
+</table>
+<p>Group: <code>gateway.vks.vngcloud.vn/v1alpha1</code> for the two new CRDs. <code>LoadBalancerConfig</code> stays in <code>vks.vngcloud.vn/v1alpha1</code> with a backwards-compatible field block.</p>
+<h3 id="13-package-layout-top-level-orientation">1.3 Package layout (top-level orientation)<a class="headerlink" href="#13-package-layout-top-level-orientation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>api/v1alpha1/                     # extended (Listener fields, MergingMode)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>api/gateway/v1alpha1/             # new group: TargetGroupConfig, ListenerRuleConfig
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>internal/controller/gateway/      # new: alb/, nlb/, shared/, targetgroupconfig/, listenerruleconfig/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>internal/usecase/gateway_uc/      # new: alb_gateway_uc/, nlb_gateway_uc/, shared/
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pkg/gateway/                      # new: utils, hostname matchers, synth-pool helpers
+</code></pre></div>
+<p>Reconcilers stay thin (request → useCase). UseCases use the existing <code>K8sRepository</code> and <code>VngCloudRepository</code>. The Gateway controller is the only writer to the vngcloud LB; HTTPRoute reconciles update an in-memory cache and enqueue the parent Gateway.</p>
+<h3 id="14-manager-wiring">1.4 Manager wiring<a class="headerlink" href="#14-manager-wiring" title="Permanent link">&para;</a></h3>
+<p><code>cmd/main.go</code> adds:
+- Register Gateway API scheme (<code>sigs.k8s.io/gateway-api/apis/v1</code>, <code>v1alpha2</code>).
+- Feature gate flags: <code>--enable-gateway-api-alb</code> (default <code>false</code> initially, <code>true</code> after stable), <code>--enable-gateway-api-nlb</code> (false until Phase 2).
+- Conditional reconciler registration based on feature gates.
+- New finalizer constants: <code>gateway.vks.vngcloud.vn/resources</code>.</p>
+<h3 id="15-coexistence-boundary">1.5 Coexistence boundary<a class="headerlink" href="#15-coexistence-boundary" title="Permanent link">&para;</a></h3>
+<p>Gateway-controller-owned vngcloud LBs carry the owner label <code>vks.vngcloud.vn/owner-resource-kind=Gateway</code>. Existing Ingress / Service controllers ignore non-matching owners. No shared-LB code paths in v1.</p>
+<hr />
+<h2 id="2-crd-schemas">2. CRD schemas<a class="headerlink" href="#2-crd-schemas" title="Permanent link">&para;</a></h2>
+<h3 id="21-loadbalancerconfig-extended">2.1 <code>LoadBalancerConfig</code> (extended)<a class="headerlink" href="#21-loadbalancerconfig-extended" title="Permanent link">&para;</a></h3>
+<p>Additive changes only. Existing fields and behavior unchanged.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">LoadBalancerConfigSpec</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="c1">// ... all existing fields unchanged ...</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="c1">// MergingMode controls how this LBC merges with another LBC when both</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="c1">// GatewayClass.parametersRef and Gateway.spec.infrastructure.parametersRef are set.</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="c1">// Only honored when this object is referenced by GatewayClass.parametersRef.</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="c1">// +kubebuilder:validation:Enum=PreferGateway;PreferGatewayClass</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nx">MergingMode</span><span class="w"> </span><span class="o">*</span><span class="nx">MergingMode</span><span class="w"> </span><span class="s">`json:&quot;mergingMode,omitempty&quot;`</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="kd">type</span><span class="w"> </span><span class="nx">Listener</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="c1">// ... all existing fields unchanged ...</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="c1">// SSLPolicy selects the listener&#39;s TLS protocol/cipher policy (vngcloud-defined).</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="c1">// Only honored on HTTPS / TLS-terminate listeners.</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nx">SSLPolicy</span><span class="w"> </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;sslPolicy,omitempty&quot;`</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="c1">// ALPNPolicy controls ALPN advertisement (e.g., &quot;HTTP2Optional&quot;, &quot;HTTP1Only&quot;).</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="c1">// Only honored on HTTPS / TLS-terminate listeners.</span>
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="nx">ALPNPolicy</span><span class="w"> </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;alpnPolicy,omitempty&quot;`</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>How <code>Listeners[]</code> is interpreted when LBC is referenced from a Gateway:</strong></p>
+<p>The existing <code>Listeners[]</code> field is reused verbatim. Items are matched to the Gateway's listeners by <code>name</code>.</p>
+<table>
+<thead>
+<tr>
+<th>LBC <code>Listener</code> field</th>
+<th>Role under Gateway</th>
+<th>Conflict handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>Selector — must equal <code>Gateway.spec.listeners[].name</code></td>
+<td>Listener entries with no matching Gateway listener are silently ignored</td>
+</tr>
+<tr>
+<td><code>protocol</code>, <code>protocolPort</code></td>
+<td>Must match the Gateway listener</td>
+<td>Mismatch → <code>Programmed=False, reason=InvalidParameters</code> on the Gateway listener</td>
+</tr>
+<tr>
+<td><code>defaultPoolName</code>, <code>policies</code></td>
+<td><strong>Ignored</strong> under Gateway use</td>
+<td>Pool/policy set is derived from routes</td>
+</tr>
+<tr>
+<td><code>certificateDefault</code>, <code>certificateAuthorities</code></td>
+<td>Override <code>tls.certificateRefs</code> when LBC provides IDs</td>
+<td>LBC wins if set; otherwise fall back to Secret refs</td>
+</tr>
+<tr>
+<td><code>clientCertificateId</code></td>
+<td>Override <code>tls.frontendValidation.caCertificateRefs</code></td>
+<td>LBC wins if set; mutually exclusive with <code>frontendValidation</code></td>
+</tr>
+<tr>
+<td><code>timeoutClient</code>, <code>timeoutMember</code>, <code>timeoutConnection</code>, <code>allowedCidrs</code>, <code>insertHeaders</code>, <code>sslPolicy</code>, <code>alpnPolicy</code></td>
+<td>Vngcloud-specific overrides</td>
+<td>Applied as-is</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Merging semantics</strong> (when both Class- and Gateway-level LBCs exist):</p>
+<ul>
+<li>Scalar fields: winner per <code>MergingMode</code> (default <code>PreferGateway</code>).</li>
+<li>List fields with named items (<code>listeners</code>, <code>tags</code>): merged by name; per-item values resolved by <code>MergingMode</code>.</li>
+<li><code>loadBalancerId</code>: per-Gateway only (ignored at class level — class can't pin a single LB).</li>
+<li>Merging produces an in-memory effective config; source LBC objects are not mutated.</li>
+</ul>
+<h3 id="22-targetgroupconfig-new-namespaced">2.2 <code>TargetGroupConfig</code> (new, namespaced)<a class="headerlink" href="#22-targetgroupconfig-new-namespaced" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// +kubebuilder:resource:shortName=tgc</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kd">type</span><span class="w"> </span><span class="nx">TargetGroupConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nx">metav1</span><span class="p">.</span><span class="nx">TypeMeta</span><span class="w">   </span><span class="s">`json:&quot;,inline&quot;`</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nx">metav1</span><span class="p">.</span><span class="nx">ObjectMeta</span><span class="w"> </span><span class="s">`json:&quot;metadata,omitempty&quot;`</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nx">Spec</span><span class="w">   </span><span class="nx">TargetGroupConfigSpec</span><span class="w">   </span><span class="s">`json:&quot;spec,omitempty&quot;`</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nx">Status</span><span class="w"> </span><span class="nx">TargetGroupConfigStatus</span><span class="w"> </span><span class="s">`json:&quot;status,omitempty&quot;`</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">}</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="kd">type</span><span class="w"> </span><span class="nx">TargetGroupConfigSpec</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="c1">// TargetReference points at a Service in the same namespace.</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nx">TargetReference</span><span class="w"> </span><span class="nx">TargetReference</span><span class="w"> </span><span class="s">`json:&quot;targetReference&quot;`</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="c1">// DefaultConfig applies when this TGC is selected via targetReference</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="c1">// and no routeConfiguration overrides match the active route.</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="nx">DefaultConfig</span><span class="w"> </span><span class="nx">TargetGroupProperties</span><span class="w"> </span><span class="s">`json:&quot;defaultConfig&quot;`</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="c1">// RouteConfigurations carries per-route overrides (selected by route GVK + name).</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="c1">// Highest specificity wins (route+rule &gt; route &gt; default).</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="nx">RouteConfigurations</span><span class="w"> </span><span class="p">[]</span><span class="nx">RouteSpecificConfig</span><span class="w"> </span><span class="s">`json:&quot;routeConfigurations,omitempty&quot;`</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="p">}</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="kd">type</span><span class="w"> </span><span class="nx">TargetReference</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">    </span><span class="nx">Group</span><span class="w"> </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;group,omitempty&quot;`</span><span class="w"> </span><span class="c1">// default &quot;&quot; (core)</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">    </span><span class="nx">Kind</span><span class="w">  </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;kind,omitempty&quot;`</span><span class="w">  </span><span class="c1">// default &quot;Service&quot;</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">    </span><span class="nx">Name</span><span class="w">  </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;name&quot;`</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="p">}</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="kd">type</span><span class="w"> </span><span class="nx">TargetGroupProperties</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">    </span><span class="c1">// +kubebuilder:validation:Enum=instance;ip</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">    </span><span class="nx">TargetType</span><span class="w">          </span><span class="o">*</span><span class="kt">string</span><span class="w">            </span><span class="s">`json:&quot;targetType,omitempty&quot;`</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">    </span><span class="nx">PoolAlgorithm</span><span class="w">       </span><span class="o">*</span><span class="kt">string</span><span class="w">            </span><span class="s">`json:&quot;poolAlgorithm,omitempty&quot;`</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">    </span><span class="nx">EnableStickySession</span><span class="w"> </span><span class="o">*</span><span class="kt">bool</span><span class="w">              </span><span class="s">`json:&quot;enableStickySession,omitempty&quot;`</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="w">    </span><span class="nx">EnableTLSEncryption</span><span class="w"> </span><span class="o">*</span><span class="kt">bool</span><span class="w">              </span><span class="s">`json:&quot;enableTLSEncryption,omitempty&quot;`</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">    </span><span class="nx">EnableProxyProtocol</span><span class="w"> </span><span class="o">*</span><span class="kt">bool</span><span class="w">              </span><span class="s">`json:&quot;enableProxyProtocol,omitempty&quot;`</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="w">    </span><span class="nx">HealthCheck</span><span class="w">         </span><span class="o">*</span><span class="nx">PoolHealthMonitor</span><span class="w"> </span><span class="s">`json:&quot;healthCheck,omitempty&quot;`</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a><span class="w">    </span><span class="nx">TargetNodeLabels</span><span class="w">    </span><span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;targetNodeLabels,omitempty&quot;`</span>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="w">    </span><span class="nx">ManageDFPMembers</span><span class="w">    </span><span class="o">*</span><span class="kt">bool</span><span class="w">              </span><span class="s">`json:&quot;manageDFPMembers,omitempty&quot;`</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="p">}</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a>
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RouteSpecificConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a><span class="w">    </span><span class="nx">RouteIdentifier</span><span class="w"> </span><span class="nx">RouteIdentifier</span><span class="w">       </span><span class="s">`json:&quot;routeIdentifier&quot;`</span>
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a><span class="w">    </span><span class="nx">Config</span><span class="w">          </span><span class="nx">TargetGroupProperties</span><span class="w"> </span><span class="s">`json:&quot;config&quot;`</span>
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="p">}</span>
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a>
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RouteIdentifier</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="w">    </span><span class="nx">Group</span><span class="w">     </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;group&quot;`</span><span class="w"> </span><span class="c1">// &quot;gateway.networking.k8s.io&quot;</span>
+<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="w">    </span><span class="nx">Kind</span><span class="w">      </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;kind&quot;`</span><span class="w">  </span><span class="c1">// &quot;HTTPRoute&quot; / &quot;TCPRoute&quot; / ...</span>
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="w">    </span><span class="nx">Namespace</span><span class="w"> </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;namespace,omitempty&quot;`</span>
+<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a><span class="w">    </span><span class="nx">Name</span><span class="w">      </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;name&quot;`</span>
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a><span class="w">    </span><span class="nx">RuleName</span><span class="w">  </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;ruleName,omitempty&quot;`</span>
+<a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a><span class="p">}</span>
+<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>
+<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="kd">type</span><span class="w"> </span><span class="nx">TargetGroupConfigStatus</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a><span class="w">    </span><span class="nx">Conditions</span><span class="w">         </span><span class="p">[]</span><span class="nx">metav1</span><span class="p">.</span><span class="nx">Condition</span><span class="w"> </span><span class="s">`json:&quot;conditions,omitempty&quot;`</span>
+<a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a><span class="w">    </span><span class="nx">ObservedGeneration</span><span class="w"> </span><span class="kt">int64</span><span class="w">              </span><span class="s">`json:&quot;observedGeneration,omitempty&quot;`</span>
+<a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Lookup priority</strong> when building a backend pool: route+rule-specific config → route-level config → default config → controller fallback defaults.</p>
+<h3 id="23-listenerruleconfig-new-namespaced">2.3 <code>ListenerRuleConfig</code> (new, namespaced)<a class="headerlink" href="#23-listenerruleconfig-new-namespaced" title="Permanent link">&para;</a></h3>
+<p>Attached via HTTPRoute filter <code>extensionRef</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">filters</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExtensionRef</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">extensionRef</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> group</span><span class="p">:</span><span class="w"> </span><span class="nv">gateway.vks.vngcloud.vn</span><span class="p p-Indicator">,</span><span class="nt"> kind</span><span class="p">:</span><span class="w"> </span><span class="nv">ListenerRuleConfig</span><span class="p p-Indicator">,</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">admin-rules</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// +kubebuilder:resource:shortName=lrc</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ListenerRuleConfig</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nx">metav1</span><span class="p">.</span><span class="nx">TypeMeta</span><span class="w">   </span><span class="s">`json:&quot;,inline&quot;`</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nx">metav1</span><span class="p">.</span><span class="nx">ObjectMeta</span><span class="w"> </span><span class="s">`json:&quot;metadata,omitempty&quot;`</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nx">Spec</span><span class="w">   </span><span class="nx">ListenerRuleConfigSpec</span><span class="w">   </span><span class="s">`json:&quot;spec,omitempty&quot;`</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="nx">Status</span><span class="w"> </span><span class="nx">ListenerRuleConfigStatus</span><span class="w"> </span><span class="s">`json:&quot;status,omitempty&quot;`</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">}</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ListenerRuleConfigSpec</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="c1">// AdditionalMatches are AND&#39;d with the HTTPRoute&#39;s standard matches.</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nx">AdditionalMatches</span><span class="w"> </span><span class="p">[]</span><span class="nx">AdditionalMatch</span><span class="w"> </span><span class="s">`json:&quot;additionalMatches,omitempty&quot;`</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">    </span><span class="c1">// Actions, if set, supersede the route&#39;s default REDIRECT_TO_POOL action.</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nx">Actions</span><span class="w"> </span><span class="p">[]</span><span class="nx">RuleAction</span><span class="w"> </span><span class="s">`json:&quot;actions,omitempty&quot;`</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="c1">// Position pins policy ordering. Default = controller-assigned (Gateway-API spec ordering).</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="c1">// +optional</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="w">    </span><span class="nx">Position</span><span class="w"> </span><span class="o">*</span><span class="kt">int32</span><span class="w"> </span><span class="s">`json:&quot;position,omitempty&quot;`</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="p">}</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="kd">type</span><span class="w"> </span><span class="nx">AdditionalMatch</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">    </span><span class="c1">// +kubebuilder:validation:Enum=Header;QueryParam;Method;SourceIP</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">    </span><span class="nx">Type</span><span class="w">    </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;type&quot;`</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="w">    </span><span class="nx">Name</span><span class="w">    </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;name,omitempty&quot;`</span><span class="w"> </span><span class="c1">// header/query name; unused for Method/SourceIP</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="w">    </span><span class="c1">// vngcloud values: EQUAL_TO | STARTS_WITH | ENDS_WITH | CONTAINS | REGEX</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="w">    </span><span class="nx">Compare</span><span class="w"> </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;compare&quot;`</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="w">    </span><span class="nx">Value</span><span class="w">   </span><span class="kt">string</span><span class="w">  </span><span class="s">`json:&quot;value&quot;`</span>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a><span class="p">}</span>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RuleAction</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a><span class="w">    </span><span class="c1">// +kubebuilder:validation:Enum=FixedResponse;Reject;Redirect</span>
+<a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a><span class="w">    </span><span class="nx">Type</span><span class="w">          </span><span class="kt">string</span><span class="w">               </span><span class="s">`json:&quot;type&quot;`</span>
+<a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a><span class="w">    </span><span class="nx">FixedResponse</span><span class="w"> </span><span class="o">*</span><span class="nx">FixedResponseAction</span><span class="w"> </span><span class="s">`json:&quot;fixedResponse,omitempty&quot;`</span>
+<a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a><span class="w">    </span><span class="nx">Redirect</span><span class="w">      </span><span class="o">*</span><span class="nx">RedirectAction</span><span class="w">      </span><span class="s">`json:&quot;redirect,omitempty&quot;`</span>
+<a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a><span class="p">}</span>
+<a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>
+<a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a><span class="kd">type</span><span class="w"> </span><span class="nx">FixedResponseAction</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a><span class="w">    </span><span class="nx">StatusCode</span><span class="w">  </span><span class="kt">int32</span><span class="w">   </span><span class="s">`json:&quot;statusCode&quot;`</span>
+<a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="w">    </span><span class="nx">ContentType</span><span class="w"> </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;contentType,omitempty&quot;`</span>
+<a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a><span class="w">    </span><span class="nx">Body</span><span class="w">        </span><span class="o">*</span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;body,omitempty&quot;`</span>
+<a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a><span class="p">}</span>
+<a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a>
+<a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a><span class="kd">type</span><span class="w"> </span><span class="nx">RedirectAction</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a><span class="w">    </span><span class="nx">URL</span><span class="w">             </span><span class="kt">string</span><span class="w"> </span><span class="s">`json:&quot;url&quot;`</span>
+<a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a><span class="w">    </span><span class="nx">HTTPCode</span><span class="w">        </span><span class="o">*</span><span class="kt">int32</span><span class="w"> </span><span class="s">`json:&quot;httpCode,omitempty&quot;`</span>
+<a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a><span class="w">    </span><span class="nx">KeepQueryString</span><span class="w"> </span><span class="o">*</span><span class="kt">bool</span><span class="w">  </span><span class="s">`json:&quot;keepQueryString,omitempty&quot;`</span>
+<a id="__codelineno-4-49" name="__codelineno-4-49" href="#__codelineno-4-49"></a><span class="p">}</span>
+<a id="__codelineno-4-50" name="__codelineno-4-50" href="#__codelineno-4-50"></a>
+<a id="__codelineno-4-51" name="__codelineno-4-51" href="#__codelineno-4-51"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ListenerRuleConfigStatus</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-4-52" name="__codelineno-4-52" href="#__codelineno-4-52"></a><span class="w">    </span><span class="nx">Conditions</span><span class="w">         </span><span class="p">[]</span><span class="nx">metav1</span><span class="p">.</span><span class="nx">Condition</span><span class="w"> </span><span class="s">`json:&quot;conditions,omitempty&quot;`</span>
+<a id="__codelineno-4-53" name="__codelineno-4-53" href="#__codelineno-4-53"></a><span class="w">    </span><span class="nx">ObservedGeneration</span><span class="w"> </span><span class="kt">int64</span><span class="w">              </span><span class="s">`json:&quot;observedGeneration,omitempty&quot;`</span>
+<a id="__codelineno-4-54" name="__codelineno-4-54" href="#__codelineno-4-54"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Forward-compat note:</strong> when vngcloud LB later adds native header/query/method matching, those fields move into the standard <code>HTTPRoute.match</code> translation. <code>ListenerRuleConfig.AdditionalMatches</code> of those types start emitting a <code>Deprecated</code> condition pointing users at the now-supported core fields. No breakage.</p>
+<h3 id="24-rbac-additions">2.4 RBAC additions<a class="headerlink" href="#24-rbac-additions" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status,verbs=update;patch
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;update;patch
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/status,verbs=update;patch
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways/finalizers,verbs=update
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes;referencegrants,verbs=get;list;watch
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>+kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes/status,verbs=update;patch
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>+kubebuilder:rbac:groups=gateway.vks.vngcloud.vn,resources=targetgroupconfigs;listenerruleconfigs,verbs=get;list;watch;update;patch
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>+kubebuilder:rbac:groups=gateway.vks.vngcloud.vn,resources=targetgroupconfigs/status;listenerruleconfigs/status,verbs=update;patch
+</code></pre></div>
+<p>(Phase 2 adds <code>tcproutes</code>, <code>udproutes</code>, <code>tlsroutes</code>; Phase 3 adds <code>grpcroutes</code>, <code>backendtlspolicies</code>.)</p>
+<hr />
+<h2 id="3-resource-mapping-data-flow">3. Resource mapping &amp; data flow<a class="headerlink" href="#3-resource-mapping-data-flow" title="Permanent link">&para;</a></h2>
+<h3 id="31-mapping-table-gateway-api-vngcloud-primitives">3.1 Mapping table — Gateway API → vngcloud primitives<a class="headerlink" href="#31-mapping-table-gateway-api-vngcloud-primitives" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Gateway API resource</th>
+<th>vngcloud entity</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GatewayClass</code> (controller=<code>gateway.vks.vngcloud.vn/alb</code>)</td>
+<td>none (declarative gate)</td>
+<td>Status <code>Accepted=True</code> once <code>parametersRef</code> LBC is valid</td>
+</tr>
+<tr>
+<td><code>GatewayClass</code> (controller=<code>gateway.vks.vngcloud.vn/nlb</code>)</td>
+<td>none</td>
+<td>same; Phase 2</td>
+</tr>
+<tr>
+<td><code>Gateway</code></td>
+<td>1 <code>LoadBalancer</code> (ALB or NLB) + N <code>Listener</code></td>
+<td>LB type fixed by GatewayClass; 1:1 binding via owner labels</td>
+</tr>
+<tr>
+<td><code>Gateway.spec.listeners[]</code></td>
+<td>vngcloud <code>Listener</code></td>
+<td><code>name</code> is the join key with LBC.Listeners[]; protocol / port / TLS mapped per §3.3</td>
+</tr>
+<tr>
+<td><code>Gateway.spec.addresses</code></td>
+<td>informational only</td>
+<td>vngcloud assigns address; user-requested IP rejected unless feature exists</td>
+</tr>
+<tr>
+<td><code>HTTPRoute</code> (per parentRef listener)</td>
+<td>1+ <code>Policy</code> + 1+ <code>Pool</code> (synthetic)</td>
+<td>One policy per <code>rule × match</code> (cartesian when multi-match); see §3.4</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.hostnames[]</code></td>
+<td><code>HOST_NAME</code> rule on each generated policy</td>
+<td><code>*.foo.com</code> → <code>REGEX</code> rule</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.rule.matches[].path</code></td>
+<td><code>PATH</code> rule (EQUAL_TO / STARTS_WITH / REGEX)</td>
+<td>Implementation-specific path types fall back to EQUAL_TO</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.rule.backendRefs[]</code> (weighted)</td>
+<td>1 synthetic <code>Pool</code> (members from union)</td>
+<td>Weight-scaled members; pool name = stable hash (§3.5)</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.rule.filters[RequestRedirect]</code></td>
+<td><code>Policy.Action = REDIRECT_TO_URL</code></td>
+<td>URL templated from filter fields</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.rule.filters[RequestHeaderModifier]</code> (set)</td>
+<td>listener <code>insertHeaders</code></td>
+<td>Only if uniform across all rules on the listener; otherwise reject</td>
+</tr>
+<tr>
+<td><code>HTTPRoute.rule.filters[ExtensionRef → ListenerRuleConfig]</code></td>
+<td>extra L7 rules + alt action</td>
+<td>See §3.6</td>
+</tr>
+<tr>
+<td><code>ReferenceGrant</code></td>
+<td>gating only</td>
+<td>Resolves cross-namespace <code>backendRefs</code> and TLS Secret refs</td>
+</tr>
+<tr>
+<td><code>TargetGroupConfig</code></td>
+<td>pool defaults</td>
+<td>Per Service + per route override; see §3.7</td>
+</tr>
+<tr>
+<td><code>ListenerRuleConfig</code></td>
+<td>policy match / action additions</td>
+<td>Attached via HTTPRoute <code>ExtensionRef</code> filter</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-controller-graph">3.2 Controller graph<a class="headerlink" href="#32-controller-graph" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>┌───────────────────────┐    parametersRef
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>│ GatewayClassController├──────────┐
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>└───────────┬───────────┘          │
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>            │                      ▼
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>            │           ┌──────────────────────┐
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>            │           │ LoadBalancerConfig   │
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>            │           │ (existing, extended) │
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>            │           └──────────────────────┘
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>            ▼                      ▲
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>┌───────────────────────┐  infrastructure.parametersRef
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>│ GatewayController     ├──────────┘
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>│ (per GatewayClass)    │◄──────── HTTPRoute parentRef
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>└───────────┬───────────┘
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>            │ owns
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>            ▼
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>   vngcloud LoadBalancer + Listeners
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>┌───────────────────────┐
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>│ HTTPRouteController   │──── parentRefs ───► Gateway (triggers Gateway reconcile)
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>└───────────┬───────────┘──── backendRefs ──► Service (triggers HTTPRoute reconcile)
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>            │
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>            │ owns (via Gateway reconcile)
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>            ▼
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>    vngcloud Policies + Pools (on the parent&#39;s Listener)
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>┌───────────────────────┐    targetReference
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>│ TargetGroupConfig     │──────────────────► Service (triggers HTTPRoute requeue)
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>│ Controller (validate) │
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>└───────────────────────┘
+<a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>
+<a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>┌───────────────────────┐    reverse-index
+<a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>│ ListenerRuleConfig    │──────────────────► HTTPRoute (triggers requeue)
+<a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>│ Controller (validate) │
+<a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a>└───────────────────────┘
+</code></pre></div>
+<p><strong>Ownership model:</strong> the <strong>Gateway controller</strong> is the only writer to the vngcloud LB. HTTPRoute reconciles do not touch vngcloud directly — they enqueue the parent Gateway. This serializes all LB mutations through one reconciler per Gateway and avoids races.</p>
+<h3 id="33-gateway-loadbalancer-listeners">3.3 Gateway → LoadBalancer + Listeners<a class="headerlink" href="#33-gateway-loadbalancer-listeners" title="Permanent link">&para;</a></h3>
+<p>Reconcile order per Gateway:</p>
+<ol>
+<li><strong>Resolve effective config</strong> = merge(<code>GatewayClass.parametersRef → LBC</code>, <code>Gateway.spec.infrastructure.parametersRef → LBC</code>) per <code>mergingMode</code>.</li>
+<li><strong>Validate listeners</strong> — protocol allowed by GatewayClass type? port unique? hostname valid? Set per-listener <code>Accepted</code> condition.</li>
+<li><strong>Lookup or create LB</strong> — by owner label <code>gateway.vks.vngcloud.vn/owner-uid=&lt;gateway-uid&gt;</code>. Type = ALB or NLB. Apply LB-level config from merged LBC.</li>
+<li><strong>Compute desired Listener set</strong> — for each <code>Gateway.spec.listeners[]</code> with <code>Accepted=True</code>:</li>
+<li>protocol / port from Gateway listener</li>
+<li>TLS: prefer LBC <code>Listener.certificateDefault/Authorities</code> IDs if present, else import Secrets from <code>tls.certificateRefs</code> (existing import path)</li>
+<li>mTLS: LBC <code>clientCertificateId</code> if set, else import from <code>tls.frontendValidation.caCertificateRefs</code></li>
+<li>other fields (timeouts, allowedCidrs, sslPolicy, alpnPolicy, insertHeaders) from merged LBC entry by listener name</li>
+<li>default pool: synthetic "default-forwarding-pool" with no members (fed by route layer)</li>
+<li><strong>Diff against vngcloud</strong> — reuse existing per-listener helpers in <code>internal/usecase/lbc_uc/deploy_listener.go</code>.</li>
+<li><strong>Trigger route layer</strong> — emit policy / pool sync for every accepted route attached to this Gateway.</li>
+<li><strong>Write status</strong> — Gateway and listener conditions per §4.</li>
+</ol>
+<h3 id="34-httproute-policies-pools">3.4 HTTPRoute → Policies + Pools<a class="headerlink" href="#34-httproute-policies-pools" title="Permanent link">&para;</a></h3>
+<p>For each HTTPRoute attached to an accepted Gateway listener:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>for each rule in route.spec.rules:
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    pool = synthesizePool(rule.backendRefs, route, ruleIdx)
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    for each match in rule.matches:
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        for each hostname in route.hostnames (or [&quot;&quot;] if empty):
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>            policy = buildPolicy(hostname, match, rule.filters, pool)
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>            policies.append(policy)
+</code></pre></div>
+<p><strong>One policy per (hostname × match × filter-resolved-action)</strong>:</p>
+<ul>
+<li>L7 rules:</li>
+<li><code>HOST_NAME</code> rule per hostname (literal → <code>EQUAL_TO</code>; wildcard → <code>REGEX</code>)</li>
+<li><code>PATH</code> rule per <code>match.path</code></li>
+<li>any <code>ListenerRuleConfig.additionalMatches</code> AND'd in</li>
+<li>Action:</li>
+<li><code>RequestRedirect</code> filter → <code>REDIRECT_TO_URL</code></li>
+<li><code>ListenerRuleConfig.actions[FixedResponse|Reject]</code> → <code>REJECT</code> (FixedResponse marked <code>Programmed=False, reason=UnsupportedFilter</code> until vngcloud adds native support; <code>Reject</code> works)</li>
+<li>default → <code>REDIRECT_TO_POOL</code> pointing at the synthetic pool</li>
+</ul>
+<p><strong>Policy ordering</strong> — Gateway API spec: most-specific path first, then header count, then route creation timestamp. Translation: assign vngcloud <code>Policy.Position</code> in spec order; existing <code>auto-reorder-policies</code> machinery reused.</p>
+<p><strong>Cross-namespace backendRefs</strong> — gated by ReferenceGrant. If grant absent, set <code>ResolvedRefs=False, reason=RefNotPermitted</code> on the route and drop just that backend from the synthesized pool (don't fail the whole rule).</p>
+<h3 id="35-synthetic-pool-naming-weight-scaling">3.5 Synthetic pool — naming &amp; weight scaling<a class="headerlink" href="#35-synthetic-pool-naming-weight-scaling" title="Permanent link">&para;</a></h3>
+<p><strong>Name</strong> (deterministic, ≤ 50 chars):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>gw_&lt;route-uid-prefix8&gt;_&lt;rule-idx&gt;_&lt;backendset-hash5&gt;
+</code></pre></div>
+<ul>
+<li><code>route-uid-prefix8</code>: first 8 chars of HTTPRoute <code>metadata.uid</code>.</li>
+<li><code>rule-idx</code>: rule index in route.</li>
+<li><code>backendset-hash5</code>: 5-char hash of sorted <code>(ns, name, port, weight)</code> tuples.</li>
+</ul>
+<p>Hash changes only when the backend set / weights change; member churn within a backend keeps the same pool.</p>
+<p><strong>Weight scaling algorithm:</strong></p>
+<ol>
+<li>Collect each backend's current ready endpoints from EndpointSlice (or NodePort + ready-nodes, by target-type).</li>
+<li>For each backend <code>b</code> with desired weight <code>w_b</code> and <code>n_b</code> ready endpoints, base member weight = 1.</li>
+<li>Apply weight multiplier: <code>member_weight = round(w_b * scale / n_b)</code> where <code>scale = lcm(n_b for all b) / gcd(weights)</code> capped at 100 to avoid huge integers.</li>
+<li>Floor every member weight at 1.</li>
+<li>Skip backends where the ReferenceGrant is missing.</li>
+</ol>
+<p><strong>Health check</strong> for the synthetic pool — single config from priority order:</p>
+<ol>
+<li>Route-level <code>TargetGroupConfig.routeConfigurations[]</code> matching this route+rule.</li>
+<li>First backend's <code>TargetGroupConfig.defaultConfig</code>.</li>
+<li>Controller fallback (TCP check on backend port).</li>
+</ol>
+<p>Conflict (multiple backends with conflicting TGC health-check configs) → <code>ResolvedRefs=False, reason=BackendConfigMismatch</code> on the route.</p>
+<h3 id="36-listenerruleconfig-wiring">3.6 ListenerRuleConfig wiring<a class="headerlink" href="#36-listenerruleconfig-wiring" title="Permanent link">&para;</a></h3>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gateway.networking.k8s.io/v1</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTPRoute</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nt">spec</span><span class="p">:</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span><span class="nt">rules</span><span class="p">:</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">matches</span><span class="p">:</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">PathPrefix</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="nv">/admin</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">filters</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ExtensionRef</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">      </span><span class="nt">extensionRef</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> group</span><span class="p">:</span><span class="w"> </span><span class="nv">gateway.vks.vngcloud.vn</span><span class="p p-Indicator">,</span><span class="nt"> kind</span><span class="p">:</span><span class="w"> </span><span class="nv">ListenerRuleConfig</span><span class="p p-Indicator">,</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">admin-rules</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="nt">backendRefs</span><span class="p">:</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> name</span><span class="p">:</span><span class="w"> </span><span class="nv">admin-svc</span><span class="p p-Indicator">,</span><span class="nt"> port</span><span class="p">:</span><span class="w"> </span><span class="nv">8080</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p><code>admin-rules</code> adds (e.g.) a <code>Header X-Source CONTAINS internal</code> match and a <code>SourceIP STARTS_WITH 10.0.</code> match. Both AND'd onto the policy generated from this rule.</p>
+<p>If an <code>Action</code> is specified in <code>ListenerRuleConfig</code>, it overrides the default <code>REDIRECT_TO_POOL</code> (useful for fixed-response / reject without a backend).</p>
+<p>The ListenerRuleConfig controller maintains a reverse-index (config-name → routes referencing it) so updates trigger route requeues.</p>
+<h3 id="37-targetgroupconfig-wiring">3.7 TargetGroupConfig wiring<a class="headerlink" href="#37-targetgroupconfig-wiring" title="Permanent link">&para;</a></h3>
+<p>Selector cascade per <code>(route, ruleIdx, backendRef)</code>:</p>
+<ol>
+<li>Find TGCs whose <code>targetReference</code> matches the backend Service (in same namespace).</li>
+<li>Among those, prefer entries in <code>routeConfigurations[]</code> matching <code>(route GVK, name, ruleName)</code>; fall back to <code>defaultConfig</code>.</li>
+<li>If multiple TGCs target the same Service, the one with more specific <code>routeConfigurations[]</code> wins; ties broken by oldest-first creation timestamp (with <code>Conflicted=True</code> on the loser).</li>
+</ol>
+<p>A TGC change reverse-indexes to all routes whose backends it targets and requeues each.</p>
+<h3 id="38-watch-reverse-index-map">3.8 Watch &amp; reverse-index map<a class="headerlink" href="#38-watch-reverse-index-map" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Watch source</th>
+<th>Triggers requeue of</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GatewayClass</code></td>
+<td>Self + all Gateways referencing this class</td>
+</tr>
+<tr>
+<td><code>LoadBalancerConfig</code></td>
+<td>All GatewayClasses &amp; Gateways referencing it</td>
+</tr>
+<tr>
+<td><code>Gateway</code></td>
+<td>Self + all routes whose <code>parentRefs</code> resolve to it</td>
+</tr>
+<tr>
+<td><code>HTTPRoute</code></td>
+<td>Self + parent Gateway</td>
+</tr>
+<tr>
+<td><code>Service</code></td>
+<td>All HTTPRoutes whose <code>backendRefs</code> include it</td>
+</tr>
+<tr>
+<td><code>EndpointSlice</code></td>
+<td>Same as Service</td>
+</tr>
+<tr>
+<td><code>Secret</code> (TLS)</td>
+<td>All Gateways whose <code>certificateRefs</code> / <code>frontendValidation</code> include it</td>
+</tr>
+<tr>
+<td><code>ReferenceGrant</code></td>
+<td>All routes / Gateways whose cross-ns refs were previously denied</td>
+</tr>
+<tr>
+<td><code>TargetGroupConfig</code></td>
+<td>All HTTPRoutes whose <code>backendRefs</code> matches</td>
+</tr>
+<tr>
+<td><code>ListenerRuleConfig</code></td>
+<td>All HTTPRoutes whose filters reference it</td>
+</tr>
+</tbody>
+</table>
+<p>Indexes via controller-runtime <code>Manager.GetFieldIndexer()</code> and a small <code>pkg/gateway/reference_indexer.go</code> (mirrors <code>pkg/ingress/reference_indexer.go</code>).</p>
+<h3 id="39-eventual-consistency-notes">3.9 Eventual-consistency notes<a class="headerlink" href="#39-eventual-consistency-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A change to one HTTPRoute requeues only its parent Gateway → Gateway reconcile rebuilds the full policy / pool set for that LB. Idempotent diff drives create / update / delete.</li>
+<li>Per-Gateway reconciles serialized by controller-runtime work queues.</li>
+<li>Status updates batched at end of reconcile (one PATCH per object) to minimize API churn.</li>
+<li>Long-running LB ops (provisioning, listener create) reuse existing requeue-with-backoff machinery from <code>lbc_uc</code>.</li>
+</ul>
+<hr />
+<h2 id="4-status-conditions-events-metrics">4. Status conditions, events, metrics<a class="headerlink" href="#4-status-conditions-events-metrics" title="Permanent link">&para;</a></h2>
+<h3 id="41-status-conditions">4.1 Status conditions<a class="headerlink" href="#41-status-conditions" title="Permanent link">&para;</a></h3>
+<h4 id="gatewayclassstatusconditions"><code>GatewayClass.status.conditions</code><a class="headerlink" href="#gatewayclassstatusconditions" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>True</th>
+<th>False</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Accepted</code></td>
+<td>parametersRef LBC valid + supports the GatewayClass type</td>
+<td>LBC missing / type mismatch / invalid</td>
+<td><code>Accepted</code> / <code>InvalidParameters</code> / <code>Pending</code></td>
+</tr>
+<tr>
+<td><code>SupportedVersion</code></td>
+<td>controller version supports the Gateway API version of the class</td>
+<td>version skew</td>
+<td><code>SupportedVersion</code> / <code>UnsupportedVersion</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="gatewaystatusconditions"><code>Gateway.status.conditions</code><a class="headerlink" href="#gatewaystatusconditions" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>True</th>
+<th>False</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Accepted</code></td>
+<td>spec valid; this controller owns the class; merged config resolved</td>
+<td>invalid spec / unsupported feature / class not accepted</td>
+<td><code>Accepted</code> / <code>InvalidParameters</code> / <code>NotReconciled</code> / <code>UnsupportedAddress</code></td>
+</tr>
+<tr>
+<td><code>Programmed</code></td>
+<td>vngcloud LB created, listeners synced, addresses populated</td>
+<td>LB provisioning failed; listener creation failed</td>
+<td><code>Programmed</code> / <code>Pending</code> / <code>Invalid</code> / <code>NoResources</code> / <code>VngcloudAPIError</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="gatewaystatuslistenersconditions"><code>Gateway.status.listeners[].conditions</code><a class="headerlink" href="#gatewaystatuslistenersconditions" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>True</th>
+<th>False</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Accepted</code></td>
+<td>protocol allowed for this GatewayClass; port unique within Gateway</td>
+<td>mixed protocols / dup port / unsupported feature</td>
+<td><code>Accepted</code> / <code>UnsupportedProtocol</code> / <code>PortUnavailable</code> / <code>Invalid</code></td>
+</tr>
+<tr>
+<td><code>Programmed</code></td>
+<td>listener exists on vngcloud LB</td>
+<td>not yet created / failed</td>
+<td><code>Programmed</code> / <code>Pending</code> / <code>Invalid</code></td>
+</tr>
+<tr>
+<td><code>ResolvedRefs</code></td>
+<td>all <code>certificateRefs</code> and <code>frontendValidation.caCertificateRefs</code> resolved</td>
+<td>grant missing / Secret not found / unsupported group</td>
+<td><code>ResolvedRefs</code> / <code>RefNotPermitted</code> / <code>InvalidCertificateRef</code> / <code>InvalidCACertificateRef</code></td>
+</tr>
+<tr>
+<td><code>Conflicted</code></td>
+<td>always <code>False</code> in v1 (no shared LBs)</td>
+<td>n/a</td>
+<td><code>NoConflicts</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>Gateway.status.listeners[].attachedRoutes</code> recomputed each Gateway reconcile.</p>
+<p><code>Gateway.status.addresses[]</code> populated from vngcloud LB once <code>Programmed=True</code>. <code>IPAddress</code> for public/internal/InterVPC; <code>Hostname</code> if vngcloud assigns DNS-only (future).</p>
+<h4 id="httproutestatusparentsconditions-per-parentref"><code>HTTPRoute.status.parents[].conditions</code> (per parentRef)<a class="headerlink" href="#httproutestatusparentsconditions-per-parentref" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>True</th>
+<th>False</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Accepted</code></td>
+<td>parent Gateway exists, allows route kind, namespace allowed</td>
+<td>listener restricts kind / ns / hostname</td>
+<td><code>Accepted</code> / <code>NotAllowedByListeners</code> / <code>NoMatchingListenerHostname</code> / <code>NoMatchingParent</code></td>
+</tr>
+<tr>
+<td><code>ResolvedRefs</code></td>
+<td>all <code>backendRefs</code> and <code>extensionRef</code> filters resolved</td>
+<td>backend missing / wrong kind / cross-ns denied / TGC/LRC unresolved</td>
+<td><code>ResolvedRefs</code> / <code>BackendNotFound</code> / <code>RefNotPermitted</code> / <code>InvalidKind</code> / <code>InvalidExtensionRef</code></td>
+</tr>
+<tr>
+<td><code>PartiallyInvalid</code> (when at least one rule programmed but some dropped)</td>
+<td>per spec</td>
+<td>n/a</td>
+<td><code>UnsupportedValue</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="custom-crd-status">Custom CRD status<a class="headerlink" href="#custom-crd-status" title="Permanent link">&para;</a></h4>
+<p><code>TargetGroupConfig.status</code> and <code>ListenerRuleConfig.status</code>:</p>
+<ul>
+<li><code>Accepted</code> — schema valid, target exists.</li>
+<li><code>Conflicted</code> — <code>True</code> when another higher-specificity TGC also targets the same Service+route.</li>
+<li><code>InUse</code> — <code>True</code> when at least one route currently references this config.</li>
+</ul>
+<p><code>LoadBalancerConfig.status</code> (existing, extended) gets a new condition <code>ReferencedByGateway</code> (informational).</p>
+<h3 id="42-kubernetes-events">4.2 Kubernetes Events<a class="headerlink" href="#42-kubernetes-events" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Reconciler</th>
+<th>Event reason examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GatewayClass</td>
+<td><code>Accepted</code>, <code>InvalidParameters</code>, <code>LBCMissing</code></td>
+</tr>
+<tr>
+<td>Gateway</td>
+<td><code>LoadBalancerCreated</code>, <code>ListenerCreated</code>, <code>LoadBalancerProvisioningFailed</code>, <code>ConfigMergeFailed</code></td>
+</tr>
+<tr>
+<td>HTTPRoute</td>
+<td><code>RouteAttached</code>, <code>RouteDetached</code>, <code>BackendDropped</code>, <code>UnsupportedFilter</code></td>
+</tr>
+<tr>
+<td>TargetGroupConfig</td>
+<td><code>Conflict</code>, <code>TargetServiceMissing</code></td>
+</tr>
+<tr>
+<td>ListenerRuleConfig</td>
+<td><code>ReferencedByRoute</code>, <code>InvalidActionForListener</code></td>
+</tr>
+</tbody>
+</table>
+<p>Reuses existing <code>eventRecorder</code> plumbing.</p>
+<h3 id="43-prometheus-metrics">4.3 Prometheus metrics<a class="headerlink" href="#43-prometheus-metrics" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a># counters
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>gateway_api_reconcile_total{controller,result}
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>gateway_api_resource_count{kind,namespace,gateway_class}
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>gateway_api_listener_count{gateway_class,protocol}
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>gateway_api_route_attached_total{gateway_class}
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>gateway_api_unsupported_feature_total{kind,feature}     # informs Phase-3 prioritization
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>gateway_api_refgrant_denied_total{namespace,kind}
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a># histograms
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>gateway_api_reconcile_duration_seconds{controller,result}
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>gateway_api_lb_provisioning_seconds{gateway_class}
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a># gauges
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>gateway_api_lb_total{gateway_class,scheme}
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>gateway_api_synthetic_pool_total
+</code></pre></div>
+<p><code>metricsutil.ReconcileCounters</code> extended with <code>IncrementGateway</code> / <code>IncrementHTTPRoute</code>.</p>
+<h3 id="44-logging">4.4 Logging<a class="headerlink" href="#44-logging" title="Permanent link">&para;</a></h3>
+<p>Reuses existing <code>contexts</code> package. Log-name conventions: <code>gw/&lt;ns&gt;/&lt;name&gt;</code>, <code>httproute/&lt;ns&gt;/&lt;name&gt;</code>, <code>gwc/&lt;name&gt;</code>, <code>tgc/&lt;ns&gt;/&lt;name&gt;</code>, <code>lrc/&lt;ns&gt;/&lt;name&gt;</code>.</p>
+<h3 id="45-finalizer-strategy">4.5 Finalizer strategy<a class="headerlink" href="#45-finalizer-strategy" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Finalizer</th>
+<th>Cleanup action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Gateway</code></td>
+<td><code>gateway.vks.vngcloud.vn/resources</code></td>
+<td>Delete vngcloud LB, drop owner labels, deindex routes</td>
+</tr>
+<tr>
+<td><code>HTTPRoute</code></td>
+<td><code>gateway.vks.vngcloud.vn/route</code></td>
+<td>Trigger parent Gateway reconcile</td>
+</tr>
+<tr>
+<td><code>TargetGroupConfig</code> / <code>ListenerRuleConfig</code></td>
+<td>none</td>
+<td>Pure config; deletion = recompute downstream routes</td>
+</tr>
+</tbody>
+</table>
+<p>Deletion ordering: HTTPRoutes detach → parent Gateway reconciles → finalizer removed when policies / pools gone. Gateway finalizer removed last when LB cleanup completes.</p>
+<h3 id="46-readiness-liveness">4.6 Readiness / liveness<a class="headerlink" href="#46-readiness-liveness" title="Permanent link">&para;</a></h3>
+<p>No probe-endpoint changes. New reconcilers respect the <code>initDone</code> atomic-bool gate pattern (1s requeue while uninitialized). Fail-open on probe.</p>
+<hr />
+<h2 id="5-implementation-plan-file-layout">5. Implementation plan &amp; file layout<a class="headerlink" href="#5-implementation-plan-file-layout" title="Permanent link">&para;</a></h2>
+<h3 id="51-full-package-layout-after-all-4-phases">5.1 Full package layout (after all 4 phases)<a class="headerlink" href="#51-full-package-layout-after-all-4-phases" title="Permanent link">&para;</a></h3>
+<p>New files marked <strong>[new]</strong>, modified existing files marked <strong>[mod]</strong>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>api/
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>├── v1alpha1/
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>│   ├── loadbalancerconfig_types.go               [mod] add MergingMode + SSLPolicy/ALPNPolicy on Listener
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>│   ├── zz_generated.deepcopy.go                  [mod] regenerated
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>│   └── ... (existing files unchanged)
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>└── gateway/v1alpha1/                             [new group]
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    ├── groupversion_info.go                      [new]
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>    ├── targetgroupconfig_types.go                [new]
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>    ├── listenerruleconfig_types.go               [new]
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    └── zz_generated.deepcopy.go                  [new generated]
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>cmd/
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>└── main.go                                       [mod] register Gateway API scheme,
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>                                                        feature gates, new reconcilers
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>internal/controller/
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>├── ... (existing controllers unchanged) ...
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>└── gateway/                                      [new]
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>    ├── shared/                                   [new]
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>    │   ├── classifier.go                         protocol → GatewayClass type, listener validation
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>    │   ├── status.go                             condition helpers
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>    │   ├── reference_indexer.go                  reverse indexes (Service, Secret, RG, TGC, LRC, LBC)
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>    │   ├── finalizer.go
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>    │   ├── policy_order.go                       Gateway API match-specificity ordering
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>    │   └── eventhandlers/                        cross-resource enqueue helpers
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a>    ├── alb/                                      [new — Phase 1]
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>    │   ├── gatewayclass_controller.go
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a>    │   ├── gateway_controller.go
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a>    │   ├── httproute_controller.go
+<a id="__codelineno-11-30" name="__codelineno-11-30" href="#__codelineno-11-30"></a>    │   ├── grpcroute_controller.go               [Phase 3]
+<a id="__codelineno-11-31" name="__codelineno-11-31" href="#__codelineno-11-31"></a>    │   ├── *_test.go
+<a id="__codelineno-11-32" name="__codelineno-11-32" href="#__codelineno-11-32"></a>    │   ├── helpers_test.go
+<a id="__codelineno-11-33" name="__codelineno-11-33" href="#__codelineno-11-33"></a>    │   └── suite_test.go
+<a id="__codelineno-11-34" name="__codelineno-11-34" href="#__codelineno-11-34"></a>    ├── nlb/                                      [new — Phase 2]
+<a id="__codelineno-11-35" name="__codelineno-11-35" href="#__codelineno-11-35"></a>    │   ├── gatewayclass_controller.go
+<a id="__codelineno-11-36" name="__codelineno-11-36" href="#__codelineno-11-36"></a>    │   ├── gateway_controller.go
+<a id="__codelineno-11-37" name="__codelineno-11-37" href="#__codelineno-11-37"></a>    │   ├── tcproute_controller.go
+<a id="__codelineno-11-38" name="__codelineno-11-38" href="#__codelineno-11-38"></a>    │   ├── udproute_controller.go
+<a id="__codelineno-11-39" name="__codelineno-11-39" href="#__codelineno-11-39"></a>    │   ├── tlsroute_controller.go
+<a id="__codelineno-11-40" name="__codelineno-11-40" href="#__codelineno-11-40"></a>    │   ├── *_test.go
+<a id="__codelineno-11-41" name="__codelineno-11-41" href="#__codelineno-11-41"></a>    │   └── suite_test.go
+<a id="__codelineno-11-42" name="__codelineno-11-42" href="#__codelineno-11-42"></a>    ├── targetgroupconfig/                        [new — Phase 1, validation only]
+<a id="__codelineno-11-43" name="__codelineno-11-43" href="#__codelineno-11-43"></a>    │   ├── controller.go
+<a id="__codelineno-11-44" name="__codelineno-11-44" href="#__codelineno-11-44"></a>    │   └── controller_test.go
+<a id="__codelineno-11-45" name="__codelineno-11-45" href="#__codelineno-11-45"></a>    └── listenerruleconfig/                       [new — Phase 1, validation only]
+<a id="__codelineno-11-46" name="__codelineno-11-46" href="#__codelineno-11-46"></a>        ├── controller.go
+<a id="__codelineno-11-47" name="__codelineno-11-47" href="#__codelineno-11-47"></a>        └── controller_test.go
+<a id="__codelineno-11-48" name="__codelineno-11-48" href="#__codelineno-11-48"></a>
+<a id="__codelineno-11-49" name="__codelineno-11-49" href="#__codelineno-11-49"></a>internal/usecase/
+<a id="__codelineno-11-50" name="__codelineno-11-50" href="#__codelineno-11-50"></a>├── contracts.go                                  [mod] add GatewayClassUseCase, GatewayUseCase, RouteUseCase
+<a id="__codelineno-11-51" name="__codelineno-11-51" href="#__codelineno-11-51"></a>├── mocks.go                                      [mod] regenerated
+<a id="__codelineno-11-52" name="__codelineno-11-52" href="#__codelineno-11-52"></a>├── gateway_uc/                                   [new]
+<a id="__codelineno-11-53" name="__codelineno-11-53" href="#__codelineno-11-53"></a>│   ├── shared/                                   [new]
+<a id="__codelineno-11-54" name="__codelineno-11-54" href="#__codelineno-11-54"></a>│   │   ├── merge_config.go                       LBC merging
+<a id="__codelineno-11-55" name="__codelineno-11-55" href="#__codelineno-11-55"></a>│   │   ├── tgc_resolver.go                       cascading TGC selector
+<a id="__codelineno-11-56" name="__codelineno-11-56" href="#__codelineno-11-56"></a>│   │   ├── lrc_resolver.go                       LRC ExtensionRef resolution
+<a id="__codelineno-11-57" name="__codelineno-11-57" href="#__codelineno-11-57"></a>│   │   ├── refgrant.go                           ReferenceGrant evaluation
+<a id="__codelineno-11-58" name="__codelineno-11-58" href="#__codelineno-11-58"></a>│   │   └── *_test.go
+<a id="__codelineno-11-59" name="__codelineno-11-59" href="#__codelineno-11-59"></a>│   ├── alb_gateway_uc/                           [new — Phase 1]
+<a id="__codelineno-11-60" name="__codelineno-11-60" href="#__codelineno-11-60"></a>│   │   ├── gateway_uc.go                         Init / Ensure / Delete
+<a id="__codelineno-11-61" name="__codelineno-11-61" href="#__codelineno-11-61"></a>│   │   ├── build_lb.go                           Gateway → vngcloud LB params
+<a id="__codelineno-11-62" name="__codelineno-11-62" href="#__codelineno-11-62"></a>│   │   ├── build_listener.go                     Gateway listener → vngcloud Listener
+<a id="__codelineno-11-63" name="__codelineno-11-63" href="#__codelineno-11-63"></a>│   │   ├── build_pool.go                         synthetic pool (weights, health checks)
+<a id="__codelineno-11-64" name="__codelineno-11-64" href="#__codelineno-11-64"></a>│   │   ├── build_policy.go                       HTTPRoute rule × match × filter → Policy
+<a id="__codelineno-11-65" name="__codelineno-11-65" href="#__codelineno-11-65"></a>│   │   ├── build_cert.go                         Secret-import or cert-ID
+<a id="__codelineno-11-66" name="__codelineno-11-66" href="#__codelineno-11-66"></a>│   │   ├── build_sec_group.go                    inherits NSG behavior from Ingress
+<a id="__codelineno-11-67" name="__codelineno-11-67" href="#__codelineno-11-67"></a>│   │   ├── status.go
+<a id="__codelineno-11-68" name="__codelineno-11-68" href="#__codelineno-11-68"></a>│   │   └── *_test.go
+<a id="__codelineno-11-69" name="__codelineno-11-69" href="#__codelineno-11-69"></a>│   └── nlb_gateway_uc/                           [new — Phase 2]
+<a id="__codelineno-11-70" name="__codelineno-11-70" href="#__codelineno-11-70"></a>│       └── ...
+<a id="__codelineno-11-71" name="__codelineno-11-71" href="#__codelineno-11-71"></a>
+<a id="__codelineno-11-72" name="__codelineno-11-72" href="#__codelineno-11-72"></a>internal/repository/
+<a id="__codelineno-11-73" name="__codelineno-11-73" href="#__codelineno-11-73"></a>├── contracts.go                                  unchanged in v1
+<a id="__codelineno-11-74" name="__codelineno-11-74" href="#__codelineno-11-74"></a>├── k8s_repo/                                     unchanged
+<a id="__codelineno-11-75" name="__codelineno-11-75" href="#__codelineno-11-75"></a>├── vngcloud_repo/                                unchanged
+<a id="__codelineno-11-76" name="__codelineno-11-76" href="#__codelineno-11-76"></a>└── mocks.go                                      [mod] regenerated
+<a id="__codelineno-11-77" name="__codelineno-11-77" href="#__codelineno-11-77"></a>
+<a id="__codelineno-11-78" name="__codelineno-11-78" href="#__codelineno-11-78"></a>internal/domain/
+<a id="__codelineno-11-79" name="__codelineno-11-79" href="#__codelineno-11-79"></a>└── domain.go                                     [mod] add GatewayFinalizer, owner-kind constants
+<a id="__codelineno-11-80" name="__codelineno-11-80" href="#__codelineno-11-80"></a>
+<a id="__codelineno-11-81" name="__codelineno-11-81" href="#__codelineno-11-81"></a>pkg/
+<a id="__codelineno-11-82" name="__codelineno-11-82" href="#__codelineno-11-82"></a>├── consts/consts.go                              [mod] new GatewayClass controller-name constants
+<a id="__codelineno-11-83" name="__codelineno-11-83" href="#__codelineno-11-83"></a>├── metrics/lbc/                                  [mod] expose Gateway counters
+<a id="__codelineno-11-84" name="__codelineno-11-84" href="#__codelineno-11-84"></a>├── metrics/util/reconcile_counters.go            [mod] add IncrementGateway / IncrementHTTPRoute
+<a id="__codelineno-11-85" name="__codelineno-11-85" href="#__codelineno-11-85"></a>└── gateway/                                      [new]
+<a id="__codelineno-11-86" name="__codelineno-11-86" href="#__codelineno-11-86"></a>    ├── gatewayapi_utils.go                       hostname matchers, wildcard → regex, proto helpers
+<a id="__codelineno-11-87" name="__codelineno-11-87" href="#__codelineno-11-87"></a>    ├── synth_pool.go                             pool-name hashing helpers
+<a id="__codelineno-11-88" name="__codelineno-11-88" href="#__codelineno-11-88"></a>    └── *_test.go
+<a id="__codelineno-11-89" name="__codelineno-11-89" href="#__codelineno-11-89"></a>
+<a id="__codelineno-11-90" name="__codelineno-11-90" href="#__codelineno-11-90"></a>charts/vngcloud-load-balancer-controller/
+<a id="__codelineno-11-91" name="__codelineno-11-91" href="#__codelineno-11-91"></a>├── templates/
+<a id="__codelineno-11-92" name="__codelineno-11-92" href="#__codelineno-11-92"></a>│   ├── crds/                                     [mod] add tgc.yaml, lrc.yaml; updated lbc.yaml
+<a id="__codelineno-11-93" name="__codelineno-11-93" href="#__codelineno-11-93"></a>│   ├── gatewayclass-alb.yaml                     [new — Phase 1]
+<a id="__codelineno-11-94" name="__codelineno-11-94" href="#__codelineno-11-94"></a>│   ├── gatewayclass-nlb.yaml                     [new — Phase 2]
+<a id="__codelineno-11-95" name="__codelineno-11-95" href="#__codelineno-11-95"></a>│   ├── rbac/                                     [mod]
+<a id="__codelineno-11-96" name="__codelineno-11-96" href="#__codelineno-11-96"></a>│   └── manager-deployment.yaml                   [mod] feature-gate flags
+<a id="__codelineno-11-97" name="__codelineno-11-97" href="#__codelineno-11-97"></a>└── values.yaml                                   [mod] gatewayApi.{alb,nlb}.enabled toggles
+<a id="__codelineno-11-98" name="__codelineno-11-98" href="#__codelineno-11-98"></a>
+<a id="__codelineno-11-99" name="__codelineno-11-99" href="#__codelineno-11-99"></a>config/                                           [mod throughout — kubebuilder-managed]
+<a id="__codelineno-11-100" name="__codelineno-11-100" href="#__codelineno-11-100"></a>
+<a id="__codelineno-11-101" name="__codelineno-11-101" href="#__codelineno-11-101"></a>docs/                                             [mod throughout]
+<a id="__codelineno-11-102" name="__codelineno-11-102" href="#__codelineno-11-102"></a>├── guide/
+<a id="__codelineno-11-103" name="__codelineno-11-103" href="#__codelineno-11-103"></a>│   ├── gateway-api.md                            [new]
+<a id="__codelineno-11-104" name="__codelineno-11-104" href="#__codelineno-11-104"></a>│   ├── gateway-alb.md                            [new — Phase 1]
+<a id="__codelineno-11-105" name="__codelineno-11-105" href="#__codelineno-11-105"></a>│   ├── gateway-nlb.md                            [new — Phase 2]
+<a id="__codelineno-11-106" name="__codelineno-11-106" href="#__codelineno-11-106"></a>│   ├── gateway-extensions.md                     [new — Phase 1]
+<a id="__codelineno-11-107" name="__codelineno-11-107" href="#__codelineno-11-107"></a>│   └── gateway-migration.md                      [new — Phase 4]
+<a id="__codelineno-11-108" name="__codelineno-11-108" href="#__codelineno-11-108"></a>└── examples/                                     [new]
+<a id="__codelineno-11-109" name="__codelineno-11-109" href="#__codelineno-11-109"></a>
+<a id="__codelineno-11-110" name="__codelineno-11-110" href="#__codelineno-11-110"></a>test/                                             [mod throughout]
+<a id="__codelineno-11-111" name="__codelineno-11-111" href="#__codelineno-11-111"></a>├── e2e/gateway/                                  [new]
+<a id="__codelineno-11-112" name="__codelineno-11-112" href="#__codelineno-11-112"></a>└── conformance/                                  [new — Phase 4]
+<a id="__codelineno-11-113" name="__codelineno-11-113" href="#__codelineno-11-113"></a>
+<a id="__codelineno-11-114" name="__codelineno-11-114" href="#__codelineno-11-114"></a>go.mod                                            [mod] add sigs.k8s.io/gateway-api
+<a id="__codelineno-11-115" name="__codelineno-11-115" href="#__codelineno-11-115"></a>PROJECT                                           [mod] register new resources via kubebuilder
+</code></pre></div>
+<h3 id="52-new-go-module-dependencies">5.2 New Go module dependencies<a class="headerlink" href="#52-new-go-module-dependencies" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nx">require</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="nx">sigs</span><span class="p">.</span><span class="nx">k8s</span><span class="p">.</span><span class="nx">io</span><span class="o">/</span><span class="nx">gateway</span><span class="o">-</span><span class="nx">api</span><span class="w"> </span><span class="nx">v1</span><span class="mf">.2.0</span><span class="w">   </span><span class="c1">// Standard channel covering HTTPRoute / GRPCRoute / RG</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="p">)</span>
+</code></pre></div>
+<p>(Phase 4 conformance pulls <code>sigs.k8s.io/gateway-api/conformance</code> as a test-only dep.)</p>
+<h3 id="53-manager-wiring-cmdmaingo-deltas">5.3 Manager wiring (<code>cmd/main.go</code> deltas)<a class="headerlink" href="#53-manager-wiring-cmdmaingo-deltas" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">import</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nx">gwv1</span><span class="w"> </span><span class="s">&quot;sigs.k8s.io/gateway-api/apis/v1&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nx">gwv1alpha2</span><span class="w"> </span><span class="s">&quot;sigs.k8s.io/gateway-api/apis/v1alpha2&quot;</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nx">gwvksv1alpha1</span><span class="w"> </span><span class="s">&quot;github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1&quot;</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nx">albgw</span><span class="w"> </span><span class="s">&quot;github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/alb&quot;</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="s">&quot;github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/alb_gateway_uc&quot;</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="nx">utilruntime</span><span class="p">.</span><span class="nx">Must</span><span class="p">(</span><span class="nx">gwv1</span><span class="p">.</span><span class="nx">Install</span><span class="p">(</span><span class="nx">scheme</span><span class="p">))</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="nx">utilruntime</span><span class="p">.</span><span class="nx">Must</span><span class="p">(</span><span class="nx">gwv1alpha2</span><span class="p">.</span><span class="nx">Install</span><span class="p">(</span><span class="nx">scheme</span><span class="p">))</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="nx">utilruntime</span><span class="p">.</span><span class="nx">Must</span><span class="p">(</span><span class="nx">gwvksv1alpha1</span><span class="p">.</span><span class="nx">AddToScheme</span><span class="p">(</span><span class="nx">scheme</span><span class="p">))</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="nx">flag</span><span class="p">.</span><span class="nx">BoolVar</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">Gateway</span><span class="p">.</span><span class="nx">ALBEnabled</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;enable-gateway-api-alb&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Enable the ALB Gateway API controller (Phase 1).&quot;</span><span class="p">)</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="nx">flag</span><span class="p">.</span><span class="nx">BoolVar</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">Gateway</span><span class="p">.</span><span class="nx">NLBEnabled</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;enable-gateway-api-nlb&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Enable the NLB Gateway API controller (Phase 2+).&quot;</span><span class="p">)</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="k">if</span><span class="w"> </span><span class="nx">cfg</span><span class="p">.</span><span class="nx">Gateway</span><span class="p">.</span><span class="nx">ALBEnabled</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">    </span><span class="nx">albUC</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">alb_gateway_uc</span><span class="p">.</span><span class="nx">NewALBGatewayUseCase</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">albgw</span><span class="p">.</span><span class="nx">NewGatewayClassReconciler</span><span class="p">(</span><span class="o">...</span><span class="p">).</span><span class="nx">SetupWithManager</span><span class="p">(</span><span class="nx">mgr</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">albgw</span><span class="p">.</span><span class="nx">NewGatewayReconciler</span><span class="p">(</span><span class="nx">albUC</span><span class="p">,</span><span class="w"> </span><span class="o">...</span><span class="p">).</span><span class="nx">SetupWithManager</span><span class="p">(</span><span class="nx">mgr</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">albgw</span><span class="p">.</span><span class="nx">NewHTTPRouteReconciler</span><span class="p">(</span><span class="nx">albUC</span><span class="p">,</span><span class="w"> </span><span class="o">...</span><span class="p">).</span><span class="nx">SetupWithManager</span><span class="p">(</span><span class="nx">mgr</span><span class="p">);</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="o">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="p">}</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="c1">// TGC + LRC validation controllers always-on if any Gateway controller is on.</span>
+</code></pre></div>
+<p>Feature gates make the controller safe to upgrade in place — existing deployments don't suddenly start reconciling Gateway resources unless explicitly enabled.</p>
+<h3 id="54-mocking-test-strategy">5.4 Mocking &amp; test strategy<a class="headerlink" href="#54-mocking-test-strategy" title="Permanent link">&para;</a></h3>
+<p><strong>Unit tests</strong> — table-driven, gomock-generated mocks for <code>K8sRepository</code> / <code>VngCloudRepository</code>. Coverage targets parity with existing Ingress controller (~70% line, all <code>build_*</code> paths covered):</p>
+<ul>
+<li><code>build_listener_test.go</code> — protocol + TLS combos, cert-ID vs Secret precedence, mTLS resolution.</li>
+<li><code>build_pool_test.go</code> — synthetic-pool naming determinism, weight scaling, RG-denied-backend dropping, conflicting health-check detection.</li>
+<li><code>build_policy_test.go</code> — match cartesian, policy-position ordering, LRC additional-match composition.</li>
+<li><code>merge_config_test.go</code> — <code>PreferGateway</code> vs <code>PreferGatewayClass</code>, list-merge semantics, conflict tags.</li>
+<li><code>tgc_resolver_test.go</code> — cascade specificity, oldest-wins tiebreak, conflict-condition emission.</li>
+<li><code>refgrant_test.go</code> — allow / deny matrix; covers Secrets, Services, custom CRDs.</li>
+</ul>
+<p><strong>Suite tests</strong> (envtest) — one per reconciler, mirroring <code>internal/controller/networking/suite_test.go</code>. Validates reconcile-on-event for each watch in §3.8.</p>
+<p><strong>E2E tests</strong> — under <code>test/e2e/gateway/</code>, run against a real vngcloud LB. Gated by env var; skipped in CI by default.</p>
+<p><strong>Conformance</strong> — <code>test/conformance/conformance_test.go</code> runs the upstream Gateway API conformance suite. Phase 4 deliverable.</p>
+<h3 id="55-codegen-make-targets">5.5 Codegen / make targets<a class="headerlink" href="#55-codegen-make-targets" title="Permanent link">&para;</a></h3>
+<p>Existing <code>make generate manifests test</code> covers all generation. New entries:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>.PHONY: gateway-conformance
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>gateway-conformance: ## Run upstream Gateway API conformance suite (Phase 4)
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    go test ./test/conformance/... -tags=conformance -v
+</code></pre></div>
+<p>No mockery config changes (existing config picks up new interfaces automatically).</p>
+<h3 id="56-backward-compat-rollout-safety">5.6 Backward-compat / rollout safety<a class="headerlink" href="#56-backward-compat-rollout-safety" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CRD changes are additive</strong> — <code>LoadBalancerConfig</code> gets new optional fields only; existing manifests keep applying cleanly.</li>
+<li><strong>No changes</strong> to existing Service / Ingress / GLB / LBC / NSG controller behavior.</li>
+<li><strong>Feature gates default-off initially</strong> — opt-in upgrade. ALB flips to <code>true</code> after one minor cycle in production.</li>
+<li><strong>CRD bundle versioning</strong> — Helm chart's <code>Chart.yaml</code> minor-version bumped per phase. CRDs ship <code>served: true, storage: true</code> for v1alpha1 only initially; promotion to v1beta1/v1 deferred until conformance (Phase 4).</li>
+<li><strong>Webhook conversion</strong> — none required in v1alpha1.</li>
+</ul>
+<hr />
+<h2 id="6-phasing-roadmap">6. Phasing roadmap<a class="headerlink" href="#6-phasing-roadmap" title="Permanent link">&para;</a></h2>
+<h3 id="phase-1-l7-mvp">Phase 1 — L7 MVP<a class="headerlink" href="#phase-1-l7-mvp" title="Permanent link">&para;</a></h3>
+<p><strong>Scope</strong></p>
+<ul>
+<li><code>vngcloud-alb</code> GatewayClass + reconciler.</li>
+<li><code>Gateway</code> reconciler (ALB only): provisions LB; listeners HTTP / HTTPS / TLS-Terminate.</li>
+<li><code>HTTPRoute</code> reconciler: hostnames, path matches (Exact / PathPrefix / RegularExpression), weighted backendRefs (synthetic merged pool), <code>RequestRedirect</code> filter, listener-uniform <code>RequestHeaderModifier(set)</code> filter, <code>ExtensionRef → ListenerRuleConfig</code>.</li>
+<li><code>LoadBalancerConfig</code> extension: <code>MergingMode</code>, <code>SSLPolicy</code>, <code>ALPNPolicy</code>.</li>
+<li><code>TargetGroupConfig</code> CRD + validation controller.</li>
+<li><code>ListenerRuleConfig</code> CRD + validation controller (Header / QueryParam / Method / SourceIP matches; Reject + Redirect actions; FixedResponse marked unsupported pending vngcloud).</li>
+<li><code>ReferenceGrant</code> honored for backendRefs and TLS Secret refs.</li>
+<li>TLS via Secret import + cert IDs via LBC <code>Listener.certificateDefault.id</code>.</li>
+<li>mTLS via <code>frontendValidation.caCertificateRefs</code> + LBC <code>clientCertificateId</code>.</li>
+<li>Status conditions per §4.</li>
+<li>Events + new Prometheus metrics.</li>
+<li>Helm chart updates: opt-in via <code>gatewayApi.alb.enabled</code> (default <code>false</code> initially → <code>true</code> after one stable minor cycle).</li>
+</ul>
+<p><strong>Deliverables</strong></p>
+<ul>
+<li>All [new] / [mod] files in §5.1 marked Phase 1.</li>
+<li>Unit + suite test coverage parity with existing Ingress controller (~70 % line).</li>
+<li>5 e2e tests (basic HTTP, HTTPS+SNI, mTLS, weighted canary, cross-namespace via RG).</li>
+<li>4 user docs (<code>gateway-api.md</code>, <code>gateway-alb.md</code>, <code>gateway-extensions.md</code>, <code>examples/gateway-canary.md</code>).</li>
+</ul>
+<p><strong>Success criteria</strong></p>
+<ul>
+<li>A user can install the chart with <code>gatewayApi.alb.enabled=true</code>, apply a sample manifest, see <code>Gateway.status.addresses</code> populated, and curl through the LB.</li>
+<li>Deleting a Gateway cleans up the vngcloud LB; deleting a single HTTPRoute removes its policies / pools without disturbing the LB or sibling routes.</li>
+<li>Existing controllers behave identically before and after upgrade.</li>
+<li><code>make test</code> passes; <code>make e2e-gateway</code> passes against a real cluster.</li>
+</ul>
+<h3 id="phase-2-l4">Phase 2 — L4<a class="headerlink" href="#phase-2-l4" title="Permanent link">&para;</a></h3>
+<p><strong>Scope</strong></p>
+<ul>
+<li><code>vngcloud-nlb</code> GatewayClass + reconciler.</li>
+<li><code>Gateway</code> reconciler (NLB): TCP / UDP listeners, TLS-Passthrough listeners.</li>
+<li><code>TCPRoute</code>, <code>UDPRoute</code>, <code>TLSRoute</code> reconcilers.</li>
+<li>Reuses NLB build paths from existing <code>service_uc</code>.</li>
+<li>Helm chart: <code>gatewayApi.nlb.enabled</code> (default <code>false</code> until stable).</li>
+</ul>
+<p><strong>Deliverables</strong></p>
+<ul>
+<li>All [new]/[mod] files in §5.1 marked Phase 2.</li>
+<li>4 e2e tests (TCP echo, UDP DNS, TLS-Passthrough SNI routing, mixed-RouteKinds attachment).</li>
+<li>2 user docs (<code>gateway-nlb.md</code>, <code>examples/gateway-tls-passthrough.md</code>).</li>
+</ul>
+<p><strong>Success criteria</strong></p>
+<ul>
+<li>A <code>Gateway</code> with TCP/UDP listener provisions an NLB and routes traffic to the referenced backend.</li>
+<li>TLSRoute SNI selection works for ≥ 2 hostnames on one listener.</li>
+<li>Mixed L4+L7 listeners on a single Gateway are explicitly rejected.</li>
+</ul>
+<h3 id="phase-3-extensions-advanced">Phase 3 — Extensions &amp; advanced<a class="headerlink" href="#phase-3-extensions-advanced" title="Permanent link">&para;</a></h3>
+<p><strong>Scope</strong></p>
+<ul>
+<li><code>GRPCRoute</code> reconciler (depends on vngcloud HTTP/2 + gRPC support; if absent, ship as Unsupported with documented reason).</li>
+<li><code>BackendTLSPolicy</code> (Standard channel since Gateway API v1.2): wires to existing pool <code>EnableTLSEncryption</code>.</li>
+<li>Validation webhook for <code>LoadBalancerConfig</code>: reject <code>Listener</code> entries whose <code>protocol</code> / <code>protocolPort</code> conflict with the referenced Gateway listener (catches misconfig at apply time instead of via <code>Programmed=False</code> after reconcile).</li>
+<li><code>ListenerRuleConfig</code>: add <code>FixedResponse</code> action iff vngcloud LB exposes it.</li>
+<li>Promote header / method matches from <code>ListenerRuleConfig.AdditionalMatches</code> into core HTTPRoute matches if vngcloud gains native support (LRC fields emit <code>Deprecated</code> condition and continue working).</li>
+<li>Optional: <code>RequestMirror</code>, <code>URLRewrite</code>, <code>ResponseHeaderModifier</code> — implemented only if vngcloud LB ships native support; otherwise stay <code>Unsupported</code>.</li>
+</ul>
+<p><strong>Deliverables</strong></p>
+<ul>
+<li>New reconcilers + tests for whichever items are in scope.</li>
+<li>Updates to <code>gateway-extensions.md</code>.</li>
+</ul>
+<p><strong>Success criteria</strong></p>
+<ul>
+<li>For each implemented Phase-3 feature: e2e test green, conformance suite picks up the new capability flag.</li>
+</ul>
+<h3 id="phase-4-migration-tool-conformance-polish">Phase 4 — Migration tool, conformance, polish<a class="headerlink" href="#phase-4-migration-tool-conformance-polish" title="Permanent link">&para;</a></h3>
+<p><strong>Scope</strong></p>
+<ul>
+<li>One-shot migration: <code>gateway.vks.vngcloud.vn/adopt-from-ingress: &lt;namespace&gt;/&lt;name&gt;</code> annotation. Controller verifies the named Ingress is in the same namespace, transfers ownership labels on the existing vngcloud LB, marks the Ingress with a "migrated" finalizer (so subsequent edits are ignored), and reports <code>Programmed=True</code> against the old LB.</li>
+<li>Upstream Gateway API conformance suite (<code>test/conformance/</code>) green for: <code>Gateway</code>, <code>HTTPRoute</code> (Core), <code>ReferenceGrant</code>, <code>Mesh:false</code>. Documented capability matrix.</li>
+<li>CRD promotion path: v1alpha1 → v1beta1 (no schema changes if possible).</li>
+<li>Stable feature gates (default-on); doc audit.</li>
+</ul>
+<p><strong>Deliverables</strong></p>
+<ul>
+<li>Migration controller code + <code>gateway-migration.md</code> runbook.</li>
+<li>Conformance test job in CI (<code>make gateway-conformance</code>).</li>
+<li><code>docs/guide/gateway-conformance-matrix.md</code> listing every Gateway API feature with <code>Supported / Partial / Unsupported (reason)</code>.</li>
+</ul>
+<p><strong>Success criteria</strong></p>
+<ul>
+<li>One existing Ingress can be cut over to a Gateway without downtime or DNS change (verified e2e).</li>
+<li>Conformance tests pass for every feature claimed <code>Supported</code> in the capability matrix.</li>
+</ul>
+<hr />
+<h2 id="7-risks-mitigations">7. Risks &amp; mitigations<a class="headerlink" href="#7-risks-mitigations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>vngcloud LB API rate limits</strong> under heavy reconciles</td>
+<td>Med</td>
+<td>High</td>
+<td>Per-Gateway serialized reconcile (already designed); coalesce policy diff into one batched listener-update; existing backoff machinery in <code>lbc_uc</code></td>
+</tr>
+<tr>
+<td><strong>Synthetic pool weight scaling explodes integers</strong></td>
+<td>Med</td>
+<td>Med</td>
+<td>Cap product at 100; round with bias toward larger backends; unit-test with fuzz inputs</td>
+</tr>
+<tr>
+<td><strong>Reference-Grant denial silently drops a backend</strong></td>
+<td>Med</td>
+<td>High</td>
+<td><code>ResolvedRefs=False, reason=RefNotPermitted</code> + Warning event + Prometheus counter <code>gateway_api_refgrant_denied_total</code></td>
+</tr>
+<tr>
+<td><strong>Concurrent endpoint churn during weight rescaling causes pool flapping</strong></td>
+<td>Low</td>
+<td>Med</td>
+<td>2 s coalescing window when triggered by EndpointSlice change</td>
+</tr>
+<tr>
+<td><strong>Listener cert-ID in LBC conflicts with Secret-imported cert</strong></td>
+<td>Low</td>
+<td>Low</td>
+<td>LBC wins; document precedence; emit Warning event</td>
+</tr>
+<tr>
+<td><strong>Unsupported-feature requests pile up</strong> (URLRewrite, mirror, etc.)</td>
+<td>Med</td>
+<td>Med</td>
+<td><code>gateway_api_unsupported_feature_total</code> metric → product feedback to vngcloud LB team; documented capability matrix sets expectations</td>
+</tr>
+<tr>
+<td><strong>CRD conversion needed later</strong></td>
+<td>Low</td>
+<td>Med</td>
+<td>Plan field additions only (no removals/renames) until v1beta1 promotion; webhook conversion deferred</td>
+</tr>
+<tr>
+<td><strong>Gateway API spec churn</strong> between releases</td>
+<td>Low</td>
+<td>Med</td>
+<td>Pin SDK to a known-good Gateway API minor version (v1.2 for Phase 1); upgrade in a dedicated PR with conformance re-run</td>
+</tr>
+<tr>
+<td><strong>Two LB types in one cluster eat budget</strong> (no sharing per Q4)</td>
+<td>Med</td>
+<td>Low</td>
+<td>Document clearly; cost guidance in <code>gateway-api.md</code>; Phase 4 migration path lets users switch without doubling cost</td>
+</tr>
+<tr>
+<td><strong>Existing controllers regress</strong> during refactor of shared <code>Listener</code> struct</td>
+<td>Low</td>
+<td>High</td>
+<td>Additive-only changes; full existing test suite gates the merge</td>
+</tr>
+<tr>
+<td><strong>Field-name confusion</strong> between LBC's <code>Listener</code> (instance config) and Gateway API's <code>Listener</code> (logical listener)</td>
+<td>Med</td>
+<td>Low</td>
+<td>Section 2.1 doc table makes the join key explicit (<code>name</code>); add validation webhook in Phase 3 to reject conflicting LBC.Listener entries</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-open-items-deferred-to-implementation">8. Open items deferred to implementation<a class="headerlink" href="#8-open-items-deferred-to-implementation" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Helm-chart default for <code>gatewayApi.alb.enabled</code> — propose <code>false</code> for first Phase-1 release (0.4.0); flip to <code>true</code> after one minor cycle.</li>
+<li>Per-Gateway concurrency — start with <code>MaxConcurrentReconciles=5</code> (matches existing Ingress); revisit if rate-limit issues appear.</li>
+<li><code>Gateway.spec.addresses[]</code> user requests — reject for v1 (vngcloud assigns IP). Revisit if LB product gains BYOIP.</li>
+<li><code>infrastructure.parametersRef</code> (the LBC reference on a Gateway) — same-namespace only in v1, matches AWS. Cross-namespace LBC references (gated by ReferenceGrant) deferred to Phase 3. Note: this is unrelated to cross-namespace <code>backendRefs</code> and <code>certificateRefs</code>, which are honored in Phase 1.</li>
+<li>Naming conflict resolution between TGCs — first conflict mode = oldest-creates wins. Revisit if customer feedback prefers explicit priority.</li>
+</ol>
+<hr />
+<h2 id="9-out-of-scope-explicitly-not-planned">9. Out of scope (explicitly not planned)<a class="headerlink" href="#9-out-of-scope-explicitly-not-planned" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Mesh use cases (Gateway-API east-west).</li>
+<li>Custom GatewayClass parameters CRD beyond <code>LoadBalancerConfig</code>.</li>
+<li>Per-route load balancer addresses (one Gateway = one address set).</li>
+<li>In-place GatewayClass type swap (e.g., <code>vngcloud-alb</code> → <code>vngcloud-nlb</code> on a live Gateway). Forces recreate.</li>
+</ul>
+<hr />
+<h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://gateway-api.sigs.k8s.io/">Kubernetes Gateway API</a></li>
+<li><a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/gateway/">AWS Load Balancer Controller — Gateway API</a></li>
+<li><a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.15/guide/gateway/customization/">AWS LBC — Gateway API customization model</a></li>
+<li><a href="https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/gateway/l7gateway/">AWS LBC — L7 Routing</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/vngcloud/vngcloud-load-balancer-controller" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "search.share", "content.tabs.link", "content.code.copy", "content.action.edit"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
