@@ -237,6 +237,96 @@ var _ = Describe("Batcher Flush — Spec mutator", func() {
 	})
 })
 
+var _ = Describe("Batcher Flush — best-effort across objects", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-multi-obj-%d", GinkgoRandomSeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("attempts every object even if one fails and returns joined errors", func() {
+		// Real, existing object — patch should succeed.
+		ok := newTestLBC(ns, "lbc-ok")
+		Expect(k8sClient.Create(ctx, ok)).To(Succeed())
+
+		// Ghost object — GET will return NotFound.
+		ghost := newTestLBC(ns, "lbc-ghost")
+
+		b := k8sbatch.New(k8sClient)
+		k8sbatch.MutateStatus(b, ok, func(o *v1alpha1.LoadBalancerConfig) bool {
+			o.Status.LastReconcileMessage = "msg-ok"
+			return true
+		})
+		k8sbatch.MutateStatus(b, ghost, func(o *v1alpha1.LoadBalancerConfig) bool {
+			o.Status.LastReconcileMessage = "msg-ghost"
+			return true
+		})
+
+		err := b.Flush(ctx)
+		Expect(err).To(HaveOccurred())
+		Expect(apierrors.IsNotFound(err)).To(BeTrue(),
+			"joined error should unwrap to NotFound; got: %v", err)
+
+		// Successful object cleared; failed object remains queued.
+		Expect(b.Pending()).To(Equal(1))
+
+		// Successful patch landed.
+		got := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(ok), got)).To(Succeed())
+		Expect(got.Status.LastReconcileMessage).To(Equal("msg-ok"))
+	})
+})
+
+var _ = Describe("Batcher Flush — mid-reconcile flushes", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-midflush-%d", GinkgoRandomSeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("re-GETs on the second Flush so mutators see the current cluster state", func() {
+		lbc := newTestLBC(ns, "lbc-mid")
+		Expect(k8sClient.Create(ctx, lbc)).To(Succeed())
+
+		b := k8sbatch.New(k8sClient)
+
+		// First flush: set message to "first".
+		k8sbatch.MutateStatus(b, lbc, func(o *v1alpha1.LoadBalancerConfig) bool {
+			o.Status.LastReconcileMessage = "first"
+			return true
+		})
+		Expect(b.Flush(ctx)).To(Succeed())
+		Expect(b.Pending()).To(Equal(0))
+
+		// Out-of-band: someone else patches the status.
+		external := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbc), external)).To(Succeed())
+		externalCopy := external.DeepCopy()
+		external.Status.LastReconcileMessage = "external"
+		Expect(k8sClient.Status().Patch(ctx, external,
+			client.MergeFrom(externalCopy))).To(Succeed())
+
+		// Second flush: mutator must observe "external" (proving fresh GET).
+		k8sbatch.MutateStatus(b, lbc, func(o *v1alpha1.LoadBalancerConfig) bool {
+			Expect(o.Status.LastReconcileMessage).To(Equal("external"),
+				"second Flush should re-GET, not reuse first Flush's cached state")
+			o.Status.LastReconcileMessage = "second"
+			return true
+		})
+		Expect(b.Flush(ctx)).To(Succeed())
+
+		got := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbc), got)).To(Succeed())
+		Expect(got.Status.LastReconcileMessage).To(Equal("second"))
+	})
+})
+
 // failingPatchClient wraps a client.Client and returns the configured
 // error from the next n calls to Patch (non-status). Status patches and
 // Get/Create/Delete pass through unchanged. Used in tests to force
