@@ -10,6 +10,7 @@ import (
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -75,40 +76,50 @@ func TestMapListenerProtocol(t *testing.T) {
 	}
 }
 
-// TestCloudListenerName exercises the listener name produced via NameHelper
-// to make sure it satisfies the cloud's [a-zA-Z0-9_.-]{5,50} rule and is
-// stable across reconciles. Listener names live behind utils.NameHelper now;
-// the test goes through the helper directly because callers do.
+// TestCloudListenerName checks the per-Gateway listener name. The cloud
+// enforces [a-zA-Z0-9_.-]{5,50}; the format is "vks_gw_<uid8>_<lname>".
 func TestCloudListenerName(t *testing.T) {
 	tests := []struct {
 		name         string
-		gwName       string
+		gwUID        string
 		listenerName string
 		maxLen       int
 		checkPrefix  string
 	}{
 		{
-			name:         "short name uses the helper format",
-			gwName:       "prod-gw",
+			name:         "short name padded with uid prefix",
+			gwUID:        "abcd1234-dead-beef-0000-111122223333",
 			listenerName: "http",
 			maxLen:       50,
-			checkPrefix:  "vks-",
+			checkPrefix:  "vks_gw_abcd1234_http",
 		},
 		{
-			name:         "long listener name is truncated to 50 chars",
-			gwName:       "prod-gw",
+			name:         "long listener name truncated to 50 chars",
+			gwUID:        "abcd1234-dead-beef-0000-111122223333",
 			listenerName: "this-is-a-very-long-listener-name-that-exceeds-limit",
 			maxLen:       50,
-			checkPrefix:  "vks-",
+			checkPrefix:  "vks_gw_abcd1234_",
+		},
+		{
+			name:         "uid shorter than 8 chars used as is",
+			gwUID:        "short",
+			listenerName: "http",
+			maxLen:       50,
+			checkPrefix:  "vks_gw_short_http",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := &gwv1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: tt.gwName},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "prod",
+					Name:      "my-gw",
+					UID:       types.UID(tt.gwUID),
+				},
 			}
 			task := newTestTask(t, gw)
-			got := task.nameHelper.GenL7ListenerName(tt.listenerName)
+			l := &gwv1.Listener{Name: gwv1.SectionName(tt.listenerName)}
+			got := task.cloudListenerName(l)
 			assert.LessOrEqual(t, len(got), tt.maxLen)
 			assert.True(t, strings.HasPrefix(got, tt.checkPrefix),
 				"expected prefix %q in %q", tt.checkPrefix, got)
@@ -116,13 +127,10 @@ func TestCloudListenerName(t *testing.T) {
 	}
 
 	t.Run("deterministic across calls", func(t *testing.T) {
-		gw := &gwv1.Gateway{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "deterministic"},
-		}
+		gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{UID: "uid-1234"}}
 		task := newTestTask(t, gw)
-		n1 := task.nameHelper.GenL7ListenerName("http")
-		n2 := task.nameHelper.GenL7ListenerName("http")
-		assert.Equal(t, n1, n2)
+		l := &gwv1.Listener{Name: "http"}
+		assert.Equal(t, task.cloudListenerName(l), task.cloudListenerName(l))
 	})
 }
 

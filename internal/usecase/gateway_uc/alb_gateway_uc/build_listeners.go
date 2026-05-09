@@ -9,6 +9,7 @@ import (
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // buildListeners translates Gateway.Spec.Listeners into v1alpha1.Listener entries.
@@ -34,7 +35,7 @@ func (t *defaultGatewayBuildTask) buildListeners() ([]v1alpha1.Listener, error) 
 			continue
 		}
 		entry := v1alpha1.Listener{
-			Name:         t.nameHelper.GenL7ListenerName(string(l.Name)),
+			Name:         t.cloudListenerName(l),
 			Protocol:     proto,
 			ProtocolPort: int32(l.Port),
 		}
@@ -109,6 +110,22 @@ func (t *defaultGatewayBuildTask) applyListenerPolicy(entry *v1alpha1.Listener, 
 	}); id != nil {
 		entry.ClientCertificateId = id
 	}
+}
+
+// cloudListenerName produces a deterministic listener name keyed on the
+// Gateway's UID + the listener's K8s name. Format: "vks_gw_<uid8>_<lname>".
+// Truncated to the cloud's 50-char limit; the underlying ListenerCreate
+// regex accepts [a-zA-Z0-9_.-]{5,50} so the underscores are fine.
+func (t *defaultGatewayBuildTask) cloudListenerName(l *gwv1.Listener) string {
+	uid := string(t.gw.UID)
+	if len(uid) > 8 {
+		uid = uid[:8]
+	}
+	name := fmt.Sprintf("%sgw_%s_%s", domain.VKSResourceNamePrefix, uid, l.Name)
+	if len(name) > 50 {
+		name = name[:50]
+	}
+	return name
 }
 
 // flattenInsertHeaders returns headers in deterministic order so spec-equality

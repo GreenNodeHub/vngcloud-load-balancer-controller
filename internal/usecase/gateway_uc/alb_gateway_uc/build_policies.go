@@ -147,8 +147,8 @@ func hasRedirectFilter(filters []gwv1.HTTPRouteFilter) bool {
 // RequestRedirect filter — guaranteed present by the caller in that case —
 // flips it to REDIRECT_TO_URL.
 //
-// Method on the build task so we can use the per-Gateway NameHelper for
-// policy names; matches the L4 service / L7 ingress controllers' shape.
+// policyName is keyed on (route.UID, ruleIdx, host, match) so multiple
+// HTTPRoutes attached to the same Gateway don't collide on a single name.
 func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, ruleIdx int, rule gwv1.HTTPRouteRule, hostnames []string, poolName string) []v1alpha1.Policy {
 	matches := rule.Matches
 	if len(matches) == 0 {
@@ -161,15 +161,11 @@ func (t *defaultGatewayBuildTask) buildListenerPolicies(route *gwv1.HTTPRoute, r
 	}
 
 	out := make([]v1alpha1.Policy, 0, len(matches)*len(hostList))
-	for hi, host := range hostList {
-		for mi, m := range matches {
+	for _, host := range hostList {
+		for _, m := range matches {
 			rules := buildL7Rules(host, m)
-			// pathIndex encodes (hostIdx, matchIdx) into the helper's
-			// per-rule slot. 100 matches per host is plenty for any
-			// realistic route.
-			pathIdx := hi*100 + mi
 			policy := v1alpha1.Policy{
-				Name:    t.nameHelper.GenL7PolicyName(false, ruleIdx, pathIdx),
+				Name:    policyName(route, ruleIdx, host, m),
 				Action:  v2.PolicyActionREDIRECTTOPOOL,
 				L7Rules: rules,
 			}
