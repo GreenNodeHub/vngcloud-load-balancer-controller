@@ -52,6 +52,20 @@ type VKSLoadBalancerSpec struct {
 	SubnetID       *string           `json:"subnetId,omitempty"`
 	Tags           map[string]string `json:"tags,omitempty"`
 	LoadBalancerID *string           `json:"loadBalancerId,omitempty"`
+
+	// PrivateSubnetID overrides the LB's private subnet (used by the
+	// InterVPC scheme). Maps to LBC.Spec.PrivateSubnetId — same field the
+	// Ingress controller's "private-subnet-id" annotation writes.
+	PrivateSubnetID *string `json:"privateSubnetId,omitempty"`
+
+	// EnableAutoscale toggles cloud-side autoscaling on the LB. Maps to
+	// LBC.Spec.EnableAutoscale — same as the Ingress "enable-autoscale"
+	// annotation. Unset = cloud default (off).
+	EnableAutoscale *bool `json:"enableAutoscale,omitempty"`
+
+	// IsPOC marks the LB as a POC tier. Maps to LBC.Spec.IsPoc — same as
+	// the Ingress "is-poc" annotation. Unset = production tier.
+	IsPOC *bool `json:"isPOC,omitempty"`
 }
 
 type VKSGatewayPolicyStatus struct {

@@ -212,11 +212,29 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 // applyLoadBalancerSpec writes the LB-level fields the unscoped
 // VKSGatewayPolicy contributes. Listener-level fields (timeouts, allowedCidrs,
 // insertHeaders) are applied per-listener in Phase C.
+//
+// The unscoped policy is the sole source of truth for these fields, so each
+// is overwritten unconditionally (including with nil) — removing a field from
+// the policy must un-set it on the LBC, otherwise stale values persist
+// forever. This matches the Ingress/Service controller pattern, which
+// reassigns every reconcile from annotation-or-nil.
 func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalancerConfig) {
-	if t.unscopedPolicy == nil || t.unscopedPolicy.Spec.LoadBalancerSpec == nil {
+	var s *gwv1alpha1.VKSLoadBalancerSpec
+	if t.unscopedPolicy != nil {
+		s = t.unscopedPolicy.Spec.LoadBalancerSpec
+	}
+
+	lbc.Spec.Scheme = nil
+	lbc.Spec.PackageId = nil
+	lbc.Spec.LoadBalancerId = nil
+	lbc.Spec.PrivateSubnetId = nil
+	lbc.Spec.EnableAutoscale = nil
+	lbc.Spec.IsPoc = nil
+	lbc.Spec.Tags = nil
+
+	if s == nil {
 		return
 	}
-	s := t.unscopedPolicy.Spec.LoadBalancerSpec
 	if s.Scheme != nil {
 		scheme := v2.LoadBalancerScheme(*s.Scheme)
 		lbc.Spec.Scheme = &scheme
@@ -227,10 +245,19 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 	if s.LoadBalancerID != nil {
 		lbc.Spec.LoadBalancerId = s.LoadBalancerID
 	}
+	if s.PrivateSubnetID != nil {
+		lbc.Spec.PrivateSubnetId = s.PrivateSubnetID
+	}
+	if s.EnableAutoscale != nil {
+		lbc.Spec.EnableAutoscale = s.EnableAutoscale
+	}
+	if s.IsPOC != nil {
+		lbc.Spec.IsPoc = s.IsPOC
+	}
 	if len(s.Tags) > 0 {
-		if lbc.Spec.Tags == nil {
-			lbc.Spec.Tags = make(map[string]string, len(s.Tags))
-		}
+		// Replace the whole map (don't merge). A key removed from the
+		// policy must disappear from the LBC; merging would leak it.
+		lbc.Spec.Tags = make(map[string]string, len(s.Tags))
 		for k, v := range s.Tags {
 			lbc.Spec.Tags[k] = v
 		}

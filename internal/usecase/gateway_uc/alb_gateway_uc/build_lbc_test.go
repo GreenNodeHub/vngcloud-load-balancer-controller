@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -153,13 +154,19 @@ func TestApplyLoadBalancerSpec_WithFields(t *testing.T) {
 	scheme := "Internet"
 	pkg := "pkg-1"
 	lbID := "lb-existing"
+	subID := "subnet-private"
+	autoscale := true
+	isPoc := false
 	task.unscopedPolicy = &gwv1alpha1.VKSGatewayPolicy{
 		Spec: gwv1alpha1.VKSGatewayPolicySpec{
 			LoadBalancerSpec: &gwv1alpha1.VKSLoadBalancerSpec{
-				Scheme:         &scheme,
-				PackageID:      &pkg,
-				LoadBalancerID: &lbID,
-				Tags:           map[string]string{"env": "prod"},
+				Scheme:          &scheme,
+				PackageID:       &pkg,
+				LoadBalancerID:  &lbID,
+				PrivateSubnetID: &subID,
+				EnableAutoscale: &autoscale,
+				IsPOC:           &isPoc,
+				Tags:            map[string]string{"env": "prod"},
 			},
 		},
 	}
@@ -169,7 +176,99 @@ func TestApplyLoadBalancerSpec_WithFields(t *testing.T) {
 	assert.NotNil(t, lbc.Spec.PackageId)
 	assert.Equal(t, "pkg-1", *lbc.Spec.PackageId)
 	assert.NotNil(t, lbc.Spec.LoadBalancerId)
+	assert.NotNil(t, lbc.Spec.PrivateSubnetId)
+	assert.Equal(t, "subnet-private", *lbc.Spec.PrivateSubnetId)
+	assert.NotNil(t, lbc.Spec.EnableAutoscale)
+	assert.True(t, *lbc.Spec.EnableAutoscale)
+	assert.NotNil(t, lbc.Spec.IsPoc)
+	assert.False(t, *lbc.Spec.IsPoc)
 	assert.Equal(t, map[string]string{"env": "prod"}, lbc.Spec.Tags)
+}
+
+// TestApplyLoadBalancerSpec_RemovesStaleFields locks in the fix for the
+// sticky-field bug: when the user removes a field from VKSGatewayPolicy
+// (or removes the policy entirely), applyLoadBalancerSpec must clear the
+// corresponding LBC.Spec field — otherwise the previous value persists
+// forever, diverging from the Ingress controller's reassign-every-reconcile
+// behavior.
+func TestApplyLoadBalancerSpec_RemovesStaleFields(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+
+	// Pre-populate the LBC with values from a previous reconcile.
+	scheme := v2.LoadBalancerScheme("Internet")
+	pkg := "pkg-old"
+	lbID := "lb-old"
+	subID := "subnet-old"
+	autoscale := true
+	isPoc := true
+	lbc := &v1alpha1.LoadBalancerConfig{
+		Spec: v1alpha1.LoadBalancerConfigSpec{
+			Scheme:          &scheme,
+			PackageId:       &pkg,
+			LoadBalancerId:  &lbID,
+			PrivateSubnetId: &subID,
+			EnableAutoscale: &autoscale,
+			IsPoc:           &isPoc,
+			Tags:            map[string]string{"keep-me": "no"},
+		},
+	}
+
+	t.Run("policy entirely removed clears all stale fields", func(t *testing.T) {
+		task := newTestTask(t, gw)
+		task.unscopedPolicy = nil
+		got := lbc.DeepCopy()
+		task.applyLoadBalancerSpec(got)
+		assert.Nil(t, got.Spec.Scheme)
+		assert.Nil(t, got.Spec.PackageId)
+		assert.Nil(t, got.Spec.LoadBalancerId)
+		assert.Nil(t, got.Spec.PrivateSubnetId)
+		assert.Nil(t, got.Spec.EnableAutoscale)
+		assert.Nil(t, got.Spec.IsPoc)
+		assert.Nil(t, got.Spec.Tags)
+	})
+
+	t.Run("partial policy clears only the unset fields", func(t *testing.T) {
+		task := newTestTask(t, gw)
+		newScheme := "Internal"
+		task.unscopedPolicy = &gwv1alpha1.VKSGatewayPolicy{
+			Spec: gwv1alpha1.VKSGatewayPolicySpec{
+				LoadBalancerSpec: &gwv1alpha1.VKSLoadBalancerSpec{
+					Scheme: &newScheme,
+				},
+			},
+		}
+		got := lbc.DeepCopy()
+		task.applyLoadBalancerSpec(got)
+		// Scheme overwritten with the new value.
+		assert.NotNil(t, got.Spec.Scheme)
+		assert.Equal(t, v2.LoadBalancerScheme("Internal"), *got.Spec.Scheme)
+		// All other previously-set fields are cleared.
+		assert.Nil(t, got.Spec.PackageId)
+		assert.Nil(t, got.Spec.LoadBalancerId)
+		assert.Nil(t, got.Spec.PrivateSubnetId)
+		assert.Nil(t, got.Spec.EnableAutoscale)
+		assert.Nil(t, got.Spec.IsPoc)
+		assert.Nil(t, got.Spec.Tags)
+	})
+
+	t.Run("Tags are replaced, not merged", func(t *testing.T) {
+		task := newTestTask(t, gw)
+		task.unscopedPolicy = &gwv1alpha1.VKSGatewayPolicy{
+			Spec: gwv1alpha1.VKSGatewayPolicySpec{
+				LoadBalancerSpec: &gwv1alpha1.VKSLoadBalancerSpec{
+					Tags: map[string]string{"env": "prod"},
+				},
+			},
+		}
+		got := &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				Tags: map[string]string{"old-key": "old-val"},
+			},
+		}
+		task.applyLoadBalancerSpec(got)
+		assert.Equal(t, map[string]string{"env": "prod"}, got.Spec.Tags,
+			"old-key must be evicted when the policy doesn't list it")
+	})
 }
 
 // TestBuildLoadBalancerConfig_CreatePath tests the happy path where no LBC exists yet.

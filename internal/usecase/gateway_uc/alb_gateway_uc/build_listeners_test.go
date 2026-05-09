@@ -165,7 +165,7 @@ func TestApplyListenerPolicy(t *testing.T) {
 		},
 	}
 
-	t.Run("nil policies: no-op", func(t *testing.T) {
+	t.Run("nil policies: timeouts/cidrs nil but InsertHeaders defaulted", func(t *testing.T) {
 		task := newTestTask(t, gw)
 		task.unscopedPolicy = nil
 		entry := &v1alpha1.Listener{}
@@ -174,6 +174,13 @@ func TestApplyListenerPolicy(t *testing.T) {
 		assert.Nil(t, entry.TimeoutMember)
 		assert.Nil(t, entry.TimeoutConnection)
 		assert.Nil(t, entry.AllowedCidrs)
+		// InsertHeaders defaults to the X-Forwarded-* triplet when no policy
+		// supplies a value — same default the Ingress controller emits.
+		names := make([]string, 0, len(entry.InsertHeaders))
+		for _, h := range entry.InsertHeaders {
+			names = append(names, h.HeaderName)
+		}
+		assert.ElementsMatch(t, []string{"X-Forwarded-For", "X-Forwarded-Proto", "X-Forwarded-Port"}, names)
 	})
 
 	t.Run("unscoped policy applies timeout", func(t *testing.T) {

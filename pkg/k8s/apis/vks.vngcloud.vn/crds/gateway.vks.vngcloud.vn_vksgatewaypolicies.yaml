@@ -69,9 +69,26 @@ spec:
                 type: object
               loadBalancerSpec:
                 properties:
+                  enableAutoscale:
+                    description: |-
+                      EnableAutoscale toggles cloud-side autoscaling on the LB. Maps to
+                      LBC.Spec.EnableAutoscale — same as the Ingress "enable-autoscale"
+                      annotation. Unset = cloud default (off).
+                    type: boolean
+                  isPOC:
+                    description: |-
+                      IsPOC marks the LB as a POC tier. Maps to LBC.Spec.IsPoc — same as
+                      the Ingress "is-poc" annotation. Unset = production tier.
+                    type: boolean
                   loadBalancerId:
                     type: string
                   packageId:
+                    type: string
+                  privateSubnetId:
+                    description: |-
+                      PrivateSubnetID overrides the LB's private subnet (used by the
+                      InterVPC scheme). Maps to LBC.Spec.PrivateSubnetId — same field the
+                      Ingress controller's "private-subnet-id" annotation writes.
                     type: string
                   scheme:
                     enum:

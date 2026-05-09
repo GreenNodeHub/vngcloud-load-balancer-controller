@@ -98,11 +98,16 @@ func (t *defaultGatewayBuildTask) applyListenerPolicy(entry *v1alpha1.Listener, 
 	// InsertHeaders: per-listener overrides unscoped entirely (no merge).
 	// LBC stores headers as []InsertHeader; map[string]string in the policy
 	// goes through a deterministic-by-key flatten so generation is stable.
-	if hdrs := firstNonEmptyStringMap(policies, func(p *gwv1alpha1.VKSGatewayPolicy) map[string]string {
+	// Default — when neither policy supplies headers — is the X-Forwarded-*
+	// triplet the Ingress controller emits when the annotation is absent
+	// (see ingress_uc/build_listener.go: buildAnnotationInsertHeaders).
+	hdrs := firstNonEmptyStringMap(policies, func(p *gwv1alpha1.VKSGatewayPolicy) map[string]string {
 		return p.Spec.InsertHeaders
-	}); len(hdrs) > 0 {
-		entry.InsertHeaders = flattenInsertHeaders(hdrs)
+	})
+	if len(hdrs) == 0 {
+		hdrs = defaultInsertHeaders()
 	}
+	entry.InsertHeaders = flattenInsertHeaders(hdrs)
 
 	// ClientCertificateId: per-listener wins.
 	if id := firstNonNilString(policies, func(p *gwv1alpha1.VKSGatewayPolicy) *string {
@@ -126,6 +131,18 @@ func (t *defaultGatewayBuildTask) cloudListenerName(l *gwv1.Listener) string {
 		name = name[:50]
 	}
 	return name
+}
+
+// defaultInsertHeaders mirrors the Ingress controller's no-annotation default
+// so a Gateway-managed LB receives the same X-Forwarded-* request headers as
+// an Ingress-managed one. Users can override (or empty out) the set by
+// supplying VKSGatewayPolicy.InsertHeaders explicitly.
+func defaultInsertHeaders() map[string]string {
+	return map[string]string{
+		"X-Forwarded-For":   "true",
+		"X-Forwarded-Proto": "true",
+		"X-Forwarded-Port":  "true",
+	}
 }
 
 // flattenInsertHeaders returns headers in deterministic order so spec-equality
