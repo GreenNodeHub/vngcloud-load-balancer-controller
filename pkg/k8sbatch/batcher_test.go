@@ -327,6 +327,50 @@ var _ = Describe("Batcher Flush — mid-reconcile flushes", func() {
 	})
 })
 
+var _ = Describe("Batcher Flush — real API server conflict retry", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-conflict-%d", GinkgoRandomSeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("re-GETs and re-applies the mutator after a conflict", func() {
+		lbc := newTestLBC(ns, "lbc-conflict")
+		Expect(k8sClient.Create(ctx, lbc)).To(Succeed())
+
+		invocations := 0
+		mutator := func(o *v1alpha1.LoadBalancerConfig) bool {
+			invocations++
+			if invocations == 1 {
+				// Out-of-band patch: change the same object so the upcoming
+				// optimistic-lock PATCH will 409.
+				external := &v1alpha1.LoadBalancerConfig{}
+				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbc), external)).To(Succeed())
+				orig := external.DeepCopy()
+				external.Status.LastReconcileMessage = "out-of-band"
+				Expect(k8sClient.Status().Patch(ctx, external,
+					client.MergeFrom(orig))).To(Succeed())
+			}
+			// On both invocations, set the desired final value.
+			o.Status.LastReconcileMessage = "final"
+			return true
+		}
+
+		b := k8sbatch.New(k8sClient)
+		k8sbatch.MutateStatus(b, lbc, mutator)
+		Expect(b.Flush(ctx)).To(Succeed())
+		Expect(invocations).To(BeNumerically(">=", 2),
+			"mutator should be re-invoked after the first patch's conflict")
+
+		got := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbc), got)).To(Succeed())
+		Expect(got.Status.LastReconcileMessage).To(Equal("final"))
+	})
+})
+
 // failingPatchClient wraps a client.Client and returns the configured
 // error from the next n calls to Patch (non-status). Status patches and
 // Get/Create/Delete pass through unchanged. Used in tests to force
