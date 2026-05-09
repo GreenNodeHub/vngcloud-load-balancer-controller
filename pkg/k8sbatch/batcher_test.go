@@ -172,6 +172,7 @@ var _ = Describe("Batcher Flush — Spec mutator", func() {
 	})
 
 	It("patches Spec first then Status against the post-Spec state", func() {
+		const sg = "sg-1"
 		nsg := newTestNSG(ns, "nsg-both")
 		Expect(k8sClient.Create(ctx, nsg)).To(Succeed())
 
@@ -179,15 +180,15 @@ var _ = Describe("Batcher Flush — Spec mutator", func() {
 
 		// Spec mutator changes AttachSecurityGroups.
 		k8sbatch.MutateSpec(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
-			o.Spec.AttachSecurityGroups = []string{"sg-1"}
+			o.Spec.AttachSecurityGroups = []string{sg}
 			return true
 		})
 		// Status mutator runs AFTER Spec; observes the post-Spec state.
 		k8sbatch.MutateStatus(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
-			Expect(o.Spec.AttachSecurityGroups).To(Equal([]string{"sg-1"}),
+			Expect(o.Spec.AttachSecurityGroups).To(Equal([]string{sg}),
 				"status mutator should run against post-Spec state")
 			// Echo a summary of the Spec change into Status to verify ordering.
-			o.Status.LastReconcileMessage = "applied:sg-1"
+			o.Status.LastReconcileMessage = "applied:" + sg
 			return true
 		})
 
@@ -195,8 +196,8 @@ var _ = Describe("Batcher Flush — Spec mutator", func() {
 
 		got := &v1alpha1.NodeSecurityGroup{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsg), got)).To(Succeed())
-		Expect(got.Spec.AttachSecurityGroups).To(Equal([]string{"sg-1"}))
-		Expect(got.Status.LastReconcileMessage).To(Equal("applied:sg-1"))
+		Expect(got.Spec.AttachSecurityGroups).To(Equal([]string{sg}))
+		Expect(got.Status.LastReconcileMessage).To(Equal("applied:" + sg))
 	})
 
 	It("skips Status when Spec patch fails and keeps both queued", func() {
@@ -460,7 +461,12 @@ type failingPatchClient struct {
 	remaining int
 }
 
-func (f *failingPatchClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+func (f *failingPatchClient) Patch(
+	ctx context.Context,
+	obj client.Object,
+	patch client.Patch,
+	opts ...client.PatchOption,
+) error {
 	if f.remaining > 0 {
 		f.remaining--
 		return f.err
