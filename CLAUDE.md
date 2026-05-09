@@ -11,7 +11,7 @@ make run             # run controller locally against current kubeconfig
 make generate manifests   # regenerate deepcopy + CRDs after editing api/v1alpha1/*.go
 ```
 
-`make test` writes its envtest binaries via `setup-envtest` into `bin/`. PRs target the `v3` branch (per `docs/contributing.md`), not `main`.
+`make test` writes its envtest binaries via `setup-envtest` into `bin/`. PRs target the `main` branch.
 
 ### Running a single test
 

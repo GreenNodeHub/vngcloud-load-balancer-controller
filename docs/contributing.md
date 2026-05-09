@@ -110,6 +110,6 @@ make lint-fix
 1. Fork the repository and create a feature branch
 2. Make your changes with tests
 3. Run `make test lint`
-4. Open a PR against the `v3` branch
+4. Open a PR against the `main` branch
 
 For more information see the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html).
