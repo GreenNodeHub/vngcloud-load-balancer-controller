@@ -371,6 +371,85 @@ var _ = Describe("Batcher Flush — real API server conflict retry", func() {
 	})
 })
 
+var _ = Describe("Batcher — identity coalescing", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-coalesce-%d", GinkgoRandomSeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("treats two distinct *T pointers with the same identity as one entry", func() {
+		lbcA := newTestLBC(ns, "lbc-coalesce")
+		Expect(k8sClient.Create(ctx, lbcA)).To(Succeed())
+
+		// Different in-memory pointer, same Name/Namespace/GVK.
+		lbcB := newTestLBC(ns, "lbc-coalesce")
+		Expect(lbcA).NotTo(BeIdenticalTo(lbcB))
+
+		b := k8sbatch.New(k8sClient)
+		k8sbatch.MutateStatus(b, lbcA, func(o *v1alpha1.LoadBalancerConfig) bool {
+			o.Status.LastReconcileMessage = "from-A"
+			return true
+		})
+		k8sbatch.MutateStatus(b, lbcB, func(o *v1alpha1.LoadBalancerConfig) bool {
+			Expect(o.Status.LastReconcileMessage).To(Equal("from-A"),
+				"both mutators should run against the same fresh GET")
+			o.Status.LastReconcileMessage = "from-B"
+			return true
+		})
+		Expect(b.Pending()).To(Equal(1), "should coalesce by identity, not pointer")
+
+		Expect(b.Flush(ctx)).To(Succeed())
+
+		got := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbcA), got)).To(Succeed())
+		Expect(got.Status.LastReconcileMessage).To(Equal("from-B"))
+	})
+})
+
+var _ = Describe("Batcher — multiple types", func() {
+	var ns string
+
+	BeforeEach(func() {
+		ns = fmt.Sprintf("k8sbatch-multitype-%d", GinkgoRandomSeed())
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: ns},
+		})).To(Succeed())
+	})
+
+	It("flushes mutations against different CRD types in one Flush", func() {
+		lbc := newTestLBC(ns, "lbc-mt")
+		nsg := newTestNSG(ns, "nsg-mt")
+		Expect(k8sClient.Create(ctx, lbc)).To(Succeed())
+		Expect(k8sClient.Create(ctx, nsg)).To(Succeed())
+
+		b := k8sbatch.New(k8sClient)
+		k8sbatch.MutateStatus(b, lbc, func(o *v1alpha1.LoadBalancerConfig) bool {
+			o.Status.LastReconcileMessage = "lbc-mt-msg"
+			return true
+		})
+		k8sbatch.MutateStatus(b, nsg, func(o *v1alpha1.NodeSecurityGroup) bool {
+			o.Status.LastReconcileMessage = "nsg-mt-msg"
+			return true
+		})
+		Expect(b.Pending()).To(Equal(2))
+
+		Expect(b.Flush(ctx)).To(Succeed())
+		Expect(b.Pending()).To(Equal(0))
+
+		gotLBC := &v1alpha1.LoadBalancerConfig{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(lbc), gotLBC)).To(Succeed())
+		Expect(gotLBC.Status.LastReconcileMessage).To(Equal("lbc-mt-msg"))
+
+		gotNSG := &v1alpha1.NodeSecurityGroup{}
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(nsg), gotNSG)).To(Succeed())
+		Expect(gotNSG.Status.LastReconcileMessage).To(Equal("nsg-mt-msg"))
+	})
+})
+
 // failingPatchClient wraps a client.Client and returns the configured
 // error from the next n calls to Patch (non-status). Status patches and
 // Get/Create/Delete pass through unchanged. Used in tests to force
