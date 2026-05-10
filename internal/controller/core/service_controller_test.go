@@ -44,16 +44,24 @@ const (
 
 var _ = Describe("Service Controller", func() {
 	BeforeEach(func() {
-		// Best-effort drain of any K8s objects left over from a previous
-		// spec whose AfterEach didn't fully complete (e.g., the spec
-		// failed and its cleanup short-circuited). Then reset the
-		// in-memory mock VNGCloud state so this spec starts from a
-		// known-clean slate regardless of the previous spec's
-		// finalizer-chain progress.
+		// Drain anything a previous spec's AfterEach left behind, then
+		// WAIT for the K8s API server to finish the deletes (finalizer
+		// chains can be in flight from a failed spec). Without the
+		// wait, the next It would hit "object is being deleted" when
+		// it tries to Create with the same name. After the K8s side is
+		// clean, reset the in-memory mock VNGCloud state.
 		cleanupAllEndpoints()
 		cleanupAllLBCs()
 		cleanupAllNSGs()
 		cleanupAllServices()
+
+		expectNoServices()
+		expectNoLBCs()
+		expectNoNSGs()
+		expectNoEndpoints()
+		expectNoLoadBalancers()
+		expectNoSecurityGroups()
+
 		vngcloudRepo.Reset()
 	})
 
