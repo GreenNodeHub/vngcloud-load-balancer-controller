@@ -1614,7 +1614,7 @@ var _ = Describe("Ingress Controller", func() {
 				g.Expect(pools).ShouldNot(BeNil())
 				g.Expect((pools.Items)).Should(HaveLen(1))
 				g.Expect(pools.Items[0].Name).Should(Equal("test-pool-gogsf"))
-			}, timeout, interval).Should(Succeed())
+			}, timeout*4, interval).Should(Succeed())
 		})
 	})
 

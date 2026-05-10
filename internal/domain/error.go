@@ -28,16 +28,8 @@ const (
 
 // if the error is due to load balancer not found
 func IsLoadBalancerNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Production VNGCloud returns "Cannot get load balancer with id <id>";
-	// the in-process mock and other internal repositories return the
-	// generic domain.ErrorNotFound sentinel. Either form means the same
-	// thing at this call site (LBC delete: GetLoadBalancerByID failed
-	// because the LB is gone, so the delete is a no-op).
-	return strings.HasPrefix(err.Error(), "Cannot get load balancer with id") ||
-		errors.Is(err, ErrorNotFound)
+	// if have prefix "Cannot get load balancer with id" then consider as not found
+	return err != nil && strings.HasPrefix(err.Error(), "Cannot get load balancer with id")
 }
 
 // if the error is due to exceeded security group per server quota

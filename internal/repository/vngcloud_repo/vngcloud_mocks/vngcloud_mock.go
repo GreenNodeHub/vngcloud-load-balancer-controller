@@ -427,7 +427,9 @@ func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) 
 		}
 	}
 	logger.Errorf("[ERROR] - GetSecurityGroup: security group not found")
-	return nil, domain.ErrorNotFound
+	// Match production VNGCloud SDK message so domain.IsSecurityGroupNotFound
+	// (prefix-matches "Cannot get security group with id secg-") works.
+	return nil, fmt.Errorf("Cannot get security group with id %s", secgroupID)
 }
 
 func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
@@ -632,7 +634,9 @@ func (m *MockProvider) GetServerByID(ctx context.Context, serverID string) (*ent
 		}
 	}
 	logger.Errorf("serverID %s not found", serverID)
-	return nil, domain.ErrorNotFound
+	// Match production VNGCloud SDK message so domain.IsServerNotFound
+	// (prefix-matches "Cannot get server with id") works.
+	return nil, fmt.Errorf("Cannot get server with id %s", serverID)
 }
 
 func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string) error {
@@ -713,7 +717,10 @@ func (m *MockProvider) GetLoadBalancerByID(ctx context.Context, lbID string) (*e
 		}
 	}
 	logger.Errorf("[ERROR] - GetLoadBalancerByID: load balancer not found: %s", lbID)
-	return nil, domain.ErrorNotFound
+	// Match the production VNGCloud SDK's not-found message so callers using
+	// domain.IsLoadBalancerNotFound (which prefix-matches this exact phrase)
+	// behave the same against the mock as against the real backend.
+	return nil, fmt.Errorf("Cannot get load balancer with id %s", lbID)
 }
 
 func (m *MockProvider) GetLoadBalancerByName(ctx context.Context, name string) (*entityv2.LoadBalancer, error) {
