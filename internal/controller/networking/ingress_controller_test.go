@@ -46,9 +46,30 @@ const (
 )
 
 var _ = Describe("Ingress Controller", func() {
+	BeforeEach(func() {
+		// Best-effort drain of any K8s objects left over from a previous
+		// spec whose AfterEach didn't fully complete, then reset the
+		// in-memory mock VNGCloud state so this spec starts from a
+		// known-clean slate regardless of the previous spec's
+		// finalizer-chain progress.
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllIngreses()
+		cleanupAllServices()
+		vngcloudRepo.Reset()
+	})
 
 	AfterEach(func() {
-		// Ensure clean state before each test
+		// Cleanup must run BEFORE the assertions below; otherwise an
+		// assertion failure (Eventually timeout) short-circuits the
+		// AfterEach and leaves resources around for the next spec.
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllIngreses()
+		cleanupAllServices()
+
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
 		expectNoIngresses()
@@ -56,12 +77,6 @@ var _ = Describe("Ingress Controller", func() {
 		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
-
-		cleanupAllEndpoints()
-		cleanupAllLBCs()
-		cleanupAllNSGs()
-		cleanupAllIngreses()
-		cleanupAllServices()
 	})
 
 	Context("When create ingress with default annotation default", func() {
