@@ -206,6 +206,39 @@ func (m *MockProvider) Init(_ []string) error {
 	return err
 }
 
+// Reset clears all test-created state (load balancers, listeners, pools,
+// policies, tags, security groups, certs created post-Init, GLBs) and
+// detaches any security groups that tests attached to baseline servers.
+// Baseline state populated by NewMockProvider/Init (subnets, servers,
+// initial certs) is preserved.
+//
+// Call this in a BeforeEach to give each spec a clean slate without
+// depending on the previous spec's controller-driven cleanup completing
+// in time. Avoids cross-test leakage when finalizer chains are slow.
+func (m *MockProvider) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.loadBalancers = nil
+	m.listeners = nil
+	m.pools = nil
+	m.policies = nil
+	m.tags = nil
+	m.secgroups = nil
+	m.secgroupRules = nil
+	m.glbs = nil
+	m.globalListeners = nil
+	m.globalPools = nil
+
+	// Detach any test-attached security groups from baseline servers,
+	// but keep the servers themselves.
+	for _, s := range m.servers {
+		if s.Server != nil {
+			s.Server.SecGroups = []entityv2.ServerSecgroup{}
+		}
+	}
+}
+
 func (m *MockProvider) GetProjectID() string {
 	return m.projectID
 }

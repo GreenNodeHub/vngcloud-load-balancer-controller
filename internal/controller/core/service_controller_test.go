@@ -43,19 +43,38 @@ const (
 )
 
 var _ = Describe("Service Controller", func() {
+	BeforeEach(func() {
+		// Best-effort drain of any K8s objects left over from a previous
+		// spec whose AfterEach didn't fully complete (e.g., the spec
+		// failed and its cleanup short-circuited). Then reset the
+		// in-memory mock VNGCloud state so this spec starts from a
+		// known-clean slate regardless of the previous spec's
+		// finalizer-chain progress.
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllServices()
+		vngcloudRepo.Reset()
+	})
+
 	AfterEach(func() {
-		// Ensure clean state before each test
+		// Cleanup must run BEFORE the assertions below, otherwise an
+		// assertion failure (Eventually timeout) short-circuits the
+		// AfterEach and leaves resources around for the next spec —
+		// which then sees stale mock-VNGCloud state and fails for an
+		// unrelated reason. Best-effort deletes first, then assert
+		// the controllers' finalizer chain has fully drained.
+		cleanupAllEndpoints()
+		cleanupAllLBCs()
+		cleanupAllNSGs()
+		cleanupAllServices()
+
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
 		expectNoServices()
 		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
-
-		cleanupAllEndpoints()
-		cleanupAllLBCs()
-		cleanupAllNSGs()
-		cleanupAllServices()
 	})
 
 	Context("When creating a LoadBalancer service", func() {
