@@ -77,6 +77,12 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
+.PHONY: test-e2e-gateway  # Run Gateway-API e2e against a REAL vngcloud cluster (opt-in).
+# Requires: a real cluster reachable via KUBECONFIG, with the controller already
+# deployed and --enable-gateway-api-alb set. Provisions and tears down real ALBs.
+test-e2e-gateway:
+	RUN_GATEWAY_E2E=true go test ./test/e2e/gateway/ -v -ginkgo.v -timeout 20m
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run
