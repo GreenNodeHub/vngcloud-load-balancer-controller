@@ -47,6 +47,7 @@ import (
 	vksvngcloudvnv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	corecontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/core"
 	gatewayalbcontroller "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/alb"
+	gatewaypolicies "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/policies"
 	gatewayshared "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/glbc_controller"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/lbc_controller"
@@ -483,6 +484,16 @@ func main() { //nolint:gocyclo
 		if err := gcReconciler.SetupWithManager(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ALBGatewayClass")
 			os.Exit(1)
+		}
+
+		// Policy validators write GEP-713 status (Accepted/Conflicted/
+		// TargetNotFound) on the four VKS policy CRDs. Status-only; never touch
+		// the LoadBalancer.
+		for _, pr := range gatewaypolicies.AllReconcilers(mgr.GetClient()) {
+			if err := pr.SetupWithManager(ctx, mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "GatewayPolicyValidator")
+				os.Exit(1)
+			}
 		}
 
 		// Register the field indexes used by the gateway reconciler's watches

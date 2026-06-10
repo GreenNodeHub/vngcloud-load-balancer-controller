@@ -78,9 +78,8 @@ var _ = Describe("ALB Gateway backend targetType=ip and health-check conflict", 
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo3", "--timeout=120s")
 
 		// Two health-check policies on the same Service conflict; the
-		// oldest-created (also lexicographically first) wins. The loser's
-		// Conflicted status is NOT asserted — the policy-validator controllers
-		// that would write it are not implemented in Phase 1.
+		// oldest-created (also lexicographically first) wins the LBC, and the
+		// policy-validator controller reports the loser Conflicted.
 		kubectlApply(hcConflictYAML("hc-a-older", 2)) // applied first -> older -> wins
 		kubectlApply(hcConflictYAML("hc-b-newer", 9))
 		kubectlApply(advBackendPolicyYAML) // targetType: ip on echo3
@@ -105,6 +104,14 @@ var _ = Describe("ALB Gateway backend targetType=ip and health-check conflict", 
 		By("conflict -> oldest health-check policy (healthyThreshold 2) wins")
 		Expect(pool.HealthMonitor.HealthyThreshold).NotTo(BeNil())
 		Expect(*pool.HealthMonitor.HealthyThreshold).To(Equal(2))
+
+		By("the policy validator reports the older policy Accepted and the newer Conflicted")
+		Eventually(func(g Gomega) {
+			g.Expect(jsonpath(testNamespace, "vkshealthcheckpolicy", "hc-a-older",
+				`{.status.conditions[?(@.type=="Accepted")].status}`)).To(Equal("True"))
+			g.Expect(jsonpath(testNamespace, "vkshealthcheckpolicy", "hc-b-newer",
+				`{.status.conditions[?(@.type=="Accepted")].reason}`)).To(Equal("Conflicted"))
+		}, time.Minute, 5*time.Second).Should(Succeed())
 	})
 })
 

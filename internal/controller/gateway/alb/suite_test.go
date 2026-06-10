@@ -27,6 +27,7 @@ import (
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	gatewaypolicies "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/policies"
 	gatewayshared "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
@@ -167,6 +168,11 @@ var _ = BeforeSuite(func() {
 	gcReconciler := NewGatewayClassReconciler(k8sManager.GetClient(), k8sManager.GetScheme())
 	err = gcReconciler.SetupWithManager(ctx, k8sManager)
 	Expect(err).ToNot(HaveOccurred())
+
+	// Policy validators (status-only) under test, mirroring cmd/main.go.
+	for _, pr := range gatewaypolicies.AllReconcilers(k8sManager.GetClient()) {
+		Expect(pr.SetupWithManager(ctx, k8sManager)).To(Succeed())
+	}
 
 	// Register field indexes (mirrors cmd/main.go ordering: after SetupWithManager, before mgr.Start)
 	err = gatewayshared.RegisterIndexes(ctx, k8sManager)

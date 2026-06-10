@@ -140,6 +140,17 @@ rules:
   - list
   - watch
 - apiGroups:
+  - gateway.vks.vngcloud.vn
+  resources:
+  - vksbackendpolicies/status
+  - vksgatewaypolicies/status
+  - vkshealthcheckpolicies/status
+  - vksroutepolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - networking.k8s.io
   resources:
   - ingresses
