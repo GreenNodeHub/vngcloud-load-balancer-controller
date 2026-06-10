@@ -210,7 +210,9 @@ var _ = Describe("ALB Gateway -> LoadBalancerConfig (comprehensive)", Ordered, f
 var _ = Describe("ALB Gateway fail-closed inputs", func() {
 	It("creates no LBC for a non-existent loadBalancerId (adoption lookup fails)", func() {
 		kubectlApply(failPolicyYAML("adopt-gw", "loadBalancerId: \"lb-does-not-exist-0000\""))
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "adopt-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "adopt-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(failGatewayYAML("adopt-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "adopt-gw") }, 30*time.Second, 5*time.Second).
 			Should(BeEmpty(), "bogus loadBalancerId must fail closed")
@@ -218,7 +220,9 @@ var _ = Describe("ALB Gateway fail-closed inputs", func() {
 
 	It("creates no LBC for a preferZoneId with no matching node", func() {
 		kubectlApply(failPolicyYAML("zone-gw", `preferZoneId: "ZONE-DOES-NOT-EXIST"`))
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "zone-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zone-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(failGatewayYAML("zone-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "zone-gw") }, 30*time.Second, 5*time.Second).
 			Should(BeEmpty(), "unresolvable preferZoneId must fail closed")

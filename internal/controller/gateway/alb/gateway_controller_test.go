@@ -220,6 +220,56 @@ var _ = Describe("ALB Gateway Controller", func() {
 			}, albTimeout, albInterval).Should(Succeed())
 		})
 
+		It("should write HTTPRoute Accepted + ResolvedRefs status on its parent", func() {
+			gc := newALBGatewayClass("alb-gc-rstatus")
+			Expect(k8sClient.Create(ctx, gc)).To(Succeed())
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, gc) })
+			Eventually(func(g Gomega) {
+				got := &gwv1.GatewayClass{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "alb-gc-rstatus"}, got)).To(Succeed())
+				g.Expect(got.Status.Conditions).NotTo(BeEmpty())
+			}, albTimeout, albInterval).Should(Succeed())
+
+			svc := newNodePortSvc("alb-svc-rstatus", testNS, 80, 30182)
+			Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
+
+			gw := newGateway("alb-gw-rstatus", testNS, "alb-gc-rstatus")
+			Expect(k8sClient.Create(ctx, gw)).To(Succeed())
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, gw) })
+
+			route := newHTTPRoute("alb-route-rstatus", testNS, "alb-gw-rstatus", "alb-svc-rstatus", 80)
+			Expect(k8sClient.Create(ctx, route)).To(Succeed())
+			DeferCleanup(func() { _ = k8sClient.Delete(ctx, route) })
+
+			findCond := func(conds []metav1.Condition, t string) *metav1.Condition {
+				for i := range conds {
+					if conds[i].Type == t {
+						return &conds[i]
+					}
+				}
+				return nil
+			}
+			Eventually(func(g Gomega) {
+				got := &gwv1.HTTPRoute{}
+				g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: "alb-route-rstatus", Namespace: testNS}, got)).To(Succeed())
+				var parent *gwv1.RouteParentStatus
+				for i := range got.Status.Parents {
+					if string(got.Status.Parents[i].ControllerName) == consts.GatewayClassControllerNameALB {
+						parent = &got.Status.Parents[i]
+						break
+					}
+				}
+				g.Expect(parent).NotTo(BeNil(), "expected our controller's parent status entry")
+				accepted := findCond(parent.Conditions, string(gwv1.RouteConditionAccepted))
+				g.Expect(accepted).NotTo(BeNil())
+				g.Expect(accepted.Status).To(Equal(metav1.ConditionTrue))
+				resolved := findCond(parent.Conditions, string(gwv1.RouteConditionResolvedRefs))
+				g.Expect(resolved).NotTo(BeNil())
+				g.Expect(resolved.Status).To(Equal(metav1.ConditionTrue))
+			}, albTimeout, albInterval).Should(Succeed())
+		})
+
 		It("should set Gateway.Status Accepted condition", func() {
 			// Create GatewayClass
 			gc := newALBGatewayClass("alb-gc-status")

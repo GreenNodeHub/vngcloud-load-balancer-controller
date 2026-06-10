@@ -40,7 +40,9 @@ var _ = Describe("ALB Gateway HTTPS + per-listener policy scoping", func() {
 	It("imports a TLS Secret on the HTTPS listener and scopes a per-listener policy by sectionName", func() {
 		kubectlApply(selfSignedTLSSecretYAML(testNamespace, "tls-secret", "app.example.com"))
 		kubectlApply(tlsPoliciesYAML) // unscoped (timeoutClient 20s) + sectionName=https (99s)
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "tls-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "tls-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(tlsGatewayYAML) // http :80 + https :443 (certificateRefs: tls-secret)
 
 		var lbc *v1alpha1.LoadBalancerConfig
@@ -82,7 +84,9 @@ var _ = Describe("ALB Gateway backend targetType=ip and health-check conflict", 
 		kubectlApply(hcConflictYAML("hc-a-older", 2)) // applied first -> older -> wins
 		kubectlApply(hcConflictYAML("hc-b-newer", 9))
 		kubectlApply(advBackendPolicyYAML) // targetType: ip on echo3
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "adv-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "adv-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(advGatewayRouteYAML)
 
 		var lbc *v1alpha1.LoadBalancerConfig
@@ -129,13 +133,10 @@ var _ = Describe("ALB Gateway status reporting", Ordered, func() {
 		}, 5*time.Minute, 5*time.Second).Should(Succeed())
 	})
 
-	// PENDING / KNOWN GAP: this Phase-1 controller build does NOT write
-	// HTTPRoute parent status conditions (Accepted/ResolvedRefs) — confirmed by
-	// the route's empty .status on a real cluster and by the absence of any
-	// route-status writer in the codebase. (Policy CRD status is likewise
-	// unimplemented: there are no policy-validator controllers.) Flip PIt -> It
-	// once the route-status writer lands.
-	PIt("reports HTTPRoute Accepted + ResolvedRefs on its parent", func() {
+	// Requires the controller to be running the route-status writer
+	// (writeRouteStatuses). Verified in-process by the alb envtest suite; on a
+	// live cluster the running controller must include this build.
+	It("reports HTTPRoute Accepted + ResolvedRefs on its parent", func() {
 		Eventually(func(g Gomega) {
 			g.Expect(jsonpath(testNamespace, "httproute", "status-route",
 				`{.status.parents[0].conditions[?(@.type=="Accepted")].status}`)).To(Equal("True"))

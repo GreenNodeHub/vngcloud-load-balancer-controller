@@ -41,7 +41,14 @@ func (t *defaultGatewayBuildTask) run(ctx context.Context) error {
 	if err := t.resolveGatewayPolicies(ctx); err != nil {
 		return err
 	}
-	return t.buildLoadBalancerConfig(ctx)
+	buildErr := t.buildLoadBalancerConfig(ctx)
+	// HTTPRoute Accepted/ResolvedRefs reflect attachment + backend resolution,
+	// which don't depend on cloud provisioning — write them regardless of
+	// buildErr (best-effort; must not mask the reconcile result).
+	if err := t.writeRouteStatuses(ctx); err != nil {
+		t.logger.Warnf("write HTTPRoute statuses for Gateway %s/%s: %v", t.gw.Namespace, t.gw.Name, err)
+	}
+	return buildErr
 }
 
 // resolveGatewayPolicies finds the unscoped policy (LB-level fields + listener
