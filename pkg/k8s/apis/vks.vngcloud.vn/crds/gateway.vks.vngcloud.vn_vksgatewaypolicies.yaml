@@ -82,7 +82,22 @@ spec:
                     type: boolean
                   loadBalancerId:
                     type: string
+                  loadBalancerName:
+                    description: |-
+                      LoadBalancerName sets a custom name for the cloud LB at creation time.
+                      Maps to LBC.Spec.LoadBalancerName — same as the Ingress
+                      "load-balancer-name" annotation. Written only when the LBC is first
+                      created (the cloud name is then mirrored back into Status); unset = a
+                      controller-generated default name.
+                    type: string
                   packageId:
+                    type: string
+                  preferZoneId:
+                    description: |-
+                      PreferZoneID pins the LB to a specific availability zone. The controller
+                      resolves a subnet in that zone from a cluster node. Maps to the same
+                      zone/subnet selection the Ingress "prefer-zone-id" annotation drives.
+                      Lower precedence than LoadBalancerID (adoption) and SubnetID.
                     type: string
                   privateSubnetId:
                     description: |-

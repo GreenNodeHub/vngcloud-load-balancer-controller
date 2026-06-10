@@ -417,7 +417,8 @@ func TestResolveSubnetAndZone_Defaults(t *testing.T) {
 	gw := &gwv1.Gateway{}
 	task := newTestTask(t, gw)
 	// No policy → defaults
-	subnet, network, zone, cidr := task.resolveSubnetAndZone()
+	subnet, network, zone, cidr, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
 	assert.Equal(t, "subnet-1", subnet)
 	assert.Equal(t, "net-1", network)
 	assert.Equal(t, "HCM03-1C", zone)
@@ -432,7 +433,8 @@ func TestResolveSubnetAndZone_PolicyOverridesSubnet(t *testing.T) {
 	task.unscopedPolicy.Spec.LoadBalancerSpec = &gwv1alpha1.VKSLoadBalancerSpec{
 		SubnetID: &overrideSubnet,
 	}
-	subnet, network, _, _ := task.resolveSubnetAndZone()
+	subnet, network, _, _, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
 	assert.Equal(t, "subnet-override", subnet)
 	assert.Equal(t, "net-1", network) // network stays from default
 }
@@ -517,5 +519,5 @@ func TestEnsureALBGatewayUseCase_EnsureFinalizerThenRun(t *testing.T) {
 	err := uc.EnsureALBGatewayUseCase(context.Background(), req)
 	// Without subnet/zone set, buildLoadBalancerConfig fails.
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "could not resolve default subnet")
+	assert.Contains(t, err.Error(), "could not resolve subnet/zone")
 }

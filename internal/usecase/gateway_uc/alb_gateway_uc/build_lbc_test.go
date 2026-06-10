@@ -2,12 +2,16 @@ package alb_gateway_uc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,6 +25,144 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
+
+// newTaskAndMocks builds a task exposing its repository mocks so tests can set
+// expectations on the VNGCloud / K8s repos (needed for subnet/zone resolution).
+func newTaskAndMocks(t *testing.T, gw *gwv1.Gateway) (*defaultGatewayBuildTask, *repository.MockK8sRepository, *repository.MockVngCloudRepository) {
+	mockK8s := repository.NewMockK8sRepository(t)
+	mockVng := repository.NewMockVngCloudRepository(t)
+	uc := &albGatewayUseCase{
+		k8sRepo:           mockK8s,
+		vngcloudRepo:      mockVng,
+		k8sClient:         fake.NewClientBuilder().WithScheme(newTestScheme()).Build(),
+		defaultZone:       "HCM03-1C",
+		defaultNetworkId:  "net-1",
+		defaultSubnetId:   "subnet-1",
+		defaultSubnetCIDR: "10.0.0.0/24",
+		clusterId:         "cluster-1",
+	}
+	task := &defaultGatewayBuildTask{
+		uc:               uc,
+		gw:               gw,
+		logger:           logrus.NewEntry(logrus.New()),
+		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("cluster-1", "gateway", gw.Namespace, gw.Name),
+	}
+	return task, mockK8s, mockVng
+}
+
+func gwPolicyWithLBSpec(lb *gwv1alpha1.VKSLoadBalancerSpec) *gwv1alpha1.VKSGatewayPolicy {
+	return &gwv1alpha1.VKSGatewayPolicy{Spec: gwv1alpha1.VKSGatewayPolicySpec{LoadBalancerSpec: lb}}
+}
+
+// --- resolveSubnetAndZone: adoption (load-balancer-id) ---
+
+func TestResolveSubnetAndZone_AdoptByLoadBalancerID(t *testing.T) {
+	task, _, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
+	lbID := "lb-existing"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerID: &lbID})
+	// Adopting an LB whose backend subnet differs from the cluster default →
+	// mirror that subnet's zone/cidr so the LBC is coherent with the real LB.
+	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-existing").
+		Return(&entity.LoadBalancer{BackendSubnetID: "subnet-other"}, nil)
+	mockVng.EXPECT().GetSubnetByID(mock.Anything, "net-1", "subnet-other").
+		Return(&entity.Subnet{Id: "subnet-other", ZoneID: "HCM03-2B", Cidr: "10.1.0.0/24"}, nil)
+
+	subnet, network, zone, cidr, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "subnet-other", subnet)
+	assert.Equal(t, "net-1", network)
+	assert.Equal(t, "HCM03-2B", zone)
+	assert.Equal(t, "10.1.0.0/24", cidr)
+}
+
+func TestResolveSubnetAndZone_AdoptLBOnDefaultSubnet(t *testing.T) {
+	task, _, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
+	lbID := "lb-existing"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerID: &lbID})
+	// LB already on the cluster default subnet → short-circuit to defaults,
+	// no GetSubnetByID call (asserting it's NOT called via mockery strictness).
+	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-existing").
+		Return(&entity.LoadBalancer{BackendSubnetID: "subnet-1"}, nil)
+
+	subnet, network, zone, _, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "subnet-1", subnet)
+	assert.Equal(t, "net-1", network)
+	assert.Equal(t, "HCM03-1C", zone)
+}
+
+func TestResolveSubnetAndZone_AdoptLBLookupError(t *testing.T) {
+	task, _, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
+	lbID := "missing"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerID: &lbID})
+	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, "missing").
+		Return(nil, errors.New("not found"))
+	_, _, _, _, err := task.resolveSubnetAndZone(context.Background())
+	assert.Error(t, err)
+}
+
+// --- resolveSubnetAndZone: prefer-zone-id ---
+
+func TestResolveSubnetAndZone_PreferZone(t *testing.T) {
+	task, mockK8s, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
+	zone := "HCM03-2B"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{PreferZoneID: &zone})
+	mockK8s.EXPECT().ListNode(mock.Anything, mock.AnythingOfType("*v1.NodeList")).
+		RunAndReturn(func(_ context.Context, list *corev1.NodeList, _ ...client.ListOption) error {
+			list.Items = []corev1.Node{*makeNode("node-1", "vngcloud://ins-00000000-0000-0000-0000-000000000099")}
+			return nil
+		})
+	mockVng.EXPECT().GetServerNetworkInfo(mock.Anything, "ins-00000000-0000-0000-0000-000000000099").
+		Return(common.Zone("HCM03-2B"), "net-2", "subnet-2", "10.2.0.0/24", nil)
+
+	subnet, network, z, cidr, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "subnet-2", subnet)
+	assert.Equal(t, "net-2", network)
+	assert.Equal(t, "HCM03-2B", z)
+	assert.Equal(t, "10.2.0.0/24", cidr)
+}
+
+func TestResolveSubnetAndZone_PreferZoneEqualsDefault(t *testing.T) {
+	task, _, _ := newTaskAndMocks(t, &gwv1.Gateway{})
+	zone := "HCM03-1C" // == default zone → short-circuit, no node listing
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{PreferZoneID: &zone})
+	subnet, _, z, _, err := task.resolveSubnetAndZone(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, "subnet-1", subnet)
+	assert.Equal(t, "HCM03-1C", z)
+}
+
+func TestResolveSubnetAndZone_PreferZoneNoMatch(t *testing.T) {
+	task, mockK8s, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
+	zone := "HCM99-9Z"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{PreferZoneID: &zone})
+	mockK8s.EXPECT().ListNode(mock.Anything, mock.AnythingOfType("*v1.NodeList")).
+		RunAndReturn(func(_ context.Context, list *corev1.NodeList, _ ...client.ListOption) error {
+			list.Items = []corev1.Node{*makeNode("node-1", "vngcloud://ins-00000000-0000-0000-0000-000000000099")}
+			return nil
+		})
+	mockVng.EXPECT().GetServerNetworkInfo(mock.Anything, "ins-00000000-0000-0000-0000-000000000099").
+		Return(common.Zone("HCM03-1C"), "net-1", "subnet-1", "10.0.0.0/24", nil)
+	_, _, _, _, err := task.resolveSubnetAndZone(context.Background())
+	assert.Error(t, err)
+}
+
+// --- resolveLoadBalancerName ---
+
+func TestResolveLoadBalancerName(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	task := newTestTask(t, gw)
+
+	// No policy name → controller default.
+	assert.Equal(t, task.nameHelper.GetLoadBalancerDefaultName(), task.resolveLoadBalancerName())
+
+	// Policy name wins.
+	custom := "my-custom-lb"
+	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerName: &custom})
+	assert.Equal(t, "my-custom-lb", task.resolveLoadBalancerName())
+}
 
 // newFakeClientWithHTTPRouteIndex builds a fake client that has the HTTPRoute parent-gateway
 // field index registered — required by listAttachedHTTPRoutes.
@@ -459,7 +601,7 @@ func TestRun_NoSubnet(t *testing.T) {
 	}
 	err := task.run(context.Background())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "could not resolve default subnet")
+	assert.Contains(t, err.Error(), "could not resolve subnet/zone")
 }
 
 // TestBuildLoadBalancerConfig_MissingSubnet tests error when no subnet available.
@@ -496,5 +638,5 @@ func TestBuildLoadBalancerConfig_MissingSubnet(t *testing.T) {
 	}
 	err := task.buildLoadBalancerConfig(context.Background())
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "could not resolve default subnet")
+	assert.Contains(t, err.Error(), "could not resolve subnet/zone")
 }

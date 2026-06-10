@@ -534,6 +534,16 @@ func (in *VKSLoadBalancerSpec) DeepCopyInto(out *VKSLoadBalancerSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.LoadBalancerName != nil {
+		in, out := &in.LoadBalancerName, &out.LoadBalancerName
+		*out = new(string)
+		**out = **in
+	}
+	if in.PreferZoneID != nil {
+		in, out := &in.PreferZoneID, &out.PreferZoneID
+		*out = new(string)
+		**out = **in
+	}
 	if in.PrivateSubnetID != nil {
 		in, out := &in.PrivateSubnetID, &out.PrivateSubnetID
 		*out = new(string)

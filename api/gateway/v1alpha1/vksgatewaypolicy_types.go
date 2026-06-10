@@ -53,6 +53,19 @@ type VKSLoadBalancerSpec struct {
 	Tags           map[string]string `json:"tags,omitempty"`
 	LoadBalancerID *string           `json:"loadBalancerId,omitempty"`
 
+	// LoadBalancerName sets a custom name for the cloud LB at creation time.
+	// Maps to LBC.Spec.LoadBalancerName — same as the Ingress
+	// "load-balancer-name" annotation. Written only when the LBC is first
+	// created (the cloud name is then mirrored back into Status); unset = a
+	// controller-generated default name.
+	LoadBalancerName *string `json:"loadBalancerName,omitempty"`
+
+	// PreferZoneID pins the LB to a specific availability zone. The controller
+	// resolves a subnet in that zone from a cluster node. Maps to the same
+	// zone/subnet selection the Ingress "prefer-zone-id" annotation drives.
+	// Lower precedence than LoadBalancerID (adoption) and SubnetID.
+	PreferZoneID *string `json:"preferZoneId,omitempty"`
+
 	// PrivateSubnetID overrides the LB's private subnet (used by the
 	// InterVPC scheme). Maps to LBC.Spec.PrivateSubnetId — same field the
 	// Ingress controller's "private-subnet-id" annotation writes.

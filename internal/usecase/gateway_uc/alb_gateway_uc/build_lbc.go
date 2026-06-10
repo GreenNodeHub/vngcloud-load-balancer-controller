@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -120,26 +121,28 @@ func (t *defaultGatewayBuildTask) buildLoadBalancerConfig(ctx context.Context) e
 	lbc.Labels[domain.LabelOwnerResourceUid] = string(t.gw.UID)
 	lbc.Labels[domain.OwnerLabelGatewayUID] = string(t.gw.UID)
 
-	// Resolve subnet/zone/network. Phase A only honors what the unscoped
-	// VKSGatewayPolicy.LoadBalancerSpec.SubnetID supplies and the cluster
-	// defaults; richer subnet/zone resolution (e.g. inferring from a Gateway
-	// address selector) is Phase 2 territory.
-	subnetID, networkID, zone, _ := t.resolveSubnetAndZone()
-	if subnetID == "" || networkID == "" || zone == "" {
-		return fmt.Errorf("could not resolve default subnet/zone for Gateway %s/%s; set VKSGatewayPolicy.LoadBalancerSpec.SubnetID or wait for cluster default network discovery",
-			t.gw.Namespace, t.gw.Name)
-	}
-
 	// Type, SubnetId, ZoneId, LoadBalancerName are mirrored from the cloud LB
 	// by the LBC controller. Writing them on every reconcile fights that sync
-	// and produces an infinite reconcile loop (see commit 1bbc823). Set them
-	// only at create time.
-	lbc.Spec.VpcId = networkID
+	// and produces an infinite reconcile loop (see commit 1bbc823). Resolve and
+	// set them only at create time — that also keeps the subnet/zone resolution
+	// (which may call VNGCloud to adopt an existing LB or pin a zone) off the
+	// per-reconcile hot path. VpcId tracks the cluster network and is cheap, so
+	// it is set unconditionally.
+	lbc.Spec.VpcId = t.uc.defaultNetworkId
 	if !isCreated {
+		subnetID, networkID, zone, _, err := t.resolveSubnetAndZone(ctx)
+		if err != nil {
+			return err
+		}
+		if subnetID == "" || networkID == "" || zone == "" {
+			return fmt.Errorf("could not resolve subnet/zone for Gateway %s/%s; set VKSGatewayPolicy.LoadBalancerSpec.SubnetID/PreferZoneID or wait for cluster default network discovery",
+				t.gw.Namespace, t.gw.Name)
+		}
+		lbc.Spec.VpcId = networkID
 		lbc.Spec.Type = v2.LoadBalancerTypeLayer7
 		lbc.Spec.SubnetId = subnetID
 		lbc.Spec.ZoneId = common.Zone(zone)
-		lbc.Spec.LoadBalancerName = t.nameHelper.GetLoadBalancerDefaultName()
+		lbc.Spec.LoadBalancerName = t.resolveLoadBalancerName()
 	}
 
 	if t.uc.clusterId != "" {
@@ -264,17 +267,73 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 	}
 }
 
-// resolveSubnetAndZone returns (subnetID, networkID, zone, cidr). Phase A only
-// supports the path "VKSGatewayPolicy supplies subnet, controller probes node
-// for network/zone." Existing-LBC adoption is intentionally not handled yet —
-// the LBC controller's syncLBCSpecFromLoadBalancer mirrors those fields back.
-func (t *defaultGatewayBuildTask) resolveSubnetAndZone() (string, string, string, string) {
-	subnetID := t.uc.defaultSubnetId
-	if t.unscopedPolicy != nil && t.unscopedPolicy.Spec.LoadBalancerSpec != nil &&
-		t.unscopedPolicy.Spec.LoadBalancerSpec.SubnetID != nil {
-		subnetID = *t.unscopedPolicy.Spec.LoadBalancerSpec.SubnetID
+// resolveSubnetAndZone returns (subnetID, networkID, zone, cidr, err) for a new
+// LB, honoring the unscoped VKSGatewayPolicy.LoadBalancerSpec in the same
+// priority order the Ingress controller uses:
+//  1. LoadBalancerID — adopt the existing LB; mirror its backend subnet's
+//     zone/cidr so the LBC matches the LB the LBC controller adopts (it adopts
+//     via Spec.LoadBalancerId; see lbc_uc/deploy_lb.go).
+//  2. SubnetID — explicit subnet (zone stays the cluster default).
+//  3. PreferZoneID — pin to a zone by finding a cluster node in it.
+//  4. cluster defaults.
+func (t *defaultGatewayBuildTask) resolveSubnetAndZone(ctx context.Context) (string, string, string, string, error) {
+	var s *gwv1alpha1.VKSLoadBalancerSpec
+	if t.unscopedPolicy != nil {
+		s = t.unscopedPolicy.Spec.LoadBalancerSpec
 	}
-	return subnetID, t.uc.defaultNetworkId, string(t.uc.defaultZone), t.uc.defaultSubnetCIDR
+
+	switch {
+	case s != nil && s.LoadBalancerID != nil && *s.LoadBalancerID != "":
+		lb, err := t.uc.vngcloudRepo.GetLoadBalancerByID(ctx, *s.LoadBalancerID)
+		if err != nil || lb == nil {
+			return "", "", "", "", fmt.Errorf("get load balancer by id %s for adoption: %w", *s.LoadBalancerID, err)
+		}
+		if lb.BackendSubnetID == "" || lb.BackendSubnetID == t.uc.defaultSubnetId {
+			return t.uc.defaultSubnetId, t.uc.defaultNetworkId, string(t.uc.defaultZone), t.uc.defaultSubnetCIDR, nil
+		}
+		subnet, err := t.uc.vngcloudRepo.GetSubnetByID(ctx, t.uc.defaultNetworkId, lb.BackendSubnetID)
+		if err != nil || subnet == nil {
+			return "", "", "", "", fmt.Errorf("get subnet %s of adopted load balancer %s: %w", lb.BackendSubnetID, *s.LoadBalancerID, err)
+		}
+		return subnet.Id, t.uc.defaultNetworkId, subnet.ZoneID, subnet.Cidr, nil
+
+	case s != nil && s.SubnetID != nil && *s.SubnetID != "":
+		return *s.SubnetID, t.uc.defaultNetworkId, string(t.uc.defaultZone), t.uc.defaultSubnetCIDR, nil
+
+	case s != nil && s.PreferZoneID != nil && *s.PreferZoneID != "":
+		if common.Zone(*s.PreferZoneID) == t.uc.defaultZone {
+			return t.uc.defaultSubnetId, t.uc.defaultNetworkId, string(t.uc.defaultZone), t.uc.defaultSubnetCIDR, nil
+		}
+		nodes := &corev1.NodeList{}
+		if err := t.uc.k8sRepo.ListNode(ctx, nodes); err != nil {
+			return "", "", "", "", fmt.Errorf("list nodes to resolve prefer zone %s: %w", *s.PreferZoneID, err)
+		}
+		for _, providerID := range utils.GetListProviderIdFromNodeList(nodes) {
+			z, n, sn, cidr, err := t.uc.vngcloudRepo.GetServerNetworkInfo(ctx, providerID)
+			if err != nil {
+				continue
+			}
+			if string(z) == *s.PreferZoneID {
+				return sn, n, string(z), cidr, nil
+			}
+		}
+		return "", "", "", "", fmt.Errorf("no cluster node found in prefer zone %s", *s.PreferZoneID)
+
+	default:
+		return t.uc.defaultSubnetId, t.uc.defaultNetworkId, string(t.uc.defaultZone), t.uc.defaultSubnetCIDR, nil
+	}
+}
+
+// resolveLoadBalancerName returns the cloud LB name to set at create time:
+// the unscoped policy's LoadBalancerName when set, else a controller-generated
+// default. Mirrors the Ingress "load-balancer-name" annotation.
+func (t *defaultGatewayBuildTask) resolveLoadBalancerName() string {
+	if t.unscopedPolicy != nil && t.unscopedPolicy.Spec.LoadBalancerSpec != nil {
+		if n := t.unscopedPolicy.Spec.LoadBalancerSpec.LoadBalancerName; n != nil && *n != "" {
+			return *n
+		}
+	}
+	return t.nameHelper.GetLoadBalancerDefaultName()
 }
 
 // listOwnedLBCs finds the LBC(s) owned by gw via the
