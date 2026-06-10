@@ -535,6 +535,13 @@ Indexes via controller-runtime `Manager.GetFieldIndexer()` and `pkg/gateway/refe
 
 ## 4. Status conditions, events, metrics
 
+> **Implementation status (Phase 1): all of §4.1 below is implemented.**
+> - `GatewayClass` + `Gateway` (Accepted/Programmed/addresses/listeners) — `internal/controller/gateway/alb`.
+> - `HTTPRoute.status.parents[]` (Accepted / ResolvedRefs / PartiallyInvalid) — written each Gateway reconcile by `writeRouteStatuses` in `internal/usecase/gateway_uc/alb_gateway_uc/route_status.go`; idempotent, owns only this controller's parent entry.
+> - The four policy CRDs' status (Accepted / Conflicted / TargetNotFound + `PolicyAncestorStatus`) — `internal/controller/gateway/policies` (one generic Direct-policy validator instantiated per CRD; status-only, never writes the LB).
+>
+> Earlier "Phase F" / "follow-up" markers in code comments referring to route/policy status are superseded by this.
+
 ### 4.1 Status conditions
 
 #### `GatewayClass.status.conditions`
