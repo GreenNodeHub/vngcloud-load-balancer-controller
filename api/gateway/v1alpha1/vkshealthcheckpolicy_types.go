@@ -41,6 +41,14 @@ type VKSHealthCheckPolicySpec struct {
 	HealthyThreshold   *int32           `json:"healthyThreshold,omitempty"`
 	UnhealthyThreshold *int32           `json:"unhealthyThreshold,omitempty"`
 
+	// Port overrides the health-check (monitor) port on every pool member fed
+	// by the targeted Service. When unset, each member is probed on its own
+	// traffic port. Mirrors the Ingress `vks.vngcloud.vn/healthcheck-port`
+	// annotation; applies to all protocols.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port *int32 `json:"port,omitempty"`
+
 	HTTPHealthCheck *VKSHTTPHealthCheck `json:"httpHealthCheck,omitempty"`
 }
 
@@ -48,6 +56,18 @@ type VKSHTTPHealthCheck struct {
 	Path          *string  `json:"path,omitempty"`
 	Host          *string  `json:"host,omitempty"`
 	ExpectedCodes []string `json:"expectedCodes,omitempty"`
+
+	// Method is the HTTP method used for the probe. HTTP/HTTPS protocol only;
+	// ignored for TCP. Defaults to GET. Mirrors the Ingress
+	// `vks.vngcloud.vn/healthcheck-http-method` annotation.
+	// +kubebuilder:validation:Enum=GET;PUT;POST
+	Method *string `json:"method,omitempty"`
+
+	// HTTPVersion is the HTTP version used for the probe. HTTP/HTTPS protocol
+	// only; ignored for TCP. Defaults to "1.1". Mirrors the Ingress
+	// `vks.vngcloud.vn/healthcheck-http-version` annotation.
+	// +kubebuilder:validation:Enum="1.0";"1.1"
+	HTTPVersion *string `json:"httpVersion,omitempty"`
 }
 
 type VKSHealthCheckPolicyStatus struct {

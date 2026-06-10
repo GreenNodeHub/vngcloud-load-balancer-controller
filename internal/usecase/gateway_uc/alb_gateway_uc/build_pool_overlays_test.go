@@ -223,6 +223,100 @@ func TestApplyHealthCheckPolicyToPool_WithPolicy(t *testing.T) {
 	assert.Equal(t, 3, *pool.HealthMonitor.HealthyThreshold)
 }
 
+func makeHCPolicy(ns, name, svcName, protocol string) *gwv1alpha1.VKSHealthCheckPolicy {
+	return &gwv1alpha1.VKSHealthCheckPolicy{
+		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+		Spec: gwv1alpha1.VKSHealthCheckPolicySpec{
+			TargetRefs: []gwv1alpha2.LocalPolicyTargetReference{{Group: "", Kind: "Service", Name: gwv1alpha2.ObjectName(svcName)}},
+			Protocol:   protocol,
+		},
+	}
+}
+
+func TestApplyHealthCheckPolicyToPool_HTTPMethodVersionDefault(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	hp := makeHCPolicy("prod", "hcp", "svc-hc", "HTTP")
+	task := newTestTaskWithObjs(t, gw, hp)
+
+	pool := &v1alpha1.Pool{HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP}}
+	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
+	assert.NoError(t, err)
+	assert.NotNil(t, pool.HealthMonitor.HealthCheckMethod)
+	assert.Equal(t, v2.HealthCheckMethodGET, *pool.HealthMonitor.HealthCheckMethod)
+	assert.NotNil(t, pool.HealthMonitor.HttpVersion)
+	assert.Equal(t, v2.HealthCheckHttpVersionHttp1Minor1, *pool.HealthMonitor.HttpVersion)
+}
+
+func TestApplyHealthCheckPolicyToPool_HTTPMethodVersionOverride(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	hp := makeHCPolicy("prod", "hcp", "svc-hc", "HTTP")
+	method := "POST"
+	version := "1.0"
+	hp.Spec.HTTPHealthCheck = &gwv1alpha1.VKSHTTPHealthCheck{Method: &method, HTTPVersion: &version}
+	task := newTestTaskWithObjs(t, gw, hp)
+
+	pool := &v1alpha1.Pool{HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP}}
+	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
+	assert.NoError(t, err)
+	assert.NotNil(t, pool.HealthMonitor.HealthCheckMethod)
+	assert.Equal(t, v2.HealthCheckMethodPOST, *pool.HealthMonitor.HealthCheckMethod)
+	assert.NotNil(t, pool.HealthMonitor.HttpVersion)
+	assert.Equal(t, v2.HealthCheckHttpVersionHttp1, *pool.HealthMonitor.HttpVersion)
+}
+
+func TestApplyHealthCheckPolicyToPool_TCPIgnoresHTTPMethodVersion(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	hp := makeHCPolicy("prod", "hcp", "svc-hc", "TCP")
+	method := "POST"
+	version := "1.0"
+	hp.Spec.HTTPHealthCheck = &gwv1alpha1.VKSHTTPHealthCheck{Method: &method, HTTPVersion: &version}
+	task := newTestTaskWithObjs(t, gw, hp)
+
+	pool := &v1alpha1.Pool{HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP}}
+	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
+	assert.NoError(t, err)
+	assert.Equal(t, v2.HealthCheckProtocolTCP, pool.HealthMonitor.Protocol)
+	assert.Nil(t, pool.HealthMonitor.HealthCheckMethod)
+	assert.Nil(t, pool.HealthMonitor.HttpVersion)
+}
+
+func TestApplyHealthCheckPolicyToPool_PortOverridesMonitorPort(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	hp := makeHCPolicy("prod", "hcp", "svc-hc", "TCP")
+	port := int32(8080)
+	hp.Spec.Port = &port
+	task := newTestTaskWithObjs(t, gw, hp)
+
+	pool := &v1alpha1.Pool{
+		HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP},
+		Members: []v1alpha1.PoolMember{
+			{Name: "a", IP: "10.0.0.1", Port: 30001, MonitorPort: 30001},
+			{Name: "b", IP: "10.0.0.2", Port: 30002, MonitorPort: 30002},
+		},
+	}
+	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
+	assert.NoError(t, err)
+	assert.Equal(t, 8080, pool.Members[0].MonitorPort)
+	assert.Equal(t, 8080, pool.Members[1].MonitorPort)
+	// Traffic ports untouched.
+	assert.Equal(t, 30001, pool.Members[0].Port)
+	assert.Equal(t, 30002, pool.Members[1].Port)
+}
+
+func TestApplyHealthCheckPolicyToPool_NoPortLeavesMonitorPort(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	hp := makeHCPolicy("prod", "hcp", "svc-hc", "TCP")
+	task := newTestTaskWithObjs(t, gw, hp)
+
+	pool := &v1alpha1.Pool{
+		HealthMonitor: v1alpha1.PoolHealthMonitor{Protocol: v2.HealthCheckProtocolTCP},
+		Members:       []v1alpha1.PoolMember{{Name: "a", IP: "10.0.0.1", Port: 30001, MonitorPort: 30001}},
+	}
+	err := task.applyHealthCheckPolicyToPool(context.Background(), pool, "prod", "svc-hc")
+	assert.NoError(t, err)
+	assert.Equal(t, 30001, pool.Members[0].MonitorPort)
+}
+
 func TestResolveTargetNodeLabels(t *testing.T) {
 	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
 

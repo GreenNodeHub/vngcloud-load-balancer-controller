@@ -76,11 +76,20 @@ func (t *defaultGatewayBuildTask) applyHealthCheckPolicyToPool(ctx context.Conte
 	}
 	// HTTP/HTTPS probes need healthCheckMethod + httpVersion set or the
 	// vngcloud API rejects CreatePool. Default to GET / 1.1 — same defaults
-	// the Ingress controller falls back to when annotations are absent.
+	// the Ingress controller falls back to when annotations are absent — and
+	// let HTTPHealthCheck.Method / HTTPHealthCheck.HTTPVersion override them.
+	// These are HTTP-only; for TCP probes the whole block is skipped, so a
+	// method/version set on a TCP policy is silently ignored (matches Ingress).
 	if mon.Protocol == v2.HealthCheckProtocolHTTP || mon.Protocol == v2.HealthCheckProtocolHTTPs {
 		method := v2.HealthCheckMethodGET
+		if s.HTTPHealthCheck != nil && s.HTTPHealthCheck.Method != nil {
+			method = v2.HealthCheckMethod(*s.HTTPHealthCheck.Method)
+		}
 		mon.HealthCheckMethod = &method
 		ver := v2.HealthCheckHttpVersionHttp1Minor1
+		if s.HTTPHealthCheck != nil && s.HTTPHealthCheck.HTTPVersion != nil {
+			ver = v2.HealthCheckHttpVersion(*s.HTTPHealthCheck.HTTPVersion)
+		}
 		mon.HttpVersion = &ver
 		// successCode is also required by the API; default to "200" when the
 		// user didn't supply ExpectedCodes.
@@ -109,6 +118,14 @@ func (t *defaultGatewayBuildTask) applyHealthCheckPolicyToPool(ctx context.Conte
 		}
 	}
 	pool.HealthMonitor = mon
+	// Port overrides the monitor port on every member (protocol-agnostic).
+	// Matches the Ingress `healthcheck-port` annotation, which sets each
+	// member's MonitorPort regardless of instance/ip target type.
+	if s.Port != nil {
+		for i := range pool.Members {
+			pool.Members[i].MonitorPort = int(*s.Port)
+		}
+	}
 	return nil
 }
 

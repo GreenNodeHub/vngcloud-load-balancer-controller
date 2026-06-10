@@ -115,7 +115,7 @@ The CRD schemas and translation rules below are **bounded by what the vngcloud L
 | `FIXED_RESPONSE` action | L7 Policy | not exposed in `VKSRoutePolicy.Actions` |
 | `instance` vs `ip` target type | Members | API stores IPs only; the distinction is which IPs the *controller* resolves (pod-IP vs node-IP+nodePort). Exposed as `VKSBackendPolicy.TargetType` (controller-side toggle, not an API field). |
 | ProxyProtocol toggle on a pool | Pool | use `PoolProtocol=PROXY` instead |
-| Per-listener health-check port override | HealthMonitor | uses member's `monitorPort`; not exposed in `VKSHealthCheckPolicy` |
+| Health-check monitor port / HTTP method / HTTP version | HealthMonitor | **Now exposed** for Ingress parity via `VKSHealthCheckPolicy.port`, `.httpHealthCheck.method` (GET/PUT/POST), `.httpHealthCheck.httpVersion` (1.0/1.1). `port` overrides every member's `monitorPort`; method/version are HTTP/HTTPS-only (ignored for TCP) and default to GET / 1.1. |
 
 **Implication for HTTPRoute conformance:** `HTTPRouteMatch` has 4 dimensions — path, headers, queryParams, method. Only `path` (plus `HTTPRoute.Spec.Hostnames`) maps to a vngcloud policy rule. Routes using header / queryParam / method matching are rejected with `UnsupportedMatch`. The supported canary mechanism is weighted `backendRefs` (handled by the synth-pool weight scaler in `pkg/gateway/synth_pool.go`), not header-based routing.
 
