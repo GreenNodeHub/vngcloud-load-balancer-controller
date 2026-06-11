@@ -109,6 +109,7 @@ Key values:
 | `manager.manager.image.repository` | Controller image repository | `vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller` |
 | `manager.manager.image.tag` | Controller image tag | chart's appVersion |
 | `manager.replicaCount` | Number of controller replicas | `1` |
+| `gatewayApi.alb.enabled` | Enable the [Gateway API (ALB)](../guide/gateway-api.md) controller and install the `vngcloud-alb` GatewayClass | `true` |
 
 ## CLI Flags
 
@@ -130,6 +131,7 @@ The controller binary supports the following flags:
 | `--disable-node-security-group-controller` | `false` | Disable the NodeSecurityGroup reconciler |
 | `--disable-vngcloud-global-load-balancer-controller` | `false` | Disable the VngcloudGlobalLoadBalancer reconciler |
 | `--disable-service-glb-controller` | `false` | Disable the Service GLB reconciler |
+| `--disable-alb-gateway-controller` | `false` | Disable the Gateway API (ALB) reconcilers |
 
 ## Environment Variables
 

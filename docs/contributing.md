@@ -51,6 +51,12 @@ go clean -testcache && go test -v ./internal/controller/networking/... \
   -ginkgo.focus="When node status changes from not ready to ready"
 ```
 
+The Gateway API e2e suite provisions **real** VNGCloud ALBs and is opt-in; it needs a real cluster with the controller running:
+
+```bash
+RUN_GATEWAY_E2E=true KUBECONFIG=/path/to/cluster.yaml go test ./test/e2e/gateway/ -v
+```
+
 ## Code Generation
 
 After modifying CRD types (`api/v1alpha1/*.go`), regenerate:
