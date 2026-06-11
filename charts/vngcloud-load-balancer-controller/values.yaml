@@ -1,4 +1,11 @@
 kubernetesClusterDomain: cluster.local
+# gatewayApi toggles Kubernetes Gateway-API support.
+gatewayApi:
+  alb:
+    # When true (default), the chart installs the vngcloud-alb GatewayClass and
+    # the controller reconciles it (passes --disable-alb-gateway-controller=false).
+    # Set to false to disable Gateway-API ALB support.
+    enabled: true
 manager:
   manager:
     args:

@@ -146,9 +146,9 @@ func main() { //nolint:gocyclo
 		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
 	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
 		"If set, the ServiceGLB controller will be disabled")
-	flag.BoolVar(&disableALBGatewayController, "disable-alb-gateway-controller", true,
-		"If set, the Gateway-API ALB controller (vngcloud-alb GatewayClass) will be disabled. "+
-			"Defaults to true while Phase 1 is under active development; set --disable-alb-gateway-controller=false to enable.")
+	flag.BoolVar(&disableALBGatewayController, "disable-alb-gateway-controller", false,
+		"If set, the Gateway-API ALB controller (vngcloud-alb GatewayClass) is disabled. "+
+			"Enabled by default (Phase 1 ALB + L7 is GA); in Helm set gatewayApi.alb.enabled=false to disable.")
 	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
 			"A lower period will correct entropy more quickly, "+
