@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -44,7 +45,7 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		ensureNLBGatewayClass()
 	})
 
-	It("provisions a Type=Network LBC from a TCP listener + TCPRoute", func() {
+	It("provisions a Layer-4 LBC from a TCP listener + TCPRoute", func() {
 		kubectlApply(nlbTCPBackendYAML)
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-tcp", "--timeout=120s")
 		DeferCleanup(func() {
@@ -56,13 +57,13 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		Eventually(func(g Gomega) {
 			lbc = getOwnedLBC(testNamespace, "nlb-tcp-gw")
 			g.Expect(lbc).NotTo(BeNil())
-			g.Expect(string(lbc.Spec.Type)).To(Equal("Network"))
+			g.Expect(lbc.Spec.Type).To(Equal(v2.LoadBalancerTypeLayer4))
 			l := listenerByPort(lbc, 6379)
 			g.Expect(l).NotTo(BeNil())
-			g.Expect(string(l.Protocol)).To(Equal("TCP"))
+			g.Expect(l.Protocol).To(Equal(v2.ListenerProtocolTCP))
 			g.Expect(l.DefaultPoolName).NotTo(BeNil())
 			g.Expect(lbc.Spec.Pools).NotTo(BeEmpty())
-			g.Expect(string(lbc.Spec.Pools[0].Protocol)).To(Equal("TCP"))
+			g.Expect(lbc.Spec.Pools[0].Protocol).To(Equal(v2.PoolProtocolTCP))
 		}, 3*time.Minute, 5*time.Second).Should(Succeed())
 
 		By("the Gateway reports Programmed + an address once the NLB provisions")
@@ -90,12 +91,12 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		Eventually(func(g Gomega) {
 			lbc := getOwnedLBC(testNamespace, "nlb-udp-gw")
 			g.Expect(lbc).NotTo(BeNil())
-			g.Expect(string(lbc.Spec.Type)).To(Equal("Network"))
+			g.Expect(lbc.Spec.Type).To(Equal(v2.LoadBalancerTypeLayer4))
 			l := listenerByPort(lbc, 5353)
 			g.Expect(l).NotTo(BeNil())
-			g.Expect(string(l.Protocol)).To(Equal("UDP"))
+			g.Expect(l.Protocol).To(Equal(v2.ListenerProtocolUDP))
 			g.Expect(lbc.Spec.Pools).NotTo(BeEmpty())
-			g.Expect(string(lbc.Spec.Pools[0].Protocol)).To(Equal("UDP"))
+			g.Expect(lbc.Spec.Pools[0].Protocol).To(Equal(v2.PoolProtocolUDP))
 		}, 3*time.Minute, 5*time.Second).Should(Succeed())
 	})
 })
@@ -171,7 +172,10 @@ spec:
   template:
     metadata: {labels: {app: echo-udp}}
     spec:
-      containers: [{name: coredns, image: coredns/coredns:1.11.1, args: ["-dns.port=5353"], ports: [{containerPort: 5353, protocol: UDP}]}]
+      # Any Ready pod works: the spec asserts the LBC's UDP listener/pool shape,
+      # not UDP traffic. nginx becomes Ready without extra config (coredns
+      # crash-loops without a Corefile), so endpoints resolve into the pool.
+      containers: [{name: echo, image: nginx:alpine, ports: [{containerPort: 5353, protocol: UDP}]}]
 ---
 apiVersion: v1
 kind: Service
