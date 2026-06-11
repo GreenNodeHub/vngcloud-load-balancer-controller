@@ -100,6 +100,8 @@ rules:
   - gatewayclasses
   - httproutes
   - referencegrants
+  - tcproutes
+  - udproutes
   verbs:
   - get
   - list
@@ -125,6 +127,8 @@ rules:
   resources:
   - gateways/status
   - httproutes/status
+  - tcproutes/status
+  - udproutes/status
   verbs:
   - patch
   - update

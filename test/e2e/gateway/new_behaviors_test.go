@@ -42,7 +42,9 @@ var _ = Describe("ALB Gateway cross-namespace backend via ReferenceGrant", func(
 		kubectlApply(xnsBackendYAML(backendNS))
 		kubectl("-n", backendNS, "rollout", "status", "deploy/echo", "--timeout=120s")
 
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "xns-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "xns-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(xnsGatewayRouteYAML(backendNS))
 
 		By("without a ReferenceGrant the route reports ResolvedRefs=RefNotPermitted")
@@ -69,7 +71,9 @@ var _ = Describe("ALB Gateway cross-namespace backend via ReferenceGrant", func(
 var _ = Describe("ALB Gateway policy targeting a missing object", func() {
 	It("reports Accepted=False with reason TargetNotFound", func() {
 		kubectlApply(ghostPolicyYAML)
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "vksgatewaypolicy", "ghost-pol", "--ignore-not-found") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "vksgatewaypolicy", "ghost-pol", "--ignore-not-found")
+		})
 		Eventually(func() string {
 			return jsonpath(testNamespace, "vksgatewaypolicy", "ghost-pol",
 				`{.status.conditions[?(@.type=="Accepted")].reason}`)
@@ -84,7 +88,9 @@ var _ = Describe("ALB Gateway allowedRoutes NamespacesFromSelector", func() {
 		kubectlApply(fmt.Sprintf("apiVersion: v1\nkind: Namespace\nmetadata: {name: %s, labels: {team: blue}}\n", routeNS))
 		DeferCleanup(func() { kubectlQuiet("delete", "namespace", routeNS, "--ignore-not-found", "--wait=false") })
 
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "sel-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "sel-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(selGatewayYAML)
 		kubectlApply(selBackendRouteYAML(routeNS))
 		kubectl("-n", routeNS, "rollout", "status", "deploy/echo", "--timeout=120s")
@@ -102,7 +108,9 @@ var _ = Describe("ALB Gateway backend-config mismatch", func() {
 		kubectlApply(mismatchBackendsYAML)
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-a", "--timeout=120s")
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-b", "--timeout=120s")
-		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "gateway", "mm-gw", "--ignore-not-found", "--wait=true", "--timeout=5m") })
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "mm-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
 		kubectlApply(mismatchGatewayRouteYAML)
 
 		Eventually(func() string {

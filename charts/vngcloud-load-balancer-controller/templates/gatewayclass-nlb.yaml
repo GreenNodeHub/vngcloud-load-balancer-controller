@@ -1,0 +1,9 @@
+{{- if .Values.gatewayApi.nlb.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: vngcloud-nlb
+spec:
+  controllerName: gateway.vks.vngcloud.vn/nlb
+  description: "VNGCloud Network Load Balancer (NLB) — L4 (TCP/UDP) Gateway-API class."
+{{- end }}

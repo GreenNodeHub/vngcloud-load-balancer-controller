@@ -6,6 +6,13 @@ gatewayApi:
     # the controller reconciles it (passes --disable-alb-gateway-controller=false).
     # Set to false to disable Gateway-API ALB support.
     enabled: true
+  nlb:
+    # Gateway-API NLB (L4) support — Phase 2. DISABLED by default because it
+    # reconciles TCPRoute/UDPRoute, which are Gateway-API *experimental-channel*
+    # CRDs that must be installed in the cluster first. When true, the chart
+    # installs the vngcloud-nlb GatewayClass and the controller reconciles it
+    # (passes --disable-nlb-gateway-controller=false).
+    enabled: false
 manager:
   manager:
     args:
