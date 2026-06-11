@@ -55,7 +55,18 @@ func (t *defaultGatewayBuildTask) buildPoolsAndPolicies(ctx context.Context) ([]
 		for ruleIdx, rule := range route.Spec.Rules {
 			if hasUnsupportedMatchDimension(rule.Matches) {
 				t.logger.Warnf("HTTPRoute %s/%s rule %d uses match dimensions VNGCloud LB doesn't support "+
-					"(headers/queryParams/method); skipping rule. Phase F will mark route Accepted=False.",
+					"(headers/queryParams/method); skipping rule. Route status reports PartiallyInvalid.",
+					route.Namespace, route.Name, ruleIdx)
+				continue
+			}
+
+			// A rule's backends merge into one synthetic pool with a single
+			// overlay; divergent per-backend policies fail the rule closed
+			// (route status reports BackendConfigMismatch).
+			if diverge, err := t.ruleBackendPoliciesDiverge(ctx, route, rule); err != nil {
+				return nil, nil, err
+			} else if diverge {
+				t.logger.Warnf("HTTPRoute %s/%s rule %d: backends carry divergent VKSBackend/VKSHealthCheck policies; skipping rule",
 					route.Namespace, route.Name, ruleIdx)
 				continue
 			}

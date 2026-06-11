@@ -12,6 +12,7 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
+	sharedUC "github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
@@ -124,7 +125,12 @@ func (t *defaultGatewayBuildTask) routeResolvedRefsCondition(ctx context.Context
 				ns = string(*br.Namespace)
 			}
 			if ns != route.Namespace {
-				return ok(gwv1.RouteReasonRefNotPermitted, fmt.Sprintf("cross-namespace backendRef %s/%s requires a ReferenceGrant (not yet supported)", ns, br.Name), metav1.ConditionFalse)
+				allowed, err := sharedUC.RefGrantAllowed(ctx, t.uc.k8sClient,
+					sharedUC.Ref{Group: "", Kind: "Service", Namespace: ns, Name: string(br.Name)},
+					sharedUC.Ref{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: route.Namespace, Name: route.Name})
+				if err != nil || !allowed {
+					return ok(gwv1.RouteReasonRefNotPermitted, fmt.Sprintf("cross-namespace backendRef %s/%s not permitted by any ReferenceGrant", ns, br.Name), metav1.ConditionFalse)
+				}
 			}
 			var svc corev1.Service
 			if err := t.uc.k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: string(br.Name)}, &svc); err != nil {
@@ -135,8 +141,19 @@ func (t *defaultGatewayBuildTask) routeResolvedRefsCondition(ctx context.Context
 			}
 		}
 	}
+	// Divergent per-backend policies in a rule fail closed (the rule is dropped
+	// from the LBC); surface it so the user sees why traffic isn't served.
+	for ri := range route.Spec.Rules {
+		if diverge, err := t.ruleBackendPoliciesDiverge(ctx, route, route.Spec.Rules[ri]); err == nil && diverge {
+			return ok(reasonBackendConfigMismatch, "a rule's backends carry divergent VKSBackend/VKSHealthCheck policies", metav1.ConditionFalse)
+		}
+	}
 	return ok(gwv1.RouteReasonResolvedRefs, "All backend references resolved", metav1.ConditionTrue)
 }
+
+// reasonBackendConfigMismatch is a vngcloud-specific ResolvedRefs reason: a
+// rule's backends merge into one pool but carry conflicting per-backend policy.
+const reasonBackendConfigMismatch gwv1.RouteConditionReason = "BackendConfigMismatch"
 
 // routePartiallyInvalidCondition flags routes that have at least one rule the
 // controller silently drops (match dimensions VNGCloud LB can't express).

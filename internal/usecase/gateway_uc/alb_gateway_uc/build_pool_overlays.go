@@ -6,6 +6,7 @@ import (
 
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -162,6 +163,53 @@ func (t *defaultGatewayBuildTask) resolveTargetNodeLabels(ctx context.Context, n
 		return nil, nil
 	}
 	return bp.Spec.TargetNodeLabels, nil
+}
+
+// ruleBackendPoliciesDiverge reports whether a rule's same-namespace backends
+// resolve to different VKSBackendPolicy / VKSHealthCheckPolicy objects. A
+// synthetic pool aggregates all of a rule's backends but can carry only one
+// overlay, so divergence must fail the rule closed (rather than silently
+// applying the first backend's policy). Single-backend rules never diverge.
+func (t *defaultGatewayBuildTask) ruleBackendPoliciesDiverge(ctx context.Context, route *gwv1.HTTPRoute, rule gwv1.HTTPRouteRule) (bool, error) {
+	hcKeys := map[string]struct{}{}
+	bpKeys := map[string]struct{}{}
+	considered := 0
+	for i := range rule.BackendRefs {
+		br := &rule.BackendRefs[i].BackendRef
+		ns := route.Namespace
+		if br.Namespace != nil {
+			ns = string(*br.Namespace)
+		}
+		if ns != route.Namespace { // cross-ns handled by ReferenceGrant; not compared here
+			continue
+		}
+		if br.Weight != nil && *br.Weight == 0 {
+			continue
+		}
+		hp, err := t.resolveHealthCheckPolicy(ctx, ns, string(br.Name))
+		if err != nil {
+			return false, err
+		}
+		bp, err := t.resolveBackendPolicy(ctx, ns, string(br.Name))
+		if err != nil {
+			return false, err
+		}
+		hcKey := ""
+		if hp != nil {
+			hcKey = hp.Namespace + "/" + hp.Name
+		}
+		bpKey := ""
+		if bp != nil {
+			bpKey = bp.Namespace + "/" + bp.Name
+		}
+		hcKeys[hcKey] = struct{}{}
+		bpKeys[bpKey] = struct{}{}
+		considered++
+	}
+	if considered < 2 {
+		return false, nil
+	}
+	return len(hcKeys) > 1 || len(bpKeys) > 1, nil
 }
 
 func (t *defaultGatewayBuildTask) resolveBackendPolicy(ctx context.Context, ns, svcName string) (*gwv1alpha1.VKSBackendPolicy, error) {

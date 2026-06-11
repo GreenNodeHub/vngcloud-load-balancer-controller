@@ -43,11 +43,11 @@ func TestRouteAcceptableNamespace(t *testing.T) {
 
 	t.Run("same namespace accepted by default", func(t *testing.T) {
 		route := makeRoute("prod", "r", "prod", "my-gw")
-		assert.True(t, routeAcceptableNamespace(route, gw))
+		assert.True(t, routeAcceptableNamespace(route, gw, nil))
 	})
 	t.Run("different namespace rejected by default", func(t *testing.T) {
 		route := makeRoute("staging", "r", "prod", "my-gw")
-		assert.False(t, routeAcceptableNamespace(route, gw))
+		assert.False(t, routeAcceptableNamespace(route, gw, nil))
 	})
 	t.Run("NamespacesFromAll accepts any namespace", func(t *testing.T) {
 		gwAll := makeGateway("prod", "my-gw", gwv1.HTTPProtocolType)
@@ -56,7 +56,7 @@ func TestRouteAcceptableNamespace(t *testing.T) {
 			Namespaces: &gwv1.RouteNamespaces{From: &from},
 		}
 		route := makeRoute("other-ns", "r", "prod", "my-gw")
-		assert.True(t, routeAcceptableNamespace(route, gwAll))
+		assert.True(t, routeAcceptableNamespace(route, gwAll, nil))
 	})
 	t.Run("NamespacesFromSame rejects other namespace", func(t *testing.T) {
 		gwSame := makeGateway("prod", "my-gw", gwv1.HTTPProtocolType)
@@ -65,7 +65,7 @@ func TestRouteAcceptableNamespace(t *testing.T) {
 			Namespaces: &gwv1.RouteNamespaces{From: &from},
 		}
 		route := makeRoute("other-ns", "r", "prod", "my-gw")
-		assert.False(t, routeAcceptableNamespace(route, gwSame))
+		assert.False(t, routeAcceptableNamespace(route, gwSame, nil))
 	})
 	t.Run("NamespacesFromSame accepts same namespace", func(t *testing.T) {
 		gwSame := makeGateway("prod", "my-gw", gwv1.HTTPProtocolType)
@@ -74,22 +74,27 @@ func TestRouteAcceptableNamespace(t *testing.T) {
 			Namespaces: &gwv1.RouteNamespaces{From: &from},
 		}
 		route := makeRoute("prod", "r", "prod", "my-gw")
-		assert.True(t, routeAcceptableNamespace(route, gwSame))
+		assert.True(t, routeAcceptableNamespace(route, gwSame, nil))
 	})
-	t.Run("NamespacesFromSelector treated as allow (deferred)", func(t *testing.T) {
+	t.Run("NamespacesFromSelector matches the route namespace labels", func(t *testing.T) {
 		gwSel := makeGateway("prod", "my-gw", gwv1.HTTPProtocolType)
 		from := gwv1.NamespacesFromSelector
 		gwSel.Spec.Listeners[0].AllowedRoutes = &gwv1.AllowedRoutes{
-			Namespaces: &gwv1.RouteNamespaces{From: &from},
+			Namespaces: &gwv1.RouteNamespaces{
+				From:     &from,
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"team": "blue"}},
+			},
 		}
 		route := makeRoute("any-ns", "r", "prod", "my-gw")
-		assert.True(t, routeAcceptableNamespace(route, gwSel))
+		assert.True(t, routeAcceptableNamespace(route, gwSel, map[string]string{"team": "blue"}), "matching labels accepted")
+		assert.False(t, routeAcceptableNamespace(route, gwSel, map[string]string{"team": "red"}), "non-matching labels rejected")
+		assert.False(t, routeAcceptableNamespace(route, gwSel, nil), "no labels rejected")
 	})
 	t.Run("non-HTTP listeners are skipped", func(t *testing.T) {
 		gwTCP := makeGateway("prod", "my-gw", gwv1.TCPProtocolType)
 		route := makeRoute("prod", "r", "prod", "my-gw")
 		// No HTTP/HTTPS listeners → no listener can accept
-		assert.False(t, routeAcceptableNamespace(route, gwTCP))
+		assert.False(t, routeAcceptableNamespace(route, gwTCP, nil))
 	})
 }
 

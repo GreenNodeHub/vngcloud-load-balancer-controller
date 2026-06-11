@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 func httpListener(name, hostname string) gwv1.Listener {
@@ -125,7 +126,7 @@ func TestRouteResolvedRefsCondition(t *testing.T) {
 		assert.Equal(t, string(gwv1.RouteReasonBackendNotFound), c.Reason)
 	})
 
-	t.Run("cross-namespace -> RefNotPermitted", func(t *testing.T) {
+	t.Run("cross-namespace without grant -> RefNotPermitted", func(t *testing.T) {
 		rule := backendRule("echo", func(ref *gwv1.BackendObjectReference) {
 			ns := gwv1.Namespace("other")
 			ref.Namespace = &ns
@@ -136,6 +137,25 @@ func TestRouteResolvedRefsCondition(t *testing.T) {
 		assert.Equal(t, string(gwv1.RouteReasonRefNotPermitted), c.Reason)
 	})
 
+	t.Run("cross-namespace WITH ReferenceGrant -> ResolvedRefs", func(t *testing.T) {
+		rule := backendRule("echo", func(ref *gwv1.BackendObjectReference) {
+			ns := gwv1.Namespace("other")
+			ref.Namespace = &ns
+		})
+		r := routeWith("prod", "r", nil, []gwv1.HTTPRouteRule{rule})
+		svcOther := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "echo"}}
+		grant := &gwv1beta1.ReferenceGrant{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"},
+			Spec: gwv1beta1.ReferenceGrantSpec{
+				From: []gwv1beta1.ReferenceGrantFrom{{Group: "gateway.networking.k8s.io", Kind: "HTTPRoute", Namespace: "prod"}},
+				To:   []gwv1beta1.ReferenceGrantTo{{Group: "", Kind: "Service"}},
+			},
+		}
+		c := cond(t, r, svcOther, grant)
+		assert.Equal(t, metav1.ConditionTrue, c.Status)
+		assert.Equal(t, string(gwv1.RouteReasonResolvedRefs), c.Reason)
+	})
+
 	t.Run("non-Service kind -> InvalidKind", func(t *testing.T) {
 		rule := backendRule("echo", func(ref *gwv1.BackendObjectReference) {
 			ref.Kind = ptr.To(gwv1.Kind("Secret"))
@@ -144,6 +164,39 @@ func TestRouteResolvedRefsCondition(t *testing.T) {
 		c := cond(t, r, svc)
 		assert.Equal(t, metav1.ConditionFalse, c.Status)
 		assert.Equal(t, string(gwv1.RouteReasonInvalidKind), c.Reason)
+	})
+}
+
+func TestRuleBackendPoliciesDiverge(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	route := &gwv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "r"}}
+	twoBackends := gwv1.HTTPRouteRule{BackendRefs: []gwv1.HTTPBackendRef{
+		{BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "svc-a", Port: ptr.To(gwv1.PortNumber(80))}}},
+		{BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "svc-b", Port: ptr.To(gwv1.PortNumber(80))}}},
+	}}
+
+	t.Run("no policies -> no divergence", func(t *testing.T) {
+		task := newTestTask(t, gw)
+		d, err := task.ruleBackendPoliciesDiverge(context.Background(), route, twoBackends)
+		assert.NoError(t, err)
+		assert.False(t, d)
+	})
+
+	t.Run("health-check policy on only one of two backends -> divergence", func(t *testing.T) {
+		hp := makeHCPolicy("prod", "hcp", "svc-a", "HTTP") // svc-b has none
+		task := newTestTaskWithObjs(t, gw, hp)
+		d, err := task.ruleBackendPoliciesDiverge(context.Background(), route, twoBackends)
+		assert.NoError(t, err)
+		assert.True(t, d)
+	})
+
+	t.Run("single backend never diverges", func(t *testing.T) {
+		hp := makeHCPolicy("prod", "hcp", "svc-a", "HTTP")
+		task := newTestTaskWithObjs(t, gw, hp)
+		one := gwv1.HTTPRouteRule{BackendRefs: twoBackends.BackendRefs[:1]}
+		d, err := task.ruleBackendPoliciesDiverge(context.Background(), route, one)
+		assert.NoError(t, err)
+		assert.False(t, d)
 	})
 }
 

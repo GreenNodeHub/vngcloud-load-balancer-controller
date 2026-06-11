@@ -13,6 +13,7 @@ import (
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
+	sharedUC "github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/shared"
 	pkggw "github.com/vngcloud/vngcloud-load-balancer-controller/pkg/gateway"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
@@ -44,12 +45,21 @@ func (t *defaultGatewayBuildTask) synthesizePool(ctx context.Context, route *gwv
 			ns = string(*br.Namespace)
 		}
 		if ns != route.Namespace {
-			// Cross-namespace deferred to follow-up; skip silently with a
-			// warning so the rest of the pool still functions.
-			t.logger.Warnf("backendRef %s/%s on HTTPRoute %s/%s is cross-namespace; "+
-				"skipping (ReferenceGrant evaluation lands in a follow-up)",
-				ns, br.Name, route.Namespace, route.Name)
-			continue
+			// Cross-namespace backendRef: include it only when a ReferenceGrant
+			// in the backend's namespace permits HTTPRoutes from the route's
+			// namespace. Otherwise drop it (the route's ResolvedRefs status
+			// reports RefNotPermitted).
+			allowed, err := sharedUC.RefGrantAllowed(ctx, t.uc.k8sClient,
+				sharedUC.Ref{Group: "", Kind: "Service", Namespace: ns, Name: string(br.Name)},
+				sharedUC.Ref{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: route.Namespace, Name: route.Name})
+			if err != nil {
+				return nil, fmt.Errorf("check ReferenceGrant for backendRef %s/%s: %w", ns, br.Name, err)
+			}
+			if !allowed {
+				t.logger.Warnf("backendRef %s/%s on HTTPRoute %s/%s is cross-namespace and not permitted by any ReferenceGrant; skipping",
+					ns, br.Name, route.Namespace, route.Name)
+				continue
+			}
 		}
 		port := int32(0)
 		if br.Port != nil {

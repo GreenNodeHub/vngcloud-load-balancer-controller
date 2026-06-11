@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -149,6 +150,7 @@ func (r *GatewayReconciler) SetupWithManager(ctx context.Context, mgr manager.Ma
 		Watches(&gwv1alpha1.VKSRoutePolicy{}, gwhandlers.VKSRoutePolicyToGateway(r.k8sClient)).
 		Watches(&v1alpha1.LoadBalancerConfig{}, lbcOwnerToGateway()).
 		Watches(&corev1.Service{}, gwhandlers.ServiceToRouteParents(r.k8sClient)).
+		Watches(&gwv1beta1.ReferenceGrant{}, gwhandlers.ReferenceGrantToGateways(r.k8sClient)).
 		WithOptions(controller.Options{MaxConcurrentReconciles: r.maxConcurrentReconciles}).
 		Complete(r)
 }

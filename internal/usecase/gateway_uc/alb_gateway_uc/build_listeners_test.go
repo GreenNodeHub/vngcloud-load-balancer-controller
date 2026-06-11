@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -27,6 +28,7 @@ func newTestScheme() *runtime.Scheme {
 	_ = gwv1alpha1.AddToScheme(s)
 	_ = v1alpha1.AddToScheme(s)
 	_ = corev1.AddToScheme(s)
+	_ = gwv1beta1.Install(s)
 	return s
 }
 

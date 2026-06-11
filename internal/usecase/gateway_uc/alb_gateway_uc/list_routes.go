@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"sort"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -26,7 +31,11 @@ func (t *defaultGatewayBuildTask) listAttachedHTTPRoutes(ctx context.Context) ([
 	}
 	out := make([]gwv1.HTTPRoute, 0, len(list.Items))
 	for i := range list.Items {
-		if !routeAcceptableNamespace(&list.Items[i], t.gw) {
+		nsLabels, err := t.namespaceLabels(ctx, list.Items[i].Namespace)
+		if err != nil {
+			return nil, err
+		}
+		if !routeAcceptableNamespace(&list.Items[i], t.gw, nsLabels) {
 			continue
 		}
 		out = append(out, list.Items[i])
@@ -49,9 +58,10 @@ func (t *defaultGatewayBuildTask) listAttachedHTTPRoutes(ctx context.Context) ([
 // route is dropped entirely. Per-listener attachment (hostname / sectionName)
 // is finer-grained and runs in policy generation.
 //
-// Phase 1 honors NamespacesFromAll and NamespacesFromSame. NamespacesFromSelector
-// is treated as "allow" — selector matching is deferred per the design spec.
-func routeAcceptableNamespace(r *gwv1.HTTPRoute, gw *gwv1.Gateway) bool {
+// Honors NamespacesFromAll, NamespacesFromSame, and NamespacesFromSelector
+// (the route's namespace labels, passed in, are matched against the listener's
+// selector).
+func routeAcceptableNamespace(r *gwv1.HTTPRoute, gw *gwv1.Gateway, routeNsLabels map[string]string) bool {
 	for i := range gw.Spec.Listeners {
 		l := &gw.Spec.Listeners[i]
 		if l.Protocol != gwv1.HTTPProtocolType && l.Protocol != gwv1.HTTPSProtocolType {
@@ -72,10 +82,32 @@ func routeAcceptableNamespace(r *gwv1.HTTPRoute, gw *gwv1.Gateway) bool {
 				return true
 			}
 		case gwv1.NamespacesFromSelector:
-			return true // selector deferred
+			if l.AllowedRoutes.Namespaces.Selector == nil {
+				continue
+			}
+			sel, err := metav1.LabelSelectorAsSelector(l.AllowedRoutes.Namespaces.Selector)
+			if err != nil {
+				continue
+			}
+			if sel.Matches(labels.Set(routeNsLabels)) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// namespaceLabels returns the labels on namespace ns (nil if it doesn't exist),
+// used for NamespacesFromSelector matching.
+func (t *defaultGatewayBuildTask) namespaceLabels(ctx context.Context, ns string) (map[string]string, error) {
+	var n corev1.Namespace
+	if err := t.uc.k8sClient.Get(ctx, types.NamespacedName{Name: ns}, &n); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return n.Labels, nil
 }
 
 // listenerAcceptsRoute is the per-listener attachment check. It returns true
