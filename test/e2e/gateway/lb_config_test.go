@@ -188,8 +188,15 @@ var _ = Describe("ALB Gateway -> LoadBalancerConfig (comprehensive)", Ordered, f
 		Expect(listener.Policies).To(HaveLen(4))
 	})
 
-	// Runs last in this Ordered container: mutates the policy, so any earlier
-	// spec that asserts the pre-update value must precede it.
+	It("reports PartiallyInvalid on the route for the dropped header rule", func() {
+		Eventually(func() string {
+			return routeParentStatus(testNamespace, "kitchen-route", "PartiallyInvalid")
+		}, time.Minute, 3*time.Second).Should(Equal("True"))
+		Expect(routeParentReason(testNamespace, "kitchen-route", "PartiallyInvalid")).To(Equal("UnsupportedValue"))
+	})
+
+	// The remaining specs mutate/delete shared fixtures, so any spec that
+	// asserts the pre-update state must precede them (Ordered container).
 	It("reconciles policy updates (every-reconcile field changes; create-only name stays)", func() {
 		kubectl("-n", testNamespace, "patch", "vksgatewaypolicy", "kitchen-lb",
 			"--type=merge", "-p", `{"spec":{"timeoutClient":"45s"}}`)
@@ -203,27 +210,70 @@ var _ = Describe("ALB Gateway -> LoadBalancerConfig (comprehensive)", Ordered, f
 			g.Expect(cur.Spec.LoadBalancerName).To(Equal("e2e-kitchen"), "create-only name must NOT change")
 		}, time.Minute, 3*time.Second).Should(Succeed())
 	})
+
+	It("reverts the rule action when its VKSRoutePolicy is deleted", func() {
+		kubectl("-n", testNamespace, "delete", "vksroutepolicy", "regex-reject")
+		Eventually(func(g Gomega) {
+			cur := getOwnedLBC(testNamespace, "kitchen-gw")
+			g.Expect(cur).NotTo(BeNil())
+			l := listenerByPort(cur, 80)
+			g.Expect(l).NotTo(BeNil())
+			p := policyByPathValue(l, "^/u/[0-9]+$")
+			g.Expect(p).NotTo(BeNil())
+			g.Expect(string(p.Action)).To(Equal("REDIRECT_TO_POOL"), "REJECT overlay must revert to default")
+		}, time.Minute, 3*time.Second).Should(Succeed())
+	})
+
+	It("drops all listener policies when the HTTPRoute is deleted", func() {
+		kubectl("-n", testNamespace, "delete", "httproute", "kitchen-route")
+		Eventually(func(g Gomega) {
+			cur := getOwnedLBC(testNamespace, "kitchen-gw")
+			g.Expect(cur).NotTo(BeNil())
+			l := listenerByPort(cur, 80)
+			g.Expect(l).NotTo(BeNil())
+			g.Expect(l.Policies).To(BeEmpty())
+		}, time.Minute, 3*time.Second).Should(Succeed())
+	})
+
+	// preferZoneId positive twin of the fail-closed negative below: a second
+	// tiny gateway pinned to the zone the kitchen LB landed in must produce an
+	// LBC in that zone. (Single-zone cluster: this exercises the valid-zone
+	// path; the multi-zone node-scan path is unit-tested.)
+	It("creates the LBC in the preferred zone for a valid preferZoneId", func() {
+		zone := string(lbc.Spec.ZoneId)
+		Expect(zone).NotTo(BeEmpty())
+		kubectlApply(gwPolicyYAML("zonepos-gw", fmt.Sprintf("preferZoneId: %q", zone)))
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zonepos-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		})
+		kubectlApply(plainGatewayYAML("zonepos-gw"))
+		Eventually(func(g Gomega) {
+			cur := getOwnedLBC(testNamespace, "zonepos-gw")
+			g.Expect(cur).NotTo(BeNil())
+			g.Expect(string(cur.Spec.ZoneId)).To(Equal(zone))
+		}, time.Minute, 5*time.Second).Should(Succeed())
+	})
 })
 
 // Negative / fail-closed inputs. These error during subnet/zone resolution,
 // before the LBC is created, so they provision no cloud LB.
 var _ = Describe("ALB Gateway fail-closed inputs", func() {
 	It("creates no LBC for a non-existent loadBalancerId (adoption lookup fails)", func() {
-		kubectlApply(failPolicyYAML("adopt-gw", "loadBalancerId: \"lb-does-not-exist-0000\""))
+		kubectlApply(gwPolicyYAML("adopt-gw", "loadBalancerId: \"lb-does-not-exist-0000\""))
 		DeferCleanup(func() {
 			kubectlQuiet("-n", testNamespace, "delete", "gateway", "adopt-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
-		kubectlApply(failGatewayYAML("adopt-gw"))
+		kubectlApply(plainGatewayYAML("adopt-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "adopt-gw") }, 30*time.Second, 5*time.Second).
 			Should(BeEmpty(), "bogus loadBalancerId must fail closed")
 	})
 
 	It("creates no LBC for a preferZoneId with no matching node", func() {
-		kubectlApply(failPolicyYAML("zone-gw", `preferZoneId: "ZONE-DOES-NOT-EXIST"`))
+		kubectlApply(gwPolicyYAML("zone-gw", `preferZoneId: "ZONE-DOES-NOT-EXIST"`))
 		DeferCleanup(func() {
 			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zone-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
-		kubectlApply(failGatewayYAML("zone-gw"))
+		kubectlApply(plainGatewayYAML("zone-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "zone-gw") }, 30*time.Second, 5*time.Second).
 			Should(BeEmpty(), "unresolvable preferZoneId must fail closed")
 	})
@@ -282,7 +332,9 @@ apiVersion: gateway.vks.vngcloud.vn/v1alpha1
 kind: VKSBackendPolicy
 metadata: {name: echo-bp, namespace: %[1]s}
 spec:
-  targetRefs: [{group: "", kind: Service, name: echo}]
+  # both weighted backends share one policy — divergent per-backend policies
+  # would fail the rule closed (BackendConfigMismatch)
+  targetRefs: [{group: "", kind: Service, name: echo}, {group: "", kind: Service, name: echo-v2}]
   targetType: instance
   poolAlgorithm: LEAST_CONNECTIONS
   stickiness: true
@@ -292,7 +344,7 @@ apiVersion: gateway.vks.vngcloud.vn/v1alpha1
 kind: VKSHealthCheckPolicy
 metadata: {name: echo-hc, namespace: %[1]s}
 spec:
-  targetRefs: [{group: "", kind: Service, name: echo}]
+  targetRefs: [{group: "", kind: Service, name: echo}, {group: "", kind: Service, name: echo-v2}]
   protocol: HTTP
   interval: 15s
   timeout: 4s
@@ -349,7 +401,7 @@ spec:
     backendRefs: [{name: echo, port: 80}]
 `, testNamespace, gatewayClassName)
 
-func failPolicyYAML(gw, lbSpecLine string) string {
+func gwPolicyYAML(gw, lbSpecLine string) string {
 	return fmt.Sprintf(`
 apiVersion: gateway.vks.vngcloud.vn/v1alpha1
 kind: VKSGatewayPolicy
@@ -360,7 +412,7 @@ spec:
 `, testNamespace, gw, lbSpecLine)
 }
 
-func failGatewayYAML(gw string) string {
+func plainGatewayYAML(gw string) string {
 	return fmt.Sprintf(`
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway

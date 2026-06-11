@@ -18,7 +18,8 @@ limitations under the License.
 //
 // Unlike the Kind-based default e2e in test/e2e, these specs provision REAL
 // vngcloud ALBs, so they run only against a real cluster that already has the
-// controller deployed with --enable-gateway-api-alb. The suite is opt-in:
+// controller deployed with the ALB gateway controller enabled (the default;
+// see --disable-alb-gateway-controller). The suite is opt-in:
 //
 //	RUN_GATEWAY_E2E=true KUBECONFIG=/path/to/cluster.yaml go test ./test/e2e/gateway/ -v
 //
@@ -74,7 +75,7 @@ var _ = AfterSuite(func() {
 
 // ensureGatewayClass creates the ALB GatewayClass and proves the controller is
 // live by waiting for it to be Accepted — a fast precondition that fails the
-// whole suite early if --enable-gateway-api-alb wasn't set.
+// whole suite early if the ALB gateway controller isn't running.
 func ensureGatewayClass() {
 	kubectlApply(fmt.Sprintf(`
 apiVersion: gateway.networking.k8s.io/v1
@@ -89,7 +90,7 @@ spec:
 		return jsonpath("", "gatewayclass", gatewayClassName,
 			`{.status.conditions[?(@.type=="Accepted")].status}`)
 	}, time.Minute, 3*time.Second).Should(Equal("True"),
-		"GatewayClass not Accepted — is the controller running with --enable-gateway-api-alb?")
+		"GatewayClass not Accepted — is the controller running with --disable-alb-gateway-controller=false?")
 }
 
 // --- kubectl helpers (mirrors test/e2e's shell-out style; no client-go) ---

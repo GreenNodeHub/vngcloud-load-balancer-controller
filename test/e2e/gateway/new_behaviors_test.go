@@ -55,6 +55,25 @@ var _ = Describe("ALB Gateway cross-namespace backend via ReferenceGrant", func(
 		Eventually(func() string {
 			return routeParentStatus(testNamespace, "xns-route", "ResolvedRefs")
 		}, 2*time.Minute, 5*time.Second).Should(Equal("True"))
+
+		By("deleting the ReferenceGrant revokes the permission again")
+		kubectl("-n", backendNS, "delete", "referencegrant", "allow-routes")
+		Eventually(func() string {
+			return routeParentReason(testNamespace, "xns-route", "ResolvedRefs")
+		}, 2*time.Minute, 5*time.Second).Should(Equal("RefNotPermitted"))
+	})
+})
+
+// The policy validator reports TargetNotFound for a policy whose target is
+// missing; no Gateway exists, so no LBC (and no cloud LB) is created.
+var _ = Describe("ALB Gateway policy targeting a missing object", func() {
+	It("reports Accepted=False with reason TargetNotFound", func() {
+		kubectlApply(ghostPolicyYAML)
+		DeferCleanup(func() { kubectlQuiet("-n", testNamespace, "delete", "vksgatewaypolicy", "ghost-pol", "--ignore-not-found") })
+		Eventually(func() string {
+			return jsonpath(testNamespace, "vksgatewaypolicy", "ghost-pol",
+				`{.status.conditions[?(@.type=="Accepted")].reason}`)
+		}, time.Minute, 5*time.Second).Should(Equal("TargetNotFound"))
 	})
 })
 
@@ -93,6 +112,14 @@ var _ = Describe("ALB Gateway backend-config mismatch", func() {
 })
 
 // --- fixtures ---
+
+var ghostPolicyYAML = fmt.Sprintf(`
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata: {name: ghost-pol, namespace: %[1]s}
+spec:
+  targetRefs: [{group: gateway.networking.k8s.io, kind: Gateway, name: no-such-gw}]
+`, testNamespace)
 
 func xnsBackendYAML(ns string) string {
 	return fmt.Sprintf(`
