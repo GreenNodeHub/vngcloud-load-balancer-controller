@@ -91,12 +91,30 @@ The L4 path honors three of the four [policy CRDs](gateway-api.md#policy-crds-ge
 | CRD | Targets | L4 effect |
 |---|---|---|
 | `VKSGatewayPolicy` | `Gateway` | LB creation spec (scheme, package, name, subnet/zone, BYO-LB adoption, tags), listener timeouts, allowed CIDRs |
-| `VKSBackendPolicy` | `Service` | Pool algorithm, stickiness, member target type (`instance`/`ip`), node-label selection |
+| `VKSBackendPolicy` | `Service` | Pool algorithm, stickiness, member target type (`instance`/`ip`), node-label selection, `proxyProtocol` (PROXY protocol to the backend — see below) |
 | `VKSHealthCheckPolicy` | `Service` | Health monitor — TCP (default), PING-UDP (UDP pools), or an HTTP/HTTPS probe; interval/timeout/thresholds/port |
 
 `VKSRoutePolicy` does **not** apply to L4 — there are no L7 actions (Reject/Redirect) or path/host matching on a TCP/UDP listener. `insertHeaders`, certificates, and TLS termination are also L7-only and ignored here.
 
 Health-check defaults: a TCP listener probes its members over **TCP**; a UDP listener uses **PING-UDP** (mirrors the Service controller). A `VKSHealthCheckPolicy` can override the protocol (including an HTTP/HTTPS probe over a TCP pool) and the thresholds/interval/timeout/port.
+
+### PROXY protocol (real client IP)
+
+`VKSBackendPolicy.proxyProtocol: true` switches a **TCP** pool to the vngcloud **PROXY** pool protocol, so the NLB prepends a PROXY header and an L4 backend (an HAProxy/nginx ingress controller, a TCP proxy, ...) can recover the real client IP behind the NLB. UDP pools ignore it. Mirrors the Service controller's `vks.vngcloud.vn/enable-proxy-protocol` annotation.
+
+```yaml
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata: {name: backend-proxyproto, namespace: default}
+spec:
+  targetRefs: [{group: "", kind: Service, name: my-l4-backend}]
+  proxyProtocol: true
+```
+
+!!! warning "Set proxyProtocol before the Gateway is created"
+    The cloud pool protocol is fixed at creation. Apply the `VKSBackendPolicy` *before* the Gateway so the pool is created as `PROXY` from the start; toggling it on a live pool requires recreating the Gateway. The backend must be configured to **accept** PROXY protocol (e.g. HAProxy ingress `proxy-protocol` config), otherwise it will reject connections.
+
+See [Real client IP with NLB + HAProxy](../examples/gateway-nlb-haproxy-realip.md) for an end-to-end example.
 
 ## Status
 

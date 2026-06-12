@@ -92,4 +92,5 @@ nav:
     - TLS Termination: examples/tls-termination.md
     - Internal Load Balancer: examples/internal-lb.md
     - Custom Health Check: examples/custom-healthcheck.md
+    - Real client IP (NLB + HAProxy): examples/gateway-nlb-haproxy-realip.md
   - Contributing: contributing.md
