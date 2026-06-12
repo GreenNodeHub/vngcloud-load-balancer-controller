@@ -142,6 +142,28 @@ func TestApplyBackendPolicyToPool(t *testing.T) {
 	assert.True(t, *pool.Stickiness)
 }
 
+func TestApplyBackendPolicyToPool_ProxyProtocolOnTCP(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	bp := backendPolicy("prod", "bp", "a")
+	bp.Spec.ProxyProtocol = ptr.To(true)
+	task := newTask(t, gw, utils.NewMockEndpointResolver(t), bp)
+
+	pool := &v1alpha1.Pool{Protocol: v2.PoolProtocolTCP}
+	assert.NoError(t, task.applyBackendPolicyToPool(context.Background(), pool, "prod", "a"))
+	assert.Equal(t, v2.PoolProtocolProxy, pool.Protocol, "TCP pool switches to PROXY when proxyProtocol=true")
+}
+
+func TestApplyBackendPolicyToPool_ProxyProtocolIgnoredOnUDP(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	bp := backendPolicy("prod", "bp", "a")
+	bp.Spec.ProxyProtocol = ptr.To(true)
+	task := newTask(t, gw, utils.NewMockEndpointResolver(t), bp)
+
+	pool := &v1alpha1.Pool{Protocol: v2.PoolProtocolUDP}
+	assert.NoError(t, task.applyBackendPolicyToPool(context.Background(), pool, "prod", "a"))
+	assert.Equal(t, v2.PoolProtocolUDP, pool.Protocol, "UDP pool is left untouched")
+}
+
 func TestApplyBackendPolicyToPool_NoPolicyNoChange(t *testing.T) {
 	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
 	task := newTask(t, gw, utils.NewMockEndpointResolver(t))

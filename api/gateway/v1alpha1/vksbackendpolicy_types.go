@@ -58,6 +58,14 @@ type VKSBackendPolicySpec struct {
 	EnableTLSEncryption *bool             `json:"enableTLSEncryption,omitempty"`
 	TargetNodeLabels    map[string]string `json:"targetNodeLabels,omitempty"`
 	ManageDFPMembers    *bool             `json:"manageDFPMembers,omitempty"`
+
+	// ProxyProtocol makes the cloud LB pool speak HAProxy PROXY protocol to its
+	// members, so an L4 (NLB) backend such as an HAProxy/nginx ingress
+	// controller can recover the real client IP behind the load balancer.
+	// Honored only on the NLB (L4) path and only for TCP pools (UDP is
+	// ignored). Mirrors the Service controller's
+	// `vks.vngcloud.vn/enable-proxy-protocol` annotation.
+	ProxyProtocol *bool `json:"proxyProtocol,omitempty"`
 }
 
 type VKSBackendPolicyStatus struct {

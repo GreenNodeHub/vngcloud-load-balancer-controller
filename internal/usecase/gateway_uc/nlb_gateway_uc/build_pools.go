@@ -272,6 +272,14 @@ func (t *nlbBuildTask) applyBackendPolicyToPool(ctx context.Context, pool *v1alp
 		v := *bp.Spec.Stickiness
 		pool.Stickiness = &v
 	}
+	// PROXY protocol: switch a TCP pool to the PROXY pool protocol so the cloud
+	// LB prepends a PROXY header and an L4 backend (e.g. HAProxy/nginx ingress)
+	// can recover the real client IP. TCP-only — UDP pools are left untouched.
+	// Mirrors the Service controller's enable-proxy-protocol annotation. Set
+	// this before the Gateway is created; pool protocol is fixed at create time.
+	if bp.Spec.ProxyProtocol != nil && *bp.Spec.ProxyProtocol && pool.Protocol == v2.PoolProtocolTCP {
+		pool.Protocol = v2.PoolProtocolProxy
+	}
 	return nil
 }
 

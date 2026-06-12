@@ -151,6 +151,39 @@ var _ = Describe("NLB Gateway scenarios ported from Service/Ingress", func() {
 		}, 30*time.Second, time.Second).Should(Succeed())
 	})
 
+	// Real-client-IP use case: VKSBackendPolicy.proxyProtocol switches the TCP
+	// pool to the PROXY pool protocol so an L4 backend (e.g. HAProxy ingress)
+	// can recover the client IP.
+	It("switches the pool to PROXY protocol when VKSBackendPolicy.proxyProtocol is set", func() {
+		ensureNLBClass()
+		bp := &gwv1alpha1.VKSBackendPolicy{
+			ObjectMeta: metav1.ObjectMeta{Namespace: nlbNS, Name: "proxy-bp"},
+			Spec: gwv1alpha1.VKSBackendPolicySpec{
+				TargetRefs:    []gwv1alpha1.LocalPolicyTargetReference{{Group: "", Kind: "Service", Name: "proxy-svc"}},
+				ProxyProtocol: ptr.To(true),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bp)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, bp) })
+
+		svc := mkNodePortSvc("proxy-svc", 8080)
+		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
+		gw := mkTCPGateway("proxy-gw", 8080)
+		Expect(k8sClient.Create(ctx, gw)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, gw) })
+		route := mkTCPRoute("proxy-route", "proxy-gw", "proxy-svc", 8080)
+		Expect(k8sClient.Create(ctx, route)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, route) })
+
+		Eventually(func(g Gomega) {
+			lbc := ownedLBC(g, gw)
+			g.Expect(lbc).NotTo(BeNil())
+			g.Expect(lbc.Spec.Pools).To(HaveLen(1))
+			g.Expect(lbc.Spec.Pools[0].Protocol).To(Equal(v2.PoolProtocolProxy))
+		}, 30*time.Second, time.Second).Should(Succeed())
+	})
+
 	// Ingress controller: "When create ingress with prefer subnet ID annotation
 	// ... should create load balancer in the specified subnet".
 	It("creates the LBC in the subnet from VKSGatewayPolicy.loadBalancerSpec.subnetId", func() {
