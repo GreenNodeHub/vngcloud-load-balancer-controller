@@ -16,7 +16,7 @@ client (1.2.3.4)
 ```
 
 !!! note "Prerequisites"
-    - The [NLB Gateway controller](../guide/gateway-nlb.md) enabled (`gatewayApi.nlb.enabled=true`) and the experimental `TCPRoute` CRD installed.
+    - The [NLB Gateway controller](gateway-nlb.md) enabled (`gatewayApi.nlb.enabled=true`) and the experimental `TCPRoute` CRD installed.
     - The `vngcloud-nlb` GatewayClass `Accepted`.
 
 ## 1. Install HAProxy ingress controller

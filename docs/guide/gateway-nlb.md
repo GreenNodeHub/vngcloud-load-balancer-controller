@@ -114,7 +114,7 @@ spec:
 !!! warning "Set proxyProtocol before the Gateway is created"
     The cloud pool protocol is fixed at creation. Apply the `VKSBackendPolicy` *before* the Gateway so the pool is created as `PROXY` from the start; toggling it on a live pool requires recreating the Gateway. The backend must be configured to **accept** PROXY protocol (e.g. HAProxy ingress `proxy-protocol` config), otherwise it will reject connections.
 
-See [Real client IP with NLB + HAProxy](../examples/gateway-nlb-haproxy-realip.md) for an end-to-end example.
+See [Real client IP with NLB + HAProxy](gateway-nlb-haproxy-realip.md) for an end-to-end example.
 
 ## Status
 
