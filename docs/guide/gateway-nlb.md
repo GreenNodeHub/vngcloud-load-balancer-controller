@@ -90,7 +90,7 @@ The L4 path honors three of the four [policy CRDs](gateway-api.md#policy-crds-ge
 
 | CRD | Targets | L4 effect |
 |---|---|---|
-| `VKSGatewayPolicy` | `Gateway` | LB creation spec (scheme, package, name, subnet/zone, BYO-LB adoption, tags), listener timeouts, allowed CIDRs |
+| `VKSGatewayPolicy` | `Gateway` | LB creation spec (scheme, package, name, subnet/zone, InterVPC private subnet + zone, BYO-LB adoption, tags), listener timeouts, allowed CIDRs |
 | `VKSBackendPolicy` | `Service` | Pool algorithm, stickiness, member target type (`instance`/`ip`), node-label selection, `proxyProtocol` (PROXY protocol to the backend — see below) |
 | `VKSHealthCheckPolicy` | `Service` | Health monitor — TCP (default), PING-UDP (UDP pools), or an HTTP/HTTPS probe; interval/timeout/thresholds/port |
 
@@ -115,6 +115,24 @@ spec:
     The cloud pool protocol is fixed at creation. Apply the `VKSBackendPolicy` *before* the Gateway so the pool is created as `PROXY` from the start; toggling it on a live pool requires recreating the Gateway. The backend must be configured to **accept** PROXY protocol (e.g. HAProxy ingress `proxy-protocol` config), otherwise it will reject connections.
 
 See [Real client IP with NLB + HAProxy](gateway-nlb-haproxy-realip.md) for an end-to-end example.
+
+### InterVPC scheme
+
+An `InterVPC` LB is reachable from a client subnet in a **different VPC**. Set `scheme: InterVPC` plus the client subnet's ID and zone — `privateZoneId` is required because the client subnet lives in another VPC. Mirrors the Service controller's `private-subnet-id` / `private-zone-id` annotations.
+
+```yaml
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata: {name: intervpc-lb, namespace: default}
+spec:
+  targetRefs: [{group: gateway.networking.k8s.io, kind: Gateway, name: my-nlb}]
+  loadBalancerSpec:
+    scheme: InterVPC
+    privateSubnetId: subnet-xxxxxxxx   # client subnet in the other VPC
+    privateZoneId: HCM03-1A            # zone of that client subnet
+```
+
+Like the other LB-creation fields, these are applied when the LB is first created.
 
 ## Status
 

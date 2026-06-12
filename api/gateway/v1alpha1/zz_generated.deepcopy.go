@@ -554,6 +554,11 @@ func (in *VKSLoadBalancerSpec) DeepCopyInto(out *VKSLoadBalancerSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.PrivateZoneID != nil {
+		in, out := &in.PrivateZoneID, &out.PrivateZoneID
+		*out = new(string)
+		**out = **in
+	}
 	if in.EnableAutoscale != nil {
 		in, out := &in.EnableAutoscale, &out.EnableAutoscale
 		*out = new(bool)

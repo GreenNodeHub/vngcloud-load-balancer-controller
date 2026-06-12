@@ -255,6 +255,30 @@ func TestApplyLoadBalancerSpec(t *testing.T) {
 	assert.Equal(t, "test", lbc.Spec.Tags["env"])
 }
 
+// InterVPC needs both the private subnet and the client-subnet zone; the
+// zone maps to LBC.Spec.PrivateZoneId (a common.Zone). Mirrors the Service
+// controller's private-subnet-id + private-zone-id annotations.
+func TestApplyLoadBalancerSpec_InterVPC(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	task := newTask(t, gw, utils.NewMockEndpointResolver(t))
+	task.unscopedPolicy = &gwv1alpha1.VKSGatewayPolicy{
+		Spec: gwv1alpha1.VKSGatewayPolicySpec{
+			LoadBalancerSpec: &gwv1alpha1.VKSLoadBalancerSpec{
+				Scheme:          ptr.To("InterVPC"),
+				PrivateSubnetID: ptr.To("subnet-client"),
+				PrivateZoneID:   ptr.To("HCM03-1A"),
+			},
+		},
+	}
+	lbc := &v1alpha1.LoadBalancerConfig{}
+	task.applyLoadBalancerSpec(lbc)
+	assert.Equal(t, v2.LoadBalancerScheme("InterVPC"), *lbc.Spec.Scheme)
+	assert.Equal(t, "subnet-client", *lbc.Spec.PrivateSubnetId)
+	if assert.NotNil(t, lbc.Spec.PrivateZoneId) {
+		assert.Equal(t, "HCM03-1A", string(*lbc.Spec.PrivateZoneId))
+	}
+}
+
 func TestApplyLoadBalancerSpec_NilPolicyClears(t *testing.T) {
 	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
 	task := newTask(t, gw, utils.NewMockEndpointResolver(t)) // unscopedPolicy nil

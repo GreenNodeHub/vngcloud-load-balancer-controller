@@ -238,6 +238,7 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 	lbc.Spec.PackageId = nil
 	lbc.Spec.LoadBalancerId = nil
 	lbc.Spec.PrivateSubnetId = nil
+	lbc.Spec.PrivateZoneId = nil
 	lbc.Spec.EnableAutoscale = nil
 	lbc.Spec.IsPoc = nil
 	lbc.Spec.Tags = nil
@@ -257,6 +258,10 @@ func (t *defaultGatewayBuildTask) applyLoadBalancerSpec(lbc *v1alpha1.LoadBalanc
 	}
 	if s.PrivateSubnetID != nil {
 		lbc.Spec.PrivateSubnetId = s.PrivateSubnetID
+	}
+	if s.PrivateZoneID != nil {
+		zone := common.Zone(*s.PrivateZoneID)
+		lbc.Spec.PrivateZoneId = &zone
 	}
 	if s.EnableAutoscale != nil {
 		lbc.Spec.EnableAutoscale = s.EnableAutoscale

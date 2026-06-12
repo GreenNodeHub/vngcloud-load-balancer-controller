@@ -216,4 +216,46 @@ var _ = Describe("NLB Gateway scenarios ported from Service/Ingress", func() {
 			g.Expect(lbc.Spec.SubnetId).To(Equal("subnet-custom-123"))
 		}, 30*time.Second, time.Second).Should(Succeed())
 	})
+
+	// Service controller: scheme=InterVPC + private-subnet-id + private-zone-id.
+	// The InterVPC scheme needs the client subnet (in another VPC) and its zone;
+	// all three must reach the LBC verbatim, same values the Service controller
+	// would write.
+	It("maps the InterVPC scheme, private subnet and private zone onto the LBC", func() {
+		ensureNLBClass()
+		// scheme/private-subnet/private-zone are create-only: policy first.
+		pol := &gwv1alpha1.VKSGatewayPolicy{
+			ObjectMeta: metav1.ObjectMeta{Namespace: nlbNS, Name: "intervpc-pol"},
+			Spec: gwv1alpha1.VKSGatewayPolicySpec{
+				TargetRefs: []gwv1alpha1.LocalPolicyTargetReferenceWithSectionName{gwTargetRef("intervpc-gw")},
+				LoadBalancerSpec: &gwv1alpha1.VKSLoadBalancerSpec{
+					Scheme:          ptr.To("InterVPC"),
+					PrivateSubnetID: ptr.To("subnet-client-vpc"),
+					PrivateZoneID:   ptr.To("HCM03-1A"),
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, pol)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, pol) })
+
+		svc := mkNodePortSvc("intervpc", 7100)
+		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, svc) })
+		gw := mkTCPGateway("intervpc-gw", 7100)
+		Expect(k8sClient.Create(ctx, gw)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, gw) })
+		route := mkTCPRoute("intervpc-route", "intervpc-gw", "intervpc", 7100)
+		Expect(k8sClient.Create(ctx, route)).To(Succeed())
+		DeferCleanup(func() { _ = k8sClient.Delete(ctx, route) })
+
+		Eventually(func(g Gomega) {
+			lbc := ownedLBC(g, gw)
+			g.Expect(lbc).NotTo(BeNil())
+			g.Expect(lbc.Spec.Scheme).NotTo(BeNil())
+			g.Expect(string(*lbc.Spec.Scheme)).To(Equal("InterVPC"))
+			g.Expect(lbc.Spec.PrivateSubnetId).To(HaveValue(Equal("subnet-client-vpc")))
+			g.Expect(lbc.Spec.PrivateZoneId).NotTo(BeNil())
+			g.Expect(string(*lbc.Spec.PrivateZoneId)).To(Equal("HCM03-1A"))
+		}, 30*time.Second, time.Second).Should(Succeed())
+	})
 })

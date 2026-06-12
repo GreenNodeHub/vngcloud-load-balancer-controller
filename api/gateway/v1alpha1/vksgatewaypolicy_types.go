@@ -71,6 +71,12 @@ type VKSLoadBalancerSpec struct {
 	// Ingress controller's "private-subnet-id" annotation writes.
 	PrivateSubnetID *string `json:"privateSubnetId,omitempty"`
 
+	// PrivateZoneID is the zone of the client subnet, required by the
+	// InterVPC scheme since the client subnet lives in a different VPC.
+	// Maps to LBC.Spec.PrivateZoneId — same as the Service controller's
+	// "private-zone-id" annotation.
+	PrivateZoneID *string `json:"privateZoneId,omitempty"`
+
 	// EnableAutoscale toggles cloud-side autoscaling on the LB. Maps to
 	// LBC.Spec.EnableAutoscale — same as the Ingress "enable-autoscale"
 	// annotation. Unset = cloud default (off).

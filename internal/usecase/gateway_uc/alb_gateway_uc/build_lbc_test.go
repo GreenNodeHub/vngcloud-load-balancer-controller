@@ -297,6 +297,7 @@ func TestApplyLoadBalancerSpec_WithFields(t *testing.T) {
 	pkg := "pkg-1"
 	lbID := "lb-existing"
 	subID := "subnet-private"
+	zoneID := "HCM03-1A"
 	autoscale := true
 	isPoc := false
 	task.unscopedPolicy = &gwv1alpha1.VKSGatewayPolicy{
@@ -306,6 +307,7 @@ func TestApplyLoadBalancerSpec_WithFields(t *testing.T) {
 				PackageID:       &pkg,
 				LoadBalancerID:  &lbID,
 				PrivateSubnetID: &subID,
+				PrivateZoneID:   &zoneID,
 				EnableAutoscale: &autoscale,
 				IsPOC:           &isPoc,
 				Tags:            map[string]string{"env": "prod"},
@@ -320,6 +322,9 @@ func TestApplyLoadBalancerSpec_WithFields(t *testing.T) {
 	assert.NotNil(t, lbc.Spec.LoadBalancerId)
 	assert.NotNil(t, lbc.Spec.PrivateSubnetId)
 	assert.Equal(t, "subnet-private", *lbc.Spec.PrivateSubnetId)
+	if assert.NotNil(t, lbc.Spec.PrivateZoneId) {
+		assert.Equal(t, "HCM03-1A", string(*lbc.Spec.PrivateZoneId))
+	}
 	assert.NotNil(t, lbc.Spec.EnableAutoscale)
 	assert.True(t, *lbc.Spec.EnableAutoscale)
 	assert.NotNil(t, lbc.Spec.IsPoc)
