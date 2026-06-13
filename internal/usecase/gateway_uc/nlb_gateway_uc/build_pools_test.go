@@ -10,7 +10,9 @@ import (
 	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -150,6 +152,65 @@ func TestSynthesizeL4Pool_UDP_PingHealthCheck(t *testing.T) {
 	assert.Equal(t, v2.PoolProtocolUDP, pool.Protocol)
 	assert.Equal(t, v2.HealthCheckProtocolPINGUDP, pool.HealthMonitor.Protocol)
 	assert.Len(t, pool.Members, 1)
+}
+
+// resolveTargetNodeLabels feeds VKSBackendPolicy.TargetNodeLabels into the
+// endpoint resolver as a node selector, deciding which nodes become LB members
+// in instance mode. Mirrors the Service controller's target-node-labels.
+func TestSynthesizeL4Pool_TargetNodeLabelsBecomeSelector(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	bp := backendPolicy("prod", "node-pol", "redis")
+	bp.Spec.TargetNodeLabels = map[string]string{"role": "lb", "zone": "a"}
+
+	var captured utils.EndpointResolveOptions
+	mockEP := utils.NewMockEndpointResolver(t)
+	mockEP.EXPECT().
+		ResolveNodePortEndpoints(mock.Anything, mock.Anything, intstr.FromInt(6379), mock.Anything).
+		Run(func(_ context.Context, _ types.NamespacedName, _ intstr.IntOrString, opts ...utils.EndpointResolveOption) {
+			captured.ApplyOptions(opts)
+		}).
+		Return([]utils.EndpointAddress{{IP: "10.0.0.1", Port: 31000, Name: "n1"}}, nil).Once()
+
+	task := newTask(t, gw, mockEP, bp)
+	port := gwv1.PortNumber(6379)
+	route := &l4Route{
+		kind: "TCPRoute", namespace: "prod", name: "redis-route", uid: "u-tcp",
+		backendRefs: []gwv1.BackendRef{{BackendObjectReference: gwv1.BackendObjectReference{Name: "redis", Port: &port}}},
+	}
+	_, err := task.synthesizeL4Pool(context.Background(), route, v2.PoolProtocolTCP, v2.HealthCheckProtocolTCP)
+	assert.NoError(t, err)
+	assert.NotNil(t, captured.NodeSelector)
+	// Selector ANDs the labels: a node must carry BOTH to be an LB member.
+	assert.True(t, captured.NodeSelector.Matches(labels.Set{"role": "lb", "zone": "a"}))
+	assert.False(t, captured.NodeSelector.Matches(labels.Set{"role": "lb"}), "partial match must be rejected")
+}
+
+// With no VKSBackendPolicy for the backend, target labels are nil, so the
+// selector matches every node (LB members = all nodes) — same default as the
+// Service controller when target-node-labels is unset.
+func TestSynthesizeL4Pool_NoPolicySelectsAllNodes(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+
+	var captured utils.EndpointResolveOptions
+	mockEP := utils.NewMockEndpointResolver(t)
+	mockEP.EXPECT().
+		ResolveNodePortEndpoints(mock.Anything, mock.Anything, intstr.FromInt(6379), mock.Anything).
+		Run(func(_ context.Context, _ types.NamespacedName, _ intstr.IntOrString, opts ...utils.EndpointResolveOption) {
+			captured.ApplyOptions(opts)
+		}).
+		Return([]utils.EndpointAddress{{IP: "10.0.0.1", Port: 31000, Name: "n1"}}, nil).Once()
+
+	task := newTask(t, gw, mockEP) // no VKSBackendPolicy seeded
+	port := gwv1.PortNumber(6379)
+	route := &l4Route{
+		kind: "TCPRoute", namespace: "prod", name: "redis-route", uid: "u-tcp",
+		backendRefs: []gwv1.BackendRef{{BackendObjectReference: gwv1.BackendObjectReference{Name: "redis", Port: &port}}},
+	}
+	_, err := task.synthesizeL4Pool(context.Background(), route, v2.PoolProtocolTCP, v2.HealthCheckProtocolTCP)
+	assert.NoError(t, err)
+	assert.NotNil(t, captured.NodeSelector)
+	assert.Empty(t, captured.NodeSelector.String(), "nil target labels -> empty selector")
+	assert.True(t, captured.NodeSelector.Matches(labels.Set{"any": "node"}), "empty selector matches all nodes")
 }
 
 // A Gateway under the NLB class with only an HTTP (L7) listener has no

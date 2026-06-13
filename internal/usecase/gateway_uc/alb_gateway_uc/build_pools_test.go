@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	gwv1alpha1 "github.com/vngcloud/vngcloud-load-balancer-controller/api/gateway/v1alpha1"
@@ -114,6 +117,55 @@ func TestSynthesizePool_HappyPath_InstanceMode(t *testing.T) {
 	assert.NotNil(t, pool)
 	assert.Len(t, pool.Members, 2)
 	assert.Equal(t, "10.0.0.1", pool.Members[0].IP)
+}
+
+// resolveTargetNodeLabels must reach the resolver: synthesizePool turns
+// VKSBackendPolicy.TargetNodeLabels into a node selector passed to
+// ResolveNodePortEndpoints (instance mode). Mirrors the NLB wiring test.
+func TestSynthesizePool_TargetNodeLabelsBecomeSelector(t *testing.T) {
+	gw := &gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "gw"}}
+	bp := makeBackendPolicy("prod", "bp", "svc1", nil, nil, nil, nil)
+	bp.Spec.TargetNodeLabels = map[string]string{"role": "lb", "zone": "a"}
+
+	var captured utils.EndpointResolveOptions
+	mockEP := utils.NewMockEndpointResolver(t)
+	mockEP.EXPECT().
+		ResolveNodePortEndpoints(mock.Anything, mock.Anything, intstr.FromInt(80), mock.Anything).
+		Run(func(_ context.Context, _ types.NamespacedName, _ intstr.IntOrString, opts ...utils.EndpointResolveOption) {
+			captured.ApplyOptions(opts)
+		}).
+		Return([]utils.EndpointAddress{{IP: "10.0.0.1", Port: 30080, Name: "node-1"}}, nil).Once()
+
+	uc := &albGatewayUseCase{
+		k8sRepo:          repository.NewMockK8sRepository(t),
+		vngcloudRepo:     repository.NewMockVngCloudRepository(t),
+		k8sClient:        fake.NewClientBuilder().WithScheme(newTestScheme()).WithRuntimeObjects(bp).Build(),
+		endpointResolver: mockEP,
+		clusterId:        "cluster-1",
+	}
+	task := &defaultGatewayBuildTask{
+		uc:               uc,
+		gw:               gw,
+		logger:           logrus.NewEntry(logrus.New()),
+		listenerPolicies: make(map[string]*gwv1alpha1.VKSGatewayPolicy),
+		nameHelper:       utils.NewNameHelper("c1", "gateway", gw.Namespace, gw.Name),
+	}
+
+	port := gwv1.PortNumber(80)
+	route := &gwv1.HTTPRoute{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "r", UID: "uid-nl"}}
+	rule := gwv1.HTTPRouteRule{
+		BackendRefs: []gwv1.HTTPBackendRef{{
+			BackendRef: gwv1.BackendRef{
+				BackendObjectReference: gwv1.BackendObjectReference{Name: "svc1", Port: &port},
+			},
+		}},
+	}
+	_, err := task.synthesizePool(context.Background(), route, 0, rule)
+	assert.NoError(t, err)
+	assert.NotNil(t, captured.NodeSelector)
+	// Selector ANDs the labels: a node must carry BOTH to be an LB member.
+	assert.True(t, captured.NodeSelector.Matches(labels.Set{"role": "lb", "zone": "a"}))
+	assert.False(t, captured.NodeSelector.Matches(labels.Set{"role": "lb"}), "partial match must be rejected")
 }
 
 // TestSynthesizePool_CrossNamespaceSkipped tests that cross-namespace backends

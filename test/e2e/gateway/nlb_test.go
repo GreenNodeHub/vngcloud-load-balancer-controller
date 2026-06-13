@@ -19,6 +19,7 @@ package gateway
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -99,7 +100,50 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 			g.Expect(lbc.Spec.Pools[0].Protocol).To(Equal(v2.PoolProtocolUDP))
 		}, 3*time.Minute, 5*time.Second).Should(Succeed())
 	})
+
+	// VKSBackendPolicy.targetNodeLabels restricts which nodes become LB members
+	// (instance mode). Selecting a single node by its hostname must yield exactly
+	// one pool member — proving the label is wired into endpoint resolution.
+	It("filters LB pool members by VKSBackendPolicy.targetNodeLabels", func() {
+		names := nodeNames()
+		if len(names) < 2 {
+			Skip(fmt.Sprintf("needs >= 2 Ready nodes to prove node-label filtering (have %d)", len(names)))
+		}
+		target := names[0]
+		targetIP := nodeInternalIP(target)
+		Expect(targetIP).NotTo(BeEmpty(), "could not read InternalIP of node %s", target)
+
+		kubectlApply(nlbTCPBackendYAML) // reuse the echo-tcp NodePort backend
+		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-tcp", "--timeout=120s")
+		DeferCleanup(func() {
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-nodelabel-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "tcproute", "nodelabel-route", "--ignore-not-found")
+			kubectlQuiet("-n", testNamespace, "delete", "vksbackendpolicy", "echo-tcp-nodes", "--ignore-not-found")
+		})
+		kubectlApply(nlbNodeLabelYAML(target))
+
+		By("the LBC pool carries exactly the one selected node as a member")
+		Eventually(func(g Gomega) {
+			lbc := getOwnedLBC(testNamespace, "nlb-nodelabel-gw")
+			g.Expect(lbc).NotTo(BeNil())
+			g.Expect(lbc.Spec.Pools).NotTo(BeEmpty())
+			g.Expect(lbc.Spec.Pools[0].Members).To(HaveLen(1),
+				"targetNodeLabels selecting one node must yield one member (cluster has %d nodes)", len(names))
+			g.Expect(lbc.Spec.Pools[0].Members[0].IP).To(Equal(targetIP))
+		}, 2*time.Minute, 5*time.Second).Should(Succeed())
+	})
 })
+
+// nodeNames returns the names of all nodes in the cluster.
+func nodeNames() []string {
+	out := kubectl("get", "nodes", "-o", "jsonpath={.items[*].metadata.name}")
+	return strings.Fields(out)
+}
+
+// nodeInternalIP returns the InternalIP of the named node, or "".
+func nodeInternalIP(name string) string {
+	return jsonpath("", "node", name, `{.status.addresses[?(@.type=="InternalIP")].address}`)
+}
 
 // routeKindParentStatus reads .status.parents[0].conditions[type==cond].status
 // for an arbitrary route kind (tcproute/udproute).
@@ -199,3 +243,31 @@ spec:
   rules:
   - backendRefs: [{name: echo-udp, port: 5353}]
 `, testNamespace, nlbGatewayClassName)
+
+// nlbNodeLabelYAML fronts the echo-tcp backend with a Gateway whose
+// VKSBackendPolicy pins the LB members to a single node via hostname.
+func nlbNodeLabelYAML(nodeName string) string {
+	return fmt.Sprintf(`
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: {name: nlb-nodelabel-gw, namespace: %[1]s}
+spec:
+  gatewayClassName: %[2]s
+  listeners: [{name: tcp, protocol: TCP, port: 6379, allowedRoutes: {namespaces: {from: Same}}}]
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata: {name: nodelabel-route, namespace: %[1]s}
+spec:
+  parentRefs: [{name: nlb-nodelabel-gw, sectionName: tcp}]
+  rules:
+  - backendRefs: [{name: echo-tcp, port: 6379}]
+---
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata: {name: echo-tcp-nodes, namespace: %[1]s}
+spec:
+  targetRefs: [{group: "", kind: Service, name: echo-tcp}]
+  targetNodeLabels: {kubernetes.io/hostname: %[3]s}
+`, testNamespace, nlbGatewayClassName, nodeName)
+}
