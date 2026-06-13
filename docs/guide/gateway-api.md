@@ -211,6 +211,72 @@ spec:
 
 Without a `VKSRoutePolicy`, a routed rule defaults to `REDIRECT_TO_POOL` (forward to its backend pool).
 
+## Policy scope & multi-Gateway exposure
+
+The four CRDs follow GEP-713 **direct policy attachment**: a policy's effect is bound to the single object its `targetRefs` names and must not leak beyond it. The attachment layer fixes the scope:
+
+| Policy | Scope of effect |
+|---|---|
+| `VKSGatewayPolicy` | the LB / one listener |
+| `VKSBackendPolicy`, `VKSHealthCheckPolicy` | a **Service** — i.e. *every* pool fed by that Service, on *every* Gateway that routes to it |
+| `VKSRoutePolicy` | a route / one rule |
+
+The consequence to internalise: **backend configuration attaches to the Service, so it is global to that Service.** This mirrors upstream [`BackendTLSPolicy`](https://gateway-api.sigs.k8s.io/geps/gep-1897/) (GEP-1897), which configures the backend connection *"when [the Service] is used as a backend by a Route"* — for **all** such routes. Gateway API deliberately has no per-route / per-Gateway backend policy, and [GEP-713](https://gateway-api.sigs.k8s.io/geps/gep-713/) tells implementations **not** to key policy off a `backendRef` (it is not unique across a route's rules and is a link to another object). The only standardised sub-scope on a Service is its **port** (`sectionName`), which these CRDs do not yet use.
+
+### Expose one app through an external **and** internal Gateway
+
+Two Gateways — one `Internet`, one `Internal` — with the route attached to both. The scheme is per-Gateway, so it lives on two `VKSGatewayPolicy` objects:
+
+```yaml
+# one HTTPRoute (NLB: TCPRoute/UDPRoute) attached to both Gateways
+parentRefs: [{name: gw-ext}, {name: gw-int}]
+# ... rules / backendRefs ...
+---
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata: {name: ext, namespace: demo}
+spec:
+  targetRefs: [{group: gateway.networking.k8s.io, kind: Gateway, name: gw-ext}]
+  loadBalancerSpec: {scheme: Internet}
+---
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSGatewayPolicy
+metadata: {name: int, namespace: demo}
+spec:
+  targetRefs: [{group: gateway.networking.k8s.io, kind: Gateway, name: gw-int}]
+  loadBalancerSpec: {scheme: Internal}
+```
+
+If both LBs want the **same** backend behaviour, a single Service + a single `VKSBackendPolicy` serves both.
+
+### Different backend behaviour per Gateway → different Service
+
+Because backend policy is service-global, you **cannot** give one Service a different `targetType` (or algorithm, stickiness, …) per Gateway. When two frontends genuinely need different backend behaviour, that is two backend *intents* — model it as **two Services with the same pod selector**, each with its own `VKSBackendPolicy`:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata: {name: app-ext, namespace: demo}
+spec: {type: NodePort, selector: {app: myapp}, ports: [{port: 80, targetPort: 80}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: app-int, namespace: demo}
+spec: {type: ClusterIP, selector: {app: myapp}, ports: [{port: 80, targetPort: 80}]}
+---
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata: {name: ext-instance, namespace: demo}
+spec: {targetRefs: [{group: "", kind: Service, name: app-ext}], targetType: instance}
+---
+apiVersion: gateway.vks.vngcloud.vn/v1alpha1
+kind: VKSBackendPolicy
+metadata: {name: int-ip, namespace: demo}
+spec: {targetRefs: [{group: "", kind: Service, name: app-int}], targetType: ip}
+```
+
+`gw-ext`'s route targets `app-ext`; `gw-int`'s targets `app-int`. This is the Gateway-API-idiomatic answer, not a workaround — "different backend behaviour" is expressed as "different backend object", consistent with direct policy attachment.
+
 ## Conflict resolution & policy status
 
 When several policies of the same kind target the same object, the **oldest** (by `creationTimestamp`, then alphabetical) wins — per GEP-713. Every policy reports its outcome in `status`:

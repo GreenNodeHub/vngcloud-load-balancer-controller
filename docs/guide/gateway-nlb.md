@@ -98,6 +98,9 @@ The L4 path honors three of the four [policy CRDs](gateway-api.md#policy-crds-ge
 
 Health-check defaults: a TCP listener probes its members over **TCP**; a UDP listener uses **PING-UDP** (mirrors the Service controller). A `VKSHealthCheckPolicy` can override the protocol (including an HTTP/HTTPS probe over a TCP pool) and the thresholds/interval/timeout/port.
 
+!!! tip "One app behind an external **and** internal NLB"
+    `VKSBackendPolicy` attaches to a **Service**, so its `targetType` is global to that Service across every Gateway. To front one app with both an `Internet` and an `Internal` NLB — especially with a different `targetType` per LB — see [Policy scope & multi-Gateway exposure](gateway-api.md#policy-scope-multi-gateway-exposure).
+
 ### PROXY protocol (real client IP)
 
 `VKSBackendPolicy.proxyProtocol: true` switches a **TCP** pool to the vngcloud **PROXY** pool protocol, so the NLB prepends a PROXY header and an L4 backend (an HAProxy/nginx ingress controller, a TCP proxy, ...) can recover the real client IP behind the NLB. UDP pools ignore it. Mirrors the Service controller's `vks.vngcloud.vn/enable-proxy-protocol` annotation.
