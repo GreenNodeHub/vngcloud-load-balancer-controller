@@ -32,6 +32,11 @@ permissions:
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
+    # pr-preview-action still pins Node 20 nested actions (JamesIves/github-pages-deploy-action,
+    # marocchino/sticky-pull-request-comment). Opt them into Node 24 now to silence the deprecation
+    # warning; becomes a no-op once Node 24 is the runner default.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - uses: actions/checkout@v6
 
