@@ -6,7 +6,7 @@ We welcome contributions to the VNGCloud Load Balancer Controller!
 
 ### Prerequisites
 
-- Go 1.25.9+
+- Go 1.25.10+
 - Docker
 - `kubectl` and access to a Kubernetes cluster
 - `make`
@@ -116,6 +116,6 @@ make lint-fix
 1. Fork the repository and create a feature branch
 2. Make your changes with tests
 3. Run `make test lint`
-4. Open a PR against the `v3` branch
+4. Open a PR against the `main` branch
 
 For more information see the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html).
