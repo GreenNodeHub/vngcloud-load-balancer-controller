@@ -1460,8 +1460,8 @@
 </tr>
 <tr>
 <td><code>gatewayApi.alb.enabled</code></td>
-<td>Enable the <a href="../../guide/gateway-api/">Gateway API (ALB)</a> controller and install the <code>vngcloud-alb</code> GatewayClass</td>
-<td><code>true</code></td>
+<td>Enable the <a href="../../guide/gateway-api/">Gateway API (ALB)</a> controller and install the <code>vngcloud-alb</code> GatewayClass. Requires the Gateway-API CRDs (Gateway/HTTPRoute) to be installed first</td>
+<td><code>false</code></td>
 </tr>
 <tr>
 <td><code>gatewayApi.nlb.enabled</code></td>
@@ -1553,8 +1553,8 @@
 </tr>
 <tr>
 <td><code>--disable-alb-gateway-controller</code></td>
-<td><code>false</code></td>
-<td>Disable the Gateway API (ALB) reconcilers</td>
+<td><code>true</code></td>
+<td>Disable the Gateway API (ALB) reconcilers. Disabled by default; needs the Gateway-API CRDs (Gateway/HTTPRoute)</td>
 </tr>
 <tr>
 <td><code>--disable-nlb-gateway-controller</code></td>

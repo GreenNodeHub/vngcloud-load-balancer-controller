@@ -1647,13 +1647,13 @@
 <p>Current support covers ALB (L7) with <code>HTTPRoute</code>. NLB (L4, <code>Gateway</code> + TCP/UDP routes), <code>GRPCRoute</code>, and <code>BackendTLSPolicy</code> are planned for later phases. L4 workloads keep using <code>Service</code> of type <code>LoadBalancer</code>.</p>
 </div>
 <h2 id="enabling-disabling">Enabling / disabling<a class="headerlink" href="#enabling-disabling" title="Permanent link">&para;</a></h2>
-<p>The ALB Gateway controller is <strong>enabled by default</strong>. The Helm chart installs the <code>vngcloud-alb</code> GatewayClass and wires the controller flag from one toggle:</p>
+<p>The ALB Gateway controller is <strong>disabled by default</strong> so the chart installs cleanly on clusters that have not installed the Gateway API CRDs. Enable it only after those CRDs are present. The Helm chart installs the <code>vngcloud-alb</code> GatewayClass and wires the controller flag from one toggle:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># values.yaml</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">gatewayApi</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">alb</span><span class="p">:</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># set false to disable the controller and skip the GatewayClass</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># set true to enable the controller and install the GatewayClass</span>
 </code></pre></div>
-<p>The underlying controller flag is <code>--disable-alb-gateway-controller</code> (default <code>false</code>).</p>
+<p>The underlying controller flag is <code>--disable-alb-gateway-controller</code> (default <code>true</code>).</p>
 <div class="admonition warning">
 <p class="admonition-title">Gateway API CRDs are a prerequisite</p>
 <p>The cluster must have the <a href="https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api">Gateway API standard CRDs</a> installed (<code>Gateway</code>, <code>HTTPRoute</code>, <code>ReferenceGrant</code>, ...). The controller does not install them.</p>
