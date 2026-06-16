@@ -14,16 +14,16 @@ The controller implements the [Kubernetes Gateway API](https://gateway-api.sigs.
 
 ## Enabling / disabling
 
-The ALB Gateway controller is **enabled by default**. The Helm chart installs the `vngcloud-alb` GatewayClass and wires the controller flag from one toggle:
+The ALB Gateway controller is **disabled by default** so the chart installs cleanly on clusters that have not installed the Gateway API CRDs. Enable it only after those CRDs are present. The Helm chart installs the `vngcloud-alb` GatewayClass and wires the controller flag from one toggle:
 
 ```yaml
 # values.yaml
 gatewayApi:
   alb:
-    enabled: true   # set false to disable the controller and skip the GatewayClass
+    enabled: true   # set true to enable the controller and install the GatewayClass
 ```
 
-The underlying controller flag is `--disable-alb-gateway-controller` (default `false`).
+The underlying controller flag is `--disable-alb-gateway-controller` (default `true`).
 
 !!! warning "Gateway API CRDs are a prerequisite"
     The cluster must have the [Gateway API standard CRDs](https://gateway-api.sigs.k8s.io/guides/#installing-gateway-api) installed (`Gateway`, `HTTPRoute`, `ReferenceGrant`, ...). The controller does not install them.

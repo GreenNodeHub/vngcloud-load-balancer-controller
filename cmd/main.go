@@ -155,9 +155,10 @@ func main() { //nolint:gocyclo
 		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
 	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
 		"If set, the ServiceGLB controller will be disabled")
-	flag.BoolVar(&disableALBGatewayController, "disable-alb-gateway-controller", false,
+	flag.BoolVar(&disableALBGatewayController, "disable-alb-gateway-controller", true,
 		"If set, the Gateway-API ALB controller (vngcloud-alb GatewayClass) is disabled. "+
-			"Enabled by default (Phase 1 ALB + L7 is GA); in Helm set gatewayApi.alb.enabled=false to disable.")
+			"DISABLED by default: the Gateway-API CRDs (GatewayClass/Gateway/HTTPRoute) must be "+
+			"installed in the cluster before enabling. In Helm set gatewayApi.alb.enabled=true to enable.")
 	flag.BoolVar(&disableNLBGatewayController, "disable-nlb-gateway-controller", true,
 		"If set, the Gateway-API NLB controller (vngcloud-nlb GatewayClass, L4) is disabled. "+
 			"DISABLED by default: TCPRoute/UDPRoute are Gateway-API experimental-channel CRDs and "+
