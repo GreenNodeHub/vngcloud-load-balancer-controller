@@ -21,7 +21,7 @@ import (
 // LB-level + listener-level fields on every reconcile, so a policy edit
 // only needs to reach the Gateway controller's queue to take effect.
 func VKSGatewayPolicyToGateway() handler.EventHandler {
-	enq := func(ctx context.Context, obj client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	enq := func(_ context.Context, obj client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		p, ok := obj.(*vksv1.VKSGatewayPolicy)
 		if !ok {
 			return
@@ -129,7 +129,7 @@ func policyByServiceTargetHandler[P client.Object](c client.Client, refs func(cl
 
 func enqueueRouteParents(r *gwv1.HTTPRoute, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	for _, p := range r.Spec.ParentRefs {
-		if p.Kind != nil && *p.Kind != "Gateway" {
+		if p.Kind != nil && *p.Kind != gatewayKind {
 			continue
 		}
 		ns := r.Namespace

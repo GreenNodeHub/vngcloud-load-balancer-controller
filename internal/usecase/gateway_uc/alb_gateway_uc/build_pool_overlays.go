@@ -64,10 +64,10 @@ func (t *defaultGatewayBuildTask) applyHealthCheckPolicyToPool(ctx context.Conte
 		Protocol: v2.HealthCheckProtocol(s.Protocol),
 	}
 	if s.Interval != nil {
-		mon.Interval = ptrInt(int(s.Interval.Duration.Seconds()))
+		mon.Interval = ptrInt(int(s.Interval.Seconds()))
 	}
 	if s.Timeout != nil {
-		mon.Timeout = ptrInt(int(s.Timeout.Duration.Seconds()))
+		mon.Timeout = ptrInt(int(s.Timeout.Seconds()))
 	}
 	if s.HealthyThreshold != nil {
 		mon.HealthyThreshold = ptrInt(int(*s.HealthyThreshold))

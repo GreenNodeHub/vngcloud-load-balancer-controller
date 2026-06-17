@@ -43,7 +43,7 @@ func SynthPoolName(routeUID string, ruleIdx int, backends []BackendKey) string {
 	})
 	h := sha256.New()
 	for _, b := range sorted {
-		fmt.Fprintf(h, "%s/%s:%d=%d\n", b.Namespace, b.Name, b.Port, b.Weight)
+		_, _ = fmt.Fprintf(h, "%s/%s:%d=%d\n", b.Namespace, b.Name, b.Port, b.Weight)
 	}
 	digest := hex.EncodeToString(h.Sum(nil))
 	prefix := routeUID

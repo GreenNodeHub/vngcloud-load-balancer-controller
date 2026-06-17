@@ -179,7 +179,7 @@ func (uc *albGatewayUseCase) DeleteALBGatewayUseCase(ctx context.Context, req ct
 
 func (uc *albGatewayUseCase) fetchGatewayClass(ctx context.Context, gw *gwv1.Gateway) (*gwv1.GatewayClass, error) {
 	if gw.Spec.GatewayClassName == "" {
-		return nil, errors.New("Gateway has empty gatewayClassName")
+		return nil, errors.New("gateway has empty gatewayClassName")
 	}
 	gc := &gwv1.GatewayClass{}
 	if err := uc.k8sClient.Get(ctx, types.NamespacedName{Name: string(gw.Spec.GatewayClassName)}, gc); err != nil {

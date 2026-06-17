@@ -35,6 +35,7 @@ func newFakeClient(scheme *runtime.Scheme, objs ...client.Object) client.Client 
 		Build()
 }
 
+// nolint:unparam
 func gwPolicyTargeting(name, ns, gwName string, created time.Time) *gwv1alpha1.VKSGatewayPolicy {
 	return &gwv1alpha1.VKSGatewayPolicy{
 		ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name, CreationTimestamp: metav1.NewTime(created)},
@@ -57,6 +58,7 @@ func acceptedCondOf(p *gwv1alpha1.VKSGatewayPolicy) *metav1.Condition {
 	return nil
 }
 
+// nolint:unparam
 func reconcileGwPolicy(t *testing.T, c client.Client, name, ns string) *gwv1alpha1.VKSGatewayPolicy {
 	t.Helper()
 	r := newGatewayPolicyValidator(c)

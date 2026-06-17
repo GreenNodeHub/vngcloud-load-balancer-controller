@@ -14,8 +14,16 @@ func TestSynthPoolName_Deterministic(t *testing.T) {
 }
 
 func TestSynthPoolName_OrderInsensitive(t *testing.T) {
-	a := SynthPoolName("u", 0, []BackendKey{{Namespace: "ns", Name: "a", Port: 80, Weight: 1}, {Namespace: "ns", Name: "b", Port: 80, Weight: 1}})
-	b := SynthPoolName("u", 0, []BackendKey{{Namespace: "ns", Name: "b", Port: 80, Weight: 1}, {Namespace: "ns", Name: "a", Port: 80, Weight: 1}})
+	backendsA := []BackendKey{
+		{Namespace: "ns", Name: "a", Port: 80, Weight: 1},
+		{Namespace: "ns", Name: "b", Port: 80, Weight: 1},
+	}
+	backendsB := []BackendKey{
+		{Namespace: "ns", Name: "b", Port: 80, Weight: 1},
+		{Namespace: "ns", Name: "a", Port: 80, Weight: 1},
+	}
+	a := SynthPoolName("u", 0, backendsA)
+	b := SynthPoolName("u", 0, backendsB)
 	if a != b {
 		t.Fatalf("expected order-insensitive: %s vs %s", a, b)
 	}

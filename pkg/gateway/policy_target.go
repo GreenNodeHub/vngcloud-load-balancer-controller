@@ -30,7 +30,11 @@ func TargetRefMatches(ref gwv1alpha2.LocalPolicyTargetReference, policyNamespace
 
 // TargetRefMatchesWithSection compares a LocalPolicyTargetReferenceWithSectionName against a target.
 // SectionName matches when both are empty, both equal, or the target's section is empty.
-func TargetRefMatchesWithSection(ref gwv1alpha2.LocalPolicyTargetReferenceWithSectionName, policyNamespace string, t PolicyTarget) bool {
+func TargetRefMatchesWithSection(
+	ref gwv1alpha2.LocalPolicyTargetReferenceWithSectionName,
+	policyNamespace string,
+	t PolicyTarget,
+) bool {
 	base := gwv1alpha2.LocalPolicyTargetReference{Group: ref.Group, Kind: ref.Kind, Name: ref.Name}
 	if !TargetRefMatches(base, policyNamespace, t) {
 		return false

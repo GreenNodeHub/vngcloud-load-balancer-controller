@@ -14,7 +14,7 @@ import (
 )
 
 func RouteToGateway() handler.EventHandler {
-	enq := func(ctx context.Context, obj client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+	enq := func(_ context.Context, obj client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 		r, ok := obj.(*gwv1.HTTPRoute)
 		if !ok {
 			return

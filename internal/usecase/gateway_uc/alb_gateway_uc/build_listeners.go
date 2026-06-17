@@ -44,7 +44,7 @@ func (t *defaultGatewayBuildTask) buildListeners() ([]v1alpha1.Listener, error) 
 		out = append(out, entry)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("Gateway %s/%s has no ALB-supported listeners", t.gw.Namespace, t.gw.Name)
+		return nil, fmt.Errorf("gateway %s/%s has no ALB-supported listeners", t.gw.Namespace, t.gw.Name)
 	}
 	return out, nil
 }

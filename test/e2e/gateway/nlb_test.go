@@ -50,7 +50,8 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		kubectlApply(nlbTCPBackendYAML)
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-tcp", "--timeout=120s")
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-tcp-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-tcp-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
 		kubectlApply(nlbTCPGatewayRouteYAML)
 
@@ -85,7 +86,8 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		kubectlApply(nlbUDPBackendYAML)
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-udp", "--timeout=120s")
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-udp-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-udp-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
 		kubectlApply(nlbUDPGatewayRouteYAML)
 
@@ -116,9 +118,12 @@ var _ = Describe("NLB Gateway -> Layer-4 LoadBalancerConfig", Ordered, func() {
 		kubectlApply(nlbTCPBackendYAML) // reuse the echo-tcp NodePort backend
 		kubectl("-n", testNamespace, "rollout", "status", "deploy/echo-tcp", "--timeout=120s")
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-nodelabel-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
-			kubectlQuiet("-n", testNamespace, "delete", "tcproute", "nodelabel-route", "--ignore-not-found")
-			kubectlQuiet("-n", testNamespace, "delete", "vksbackendpolicy", "echo-tcp-nodes", "--ignore-not-found")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "nlb-nodelabel-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "tcproute", "nodelabel-route",
+				"--ignore-not-found")
+			kubectlQuiet("-n", testNamespace, "delete", "vksbackendpolicy", "echo-tcp-nodes",
+				"--ignore-not-found")
 		})
 		kubectlApply(nlbNodeLabelYAML(target))
 
@@ -166,7 +171,9 @@ spec:
 		return jsonpath("", "gatewayclass", nlbGatewayClassName,
 			`{.status.conditions[?(@.type=="Accepted")].status}`)
 	}, time.Minute, 3*time.Second).Should(Equal("True"),
-		"vngcloud-nlb GatewayClass not Accepted — is the controller running with --disable-nlb-gateway-controller=false and the experimental CRDs installed?")
+		"vngcloud-nlb GatewayClass not Accepted — "+
+			"is the controller running with --disable-nlb-gateway-controller=false "+
+			"and the experimental CRDs installed?")
 }
 
 // --- fixtures ---

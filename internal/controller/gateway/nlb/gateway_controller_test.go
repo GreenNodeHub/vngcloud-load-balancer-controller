@@ -109,7 +109,7 @@ var _ = Describe("NLB Gateway → L4 LoadBalancerConfig", func() {
 			cur := &gwv1a2.TCPRoute{}
 			g.Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: nlbNS, Name: "redis-route"}, cur)).To(Succeed())
 			g.Expect(cur.Status.Parents).NotTo(BeEmpty())
-			var accepted metav1.ConditionStatus = metav1.ConditionUnknown
+			var accepted = metav1.ConditionUnknown
 			for _, c := range cur.Status.Parents[0].Conditions {
 				if c.Type == string(gwv1.RouteConditionAccepted) {
 					accepted = c.Status

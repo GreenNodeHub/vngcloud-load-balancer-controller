@@ -7,10 +7,6 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 )
 
-type fakeObj struct {
-	name, ns, gvk string
-}
-
 func TestTargetRefMatches(t *testing.T) {
 	grp := gwv1alpha2.Group("gateway.networking.k8s.io")
 	tref := gwv1alpha2.LocalPolicyTargetReference{

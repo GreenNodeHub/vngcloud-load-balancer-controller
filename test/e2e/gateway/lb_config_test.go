@@ -62,7 +62,8 @@ var _ = Describe("ALB Gateway -> LoadBalancerConfig (comprehensive)", Ordered, f
 	})
 
 	AfterAll(func() {
-		kubectlQuiet("-n", testNamespace, "delete", "gateway", "kitchen-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		kubectlQuiet("-n", testNamespace, "delete", "gateway", "kitchen-gw",
+			"--ignore-not-found", "--wait=true", "--timeout=5m")
 	})
 
 	It("maps LB-level fields from VKSGatewayPolicy.loadBalancerSpec", func() {
@@ -244,7 +245,8 @@ var _ = Describe("ALB Gateway -> LoadBalancerConfig (comprehensive)", Ordered, f
 		Expect(zone).NotTo(BeEmpty())
 		kubectlApply(gwPolicyYAML("zonepos-gw", fmt.Sprintf("preferZoneId: %q", zone)))
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zonepos-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zonepos-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
 		kubectlApply(plainGatewayYAML("zonepos-gw"))
 		Eventually(func(g Gomega) {
@@ -261,7 +263,8 @@ var _ = Describe("ALB Gateway fail-closed inputs", func() {
 	It("creates no LBC for a non-existent loadBalancerId (adoption lookup fails)", func() {
 		kubectlApply(gwPolicyYAML("adopt-gw", "loadBalancerId: \"lb-does-not-exist-0000\""))
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "adopt-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "adopt-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
 		kubectlApply(plainGatewayYAML("adopt-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "adopt-gw") }, 30*time.Second, 5*time.Second).
@@ -271,7 +274,8 @@ var _ = Describe("ALB Gateway fail-closed inputs", func() {
 	It("creates no LBC for a preferZoneId with no matching node", func() {
 		kubectlApply(gwPolicyYAML("zone-gw", `preferZoneId: "ZONE-DOES-NOT-EXIST"`))
 		DeferCleanup(func() {
-			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zone-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+			kubectlQuiet("-n", testNamespace, "delete", "gateway", "zone-gw",
+				"--ignore-not-found", "--wait=true", "--timeout=5m")
 		})
 		kubectlApply(plainGatewayYAML("zone-gw"))
 		Consistently(func() string { return ownedLBCName(testNamespace, "zone-gw") }, 30*time.Second, 5*time.Second).
@@ -320,8 +324,11 @@ apiVersion: gateway.vks.vngcloud.vn/v1alpha1
 kind: VKSGatewayPolicy
 metadata: {name: kitchen-lb, namespace: %[1]s}
 spec:
-  targetRefs: [{group: gateway.networking.k8s.io, kind: Gateway, name: kitchen-gw}]
-  loadBalancerSpec: {scheme: Internet, loadBalancerName: e2e-kitchen, isPOC: false, enableAutoscale: false, tags: {env: e2e}}
+  targetRefs:
+    [{group: gateway.networking.k8s.io, kind: Gateway, name: kitchen-gw}]
+  loadBalancerSpec:
+    {scheme: Internet, loadBalancerName: e2e-kitchen, isPOC: false,
+      enableAutoscale: false, tags: {env: e2e}}
   timeoutClient: 30s
   timeoutMember: 60s
   timeoutConnection: 5s
@@ -351,7 +358,9 @@ spec:
   healthyThreshold: 2
   unhealthyThreshold: 3
   port: 8080
-  httpHealthCheck: {path: /healthz, host: app.example.com, method: POST, httpVersion: "1.0", expectedCodes: ["200", "201"]}
+  httpHealthCheck:
+    {path: /healthz, host: app.example.com, method: POST,
+      httpVersion: "1.0", expectedCodes: ["200", "201"]}
 ---
 apiVersion: gateway.vks.vngcloud.vn/v1alpha1
 kind: VKSRoutePolicy

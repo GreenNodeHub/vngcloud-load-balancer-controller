@@ -34,9 +34,6 @@ func testScheme() *runtime.Scheme {
 	return s
 }
 
-func kindPtr(s string) *gwv1.Kind    { v := gwv1.Kind(s); return &v }
-func nsPtr(s string) *gwv1.Namespace { v := gwv1.Namespace(s); return &v }
-
 // routeWithParents constructs an HTTPRoute that declares the given parent Gateway names.
 func routeWithParents(routeNS string, parents ...types.NamespacedName) *gwv1.HTTPRoute {
 	r := &gwv1.HTTPRoute{
@@ -119,11 +116,11 @@ func TestRouteToGateway_NonRouteObjectSkipped(t *testing.T) {
 // ---- VKSGatewayPolicyToGateway ----------------------------------------------
 
 func policyWithTargets(ns string, names ...string) *vksv1.VKSGatewayPolicy {
-	var refs []vksv1.LocalPolicyTargetReferenceWithSectionName
-	for _, name := range names {
-		refs = append(refs, vksv1.LocalPolicyTargetReferenceWithSectionName{
+	refs := make([]vksv1.LocalPolicyTargetReferenceWithSectionName, len(names))
+	for i, name := range names {
+		refs[i] = vksv1.LocalPolicyTargetReferenceWithSectionName{
 			LocalPolicyTargetReference: vksv1.LocalPolicyTargetReference{Name: gwv1.ObjectName(name)},
-		})
+		}
 	}
 	return &vksv1.VKSGatewayPolicy{
 		ObjectMeta: metav1.ObjectMeta{Name: "pol", Namespace: ns},

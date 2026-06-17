@@ -24,6 +24,7 @@ import (
 
 // fetchOwnedLBC returns the (single) LBC owned by the named Gateway, or nil if
 // none yet exists. Used inside Eventually blocks.
+// nolint:unparam
 func fetchOwnedLBC(gwName, ns string) *v1alpha1.LoadBalancerConfig {
 	lbcList, err := findLBCsByGatewayOwnerLabels(gwName, ns)
 	if err != nil || len(lbcList.Items) == 0 {
@@ -46,6 +47,7 @@ func pathExactMatch(value string) gwv1.HTTPRouteMatch {
 
 // hasL7Rule reports whether the policy has an L7Rule with the given (type,
 // compare, value).
+// nolint:unparam
 func hasL7Rule(p v1alpha1.Policy, ruleType v2.PolicyRuleType, cmp v2.PolicyCompareType, value string) bool {
 	for _, r := range p.L7Rules {
 		if r.RuleType == ruleType && r.CompareType == cmp && r.RuleValue == value {

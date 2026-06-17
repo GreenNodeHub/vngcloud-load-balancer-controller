@@ -229,7 +229,12 @@ var mismatchBackendsYAML = fmt.Sprintf(`
 apiVersion: apps/v1
 kind: Deployment
 metadata: {name: echo-a, namespace: %[1]s}
-spec: {replicas: 1, selector: {matchLabels: {app: echo-a}}, template: {metadata: {labels: {app: echo-a}}, spec: {containers: [{name: nginx, image: nginx:alpine, ports: [{containerPort: 80}]}]}}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: echo-a}}
+  template:
+    metadata: {labels: {app: echo-a}}
+    spec: {containers: [{name: nginx, image: nginx:alpine, ports: [{containerPort: 80}]}]}
 ---
 apiVersion: v1
 kind: Service
@@ -239,7 +244,12 @@ spec: {type: NodePort, selector: {app: echo-a}, ports: [{port: 80, targetPort: 8
 apiVersion: apps/v1
 kind: Deployment
 metadata: {name: echo-b, namespace: %[1]s}
-spec: {replicas: 1, selector: {matchLabels: {app: echo-b}}, template: {metadata: {labels: {app: echo-b}}, spec: {containers: [{name: nginx, image: nginx:alpine, ports: [{containerPort: 80}]}]}}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: echo-b}}
+  template:
+    metadata: {labels: {app: echo-b}}
+    spec: {containers: [{name: nginx, image: nginx:alpine, ports: [{containerPort: 80}]}]}}
 ---
 apiVersion: v1
 kind: Service

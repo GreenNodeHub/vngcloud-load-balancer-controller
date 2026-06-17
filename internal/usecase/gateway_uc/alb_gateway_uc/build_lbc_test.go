@@ -26,6 +26,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
+const testLoadBalancerID = "lb-existing"
+
 // newTaskAndMocks builds a task exposing its repository mocks so tests can set
 // expectations on the VNGCloud / K8s repos (needed for subnet/zone resolution).
 func newTaskAndMocks(t *testing.T, gw *gwv1.Gateway) (*defaultGatewayBuildTask, *repository.MockK8sRepository, *repository.MockVngCloudRepository) {
@@ -59,11 +61,11 @@ func gwPolicyWithLBSpec(lb *gwv1alpha1.VKSLoadBalancerSpec) *gwv1alpha1.VKSGatew
 
 func TestResolveSubnetAndZone_AdoptByLoadBalancerID(t *testing.T) {
 	task, _, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
-	lbID := "lb-existing"
+	lbID := testLoadBalancerID
 	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerID: &lbID})
 	// Adopting an LB whose backend subnet differs from the cluster default →
 	// mirror that subnet's zone/cidr so the LBC is coherent with the real LB.
-	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-existing").
+	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, testLoadBalancerID).
 		Return(&entity.LoadBalancer{BackendSubnetID: "subnet-other"}, nil)
 	mockVng.EXPECT().GetSubnetByID(mock.Anything, "net-1", "subnet-other").
 		Return(&entity.Subnet{Id: "subnet-other", ZoneID: "HCM03-2B", Cidr: "10.1.0.0/24"}, nil)
@@ -78,11 +80,11 @@ func TestResolveSubnetAndZone_AdoptByLoadBalancerID(t *testing.T) {
 
 func TestResolveSubnetAndZone_AdoptLBOnDefaultSubnet(t *testing.T) {
 	task, _, mockVng := newTaskAndMocks(t, &gwv1.Gateway{})
-	lbID := "lb-existing"
+	lbID := testLoadBalancerID
 	task.unscopedPolicy = gwPolicyWithLBSpec(&gwv1alpha1.VKSLoadBalancerSpec{LoadBalancerID: &lbID})
 	// LB already on the cluster default subnet → short-circuit to defaults,
 	// no GetSubnetByID call (asserting it's NOT called via mockery strictness).
-	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-existing").
+	mockVng.EXPECT().GetLoadBalancerByID(mock.Anything, testLoadBalancerID).
 		Return(&entity.LoadBalancer{BackendSubnetID: "subnet-1"}, nil)
 
 	subnet, network, zone, _, err := task.resolveSubnetAndZone(context.Background())

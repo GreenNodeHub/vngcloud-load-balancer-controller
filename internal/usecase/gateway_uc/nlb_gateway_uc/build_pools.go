@@ -64,7 +64,7 @@ func (t *nlbBuildTask) buildListenersAndPools(ctx context.Context) ([]v1alpha1.P
 	}
 
 	if len(listeners) == 0 {
-		return nil, nil, fmt.Errorf("Gateway %s/%s has no NLB-supported listeners with an attached route", t.gw.Namespace, t.gw.Name)
+		return nil, nil, fmt.Errorf("gateway %s/%s has no NLB-supported listeners with an attached route", t.gw.Namespace, t.gw.Name)
 	}
 
 	sort.SliceStable(pools, func(i, j int) bool { return pools[i].Name < pools[j].Name })
@@ -302,10 +302,10 @@ func (t *nlbBuildTask) applyHealthCheckPolicyToPool(ctx context.Context, pool *v
 		mon.Protocol = v2.HealthCheckProtocol(s.Protocol)
 	}
 	if s.Interval != nil {
-		mon.Interval = ptrInt(int(s.Interval.Duration.Seconds()))
+		mon.Interval = ptrInt(int(s.Interval.Seconds()))
 	}
 	if s.Timeout != nil {
-		mon.Timeout = ptrInt(int(s.Timeout.Duration.Seconds()))
+		mon.Timeout = ptrInt(int(s.Timeout.Seconds()))
 	}
 	if s.HealthyThreshold != nil {
 		mon.HealthyThreshold = ptrInt(int(*s.HealthyThreshold))
@@ -357,13 +357,13 @@ func (t *nlbBuildTask) applyListenerPolicy(entry *v1alpha1.Listener) {
 		return
 	}
 	if p.Spec.TimeoutClient != nil {
-		entry.TimeoutClient = ptr32(int32(p.Spec.TimeoutClient.Duration.Seconds()))
+		entry.TimeoutClient = ptr32(int32(p.Spec.TimeoutClient.Seconds()))
 	}
 	if p.Spec.TimeoutMember != nil {
-		entry.TimeoutMember = ptr32(int32(p.Spec.TimeoutMember.Duration.Seconds()))
+		entry.TimeoutMember = ptr32(int32(p.Spec.TimeoutMember.Seconds()))
 	}
 	if p.Spec.TimeoutConnection != nil {
-		entry.TimeoutConnection = ptr32(int32(p.Spec.TimeoutConnection.Duration.Seconds()))
+		entry.TimeoutConnection = ptr32(int32(p.Spec.TimeoutConnection.Seconds()))
 	}
 	if len(p.Spec.AllowedCIDRs) > 0 {
 		s := joinCommaStrings(p.Spec.AllowedCIDRs)

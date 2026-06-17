@@ -22,9 +22,6 @@ const (
 	testNS      = "default"
 )
 
-// albGatewayClassName is the GatewayClass name we use throughout tests.
-const albGatewayClassName = "vngcloud-alb-test"
-
 // newALBGatewayClass creates a GatewayClass that the ALB controller claims.
 func newALBGatewayClass(name string) *gwv1.GatewayClass {
 	return &gwv1.GatewayClass{
@@ -81,6 +78,7 @@ func newNodePortSvc(name, ns string, port int32, nodePort int32) *corev1.Service
 
 // newHTTPRoute creates a simple HTTPRoute pointing at a backend service and a
 // parent Gateway.
+// nolint:unparam
 func newHTTPRoute(name, ns, gwName, svcName string, svcPort int32) *gwv1.HTTPRoute {
 	port := gwv1.PortNumber(svcPort)
 	return &gwv1.HTTPRoute{

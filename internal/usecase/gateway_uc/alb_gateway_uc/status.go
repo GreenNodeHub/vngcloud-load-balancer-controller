@@ -210,4 +210,4 @@ func listenerStatusesEqual(a, b []gwv1.ListenerStatus) bool {
 
 // _unusedCorev1 keeps the import set forward-compatible with future status
 // fields that need corev1.ConditionStatus / EndpointAddress shapes.
-var _unusedCorev1 corev1.ConditionStatus
+var _ corev1.ConditionStatus

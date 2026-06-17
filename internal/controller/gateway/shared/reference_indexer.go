@@ -114,20 +114,20 @@ func parentGatewayKeys(routeNS string, refs []gwv1.ParentReference) []string {
 
 // backendServiceKeys returns "<ns>/<name>" for every backendRef.
 func backendServiceKeys(routeNS string, refs []gwv1.BackendRef) []string {
-	var keys []string
-	for _, br := range refs {
+	keys := make([]string, len(refs))
+	for i, br := range refs {
 		ns := routeNS
 		if br.Namespace != nil {
 			ns = string(*br.Namespace)
 		}
-		keys = append(keys, ns+"/"+string(br.Name))
+		keys[i] = ns + "/" + string(br.Name)
 	}
 	return keys
 }
 
 func IndexHTTPRouteByServiceFunc(obj client.Object) []string {
 	r := obj.(*gwv1.HTTPRoute)
-	var keys []string
+	keys := make([]string, 0, len(r.Spec.Rules))
 	for _, rule := range r.Spec.Rules {
 		for _, br := range rule.BackendRefs {
 			ns := r.Namespace
@@ -157,36 +157,36 @@ func IndexHTTPRouteByParentFunc(obj client.Object) []string {
 
 func IndexVKSGatewayPolicyByGatewayFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSGatewayPolicy)
-	var keys []string
-	for _, t := range p.Spec.TargetRefs {
-		keys = append(keys, p.Namespace+"/"+string(t.Name))
+	keys := make([]string, len(p.Spec.TargetRefs))
+	for i, t := range p.Spec.TargetRefs {
+		keys[i] = p.Namespace + "/" + string(t.Name)
 	}
 	return keys
 }
 
 func IndexVKSBackendPolicyByServiceFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSBackendPolicy)
-	var keys []string
-	for _, t := range p.Spec.TargetRefs {
-		keys = append(keys, p.Namespace+"/"+string(t.Name))
+	keys := make([]string, len(p.Spec.TargetRefs))
+	for i, t := range p.Spec.TargetRefs {
+		keys[i] = p.Namespace + "/" + string(t.Name)
 	}
 	return keys
 }
 
 func IndexVKSHealthCheckPolicyByServiceFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSHealthCheckPolicy)
-	var keys []string
-	for _, t := range p.Spec.TargetRefs {
-		keys = append(keys, p.Namespace+"/"+string(t.Name))
+	keys := make([]string, len(p.Spec.TargetRefs))
+	for i, t := range p.Spec.TargetRefs {
+		keys[i] = p.Namespace + "/" + string(t.Name)
 	}
 	return keys
 }
 
 func IndexVKSRoutePolicyByRouteFunc(obj client.Object) []string {
 	p := obj.(*vksv1.VKSRoutePolicy)
-	var keys []string
-	for _, t := range p.Spec.TargetRefs {
-		keys = append(keys, p.Namespace+"/"+string(t.Name))
+	keys := make([]string, len(p.Spec.TargetRefs))
+	for i, t := range p.Spec.TargetRefs {
+		keys[i] = p.Namespace + "/" + string(t.Name)
 	}
 	return keys
 }

@@ -128,7 +128,8 @@ var _ = Describe("ALB Gateway status reporting", Ordered, func() {
 		kubectlApply(statusGatewayRouteYAML)
 	})
 	AfterAll(func() {
-		kubectlQuiet("-n", testNamespace, "delete", "gateway", "status-gw", "--ignore-not-found", "--wait=true", "--timeout=5m")
+		kubectlQuiet("-n", testNamespace, "delete", "gateway", "status-gw",
+			"--ignore-not-found", "--wait=true", "--timeout=5m")
 	})
 
 	It("reports Gateway Programmed + an address once the LB provisions", func() {

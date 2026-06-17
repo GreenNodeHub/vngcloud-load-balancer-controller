@@ -18,11 +18,13 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 )
 
+const gatewayKind = "Gateway"
+
 // enqueueParentGateways adds a reconcile request for every parentRef of kind
 // Gateway on the route. Shared by the TCP/UDP route handlers.
 func enqueueParentGateways(routeNS string, refs []gwv1.ParentReference, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	for _, p := range refs {
-		if p.Kind != nil && *p.Kind != "Gateway" {
+		if p.Kind != nil && *p.Kind != gatewayKind {
 			continue
 		}
 		ns := routeNS
