@@ -16,6 +16,8 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 )
 
+// +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
+
 // VKSGatewayPolicyToGateway enqueues the Gateways named in the policy's
 // targetRefs. The Gateway use case re-resolves the policy's effective
 // LB-level + listener-level fields on every reconcile, so a policy edit
