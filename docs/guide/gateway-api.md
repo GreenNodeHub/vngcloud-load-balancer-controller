@@ -2,6 +2,73 @@
 
 The controller implements the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io/) (v1) for VNGCloud **Application Load Balancers** (L7). It is the successor to the Ingress + annotations path: a `Gateway` + `HTTPRoute` pair produces the same `LoadBalancerConfig` the Ingress controller emits, so both paths drive identical cloud resources.
 
+```mermaid
+flowchart TD
+    subgraph U["1. User declares (Gateway API CRDs)"]
+        GC["GatewayClass
+vngcloud-alb = L7 / vngcloud-nlb = L4"]
+        GW["Gateway
+spec.listeners: protocol + port"]
+        RT["Route (parentRef -> Gateway)
+HTTPRoute=L7 / TCPRoute,UDPRoute=L4
+matches + backendRefs"]
+        SVC["Service NodePort = backend"]
+        PGW["VKSGatewayPolicy -> Gateway
+name, scheme, subnet, timeout, cidr, cert"]
+        PBE["VKSBackendPolicy -> Service
+algorithm, stickiness, targetType"]
+        PHC["VKSHealthCheckPolicy -> Service
+HC protocol/interval/path"]
+        PRT["VKSRoutePolicy -> HTTPRoute
+reject/redirect, position"]
+    end
+    GC -. gatewayClassName .-> GW
+    GW -- parentRef --> RT
+    RT -- backendRef --> SVC
+    PGW -. targetRef .-> GW
+    PBE -. targetRef .-> SVC
+    PHC -. targetRef .-> SVC
+    PRT -. targetRef .-> RT
+    REC["2. Controller: combines Gateway+Route+Policies
+=> 1 LoadBalancerConfig"]
+    GW ==> REC
+    RT ==> REC
+    SVC ==> REC
+    PGW ==> REC
+    PBE ==> REC
+    PHC ==> REC
+    PRT ==> REC
+    LBC["3. LoadBalancerConfig (lbc) = desired state"]
+    REC ==> LBC
+    LB["4. vLB: LoadBalancer (L4/L7)"]
+    LSN["Listener"]
+    POOL["Pool"]
+    MEM["Members (nodeIP:NodePort, weight)"]
+    HM["Health Monitor"]
+    LBC ==>|calls vLB API| LB
+    LB --> LSN
+    LSN --> POOL
+    POOL --> MEM
+    POOL --> HM
+    STATUS["Status: Gateway Programmed+IP / Route Accepted+ResolvedRefs"]
+    LB -. when ready .-> STATUS
+
+    classDef cLB fill:#cfe2ff,stroke:#0d6efd,stroke-width:2px,color:#000
+    classDef cListener fill:#d1e7dd,stroke:#198754,stroke-width:2px,color:#000
+    classDef cPool fill:#ffe5d0,stroke:#fd7e14,stroke-width:2px,color:#000
+    classDef cMember fill:#e2d9f3,stroke:#6f42c1,stroke-width:2px,color:#000
+    classDef cHM fill:#f8d7da,stroke:#dc3545,stroke-width:2px,color:#000
+    classDef cCtrl fill:#e9ecef,stroke:#6c757d,stroke-width:1px,color:#000
+    classDef cStatus fill:#fff3cd,stroke:#ffc107,stroke-width:1px,color:#000
+    class GC,PGW,LB cLB
+    class GW,LSN cListener
+    class RT,PBE,PRT,POOL cPool
+    class SVC,MEM cMember
+    class PHC,HM cHM
+    class REC,LBC cCtrl
+    class STATUS cStatus
+```
+
 | | |
 |---|---|
 | GatewayClass | `vngcloud-alb` |
