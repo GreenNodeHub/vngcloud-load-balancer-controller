@@ -18,6 +18,9 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gatewayclasses/status,verbs=patch;update
+
 // GatewayClassReconciler accepts every GatewayClass whose ControllerName is the
 // NLB one, writing only the Accepted condition.
 type GatewayClassReconciler struct {

@@ -110,6 +110,17 @@ rules:
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
+  - gatewayclasses/status
+  - gateways/status
+  - httproutes/status
+  - tcproutes/status
+  - udproutes/status
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
   - gateways
   verbs:
   - get
@@ -122,16 +133,6 @@ rules:
   resources:
   - gateways/finalizers
   verbs:
-  - update
-- apiGroups:
-  - gateway.networking.k8s.io
-  resources:
-  - gateways/status
-  - httproutes/status
-  - tcproutes/status
-  - udproutes/status
-  verbs:
-  - patch
   - update
 - apiGroups:
   - gateway.vks.vngcloud.vn

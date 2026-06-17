@@ -5,5 +5,5 @@ metadata:
   name: vngcloud-alb
 spec:
   controllerName: gateway.vks.vngcloud.vn/alb
-  description: "VNGCloud Application Load Balancer (ALB) — L7 Gateway-API class."
+  description: "VNGCloud ALB - L7 Gateway-API class."
 {{- end }}
