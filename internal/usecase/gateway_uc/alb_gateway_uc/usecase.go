@@ -22,6 +22,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -34,6 +35,10 @@ type albGatewayUseCase struct {
 	// (Gateway, HTTPRoute, VKS*Policy) that don't have typed accessors on
 	// repository.K8sRepository. Passed in alongside k8sRepo at construction.
 	k8sClient client.Client
+
+	// finalizerManager owns the add/remove-finalizer flow (re-Get + optimistic
+	// Patch + retry-on-conflict), shared with the non-Gateway controllers.
+	finalizerManager k8s.FinalizerManager
 
 	clusterId         string
 	defaultNetworkId  string
@@ -49,6 +54,7 @@ func NewALBGatewayUseCase(
 	vngcloudRepo repository.VngCloudRepository,
 	endpointResolver utils.EndpointResolver,
 	k8sClient client.Client,
+	finalizerManager k8s.FinalizerManager,
 ) usecase.ALBGatewayUseCase {
 	return &albGatewayUseCase{
 		clusterId:        clusterId,
@@ -56,6 +62,7 @@ func NewALBGatewayUseCase(
 		vngcloudRepo:     vngcloudRepo,
 		endpointResolver: endpointResolver,
 		k8sClient:        k8sClient,
+		finalizerManager: finalizerManager,
 	}
 }
 

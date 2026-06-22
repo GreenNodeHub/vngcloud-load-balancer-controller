@@ -482,6 +482,7 @@ func main() { //nolint:gocyclo
 			vngcloudRepo,
 			endpointResolver,
 			mgr.GetClient(),
+			finalizerManager,
 		)
 		albGatewayReconciler := gatewayalbcontroller.NewGatewayReconciler(
 			mgr.GetClient(),
@@ -525,6 +526,7 @@ func main() { //nolint:gocyclo
 			vngcloudRepo,
 			endpointResolver,
 			mgr.GetClient(),
+			finalizerManager,
 		)
 		nlbGatewayReconciler := gatewaynlbcontroller.NewGatewayReconciler(
 			mgr.GetClient(),

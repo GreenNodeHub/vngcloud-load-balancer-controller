@@ -26,11 +26,11 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	gwsharedctl "github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -39,6 +39,10 @@ type nlbGatewayUseCase struct {
 	vngcloudRepo     repository.VngCloudRepository
 	endpointResolver utils.EndpointResolver
 	k8sClient        client.Client
+
+	// finalizerManager owns the add/remove-finalizer flow (re-Get + optimistic
+	// Patch + retry-on-conflict), shared with the non-Gateway controllers.
+	finalizerManager k8s.FinalizerManager
 
 	clusterId         string
 	defaultNetworkId  string
@@ -54,6 +58,7 @@ func NewNLBGatewayUseCase(
 	vngcloudRepo repository.VngCloudRepository,
 	endpointResolver utils.EndpointResolver,
 	k8sClient client.Client,
+	finalizerManager k8s.FinalizerManager,
 ) usecase.NLBGatewayUseCase {
 	return &nlbGatewayUseCase{
 		clusterId:        clusterId,
@@ -61,6 +66,7 @@ func NewNLBGatewayUseCase(
 		vngcloudRepo:     vngcloudRepo,
 		endpointResolver: endpointResolver,
 		k8sClient:        k8sClient,
+		finalizerManager: finalizerManager,
 	}
 }
 
@@ -189,10 +195,7 @@ func (uc *nlbGatewayUseCase) listNodesForNetworkProbe(ctx context.Context) ([]*c
 }
 
 func (uc *nlbGatewayUseCase) ensureFinalizer(ctx context.Context, gw *gwv1.Gateway) error {
-	if !gwsharedctl.AddFinalizer(gw, domain.GatewayFinalizer) {
-		return nil
-	}
-	if err := uc.k8sClient.Update(ctx, gw); err != nil {
+	if err := uc.finalizerManager.AddFinalizers(ctx, gw, domain.GatewayFinalizer); err != nil {
 		return fmt.Errorf("add finalizer on Gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
 	return nil
@@ -201,14 +204,15 @@ func (uc *nlbGatewayUseCase) ensureFinalizer(ctx context.Context, gw *gwv1.Gatew
 // handleDeletion removes the LBC owned by this Gateway and then drops the
 // finalizer. The LBC controller's own finalizer guarantees the cloud LB is
 // gone before the LBC object is.
+//
+// RemoveFinalizers re-Gets the Gateway before patching and treats an
+// already-deleted object as success, so a racing delete (the stale-UID
+// StorageError we used to log) no longer surfaces as a reconcile error.
 func (uc *nlbGatewayUseCase) handleDeletion(ctx context.Context, gw *gwv1.Gateway) error {
 	if err := uc.deleteOwnedLBC(ctx, gw); err != nil {
 		return err
 	}
-	if !gwsharedctl.RemoveFinalizer(gw, domain.GatewayFinalizer) {
-		return nil
-	}
-	if err := uc.k8sClient.Update(ctx, gw); err != nil {
+	if err := uc.finalizerManager.RemoveFinalizers(ctx, gw, domain.GatewayFinalizer); err != nil {
 		return fmt.Errorf("remove finalizer on Gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
 	return nil

@@ -33,6 +33,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/k8s_repo"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository/vngcloud_repo/vngcloud_mocks"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/gateway_uc/alb_gateway_uc"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -155,6 +156,7 @@ var _ = BeforeSuite(func() {
 		vngcloudRepo,
 		endpointResolver,
 		k8sManager.GetClient(),
+		k8s.NewDefaultFinalizerManager(k8sManager.GetClient(), ctrl.Log),
 	)
 
 	// Setup Gateway reconciler

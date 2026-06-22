@@ -1,13 +1,9 @@
 package shared
 
 import (
-	"context"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
@@ -15,14 +11,6 @@ import (
 )
 
 // ---- helpers ----------------------------------------------------------------
-
-func sharedScheme() *runtime.Scheme {
-	s := runtime.NewScheme()
-	_ = corev1.AddToScheme(s)
-	_ = gwv1.Install(s)
-	_ = vksv1.AddToScheme(s)
-	return s
-}
 
 func nsPtr(s string) *gwv1alpha2.Namespace { v := gwv1alpha2.Namespace(s); return &v }
 func kindPtr(s string) *gwv1alpha2.Kind    { v := gwv1alpha2.Kind(s); return &v }
@@ -180,82 +168,6 @@ func TestIndexVKSRoutePolicyByRouteFunc(t *testing.T) {
 	keys := IndexVKSRoutePolicyByRouteFunc(p)
 	if len(keys) != 1 || keys[0] != "ns/route-1" {
 		t.Errorf("unexpected keys %v", keys)
-	}
-}
-
-// ---- AddFinalizer / RemoveFinalizer / EnsureFinalizer -----------------------
-
-func TestAddFinalizer_AddsWhenAbsent(t *testing.T) {
-	obj := &gwv1.HTTPRoute{}
-	added := AddFinalizer(obj, "test/fin")
-	if !added {
-		t.Fatal("expected true when finalizer was added")
-	}
-	fins := obj.GetFinalizers()
-	if len(fins) != 1 || fins[0] != "test/fin" {
-		t.Errorf("unexpected finalizers %v", fins)
-	}
-}
-
-func TestAddFinalizer_NoopWhenPresent(t *testing.T) {
-	obj := &gwv1.HTTPRoute{}
-	obj.SetFinalizers([]string{"test/fin"})
-	added := AddFinalizer(obj, "test/fin")
-	if added {
-		t.Fatal("expected false when finalizer already present")
-	}
-	if len(obj.GetFinalizers()) != 1 {
-		t.Errorf("finalizers mutated unexpectedly: %v", obj.GetFinalizers())
-	}
-}
-
-func TestRemoveFinalizer_RemovesWhenPresent(t *testing.T) {
-	obj := &gwv1.HTTPRoute{}
-	obj.SetFinalizers([]string{"other/fin", "test/fin"})
-	removed := RemoveFinalizer(obj, "test/fin")
-	if !removed {
-		t.Fatal("expected true when finalizer was removed")
-	}
-	fins := obj.GetFinalizers()
-	if len(fins) != 1 || fins[0] != "other/fin" {
-		t.Errorf("unexpected finalizers %v", fins)
-	}
-}
-
-func TestRemoveFinalizer_NoopWhenAbsent(t *testing.T) {
-	obj := &gwv1.HTTPRoute{}
-	obj.SetFinalizers([]string{"other/fin"})
-	removed := RemoveFinalizer(obj, "test/fin")
-	if removed {
-		t.Fatal("expected false when finalizer not present")
-	}
-}
-
-func TestEnsureFinalizer_AddsViaClient(t *testing.T) {
-	scheme := sharedScheme()
-	obj := &gwv1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "ns"},
-	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
-	err := EnsureFinalizer(context.Background(), c, obj, "test/fin")
-	if err != nil {
-		t.Fatalf("EnsureFinalizer error: %v", err)
-	}
-	fins := obj.GetFinalizers()
-	if len(fins) != 1 || fins[0] != "test/fin" {
-		t.Errorf("unexpected finalizers %v", fins)
-	}
-}
-
-func TestEnsureFinalizer_NoopWhenAlreadyPresent(t *testing.T) {
-	scheme := sharedScheme()
-	obj := &gwv1.HTTPRoute{
-		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "ns", Finalizers: []string{"test/fin"}},
-	}
-	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(obj).Build()
-	err := EnsureFinalizer(context.Background(), c, obj, "test/fin")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

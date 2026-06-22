@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
@@ -21,6 +22,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 )
 
 // makeNode creates a Node with a given providerID.
@@ -39,7 +41,7 @@ func TestNewALBGatewayUseCase(t *testing.T) {
 	s := newTestScheme()
 	fakeClient := fake.NewClientBuilder().WithScheme(s).Build()
 
-	uc := NewALBGatewayUseCase("cluster-1", mockK8s, mockVng, nil, fakeClient)
+	uc := NewALBGatewayUseCase("cluster-1", mockK8s, mockVng, nil, fakeClient, nil)
 	assert.NotNil(t, uc)
 }
 
@@ -330,7 +332,8 @@ func TestEnsureALBGatewayUseCase_DeletionPath(t *testing.T) {
 		ListLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).Once()
 
-	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
+	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard())}
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "prod", Name: "my-gw"}}
 	err := uc.EnsureALBGatewayUseCase(context.Background(), req)
 	assert.NoError(t, err)
@@ -368,7 +371,8 @@ func TestDeleteALBGatewayUseCase_ExistingGateway(t *testing.T) {
 		ListLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).Once()
 
-	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
+	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard())}
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "prod", Name: "existing-gw"}}
 	err := uc.DeleteALBGatewayUseCase(context.Background(), req)
 	assert.NoError(t, err)
@@ -507,9 +511,10 @@ func TestEnsureALBGatewayUseCase_EnsureFinalizerThenRun(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(gc, gw).Build()
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
-	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient}
+	uc := &albGatewayUseCase{k8sRepo: mockK8s, vngcloudRepo: mockVng, k8sClient: fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard())}
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Namespace: "prod", Name: "my-gw"}}
-	// ensureFinalizer calls k8sClient.Update which should succeed (fake client).
+	// ensureFinalizer calls AddFinalizers which should succeed (fake client).
 	// Then task.run() will be called. Without subnet info, buildLoadBalancerConfig
 	// will fail with "could not resolve default subnet".
 	// The list call is needed for buildLoadBalancerConfig → listOwnedLBCs.

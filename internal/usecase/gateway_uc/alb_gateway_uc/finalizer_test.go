@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 )
 
 func buildUCWithGW(t *testing.T, gw *gwv1.Gateway) (*albGatewayUseCase, *repository.MockK8sRepository) {
@@ -24,9 +26,10 @@ func buildUCWithGW(t *testing.T, gw *gwv1.Gateway) (*albGatewayUseCase, *reposit
 	mockK8s := repository.NewMockK8sRepository(t)
 	mockVng := repository.NewMockVngCloudRepository(t)
 	uc := &albGatewayUseCase{
-		k8sRepo:      mockK8s,
-		vngcloudRepo: mockVng,
-		k8sClient:    fakeClient,
+		k8sRepo:          mockK8s,
+		vngcloudRepo:     mockVng,
+		k8sClient:        fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard()),
 	}
 	return uc, mockK8s
 }
@@ -79,9 +82,10 @@ func TestHandleDeletion_NoOwnedLBCs(t *testing.T) {
 		Return(nil)
 
 	uc := &albGatewayUseCase{
-		k8sRepo:      mockK8s,
-		vngcloudRepo: mockVng,
-		k8sClient:    fakeClient,
+		k8sRepo:          mockK8s,
+		vngcloudRepo:     mockVng,
+		k8sClient:        fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard()),
 	}
 	err := uc.handleDeletion(context.Background(), gw)
 	assert.NoError(t, err)
@@ -130,9 +134,43 @@ func TestHandleDeletion_DeletesOwnedLBC(t *testing.T) {
 		Return(nil)
 
 	uc := &albGatewayUseCase{
-		k8sRepo:      mockK8s,
-		vngcloudRepo: mockVng,
-		k8sClient:    fakeClient,
+		k8sRepo:          mockK8s,
+		vngcloudRepo:     mockVng,
+		k8sClient:        fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard()),
+	}
+	err := uc.handleDeletion(context.Background(), gw)
+	assert.NoError(t, err)
+}
+
+func TestHandleDeletion_GatewayAlreadyGone(t *testing.T) {
+	// Reconciler races deletion: the Gateway no longer exists in the apiserver
+	// by the time we try to drop the finalizer, so RemoveFinalizers' re-Get
+	// returns NotFound. Cleanup is already complete — handleDeletion must not
+	// error/re-queue.
+	gw := &gwv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:         "prod",
+			Name:              "gone-gw",
+			Finalizers:        []string{domain.GatewayFinalizer},
+			DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time},
+		},
+	}
+	s := newTestScheme()
+	// Build the client WITHOUT the Gateway → the re-Get returns NotFound.
+	fakeClient := fake.NewClientBuilder().WithScheme(s).Build()
+	mockK8s := repository.NewMockK8sRepository(t)
+	mockVng := repository.NewMockVngCloudRepository(t)
+
+	mockK8s.EXPECT().
+		ListLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	uc := &albGatewayUseCase{
+		k8sRepo:          mockK8s,
+		vngcloudRepo:     mockVng,
+		k8sClient:        fakeClient,
+		finalizerManager: k8s.NewDefaultFinalizerManager(fakeClient, logr.Discard()),
 	}
 	err := uc.handleDeletion(context.Background(), gw)
 	assert.NoError(t, err)

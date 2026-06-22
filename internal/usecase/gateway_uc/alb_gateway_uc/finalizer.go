@@ -8,7 +8,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/controller/gateway/shared"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
@@ -25,10 +24,7 @@ func (uc *albGatewayUseCase) listNodesForNetworkProbe(ctx context.Context) ([]*c
 }
 
 func (uc *albGatewayUseCase) ensureFinalizer(ctx context.Context, gw *gwv1.Gateway) error {
-	if !shared.AddFinalizer(gw, domain.GatewayFinalizer) {
-		return nil
-	}
-	if err := uc.k8sClient.Update(ctx, gw); err != nil {
+	if err := uc.finalizerManager.AddFinalizers(ctx, gw, domain.GatewayFinalizer); err != nil {
 		return fmt.Errorf("add finalizer on Gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
 	return nil
@@ -37,14 +33,15 @@ func (uc *albGatewayUseCase) ensureFinalizer(ctx context.Context, gw *gwv1.Gatew
 // handleDeletion removes the LBC owned by this Gateway and then drops the
 // finalizer so the apiserver can complete the delete. The LBC controller's
 // own finalizer ensures the cloud LB is gone before the LBC object is.
+//
+// RemoveFinalizers re-Gets the Gateway before patching and treats an
+// already-deleted object as success, so a racing delete (the stale-UID
+// StorageError we used to log) no longer surfaces as a reconcile error.
 func (uc *albGatewayUseCase) handleDeletion(ctx context.Context, gw *gwv1.Gateway) error {
 	if err := uc.deleteOwnedLBC(ctx, gw); err != nil {
 		return err
 	}
-	if !shared.RemoveFinalizer(gw, domain.GatewayFinalizer) {
-		return nil
-	}
-	if err := uc.k8sClient.Update(ctx, gw); err != nil {
+	if err := uc.finalizerManager.RemoveFinalizers(ctx, gw, domain.GatewayFinalizer); err != nil {
 		return fmt.Errorf("remove finalizer on Gateway %s/%s: %w", gw.Namespace, gw.Name, err)
 	}
 	return nil
