@@ -2,90 +2,90 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/contributing/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/annotations/ingress/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/annotations/service/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/deploy/configuration/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/deploy/installation/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/deploy/upgrade/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/examples/custom-healthcheck/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/examples/internal-lb/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/examples/tls-termination/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/gateway-api/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/gateway-nlb-haproxy-realip/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/gateway-nlb/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/global-load-balancer/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/ingress/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/load-balancer-config/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/node-security-group/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/guide/service/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/superpowers/plans/2026-05-08-gateway-api-gep713-phase1/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/superpowers/plans/2026-05-09-k8sbatch/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/superpowers/specs/2026-05-08-gateway-api-gep713-design/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
     <url>
          <loc>https://vngcloud.github.io/vngcloud-load-balancer-controller/superpowers/specs/2026-05-09-k8sbatch-design/</loc>
-         <lastmod>2026-06-22</lastmod>
+         <lastmod>2026-06-25</lastmod>
     </url>
 </urlset>
