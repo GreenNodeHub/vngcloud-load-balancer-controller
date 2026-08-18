@@ -326,9 +326,11 @@ type GlobalLoadBalancerConfigStatus struct {
 	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
 	// CreatedPools is the list of created pool IDs
+	// Keyed by id, not name: pool names are only unique within one load balancer, so
+	// migrating to another load balancer would collide on name.
 	// +optional
 	// +listType=map
-	// +listMapKey=name
+	// +listMapKey=id
 	CreatedPools []CreatedGlobalPool `json:"createdPools,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
