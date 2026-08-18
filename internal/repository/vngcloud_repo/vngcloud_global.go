@@ -75,7 +75,7 @@ func (m *vngCloudRepository) DeleteGlobalLoadBalancer(ctx context.Context, glbID
 	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalLoadBalancer(global.NewDeleteGlobalLoadBalancerRequest(glbID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalLoadBalancer: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
@@ -146,7 +146,7 @@ func (m *vngCloudRepository) DeleteGlobalPool(ctx context.Context, glbID, poolID
 	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalPool(global.NewDeleteGlobalPoolRequest(glbID, poolID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalPool: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
@@ -157,7 +157,7 @@ func (m *vngCloudRepository) UpdateGlobalPool(ctx context.Context, glbID, poolID
 	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalPool(opt.AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - UpdateGlobalPool: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func (m *vngCloudRepository) PatchGlobalPoolMembers(ctx context.Context, glbID, 
 	err := m.client.GLBGateway().V1().GLBService().PatchGlobalPoolMembers(opt.WithPoolId(poolID).WithLoadBalancerId(glbID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - PatchGlobalPoolMembers: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
@@ -222,7 +222,7 @@ func (m *vngCloudRepository) DeleteGlobalListener(ctx context.Context, glbID, li
 	err := m.client.GLBGateway().V1().GLBService().DeleteGlobalListener(global.NewDeleteGlobalListenerRequest(glbID, listenerID).AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - DeleteGlobalListener: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
@@ -233,7 +233,7 @@ func (m *vngCloudRepository) UpdateGlobalListener(ctx context.Context, glbID, li
 	_, err := m.client.GLBGateway().V1().GLBService().UpdateGlobalListener(opt.AddUserAgent(m.userAgent))
 	if err != nil {
 		logger.Error("[ERROR] - UpdateGlobalListener: ", err, ", params: ", err.GetListParameters())
-		return err.GetError()
+		return domain.SDKError(err)
 	}
 	return nil
 }
