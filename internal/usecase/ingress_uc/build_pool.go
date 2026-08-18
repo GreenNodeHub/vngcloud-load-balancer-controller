@@ -2,12 +2,15 @@ package ingress_uc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -41,11 +44,16 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	if isHaveDefaultBackend {
 		t.logger.Debugf("ingress %s/%s has default backend, building default pool.", t.ingress.Namespace, t.ingress.Name)
 		defaultPool, err = t.buildPool(ctx, t.ingress.Spec.DefaultBackend.Service, targetNodeLabels)
-		if err != nil {
+		switch {
+		case errors.Is(err, errBackendNotFound):
+			// leave the default backend out; the rules below are still worth serving
+			defaultPool = nil
+		case err != nil:
 			return nil, nil, err
+		default:
+			defaultPool.Name = domain.DEFAULT_NAME_DEFAULT_POOL
+			appendPool(*defaultPool)
 		}
-		defaultPool.Name = domain.DEFAULT_NAME_DEFAULT_POOL
-		appendPool(*defaultPool)
 	}
 
 	// build listener http
@@ -56,7 +64,8 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		if err != nil {
 			return nil, nil, err
 		}
-		if isHaveDefaultBackend {
+		// defaultPool is nil when the default backend's Service does not exist
+		if defaultPool != nil {
 			httpListener.DefaultPoolName = &defaultPool.Name
 		}
 	}
@@ -72,7 +81,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 		if err != nil {
 			return nil, nil, err
 		}
-		if isHaveDefaultBackend {
+		if defaultPool != nil {
 			httpsListener.DefaultPoolName = &defaultPool.Name
 		}
 	}
@@ -102,6 +111,10 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 			if newPolicy.Action == loadbalancerv2.PolicyActionREDIRECTTOPOOL {
 				// build pool
 				newPool, err := t.buildPool(ctx, path.Backend.Service, targetNodeLabels)
+				if errors.Is(err, errBackendNotFound) {
+					// drop this path only: no pool, and no policy pointing at one
+					continue
+				}
 				if err != nil {
 					return nil, nil, err
 				}
@@ -155,10 +168,21 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 }
 
 // from serviceBackend include name and port, build the pool
+// errBackendNotFound marks a backend whose Service does not exist. Callers drop just
+// that path instead of failing the whole Ingress: one bad backend reference - a typo, or
+// a chart whose Service has not been applied yet - must not take the other rules down
+// with it. Every other error stays fatal, so a transient API failure cannot silently
+// remove routes from the load balancer.
+var errBackendNotFound = errors.New("backend service not found")
+
 func (t *defaultModelBuildTask) buildPool(ctx context.Context, service *networkingv1.IngressServiceBackend, targetNodeLabels map[string]string) (*v1alpha1.Pool, error) {
 	// find service
 	findService, err := t.k8sRepo.GetService(ctx, types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			t.logger.Warnf("service %s/%s not found, skipping this backend", t.ingress.GetNamespace(), service.Name)
+			return nil, fmt.Errorf("%w: %s/%s", errBackendNotFound, t.ingress.GetNamespace(), service.Name)
+		}
 		t.logger.Errorf("failed to get service %s/%s: %v", t.ingress.GetNamespace(), service.Name, err)
 		return nil, err
 	}
