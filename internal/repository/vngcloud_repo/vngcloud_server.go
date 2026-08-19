@@ -21,7 +21,7 @@ func (r *vngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subne
 	subnet, sdkErr := r.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(r.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return subnet, nil
 }
@@ -80,7 +80,7 @@ func (m *vngCloudRepository) GetServerByID(ctx context.Context, serverID string)
 	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return server, nil
 }
@@ -103,7 +103,7 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return servers, nil
 }
