@@ -7,6 +7,11 @@ manager:
     - --log-level=info
     - --leader-elect
     - --health-probe-bind-address=:8081
+    # Safety net for missed changes; watches handle the normal path. Each resync
+    # re-resolves every node for every Ingress and Service, so the cost scales with
+    # both and lands on a per-project API rate limit. Lower it only if drift needs
+    # correcting sooner and the project has API budget to spare.
+    - --sync-period=30m
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
