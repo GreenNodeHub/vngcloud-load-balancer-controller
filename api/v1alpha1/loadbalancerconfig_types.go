@@ -447,10 +447,12 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
-	// CreatedListeners is the list of created listener IDs
+	// CreatedPools is the list of created pool IDs
+	// Keyed by id, not name: pool names are only unique within one load balancer, so
+	// migrating an Ingress to another load balancer would collide on name.
 	// +optional
 	// +listType=map
-	// +listMapKey=name
+	// +listMapKey=id
 	CreatedPools []CreatedPool `json:"createdPools,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
