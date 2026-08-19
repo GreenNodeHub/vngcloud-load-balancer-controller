@@ -46,9 +46,14 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	currentPool := searchPoolByName(pool.Name)
 	if currentPool == nil {
 		// Create new pool
-		_pool, err := t.vngcloudRepo.CreatePool(ctx, lbId,
-			t.buildCreatePoolRequest(ctx, lbId, pool),
-		)
+		var _pool *entityv2.Pool
+		err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			var createErr error
+			_pool, createErr = t.vngcloudRepo.CreatePool(ctx, lbId,
+				t.buildCreatePoolRequest(ctx, lbId, pool),
+			)
+			return createErr
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +89,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, pool, currentPool)
 	if updateOptions != nil {
 		t.logger.Info("Need update pool: ", strings.Join(message, ", "))
-		err := t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
+		err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			return t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
+		})
 		if err != nil {
 			t.logger.Error("Failed to update pool: ", err)
 			return nil, err
@@ -125,7 +132,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, currentPool.UUID).WithMembers(convertMembers...)
 
 		t.logger.Info("Need update pool members: ", updateMembers)
-		if err = t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions); err != nil {
+		if err = t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			return t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions)
+		}); err != nil {
 			t.logger.Error("Failed to update pool members: ", err)
 			return nil, err
 		}
