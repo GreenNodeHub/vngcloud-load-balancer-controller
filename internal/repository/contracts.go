@@ -35,7 +35,11 @@ type VngCloudRepository interface {
 	ListLoadBalancerPackageByZone(ctx context.Context, zone common.Zone) (*entityv2.ListLoadBalancerPackages, error)
 
 	// Tags
+	// may be served from a short-lived cache; a caller about to write must call
+	// InvalidateTagsCache first and decide again on the fresh result
 	ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error)
+	// forgets any cached tags for the resource, so the next ListTags reads through
+	InvalidateTagsCache(resourceID string)
 	// overwrites the tags of the resource
 	CreateTags(ctx context.Context, resourceID string, tags map[string]string) error
 	// adding or updating the tags to the resource

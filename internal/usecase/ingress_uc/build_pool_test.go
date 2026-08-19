@@ -22,10 +22,10 @@ import (
 // transient API failure must not silently drop routes off the load balancer.
 func TestBuildPoolReportsMissingServiceAsSkippable(t *testing.T) {
 	tests := []struct {
-		name        string
-		getErr      error
-		wantSkip    bool
-		wantErr     bool
+		name     string
+		getErr   error
+		wantSkip bool
+		wantErr  bool
 	}{
 		{
 			name:     "service does not exist - skippable",

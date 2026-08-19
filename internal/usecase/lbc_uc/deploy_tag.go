@@ -8,17 +8,57 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
-// oldTags: obj.Status.Tags
-// newTags: obj.Spec.Tags
-// currentTags: get in portal
-// merge them and update
-// if spec.cluster exist, add tag cluster ids
-func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) error {
-	currentTags := make(map[string]string)
-	listTags, err := t.vngcloudRepo.ListTags(ctx, lbId)
-	if err != nil {
+// computeTagsFunc produces the tags this cluster wants on a load balancer, given the tags
+// the load balancer currently carries. It also returns the tags this cluster created
+// previously, which buildTag treats as ours to drop.
+//
+// It is a function rather than a value because ensureTags may have to compute the answer
+// twice, against two different reads.
+type computeTagsFunc func(currentTags map[string]string) (ensured, created map[string]string)
+
+// ensureTags brings a load balancer's tags to what computeTags asks for, writing only if
+// they differ.
+//
+// The first read may be served from cache (see ListTags), which is the point: in the
+// steady state nothing needs changing and that read is pure overhead on every reconcile of
+// every LBC. It was the largest single source of rate-limited requests.
+//
+// A cached read is only ever trusted to say "nothing to do". Before writing we invalidate
+// and decide again on a fresh read, because the cluster tag holds a list of cluster ids
+// merged from the value we just saw: writing a stale one would silently drop the id of
+// another cluster that started using this load balancer meanwhile. Writes are rare, so the
+// extra read costs almost nothing.
+//
+// The cost of a stale read is therefore only a missed update - a tag edited outside the
+// controller heals on a later reconcile, at most one TTL later - never a wrong write.
+func (t *defaultModelDeployTask) ensureTags(ctx context.Context, lbId string, computeTags computeTagsFunc) error {
+	needUpdate, _, err := t.diffTags(ctx, lbId, computeTags)
+	if err != nil || !needUpdate {
 		return err
 	}
+
+	t.vngcloudRepo.InvalidateTagsCache(lbId)
+	needUpdate, ensuredTags, err := t.diffTags(ctx, lbId, computeTags)
+	if err != nil || !needUpdate {
+		return err
+	}
+
+	t.logger.Infof("Updating tags for load balancer %s: %v", lbId, ensuredTags)
+	if err := t.vngcloudRepo.CreateTags(ctx, lbId, ensuredTags); err != nil {
+		return err
+	}
+
+	return t.statusAddCreatedTags(ctx, ensuredTags)
+}
+
+// diffTags reads the load balancer's tags and reports whether they differ from what
+// computeTags wants, along with the set that would be written.
+func (t *defaultModelDeployTask) diffTags(ctx context.Context, lbId string, computeTags computeTagsFunc) (bool, map[string]string, error) {
+	listTags, err := t.vngcloudRepo.ListTags(ctx, lbId)
+	if err != nil {
+		return false, nil, err
+	}
+	currentTags := make(map[string]string)
 	for _, tag := range listTags.Items {
 		// ignore system tag, not allow to modify
 		if tag.SystemTag {
@@ -26,48 +66,50 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 		}
 		currentTags[tag.Key] = tag.Value
 	}
-	ensuredTags := make(map[string]string)
-	if t.lbConfig.Spec.Tags != nil {
-		ensuredTags = t.lbConfig.Spec.Tags
-	}
-	createdTags := make(map[string]string)
-	for k, v := range t.lbConfig.Status.CreatedTags {
-		createdTags[k] = v
-	}
 
-	// ensure ClusterTagKey tag and DeprecatedClusterTagKey tag
-	if t.lbConfig.Spec.ClusterId != nil && isValidVksId(*t.lbConfig.Spec.ClusterId) {
-		// ensure have ClusterTagKey
-		vksClusterValue := currentTags[domain.ClusterTagKey]
-		vksClusterValue = joinTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
-		ensuredTags[domain.ClusterTagKey] = vksClusterValue
+	ensuredTags, createdTags := computeTags(currentTags)
+	needUpdate, mergedTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
+	return needUpdate, mergedTags, nil
+}
 
-		// // ensure have DeprecatedClusterTagKey
-		// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
-		// deprecatedVksClusterValue = joinTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
-		// ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
-	}
+// deployTags ensures the tags this cluster owns are set on the load balancer: the cluster
+// id (appended to whatever other clusters are already listed), the VPC id, and billing.
+func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) error {
+	return t.ensureTags(ctx, lbId, func(currentTags map[string]string) (map[string]string, map[string]string) {
+		// Copy rather than build on Spec.Tags: Spec belongs to the owner controller, and
+		// this runs more than once per ensureTags.
+		ensuredTags := make(map[string]string, len(t.lbConfig.Spec.Tags))
+		for k, v := range t.lbConfig.Spec.Tags {
+			ensuredTags[k] = v
+		}
+		createdTags := make(map[string]string, len(t.lbConfig.Status.CreatedTags))
+		for k, v := range t.lbConfig.Status.CreatedTags {
+			createdTags[k] = v
+		}
 
-	// ensure vpc id tag
-	if t.lbConfig.Spec.VpcId != "" {
-		ensuredTags[domain.VpcTagKey] = t.lbConfig.Spec.VpcId
-	}
+		// ensure ClusterTagKey tag and DeprecatedClusterTagKey tag
+		if t.lbConfig.Spec.ClusterId != nil && isValidVksId(*t.lbConfig.Spec.ClusterId) {
+			// ensure have ClusterTagKey
+			vksClusterValue := currentTags[domain.ClusterTagKey]
+			vksClusterValue = joinTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
+			ensuredTags[domain.ClusterTagKey] = vksClusterValue
 
-	// ensure billing tag
-	ensuredTags[domain.BillingTagKey] = domain.BillingTagValue
+			// // ensure have DeprecatedClusterTagKey
+			// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
+			// deprecatedVksClusterValue = joinTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
+			// ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
+		}
 
-	needUpdate, ensuredTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
-	if !needUpdate {
-		return nil
-	}
+		// ensure vpc id tag
+		if t.lbConfig.Spec.VpcId != "" {
+			ensuredTags[domain.VpcTagKey] = t.lbConfig.Spec.VpcId
+		}
 
-	t.logger.Infof("Updating tags for load balancer %s: %v", lbId, ensuredTags)
-	err = t.vngcloudRepo.CreateTags(ctx, lbId, ensuredTags)
-	if err != nil {
-		return err
-	}
+		// ensure billing tag
+		ensuredTags[domain.BillingTagKey] = domain.BillingTagValue
 
-	return t.statusAddCreatedTags(ctx, ensuredTags)
+		return ensuredTags, createdTags
+	})
 }
 
 func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTags, newTags map[string]string) (bool, map[string]string) {

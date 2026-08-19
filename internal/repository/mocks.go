@@ -2493,6 +2493,46 @@ func (_c *MockVngCloudRepository_ImportCertificate_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// InvalidateTagsCache provides a mock function for the type MockVngCloudRepository
+func (_mock *MockVngCloudRepository) InvalidateTagsCache(resourceID string) {
+	_mock.Called(resourceID)
+	return
+}
+
+// MockVngCloudRepository_InvalidateTagsCache_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InvalidateTagsCache'
+type MockVngCloudRepository_InvalidateTagsCache_Call struct {
+	*mock.Call
+}
+
+// InvalidateTagsCache is a helper method to define mock.On call
+//   - resourceID string
+func (_e *MockVngCloudRepository_Expecter) InvalidateTagsCache(resourceID interface{}) *MockVngCloudRepository_InvalidateTagsCache_Call {
+	return &MockVngCloudRepository_InvalidateTagsCache_Call{Call: _e.mock.On("InvalidateTagsCache", resourceID)}
+}
+
+func (_c *MockVngCloudRepository_InvalidateTagsCache_Call) Run(run func(resourceID string)) *MockVngCloudRepository_InvalidateTagsCache_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockVngCloudRepository_InvalidateTagsCache_Call) Return() *MockVngCloudRepository_InvalidateTagsCache_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockVngCloudRepository_InvalidateTagsCache_Call) RunAndReturn(run func(resourceID string)) *MockVngCloudRepository_InvalidateTagsCache_Call {
+	_c.Run(run)
+	return _c
+}
+
 // ListCertificates provides a mock function for the type MockVngCloudRepository
 func (_mock *MockVngCloudRepository) ListCertificates(ctx context.Context) (*entity.ListCertificates, error) {
 	ret := _mock.Called(ctx)
