@@ -11,58 +11,40 @@ import (
 // If the tag value becomes empty after removal, the tag key is deleted.
 // VpcTagKey and BillingTagKey are only deleted if no other cluster is using the LB.
 // Also updates the CreatedTags in status.
+//
+// Like deployTags this goes through ensureTags, so the value it writes is always computed
+// from a fresh read: removing this cluster's id from a stale list would resurrect an id
+// another cluster had just removed, or drop one it had just added.
 func (t *defaultModelDeployTask) deleteRedundantTags(ctx context.Context, lbId string) error {
-	currentTags := make(map[string]string)
-	listTags, err := t.vngcloudRepo.ListTags(ctx, lbId)
-	if err != nil {
-		return err
-	}
-	for _, tag := range listTags.Items {
-		// ignore system tag, not allow to modify
-		if tag.SystemTag {
-			continue
-		}
-		currentTags[tag.Key] = tag.Value
-	}
+	return t.ensureTags(ctx, lbId, func(currentTags map[string]string) (map[string]string, map[string]string) {
+		ensuredTags := make(map[string]string)
 
-	ensuredTags := make(map[string]string)
-
-	createdTags := make(map[string]string)
-	for k, v := range t.lbConfig.Status.CreatedTags {
-		createdTags[k] = v
-	}
-
-	// ensure ClusterTagKey tag and DeprecatedClusterTagKey tag
-	if t.lbConfig.Spec.ClusterId != nil {
-		// ensure remove ClusterTagKey
-		vksClusterValue := currentTags[domain.ClusterTagKey]
-		vksClusterValue = removeTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
-		if vksClusterValue != "" {
-			ensuredTags[domain.ClusterTagKey] = vksClusterValue
+		createdTags := make(map[string]string, len(t.lbConfig.Status.CreatedTags))
+		for k, v := range t.lbConfig.Status.CreatedTags {
+			createdTags[k] = v
 		}
 
-		// // ensure remove DeprecatedClusterTagKey
-		// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
-		// deprecatedVksClusterValue = removeTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
-		// if deprecatedVksClusterValue != "" {
-		// 	ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
-		// }
-	}
+		// ensure ClusterTagKey tag and DeprecatedClusterTagKey tag
+		if t.lbConfig.Spec.ClusterId != nil {
+			// ensure remove ClusterTagKey
+			vksClusterValue := currentTags[domain.ClusterTagKey]
+			vksClusterValue = removeTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
+			if vksClusterValue != "" {
+				ensuredTags[domain.ClusterTagKey] = vksClusterValue
+			}
 
-	// ignore delete VpcTagKey and BillingTagKey
-	delete(createdTags, domain.VpcTagKey)
-	delete(createdTags, domain.BillingTagKey)
+			// // ensure remove DeprecatedClusterTagKey
+			// deprecatedVksClusterValue := currentTags[domain.DeprecatedClusterTagKey]
+			// deprecatedVksClusterValue = removeTagValue(deprecatedVksClusterValue, *t.lbConfig.Spec.ClusterId, domain.DeprecatedClusterTagValueSeparator)
+			// if deprecatedVksClusterValue != "" {
+			// 	ensuredTags[domain.DeprecatedClusterTagKey] = deprecatedVksClusterValue
+			// }
+		}
 
-	needUpdate, ensuredTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
-	if !needUpdate {
-		return nil
-	}
+		// ignore delete VpcTagKey and BillingTagKey
+		delete(createdTags, domain.VpcTagKey)
+		delete(createdTags, domain.BillingTagKey)
 
-	t.logger.Infof("Updating tags for load balancer %s: %v", lbId, ensuredTags)
-	err = t.vngcloudRepo.CreateTags(ctx, lbId, ensuredTags)
-	if err != nil {
-		return err
-	}
-
-	return t.statusAddCreatedTags(ctx, ensuredTags)
+		return ensuredTags, createdTags
+	})
 }
