@@ -34,6 +34,10 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 		return "", "", "", "", domain.ErrorInvalidInput
 	}
 
+	if cached, ok := m.serverNetworkCache.get(instanceID); ok {
+		return cached.zoneID, cached.networkID, cached.subnetID, cached.subnetCIDR, nil
+	}
+
 	server, sdkErr := m.GetServerByID(ctx, instanceID)
 	if sdkErr != nil {
 		return "", "", "", "", sdkErr
@@ -56,6 +60,15 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get subnet CIDR: %v", err)
 		return "", "", "", "", err
 	}
+
+	// Only successful lookups are remembered: caching a NotFound would keep a node that
+	// is still being created unreachable for the whole TTL.
+	m.serverNetworkCache.put(instanceID, serverNetworkInfo{
+		zoneID:     zoneID,
+		networkID:  networkID,
+		subnetID:   subnetID,
+		subnetCIDR: subnetCIDR,
+	})
 
 	return zoneID, networkID, subnetID, subnetCIDR, nil
 }

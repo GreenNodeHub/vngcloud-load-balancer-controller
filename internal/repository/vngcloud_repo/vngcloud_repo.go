@@ -28,6 +28,8 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 	}
 	vngcloudRepo := &vngCloudRepository{
 		cfg: cfg,
+		// built once per process, never per reconcile
+		serverNetworkCache: newServerNetworkCache(serverNetworkCacheTTL, serverNetworkCacheMaxSize),
 	}
 
 	metadator := metadata.GetMetadataProvider(vngcloudRepo.cfg.Metadata.SearchOrder)
@@ -77,6 +79,9 @@ type vngCloudRepository struct {
 
 	// client to manage INTERVPC load balancer
 	superClient client.IClient
+
+	// where each node sits on the network; see serverNetworkCache
+	serverNetworkCache *serverNetworkCache
 
 	// zoneID     common.Zone
 	// netID      string
