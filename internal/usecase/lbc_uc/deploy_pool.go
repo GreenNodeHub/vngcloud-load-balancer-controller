@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,6 +17,11 @@ import (
 // oldPools are in Status
 // newPools are in Spec
 // ensure them to portal. Don't delete old pool because some listener is using them
+// errPartialDeploy marks a pass in which some pools were deployed and others were not. The
+// caller must not treat the returned list as the desired state: it is missing the pools that
+// failed, and handing it to deleteRedundantPools would delete exactly those.
+var errPartialDeploy = errors.New("some pools could not be deployed")
+
 func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) ([]v1alpha1.CreatedPool, error) {
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {
@@ -23,12 +29,22 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 	}
 
 	createdPools := make([]v1alpha1.CreatedPool, 0)
+	failures := make([]error, 0)
 	for _, pool := range t.lbConfig.Spec.Pools {
-		if createdPool, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
-			return nil, err
-		} else {
-			createdPools = append(createdPools, *createdPool)
+		createdPool, err := t.deployPool(ctx, lbId, &pool, currentPools)
+		if err != nil {
+			// Keep going. The pools are independent, and returning here abandoned every
+			// pool behind this one - so whichever pool followed a failure never got
+			// deployed in that pass, every pass.
+			t.logger.Errorf("Failed to deploy pool %s: %v", pool.Name, err)
+			failures = append(failures, fmt.Errorf("pool %s: %w", pool.Name, err))
+			continue
 		}
+		createdPools = append(createdPools, *createdPool)
+	}
+
+	if len(failures) > 0 {
+		return createdPools, fmt.Errorf("%w: %w", errPartialDeploy, errors.Join(failures...))
 	}
 	return createdPools, nil
 }
