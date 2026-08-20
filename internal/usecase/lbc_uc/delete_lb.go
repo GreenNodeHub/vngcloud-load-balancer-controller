@@ -35,14 +35,11 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		return err
 	}
 
-	// A load balancer the user pinned is never deleted, however empty it looks to us.
-	userProvided := t.isUserProvidedLoadBalancer()
-
 	canDelete, err := t.canDeleteWholeLoadBalancer(ctx, lbId, t.lbConfig.Spec.Type)
 	if err != nil {
 		return err
 	}
-	if canDelete && !userProvided {
+	if canDelete {
 		t.logger.Infof("Deleting load balancer %s in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 		err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 		if err != nil {
@@ -65,15 +62,14 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		if err != nil {
 			return err
 		}
-		if isEmpty && !userProvided {
+		if isEmpty {
 			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 			if err != nil {
 				return err
 			}
 		} else {
-			// The load balancer stays: either something else is still on it, or it belongs
-			// to the user. Either way, take this cluster out of its cluster tag.
+			// load balancer still exists, remove cluster id from cluster tags
 			if err := t.deleteRedundantTags(ctx, lbId); err != nil {
 				return err
 			}
@@ -219,22 +215,4 @@ func canCover[T, U any](bigOne []T, smallOne []U, isExist func([]T, U) (bool, er
 		}
 	}
 	return true, nil
-}
-
-// isUserProvidedLoadBalancer reports whether this load balancer was pinned by the user with
-// the vks.vngcloud.vn/load-balancer-id annotation rather than created by the controller.
-//
-// Spec belongs to the Ingress and Service controllers, and the only thing that ever puts a
-// value in LoadBalancerId is that annotation - this use case writes Status only. So a
-// non-empty Spec.LoadBalancerId means the user brought their own load balancer.
-//
-// Such a load balancer is not ours to delete. It may still serve other
-// LoadBalancerConfigs, or workloads outside this cluster entirely, and we cannot see
-// either from here. Deleting one took a shared ALB and its IP away and left every service
-// on it dark until they were repointed by hand.
-//
-// If this ever misjudges, it errs toward leaving a load balancer behind: that costs money
-// and is visible in the portal, where the opposite mistake costs an outage.
-func (t *defaultModelDeployTask) isUserProvidedLoadBalancer() bool {
-	return t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != ""
 }
