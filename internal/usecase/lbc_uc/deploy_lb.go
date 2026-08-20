@@ -166,6 +166,14 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 		}
 	}
 
+	// We made it, so it is ours to delete later - both branches above are creations, this
+	// function is only reached when no existing load balancer was found. Recorded before
+	// anything else can fail: a load balancer we created but do not recognise would be left
+	// behind for good.
+	if err := t.statusSetCreatedLoadBalancerId(ctx, lbEntity.UUID); err != nil {
+		return "", err
+	}
+
 	if err := t.statusAddLoadBalancerId(ctx, &lbEntity.UUID, &lbEntity.Address); err != nil {
 		return "", err
 	}
