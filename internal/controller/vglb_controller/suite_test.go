@@ -64,7 +64,17 @@ var (
 	k8sClient    client.Client
 	vngcloudRepo *vngcloud_mocks.MockProvider
 
+	// The use case only builds a GLBC when the VGLB names this cluster as its config
+	// cluster, so the suite has to have an identity for newVGLBResource to point at.
+	mockClusterID = "k8s-00000000-0000-0000-0000-000000000000"
+
 	mockConfig = &config.Config{
+		Cluster: struct {
+			IsRunRemote bool   `mapstructure:"isRunRemote"`
+			Namespace   string `mapstructure:"namespace"`
+			ClusterID   string `mapstructure:"clusterID"`
+			Region      string `mapstructure:"region"`
+		}{ClusterID: mockClusterID},
 		GlobalLoadBalancerOpts: config.GlobalLoadBalancerOpts{
 			DefaultL4PackageName:      "glb-small",
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
