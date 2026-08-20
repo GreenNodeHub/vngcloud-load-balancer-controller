@@ -135,11 +135,13 @@ func main() { //nolint:gocyclo
 		"If set, the VngcloudGlobalLoadBalancer controller will be disabled")
 	flag.BoolVar(&disableServiceGLBController, "disable-service-glb-controller", false,
 		"If set, the ServiceGLB controller will be disabled")
-	flag.DurationVar(&syncPeriod, "sync-period", 5*time.Minute,
+	flag.DurationVar(&syncPeriod, "sync-period", 30*time.Minute,
 		"The minimum frequency at which watched resources are reconciled. "+
-			"A lower period will correct entropy more quickly, "+
-			"but reduce responsiveness to change if there are many watched resources. "+
-			"Examples: 5m, 1h, 30s. Defaults to 5 minutes.")
+			"This is the safety net for changes the controller missed, not the main path - "+
+			"watches handle those. Every resync re-resolves each node for each Ingress and "+
+			"Service, so the cost scales with both and lands on a per-project API rate limit. "+
+			"Lower it if drift needs correcting sooner and the project has API budget to spare. "+
+			"Examples: 5m, 30m, 1h.")
 	opts := zap.Options{
 		Development: true,
 	}
