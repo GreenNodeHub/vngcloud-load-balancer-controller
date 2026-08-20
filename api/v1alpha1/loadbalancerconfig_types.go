@@ -425,6 +425,14 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
+	// CreatedLoadBalancerId is the load balancer this LBC created, as opposed to one it
+	// adopted. It is what lets the controller tell a load balancer of its own making from one
+	// the user brought, which must never be deleted. Recorded here so that the durable record
+	// on the load balancer itself - the created-by-cluster tag - can still be written on a
+	// later reconcile if the first attempt fails.
+	// +optional
+	CreatedLoadBalancerId *string `json:"createdLoadBalancerId,omitempty"`
+
 	// LoadBalancerName is the actual name of the load balancer in VNG Cloud,
 	// observed from the cloud after creation/adoption. May differ from Spec.LoadBalancerName
 	// when an existing load balancer is adopted via the load-balancer-id annotation.

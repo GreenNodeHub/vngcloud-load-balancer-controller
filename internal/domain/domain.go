@@ -69,6 +69,12 @@ const (
 	BillingTagKey            = "vng.billing.product"
 	BillingTagValue          = "vks"
 	ClusterTagKey            = "vng.vks.cluster.ids"
+
+	// CreatedByClusterTagKey records which cluster created the load balancer, as opposed to
+	// ClusterTagKey which records the clusters merely using it. It is written by the LBC that
+	// created it and outlives that LBC, which is what lets the others tell a load balancer the
+	// cluster created from one the user brought. See createdByThisCluster.
+	CreatedByClusterTagKey = "vng.vks.created-by-cluster"
 	ClusterTagValueSeparator = "/"
 
 	DeprecatedClusterTagKey            = "vks-cluster-ids"
