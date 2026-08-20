@@ -78,6 +78,10 @@ func (t *defaultModelDeployTask) deleteRedundantTags(ctx context.Context, lbId s
 		delete(createdTags, domain.VpcTagKey)
 		delete(createdTags, domain.BillingTagKey)
 
+		// The provenance tag has to outlive this LBC - that is its whole purpose - so it is
+		// not ours to drop on the way out either.
+		delete(createdTags, domain.CreatedByClusterTagKey)
+
 		return ensuredTags, createdTags
 	})
 	if lookupErr != nil {

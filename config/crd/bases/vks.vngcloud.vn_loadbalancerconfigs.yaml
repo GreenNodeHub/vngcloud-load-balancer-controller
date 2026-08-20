@@ -571,6 +571,14 @@ spec:
                 x-kubernetes-list-map-keys:
                 - id
                 x-kubernetes-list-type: map
+              createdLoadBalancerId:
+                description: |-
+                  CreatedLoadBalancerId is the load balancer this LBC created, as opposed to one it
+                  adopted. It is what lets the controller tell a load balancer of its own making from one
+                  the user brought, which must never be deleted. Recorded here so that the durable record
+                  on the load balancer itself - the created-by-cluster tag - can still be written on a
+                  later reconcile if the first attempt fails.
+                type: string
               createdPools:
                 description: |-
                   CreatedPools is the list of created pool IDs

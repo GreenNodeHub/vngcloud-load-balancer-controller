@@ -86,6 +86,41 @@ func (t *defaultModelDeployTask) diffTags(ctx context.Context, lbId string, comp
 	return tagDiff{needUpdate: needUpdate, write: mergedTags, authored: ensuredTags}, nil
 }
 
+// createdByThisCluster reports whether this cluster created the load balancer, which is what
+// makes it ours to delete. A load balancer the user brought must never be deleted, however
+// empty it looks to us: an Ingress deleted and recreated - an Argo replace, a helm reinstall -
+// would otherwise take the user's load balancer and its address with it.
+//
+// Three signals, most trustworthy first:
+//
+//  1. The provenance tag, written by whichever LBC created the load balancer. This is the one
+//     that outlives that LBC, which is what matters when several LBCs share a load balancer
+//     and the one that created it is deleted first. A tag naming another cluster is a
+//     definite no.
+//  2. This LBC's own record of having created it, for the window between creating a load
+//     balancer and getting the tag onto it.
+//  3. For a load balancer that predates the tag: nothing here can prove provenance, so fall
+//     back to what the user asked for. Pinning an id is the only sign we have that the load
+//     balancer might not be ours, and leaving one behind is a great deal better than deleting
+//     somebody else's.
+//
+// Note there is deliberately no comparison of names: Spec.LoadBalancerName is mirrored from
+// the cloud once a load balancer is adopted, so it says nothing about who created it.
+//
+// currentTags comes from a read the caller already needed, so this costs nothing.
+func (t *defaultModelDeployTask) createdByThisCluster(lbId string, currentTags map[string]string) bool {
+	if createdBy, tagged := currentTags[domain.CreatedByClusterTagKey]; tagged {
+		return t.lbConfig.Spec.ClusterId != nil && createdBy == *t.lbConfig.Spec.ClusterId
+	}
+
+	if t.lbConfig.Status.CreatedLoadBalancerId != nil && *t.lbConfig.Status.CreatedLoadBalancerId == lbId {
+		return true
+	}
+
+	pinned := t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != ""
+	return !pinned
+}
+
 // deployTags ensures the tags this cluster owns are set on the load balancer: the cluster
 // id (appended to whatever other clusters are already listed), the VPC id, and billing.
 func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) error {
@@ -126,6 +161,15 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 
 		// ensure billing tag
 		ensuredTags[domain.BillingTagKey] = domain.BillingTagValue
+
+		// Record on the load balancer that this cluster created it, so that once this LBC is
+		// gone the others can still tell it apart from one the user brought. Only the LBC that
+		// created it may assert this, and only from its own record - never from the fallbacks
+		// in createdByThisCluster, which would let an adopted load balancer claim itself.
+		if t.lbConfig.Spec.ClusterId != nil && isValidVksId(*t.lbConfig.Spec.ClusterId) &&
+			t.lbConfig.Status.CreatedLoadBalancerId != nil && *t.lbConfig.Status.CreatedLoadBalancerId == lbId {
+			ensuredTags[domain.CreatedByClusterTagKey] = *t.lbConfig.Spec.ClusterId
+		}
 
 		return ensuredTags, createdTags
 	})
