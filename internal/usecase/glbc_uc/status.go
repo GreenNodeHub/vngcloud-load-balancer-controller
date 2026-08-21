@@ -2,6 +2,7 @@ package glbc_uc
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"k8s.io/utils/ptr"
@@ -10,6 +11,13 @@ import (
 )
 
 func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int, name string) error {
+	// Same guard as lbc_uc: id is the key of a map-list the CRD marks required, so an entry
+	// with an empty id makes the API server reject the whole status patch, every reconcile,
+	// and the GLBC never moves again. Failing and retrying is the honest answer.
+	if listenerId == "" {
+		return errors.New("global listener has no id after create, need to retry")
+	}
+
 	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, l := range obj.Status.CreatedListeners {
@@ -30,6 +38,10 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 }
 
 func (t *defaultModelDeployTask) statusUpdatePoolMember(ctx context.Context, poolId string, name string, poolMembers []v1alpha1.CreatedGlobalPoolMember) error {
+	if poolId == "" {
+		return errors.New("global pool has no id after create, need to retry")
+	}
+
 	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, p := range obj.Status.CreatedPools {

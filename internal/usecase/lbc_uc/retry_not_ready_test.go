@@ -44,10 +44,13 @@ func TestRetryOnLoadBalancerNotReady(t *testing.T) {
 			wantWaits: 1,
 		},
 		{
+			// Two waits, not three: after the final failed attempt there is nothing left to
+			// retry, so waiting again would burn a full poll cycle only to return the error
+			// already in hand.
 			name:      "busy every time - gives up and reports it",
 			errs:      []error{notReadyErr(), notReadyErr(), notReadyErr()},
 			wantCalls: 3,
-			wantWaits: 3,
+			wantWaits: 2,
 			wantErr:   true,
 		},
 		{

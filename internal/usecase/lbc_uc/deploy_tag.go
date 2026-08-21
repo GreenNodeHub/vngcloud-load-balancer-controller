@@ -2,6 +2,8 @@ package lbc_uc
 
 import (
 	"context"
+
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"slices"
 	"strings"
 
@@ -65,6 +67,23 @@ func (t *defaultModelDeployTask) ensureTags(ctx context.Context, lbId string, co
 	return t.statusAddCreatedTags(ctx, diff.authored)
 }
 
+// tagsToMap flattens an SDK tag list, skipping system tags - those are not ours to modify,
+// and they must not feed an ownership decision either. Every reader of a load balancer's
+// tags goes through this one function so no two paths can see different views.
+func tagsToMap(listTags *entityv2.ListTags) map[string]string {
+	tags := make(map[string]string)
+	if listTags == nil {
+		return tags
+	}
+	for _, tag := range listTags.Items {
+		if tag == nil || tag.SystemTag {
+			continue
+		}
+		tags[tag.Key] = tag.Value
+	}
+	return tags
+}
+
 // diffTags reads the load balancer's tags and reports whether they differ from what
 // computeTags wants, along with the set that would be written.
 func (t *defaultModelDeployTask) diffTags(ctx context.Context, lbId string, computeTags computeTagsFunc) (tagDiff, error) {
@@ -72,14 +91,7 @@ func (t *defaultModelDeployTask) diffTags(ctx context.Context, lbId string, comp
 	if err != nil {
 		return tagDiff{}, err
 	}
-	currentTags := make(map[string]string)
-	for _, tag := range listTags.Items {
-		// ignore system tag, not allow to modify
-		if tag.SystemTag {
-			continue
-		}
-		currentTags[tag.Key] = tag.Value
-	}
+	currentTags := tagsToMap(listTags)
 
 	ensuredTags, createdTags := computeTags(currentTags)
 	needUpdate, mergedTags := t.buildTag(ctx, currentTags, createdTags, ensuredTags)
@@ -115,6 +127,14 @@ func (t *defaultModelDeployTask) createdByThisCluster(lbId string, currentTags m
 
 	if t.lbConfig.Status.CreatedLoadBalancerId != nil && *t.lbConfig.Status.CreatedLoadBalancerId == lbId {
 		return true
+	}
+
+	// This LBC's own record of having adopted it - reached through an annotation, by id or
+	// by name. Recorded at adoption precisely because neither of the signals above exists
+	// for a load balancer somebody else created, and the pin fallback below cannot see the
+	// by-name path (nothing sets Spec.LoadBalancerId there) or a pin that was later removed.
+	if t.lbConfig.Status.AdoptedLoadBalancerId != nil && *t.lbConfig.Status.AdoptedLoadBalancerId == lbId {
+		return false
 	}
 
 	pinned := t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != ""

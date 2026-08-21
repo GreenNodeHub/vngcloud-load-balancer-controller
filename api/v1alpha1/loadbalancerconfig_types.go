@@ -425,6 +425,23 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
+	// AdoptedLoadBalancerId is the load balancer this LBC adopted - reached through the
+	// load-balancer-id or load-balancer-name annotation rather than created by the
+	// controller. It is the negative counterpart of CreatedLoadBalancerId: an adopted load
+	// balancer is never this cluster's to delete, even if the pin annotation is later
+	// removed. Nil on objects from before this field existed, which deliberately leaves
+	// their delete behavior unchanged.
+	// +optional
+	AdoptedLoadBalancerId *string `json:"adoptedLoadBalancerId,omitempty"`
+
+	// RetiringLoadBalancer is the load balancer this LBC is migrating away from, along
+	// with the record of what this LBC created on it. Written when spec.loadBalancerId is
+	// repointed; the old load balancer keeps serving until the new one is fully deployed,
+	// and only then is it torn down from this snapshot and the field cleared. Kept in
+	// status so the teardown survives controller restarts.
+	// +optional
+	RetiringLoadBalancer *RetiringLoadBalancer `json:"retiringLoadBalancer,omitempty"`
+
 	// CreatedLoadBalancerId is the load balancer this LBC created, as opposed to one it
 	// adopted. It is what lets the controller tell a load balancer of its own making from one
 	// the user brought, which must never be deleted. Recorded here so that the durable record
@@ -492,6 +509,27 @@ type LoadBalancerConfigStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// RetiringLoadBalancer is the snapshot a migration leaves behind: the load balancer being
+// left, and what this LBC had created on it. The snapshot exists because the live
+// created* lists are reused for the new load balancer as soon as the migration starts.
+type RetiringLoadBalancer struct {
+	// Id is the load balancer being migrated away from
+	// +required
+	Id string `json:"id"`
+
+	// CreatedListeners this LBC created on the retiring load balancer
+	// +optional
+	CreatedListeners []CreatedListener `json:"createdListeners,omitempty"`
+
+	// CreatedPools this LBC created on the retiring load balancer
+	// +optional
+	CreatedPools []CreatedPool `json:"createdPools,omitempty"`
+
+	// CreatedTags this LBC wrote on the retiring load balancer
+	// +optional
+	CreatedTags map[string]string `json:"createdTags,omitempty"`
 }
 
 type CreatedPool struct {

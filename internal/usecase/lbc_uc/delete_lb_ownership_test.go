@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -231,4 +232,48 @@ func TestDeleteRedundantTagsKeepsTheProvenanceTag(t *testing.T) {
 	assert.NoError(t, task.deleteRedundantTags(context.Background(), "lb-123"))
 	assert.NotContains(t, written, domain.ClusterTagKey, "the departing cluster's id must go")
 	assert.Equal(t, thisClusterId, written[domain.CreatedByClusterTagKey], "but provenance must stay")
+}
+
+// The hole the adoption record closes: a load balancer the user created in the portal and
+// referenced by NAME. Nothing on that path sets Spec.LoadBalancerId, so before the record
+// existed the "not pinned means ours" fallback claimed it - and deleted it with the Ingress.
+// The same record also covers a pin that is later removed from the annotations.
+func TestDeleteLoadBalancerNeverDeletesOneAdoptedByName(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	emptyLoadBalancer(vngcloud, nil)
+	// Unpinned - exactly what an adoption by name (or a removed pin) looks like in Spec.
+	task := ownershipTask(vngcloud, k8s, nil, nil)
+	task.lbConfig.Status.AdoptedLoadBalancerId = ptr.To("lb-1")
+
+	// strict mock: DeleteLoadBalancer undeclared, so any call fails the test
+	assert.NoError(t, task.delete(context.Background()))
+}
+
+// Adoption is recorded the moment the by-name lookup finds an existing load balancer,
+// before anything else can fail - otherwise a crash right after adoption would leave the
+// load balancer unprotected.
+func TestDeployLoadBalancerRecordsAdoptionByName(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+
+	vngcloud.EXPECT().GetLoadBalancerByName(mock.Anything, "user-made-lb").
+		Return(&entityv2.LoadBalancer{UUID: "lb-1", Name: "user-made-lb"}, nil).Once()
+	k8s.EXPECT().PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+	// stop the walk right after the adoption record is written (ensureExist was handed the
+	// entity, so its first cloud call is the active-wait)
+	vngcloud.EXPECT().WaitForLBActive(mock.Anything, "lb-1").
+		Return(nil, errors.New("stop here: adoption must already be recorded")).Once()
+
+	task := ownershipTask(vngcloud, k8s, nil, nil)
+	task.lbConfig.Status.LoadBalancerId = nil
+	task.lbConfig.Spec.LoadBalancerName = "user-made-lb"
+
+	_, err := task.deployLoadBalancer(context.Background(), nil)
+	assert.Error(t, err)
+
+	if assert.NotNil(t, task.lbConfig.Status.AdoptedLoadBalancerId) {
+		assert.Equal(t, "lb-1", *task.lbConfig.Status.AdoptedLoadBalancerId)
+	}
 }

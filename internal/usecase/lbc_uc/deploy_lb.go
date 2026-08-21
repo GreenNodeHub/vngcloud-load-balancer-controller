@@ -74,7 +74,7 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	}
 
 	// update status
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+	if err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		// check on fresh copy if already equal
 		if createdListenersEqual(obj.Status.CreatedListeners, newCreatedListeners) &&
 			createdPoolsEqual(obj.Status.CreatedPools, newCreatedPools) &&
@@ -85,7 +85,25 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 		obj.Status.CreatedPools = newCreatedPools
 		obj.Status.CreatedCertificates = createdCerts
 		return true
-	})
+	}); err != nil {
+		return err
+	}
+
+	// The new load balancer is fully deployed, so a load balancer this LBC migrated away
+	// from can finally be torn down - this ordering is what keeps the old one serving for
+	// the whole transition. Note the reconcile's per-LB lock is keyed on the current id,
+	// not the retiring one; that matches the pre-migration code, and every write below is
+	// scoped to resources this LBC created, with busy retries absorbing contention from
+	// siblings still using the old load balancer.
+	if retiring := t.lbConfig.Status.RetiringLoadBalancer; retiring != nil {
+		if err := t.teardownRetiringLoadBalancer(ctx, retiring); err != nil {
+			return err
+		}
+		if err := t.statusSetRetiringLoadBalancer(ctx, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // deployLoadBalancer creates or ensures the load balancer exists, handling migrations if necessary.
@@ -110,6 +128,12 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, created
 	// if not exist lbId in status
 	// try to use spec lbId
 	if t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != "" {
+		// An adoption, recorded as such before anything else can fail: this load balancer
+		// existed before we did, so it is never ours to delete - not even if the pin
+		// annotation is removed later, which would otherwise make it look unowned.
+		if err := t.statusSetAdoptedLoadBalancerId(ctx, *t.lbConfig.Spec.LoadBalancerId); err != nil {
+			return "", err
+		}
 		lbId, err := t.ensureExistLoadBalancer(ctx, *t.lbConfig.Spec.LoadBalancerId, nil)
 		if err != nil {
 			return lbId, err
@@ -124,6 +148,13 @@ func (t *defaultModelDeployTask) deployLoadBalancer(ctx context.Context, created
 			return "", err
 		}
 		if lb != nil {
+			// Adoption by name. This was the hole in the ownership check: nothing pins
+			// Spec.LoadBalancerId on this path, so without the adoption record the fallback
+			// "not pinned means ours" would claim - and later delete - the user's load
+			// balancer.
+			if err := t.statusSetAdoptedLoadBalancerId(ctx, lb.UUID); err != nil {
+				return "", err
+			}
 			lbId, err := t.ensureExistLoadBalancer(ctx, lb.UUID, lb)
 			if err != nil {
 				return lbId, err
@@ -201,28 +232,59 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 	return t.ensureExistLoadBalancer(ctx, lbEntity.UUID, nil)
 }
 
-// when update load balancer id to new value
+// when update load balancer id to new value.
+//
+// The old load balancer is NOT torn down here: at this moment the new one carries nothing,
+// so stripping the old one first opens a window where neither side serves - re-pinning a
+// production Ingress would take an outage measured in vLB write latencies. Instead the old
+// load balancer and the record of what this LBC created on it are parked in
+// status.retiringLoadBalancer; it keeps serving, and deploy() tears it down only after the
+// new load balancer is fully deployed. Parked in status rather than in memory so the
+// teardown survives a controller restart.
 func (t *defaultModelDeployTask) migrateLoadBalancer(ctx context.Context, oldId, newId string) (string, error) {
 	t.logger.Infof("Migrate load balancer from %s to %s...", oldId, newId)
 
-	// Reclaim the old load balancer before touching the new one: status.createdListeners
-	// and status.createdPools are the only record of what we put there, and
-	// ensureExistLoadBalancer below overwrites them.
-	if err := t.teardownOnLoadBalancer(ctx, oldId); err != nil {
+	// The new load balancer was reached through the pin annotation, so it is an adoption:
+	// never this cluster's to delete, whatever later happens to the annotation.
+	if err := t.statusSetAdoptedLoadBalancerId(ctx, newId); err != nil {
+		return "", err
+	}
+
+	if prev := t.lbConfig.Status.RetiringLoadBalancer; prev != nil && prev.Id != oldId {
+		// A second migration before the first teardown finished. The earlier snapshot is
+		// replaced, so whatever was left on that load balancer stays there - leaking beats
+		// tearing down from a record we can no longer trust.
+		t.logger.Warnf("Load balancer %s was still retiring when the migration to %s started; its remaining resources are left in place", prev.Id, newId)
+	}
+	if err := t.statusSetRetiringLoadBalancer(ctx, &v1alpha1.RetiringLoadBalancer{
+		Id:               oldId,
+		CreatedListeners: t.lbConfig.Status.CreatedListeners,
+		CreatedPools:     t.lbConfig.Status.CreatedPools,
+		CreatedTags:      t.lbConfig.Status.CreatedTags,
+	}); err != nil {
+		return "", err
+	}
+
+	// Only now that the snapshot is persisted may the live record be cleared for the new
+	// load balancer. A crash between the two writes leaves both the snapshot and the live
+	// record pointing at the old one, which the teardown tolerates.
+	if err := t.statusClearCreatedResources(ctx); err != nil {
 		return "", err
 	}
 
 	return t.ensureExistLoadBalancer(ctx, newId, nil)
 }
 
-// teardownOnLoadBalancer removes the listeners, policies and pools this
-// LoadBalancerConfig created on lbId, then forgets them in status.
+// teardownRetiringLoadBalancer removes the listeners, policies and pools this
+// LoadBalancerConfig created on the retiring load balancer, then releases its tags. It
+// works entirely from the snapshot, never from live status - by the time it runs, status
+// describes the new load balancer.
 //
-// Unlike deleteLoadBalancer it never deletes lbId itself. A load balancer reached
-// through spec.loadBalancerId belongs to the user and may still serve other
-// LoadBalancerConfigs, so removing it would take down unrelated traffic.
-func (t *defaultModelDeployTask) teardownOnLoadBalancer(ctx context.Context, lbId string) error {
-	if _, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId); err != nil {
+// It never deletes the load balancer itself. A load balancer reached through
+// spec.loadBalancerId belongs to the user and may still serve other LoadBalancerConfigs,
+// so removing it would take down unrelated traffic.
+func (t *defaultModelDeployTask) teardownRetiringLoadBalancer(ctx context.Context, retiring *v1alpha1.RetiringLoadBalancer) error {
+	if _, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, retiring.Id); err != nil {
 		if domain.IsLoadBalancerNotFound(err) {
 			return nil // already gone, nothing left to reclaim
 		}
@@ -230,26 +292,19 @@ func (t *defaultModelDeployTask) teardownOnLoadBalancer(ctx context.Context, lbI
 	}
 
 	// Listeners first: deleteRedundantPools keeps any pool a policy still points at.
-	if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}); err != nil {
+	if err := t.deleteRedundantListenersFrom(ctx, retiring.Id, retiring.CreatedListeners, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}); err != nil {
 		return err
 	}
-	if err := t.deleteRedundantPools(ctx, lbId, []v1alpha1.CreatedPool{}); err != nil {
-		return err
-	}
-
-	// Stop claiming to use it. Nothing will ever come back to this load balancer - status now
-	// points at the new one - so a cluster id left in vng.vks.cluster.ids here stays for good,
-	// and the load balancer goes on looking like this cluster's. deleteRedundantTags keeps the
-	// id if a sibling LBC still uses the load balancer, and leaves the vpc, billing and
-	// provenance tags alone.
-	//
-	// Must run before the status is cleared: it reads status.createdTags to know which tags
-	// are this cluster's to drop.
-	if err := t.deleteRedundantTags(ctx, lbId); err != nil {
+	if err := t.deleteRedundantPoolsFrom(ctx, retiring.Id, retiring.CreatedPools, []v1alpha1.CreatedPool{}); err != nil {
 		return err
 	}
 
-	return t.statusClearCreatedResources(ctx)
+	// Stop claiming to use it. Nothing will ever come back to this load balancer, so a
+	// cluster id left in vng.vks.cluster.ids here stays for good, and the load balancer
+	// goes on looking like this cluster's. deleteRedundantTagsFrom keeps the id if a
+	// sibling LBC still uses the load balancer, and leaves the vpc, billing and provenance
+	// tags alone.
+	return t.deleteRedundantTagsFrom(ctx, retiring.Id, retiring.CreatedTags)
 }
 
 // ensure tag, package, ...
