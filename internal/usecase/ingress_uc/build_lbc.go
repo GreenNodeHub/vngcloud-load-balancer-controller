@@ -70,8 +70,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 	if address != "" {
 		err := t.k8sRepo.UpdateIngressStatusAddress(ctx, k8s.NamespacedName(t.ingress), address)
 		if err != nil {
-			t.logger.Errorf("failed to update ingress status address: %v", err)
-			return err
+			return errors.Wrap(err, "failed to update ingress status address")
 		}
 	}
 	return nil
@@ -86,11 +85,9 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 		domain.LabelOwnerResourceUid:  string(t.ingress.UID),
 	})
 	if err != nil {
-		t.logger.Errorf("failed to list LBC: %v", err)
-		return err
+		return errors.Wrap(err, "failed to list LoadBalancerConfig")
 	}
 	if len(lbcList.Items) > 1 {
-		t.logger.Errorf("found multiple LBC for ingress %s/%s", t.ingress.Namespace, t.ingress.Name)
 		return errors.New("found multiple LBC for ingress " + t.ingress.Namespace + "/" + t.ingress.Name)
 	}
 	lbConfig := &v1alpha1.LoadBalancerConfig{}
@@ -115,7 +112,7 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	var isIgnore bool
 	_, _ = t.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, t.ingress.Annotations)
 	if isIgnore {
-		t.logger.Info("Ingress has ignore load balancer config annotation, skip.")
+		t.logger.Debug("Ingress has ignore load balancer config annotation, skip.")
 		return nil
 	}
 
@@ -185,16 +182,14 @@ func (t *defaultModelBuildTask) buildLoadBalancerConfig(ctx context.Context) err
 	if !isCreated {
 		err = t.k8sRepo.CreateLoadBalancerConfig(ctx, lbConfig)
 		if err != nil {
-			t.logger.Errorf("failed to create LBC: %v", err)
-			return err
+			return errors.Wrap(err, "failed to create LoadBalancerConfig")
 		}
 	} else {
 		// Only patch if spec actually changed to avoid unnecessary generation increments
 		if !lbcSpecEqual(oldLBConfig.Spec, lbConfig.Spec) {
 			err = t.k8sRepo.PatchLoadBalancerConfig(ctx, lbConfig, client.MergeFrom(oldLBConfig))
 			if err != nil {
-				t.logger.Errorf("failed to patch LBC: %v", err)
-				return err
+				return errors.Wrapf(err, "failed to patch LoadBalancerConfig %s/%s", lbConfig.Namespace, lbConfig.Name)
 			}
 		}
 	}
@@ -214,7 +209,6 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 		return err
 	}
 	if len(nsgList.Items) > 1 {
-		t.logger.Errorf("found multiple NodeSecurityGroup for ingress %s/%s", t.ingress.Namespace, t.ingress.Name)
 		return errors.New("found multiple NodeSecurityGroup for ingress " + t.ingress.Namespace + "/" + t.ingress.Name)
 	}
 	nsg := &v1alpha1.NodeSecurityGroup{}
@@ -265,16 +259,14 @@ func (t *defaultModelBuildTask) buildNodeSecurityGroup(ctx context.Context) erro
 	if !isCreated {
 		err = t.k8sRepo.CreateNodeSecurityGroup(ctx, nsg)
 		if err != nil {
-			t.logger.Errorf("failed to create NodeSecurityGroup: %v", err)
-			return err
+			return errors.Wrap(err, "failed to create NodeSecurityGroup")
 		}
 	} else {
 		// Only patch if spec actually changed to avoid unnecessary generation increments
 		if !nsgSpecEqual(oldNSG.Spec, nsg.Spec) {
 			err = t.k8sRepo.PatchNodeSecurityGroup(ctx, nsg, client.MergeFrom(oldNSG))
 			if err != nil {
-				t.logger.Errorf("failed to patch NodeSecurityGroup: %v", err)
-				return err
+				return errors.Wrapf(err, "failed to patch NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
 			}
 		}
 	}
@@ -319,7 +311,7 @@ func (t *defaultModelBuildTask) buildPrivateSubnetId(_ context.Context) *string 
 	// Fall back to deprecated annotation
 	_ = t.annotationParser.ParseStringAnnotation(annotations.SuffixBackendSubnetID, &option, t.ingress.Annotations)
 	if option != "" {
-		t.logger.Warnf("Annotation '%s' is deprecated, please use '%s' instead",
+		t.logger.Debugf("Annotation '%s' is deprecated, please use '%s' instead",
 			annotations.SuffixBackendSubnetID, annotations.SuffixPrivateSubnetID)
 		return &option
 	}
@@ -344,17 +336,21 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 	// try to get from load-balancer-id annotation
 	if lbID := t.buildLoadBalancerId(ctx); lbID != nil {
 		lb, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, *lbID)
-		if err != nil || lb == nil {
-			t.logger.Errorf("Failed to get load balancer by id %s: %s.", *lbID, err)
-			return common.Zone(""), "", "", "", errors.New("failed to get load balancer by id " + *lbID + ": " + err.Error())
+		if err != nil {
+			return common.Zone(""), "", "", "", errors.Wrapf(err, "failed to get load balancer by id %s", *lbID)
+		}
+		if lb == nil {
+			return common.Zone(""), "", "", "", errors.Errorf("load balancer %s not found", *lbID)
 		}
 		if lb.BackendSubnetID == t.defaultSubnetId {
 			return zone, networkId, subnetId, subnetCIDR, _err
 		}
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, lb.BackendSubnetID)
-		if err != nil || subnet == nil {
-			t.logger.Errorf("Failed to get subnet: %s.", err)
-			return common.Zone(""), "", "", "", errors.New("failed to get subnet: " + err.Error())
+		if err != nil {
+			return common.Zone(""), "", "", "", errors.Wrapf(err, "failed to get subnet %s", lb.BackendSubnetID)
+		}
+		if subnet == nil {
+			return common.Zone(""), "", "", "", errors.Errorf("subnet %s not found", lb.BackendSubnetID)
 		}
 		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
 	}
@@ -377,9 +373,11 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 		}
 
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, existingSubnetId)
-		if err != nil || subnet == nil {
-			t.logger.Errorf("Failed to get existing subnet %s: %v", existingSubnetId, err)
-			return common.Zone(""), "", "", "", errors.New("failed to get existing subnet: " + existingSubnetId)
+		if err != nil {
+			return common.Zone(""), "", "", "", errors.Wrapf(err, "failed to get existing subnet %s", existingSubnetId)
+		}
+		if subnet == nil {
+			return common.Zone(""), "", "", "", errors.Errorf("existing subnet %s not found", existingSubnetId)
 		}
 		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
 	}
@@ -392,9 +390,11 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 			return zone, networkId, subnetId, subnetCIDR, _err
 		}
 		subnet, err := t.vngcloudRepo.GetSubnetByID(ctx, t.defaultNetworkId, preferSubnetId)
-		if err != nil || subnet == nil {
-			t.logger.Errorf("Failed to get prefer subnet: %s.", err)
-			return common.Zone(""), "", "", "", errors.New("failed to get prefer subnet: " + err.Error())
+		if err != nil {
+			return common.Zone(""), "", "", "", errors.Wrapf(err, "failed to get prefer subnet %s", preferSubnetId)
+		}
+		if subnet == nil {
+			return common.Zone(""), "", "", "", errors.Errorf("prefer subnet %s not found", preferSubnetId)
 		}
 		return common.Zone(subnet.ZoneID), t.defaultNetworkId, subnet.Id, subnet.Cidr, nil
 	}
@@ -410,8 +410,7 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 		nodes := &corev1.NodeList{}
 		err := t.k8sRepo.ListNode(ctx, nodes)
 		if err != nil {
-			t.logger.Errorf("Failed to list nodes: %s.", err)
-			return common.Zone(""), "", "", "", errors.New("failed to list nodes: " + err.Error())
+			return common.Zone(""), "", "", "", errors.Wrap(err, "failed to list nodes")
 		}
 
 		providerIds := utils.GetListProviderIdFromNodeList(nodes)
@@ -424,7 +423,6 @@ func (t *defaultModelBuildTask) buildSubnetAndZone(ctx context.Context, existing
 				return _zone, _networkID, _subnetID, _subnetCIDR, nil
 			}
 		}
-		t.logger.Errorf("Failed to find subnet in prefer zone %s.", preferZoneId)
 		return common.Zone(""), "", "", "", errors.New("failed to find subnet in prefer zone " + preferZoneId)
 	}
 
@@ -466,8 +464,8 @@ func (t *defaultModelBuildTask) buildTags(_ context.Context) map[string]string {
 	option := make(map[string]string)
 	exist, err := t.annotationParser.ParseStringMapAnnotation(annotations.SuffixTags, &option, t.ingress.Annotations)
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string.",
-			annotations.SuffixTags)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string: %v",
+			annotations.SuffixTags, err)
 		return nil
 	}
 	if !exist {
@@ -480,8 +478,8 @@ func (t *defaultModelBuildTask) buildTargetNodeLabels(_ context.Context) map[str
 	option := make(map[string]string)
 	exist, err := t.annotationParser.ParseStringMapAnnotation(annotations.SuffixTargetNodeLabels, &option, t.ingress.Annotations)
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string.",
-			annotations.SuffixTargetNodeLabels)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a map[string]string: %v",
+			annotations.SuffixTargetNodeLabels, err)
 		return nil
 	}
 	if !exist {
@@ -521,11 +519,10 @@ func (t *defaultModelBuildTask) getLBCAddress(ctx context.Context) string {
 		domain.LabelOwnerResourceUid:  string(t.ingress.UID),
 	})
 	if err != nil {
-		t.logger.Warnf("failed to list LBC: %v", err)
+		// already logged by buildLoadBalancerConfig in the same reconcile
 		return ""
 	}
 	if len(lbcList.Items) > 1 {
-		t.logger.Warnf("found multiple LBC for ingress %s/%s", t.ingress.Namespace, t.ingress.Name)
 		return ""
 	}
 	if len(lbcList.Items) == 0 {

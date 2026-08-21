@@ -2,6 +2,7 @@ package service_glb_uc
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -68,13 +69,10 @@ func NewServiceGLBUseCase(
 
 // InitServiceGLBUseCase reads network info from node labels (same pattern as vglb_uc).
 func (uc *serviceGLBUseCase) InitServiceGLBUseCase(ctx context.Context) error {
-	logger := contexts.NewContext(ctx).Log()
-
 	nodes := &corev1.NodeList{}
 	err := uc.k8sRepo.ListNode(ctx, nodes)
 	if err != nil {
-		logger.Errorf("failed to list nodes: %v", err)
-		return err
+		return fmt.Errorf("failed to list nodes: %w", err)
 	}
 	if len(nodes.Items) == 0 {
 		return errors.New("no nodes found in cluster")
@@ -134,11 +132,8 @@ func (uc *serviceGLBUseCase) DeleteServiceGLBUseCase(ctx context.Context, req ct
 		return client.IgnoreNotFound(err)
 	}
 
-	logger := contexts.NewContext(ctx).Log()
-
 	stillExist, err := uc.deleteGlobalLoadBalancerConfig(ctx, svc)
 	if err != nil {
-		logger.Errorf("failed to delete GlobalLoadBalancerConfig for Service %s/%s: %v", svc.Namespace, svc.Name, err)
 		return err
 	}
 
@@ -163,8 +158,7 @@ func (uc *serviceGLBUseCase) deleteGlobalLoadBalancerConfig(ctx context.Context,
 		domain.LabelOwnerResourceUid:  string(svc.UID),
 	})
 	if err != nil {
-		logger.Errorf("failed to list GLBCs by label: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list GLBCs by label: %w", err)
 	}
 
 	if len(glbcList.Items) == 0 {
@@ -177,15 +171,11 @@ func (uc *serviceGLBUseCase) deleteGlobalLoadBalancerConfig(ctx context.Context,
 		if glbc.DeletionTimestamp.IsZero() {
 			err = uc.k8sRepo.DeleteGlobalLoadBalancerConfig(ctx, &glbc)
 			if client.IgnoreNotFound(err) != nil {
-				logger.Errorf("failed to delete GLBC %s/%s: %v", glbc.Namespace, glbc.Name, err)
-				return nil, err
+				return nil, fmt.Errorf("failed to delete GLBC %s/%s: %w", glbc.Namespace, glbc.Name, err)
 			}
 		}
 		stillExist = append(stillExist, "glbc:"+glbc.Namespace+"/"+glbc.Name)
 	}
 
-	if len(stillExist) == 0 {
-		logger.Info("All GlobalLoadBalancerConfigs successfully deleted")
-	}
 	return stillExist, nil
 }

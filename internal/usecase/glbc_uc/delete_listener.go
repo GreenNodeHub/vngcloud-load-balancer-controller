@@ -2,6 +2,7 @@ package glbc_uc
 
 import (
 	"context"
+	"fmt"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 
@@ -44,7 +45,7 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 	for _, candidateId := range deleteCandidates {
 		isExist, listener := isListenerExist(candidateId)
 		if !isExist {
-			t.logger.Warnf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
+			t.logger.Debugf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
 			continue
 		}
 
@@ -55,12 +56,10 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 
 		if !isListenerInUse(candidateId) && canDeleteWhole {
 			if err := t.vngcloudRepo.DeleteGlobalListener(ctx, lbId, candidateId); err != nil {
-				t.logger.Error("Failed to delete listener: ", err)
-				return err
+				return fmt.Errorf("delete listener %s on LB %s: %w", candidateId, lbId, err)
 			}
 			if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				return fmt.Errorf("wait LB %s active after deleting listener %s: %w", lbId, candidateId, err)
 			}
 		}
 	}
@@ -110,8 +109,7 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 	// Step 4: Fetch current PoolMember groups from VNG Cloud
 	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, listener.GlobalPoolID)
 	if err != nil {
-		t.logger.Errorf("Failed to list pool members for pool %s: %v", listener.GlobalPoolID, err)
-		return false, err
+		return false, fmt.Errorf("list members of pool %s on LB %s: %w", listener.GlobalPoolID, lbId, err)
 	}
 
 	// Step 5: Build a map of created PoolMember group names for fast lookup

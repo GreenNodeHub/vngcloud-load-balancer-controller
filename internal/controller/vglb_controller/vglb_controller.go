@@ -102,7 +102,7 @@ type VngcloudGlobalLoadBalancerReconciler struct {
 
 func (r *VngcloudGlobalLoadBalancerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
-		ctrl.Log.Info("Init not done yet, requeueing...")
+		ctrl.Log.V(1).Info("init not done yet, requeueing", "controller", controllerName)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -133,22 +133,20 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcile(ctx context.Context, re
 	if !object.DeletionTimestamp.IsZero() {
 		err := r.reconcileDelete(ctx, req, object)
 		if err != nil {
-			logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 			r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
 			return err
 		}
-		logger.Infof("%s Delete successfully.", domain.SuccessIcon)
+		logger.Info("Delete successful")
 		r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
 		return nil
 	}
 
 	err = r.reconcileEnsure(ctx, req, object)
 	if err != nil {
-		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
-	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
+	logger.Debug("Ensure successful")
 	r.eventRecorder.Event(object, corev1.EventTypeNormal, "Ensured", key)
 	return nil
 }
@@ -176,7 +174,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcileEnsure(ctx context.Conte
 func (r *VngcloudGlobalLoadBalancerReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
 	if !k8s.HasFinalizer(obj, domain.VglbFinalizer) {
-		logger.Warn("Finalizer is not found, return.")
+		logger.Debug("Finalizer not found, skip delete")
 		return nil
 	}
 
@@ -198,7 +196,7 @@ func (r *VngcloudGlobalLoadBalancerReconciler) reconcileDelete(ctx context.Conte
 // SetupWithManager sets up the controller with the Manager.
 func (r *VngcloudGlobalLoadBalancerReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		log := ctrl.Log.WithName("init")
+		log := ctrl.Log.WithName(controllerName).WithName("init")
 		log.Info("Running initialization...")
 
 		if err := r.vglbUseCase.InitVngcloudGlobalLoadBalancerUseCase(ctx); err != nil {

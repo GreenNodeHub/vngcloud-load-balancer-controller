@@ -26,17 +26,19 @@ func HandleReconcileError(err error, log *logrus.Entry) (ctrl.Result, error) {
 
 	var requeueNeededAfter *RequeueNeededAfter
 	if errors.As(err, &requeueNeededAfter) {
-		log.Info("requeue after duration: ", requeueNeededAfter.Duration(), ", reason: ", requeueNeededAfter.Reason())
+		log.Debug("requeue after duration: ", requeueNeededAfter.Duration(), ", reason: ", requeueNeededAfter.Reason())
 		return ctrl.Result{RequeueAfter: requeueNeededAfter.Duration()}, nil
 	}
 
 	var requeueNeeded *RequeueNeeded
 	if errors.As(err, &requeueNeeded) {
-		log.Info("requeue immediately reason: ", requeueNeeded.Reason())
+		log.Debug("requeue immediately, reason: ", requeueNeeded.Reason())
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	log.Infof("requeue after 5 seconds + exponential back-off, reason: %v", err)
+	// The single place a reconcile failure is logged; the layers below wrap
+	// the error with context instead of logging it themselves.
+	log.Errorf("reconcile failed, requeue with exponential back-off: %v", err)
 	time.Sleep(5 * time.Second)
 	return ctrl.Result{}, err
 }

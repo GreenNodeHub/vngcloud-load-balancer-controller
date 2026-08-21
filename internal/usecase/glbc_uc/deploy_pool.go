@@ -34,7 +34,6 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 			// Keep going. The pools are independent, and returning here abandoned every
 			// pool behind this one - so whichever pool followed a failure never got
 			// deployed in that pass, every pass.
-			t.logger.Errorf("Failed to deploy pool %s: %v", pool.Name, err)
 			failures = append(failures, fmt.Errorf("pool %s: %w", pool.Name, err))
 			continue
 		}
@@ -94,19 +93,17 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	// ensure exist pool (spec + health monitor, not members)
 	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, poolSpec, currentPool)
 	if updateOptions != nil {
-		t.logger.Info("Need update pool: ", strings.Join(message, ", "))
+		t.logger.Infof("Need update pool %s on LB %s: %s", currentPool.ID, lbId, strings.Join(message, ", "))
 		err := t.vngcloudRepo.UpdateGlobalPool(ctx, lbId, currentPool.ID, updateOptions)
 		if err != nil {
-			t.logger.Error("Failed to update pool: ", err)
-			return nil, err
+			return nil, fmt.Errorf("update pool %s on LB %s: %w", currentPool.ID, lbId, err)
 		}
 		// TODO: uncomment me
 		// if err := t.statusAddPool(ctx, currentPool.ID, currentPool.Name); err != nil {
 		// 	return nil, err
 		// }
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, fmt.Errorf("wait LB %s active after updating pool %s: %w", lbId, currentPool.ID, err)
 		}
 	}
 

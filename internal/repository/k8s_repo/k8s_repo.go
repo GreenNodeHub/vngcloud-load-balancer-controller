@@ -2,9 +2,7 @@ package k8s_repo
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"os"
 	"slices"
 	"time"
 
@@ -20,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 )
 
@@ -72,7 +69,7 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 
 		svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{Hostname: newHostname}}
 		logger := contexts.NewContext(ctx).Log()
-		logger.Infof("%s Updating Service LoadBalancer status address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
+		logger.Infof("Updating Service LoadBalancer status address %s/%s", n.Namespace, n.Name)
 		return r.client.Status().Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
 
@@ -85,7 +82,7 @@ func (r *k8sRepository) UpdateServiceStatusAddress(ctx context.Context, n types.
 		svc.Spec.ExternalIPs = append(svc.Spec.ExternalIPs, address)
 
 		logger := contexts.NewContext(ctx).Log()
-		logger.Infof("%s Updating Service NodePort externalIPs address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
+		logger.Infof("Updating Service NodePort externalIPs address %s/%s", n.Namespace, n.Name)
 		return r.client.Patch(ctx, svc, client.MergeFrom(objectOld))
 	}
 
@@ -104,7 +101,7 @@ func (r *k8sRepository) GetLoadBalancerConfig(ctx context.Context, n types.Names
 
 func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Creating LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
+	logger.Infof("Creating LoadBalancerConfig %s/%s", lbc.Namespace, lbc.Name)
 
 	err := r.client.Create(ctx, lbc, opts...)
 	if err != nil {
@@ -120,7 +117,7 @@ func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alp
 		if client.IgnoreNotFound(err) != nil {
 			return err // non-NotFound error, return immediately
 		}
-		logger.Warn("Create returned nil but object not found, retrying...")
+		logger.Warnf("Create returned nil but LoadBalancerConfig %s/%s not found, retrying...", lbc.GetNamespace(), lbc.GetName())
 		time.Sleep(250 * time.Millisecond)
 	}
 	return err
@@ -128,19 +125,19 @@ func (r *k8sRepository) CreateLoadBalancerConfig(ctx context.Context, lbc *v1alp
 
 func (r *k8sRepository) DeleteLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Deleting LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
+	logger.Infof("Deleting LoadBalancerConfig %s/%s", lbc.Namespace, lbc.Name)
 	return r.client.Delete(ctx, lbc)
 }
 
 func (r *k8sRepository) PatchLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Patching LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
+	logger.Debugf("Patching LoadBalancerConfig %s/%s", lbc.Namespace, lbc.Name)
 	return r.client.Patch(ctx, lbc, patch, opts...)
 }
 
 func (r *k8sRepository) UpdateLoadBalancerConfig(ctx context.Context, lbc *v1alpha1.LoadBalancerConfig, opts ...client.UpdateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Updating LoadBalancerConfig %s/%s", domain.RequestIcon, lbc.Namespace, lbc.Name)
+	logger.Debugf("Updating LoadBalancerConfig %s/%s", lbc.Namespace, lbc.Name)
 	return r.client.Update(ctx, lbc, opts...)
 }
 
@@ -178,6 +175,8 @@ func (r *k8sRepository) patchMutateStatusObject(
 			return nil
 		}
 
+		logger := contexts.NewContext(ctx).Log()
+
 		diff := cmp.Diff(oldObject, objGet,
 			// Ignore metadata and spec fields - we only care about Status changes
 			cmpopts.IgnoreTypes(metav1.ObjectMeta{}, metav1.TypeMeta{}),
@@ -185,13 +184,11 @@ func (r *k8sRepository) patchMutateStatusObject(
 			cmpopts.IgnoreFields(v1alpha1.NodeSecurityGroup{}, "Spec"),
 		)
 		if diff != "" && logrus.IsLevelEnabled(logrus.DebugLevel) {
-			// Print directly to stderr for clean, unescaped formatting
-			fmt.Fprintf(os.Stderr, "\n%s  status diff (before mutation -> after mutation):\n%s\n", domain.DebugIcon, diff)
+			logger.Debugf("status diff (before -> after):\n%s", diff)
 		}
 
 		// patch only status, with optimistic lock
-		logger := contexts.NewContext(ctx).Log()
-		logger.Infof("%s Patching status %s/%s", domain.RequestIcon, objGet.GetNamespace(), objGet.GetName())
+		logger.Debugf("Patching status %s/%s", objGet.GetNamespace(), objGet.GetName())
 		return r.client.Status().Patch(ctx, objGet,
 			client.MergeFromWithOptions(oldObject, client.MergeFromWithOptimisticLock{}))
 	})
@@ -215,7 +212,7 @@ func (r *k8sRepository) ListNodeSecurityGroup(ctx context.Context, list *v1alpha
 
 func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Creating NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
+	logger.Infof("Creating NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
 
 	err := r.client.Create(ctx, nsg, opts...)
 	if err != nil {
@@ -231,7 +228,7 @@ func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alph
 		if client.IgnoreNotFound(err) != nil {
 			return err // non-NotFound error, return immediately
 		}
-		logger.Warn("Create returned nil but object not found, retrying...")
+		logger.Warnf("Create returned nil but NodeSecurityGroup %s/%s not found, retrying...", nsg.GetNamespace(), nsg.GetName())
 		time.Sleep(250 * time.Millisecond)
 	}
 	return err
@@ -239,13 +236,13 @@ func (r *k8sRepository) CreateNodeSecurityGroup(ctx context.Context, nsg *v1alph
 
 func (r *k8sRepository) DeleteNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Deleting NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
+	logger.Infof("Deleting NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
 	return r.client.Delete(ctx, nsg)
 }
 
 func (r *k8sRepository) PatchNodeSecurityGroup(ctx context.Context, nsg *v1alpha1.NodeSecurityGroup, patch client.Patch, opts ...client.PatchOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Patching NodeSecurityGroup %s/%s", domain.RequestIcon, nsg.Namespace, nsg.Name)
+	logger.Debugf("Patching NodeSecurityGroup %s/%s", nsg.Namespace, nsg.Name)
 	return r.client.Patch(ctx, nsg, patch, opts...)
 }
 
@@ -296,7 +293,7 @@ func (r *k8sRepository) UpdateIngressStatusAddress(ctx context.Context, n types.
 	objectOld := ing.DeepCopy()
 	ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{Hostname: newHostname}}
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Updating Ingress status address %s/%s", domain.RequestIcon, n.Namespace, n.Name)
+	logger.Infof("Updating Ingress status address %s/%s", n.Namespace, n.Name)
 	return r.client.Status().Patch(ctx, ing, client.MergeFrom(objectOld))
 }
 
@@ -322,7 +319,7 @@ func (r *k8sRepository) ListGlobalLoadBalancerConfig(ctx context.Context, list *
 
 func (r *k8sRepository) CreateGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, opts ...client.CreateOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Creating GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	logger.Infof("Creating GlobalLoadBalancerConfig %s/%s", glbc.Namespace, glbc.Name)
 
 	err := r.client.Create(ctx, glbc, opts...)
 	if err != nil {
@@ -338,7 +335,7 @@ func (r *k8sRepository) CreateGlobalLoadBalancerConfig(ctx context.Context, glbc
 		if client.IgnoreNotFound(err) != nil {
 			return err // non-NotFound error, return immediately
 		}
-		logger.Warn("Create returned nil but object not found, retrying...")
+		logger.Warnf("Create returned nil but GlobalLoadBalancerConfig %s/%s not found, retrying...", glbc.GetNamespace(), glbc.GetName())
 		time.Sleep(250 * time.Millisecond)
 	}
 	return err
@@ -346,13 +343,13 @@ func (r *k8sRepository) CreateGlobalLoadBalancerConfig(ctx context.Context, glbc
 
 func (r *k8sRepository) DeleteGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Deleting GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	logger.Infof("Deleting GlobalLoadBalancerConfig %s/%s", glbc.Namespace, glbc.Name)
 	return r.client.Delete(ctx, glbc)
 }
 
 func (r *k8sRepository) PatchGlobalLoadBalancerConfig(ctx context.Context, glbc *v1alpha1.GlobalLoadBalancerConfig, patch client.Patch, opts ...client.PatchOption) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Patching GlobalLoadBalancerConfig %s/%s", domain.RequestIcon, glbc.Namespace, glbc.Name)
+	logger.Debugf("Patching GlobalLoadBalancerConfig %s/%s", glbc.Namespace, glbc.Name)
 	return r.client.Patch(ctx, glbc, patch, opts...)
 }
 

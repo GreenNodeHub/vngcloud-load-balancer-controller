@@ -50,16 +50,14 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		}
 		_lis, err := t.vngcloudRepo.CreateListener(ctx, lbId, createRequest)
 		if err != nil {
-			t.logger.Error("Failed to create listener: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "create listener port %d on LB %s", listenerSpec.ProtocolPort, lbId)
 		}
 		if err := t.statusAddListener(ctx, _lis.UUID, int(listenerSpec.ProtocolPort)); err != nil {
 			return nil, err
 		}
 
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "wait LB %s active after creating listener %s", lbId, _lis.UUID)
 		}
 		currentListener, err = t.vngcloudRepo.GetListenerById(ctx, lbId, _lis.UUID)
 		if err != nil {
@@ -72,8 +70,8 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	}
 
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
-		t.logger.Error("Listener protocol mismatch: ", currentListener.Protocol, listenerSpec.Protocol)
-		return nil, errors.New("listener port " + string(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
+		return nil, errors.Errorf("listener %s port %d protocol mismatch (current %s, want %s), please delete listener first in portal",
+			currentListener.UUID, listenerSpec.ProtocolPort, currentListener.Protocol, listenerSpec.Protocol)
 	}
 
 	// update exist listener
@@ -82,16 +80,14 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		return nil, err
 	}
 	if updateOptions != nil {
-		t.logger.Info("Need update listener: ", strings.Join(message, ", "))
+		t.logger.Infof("Need update listener %s (port %d) on LB %s: %s", currentListener.UUID, currentListener.ProtocolPort, lbId, strings.Join(message, ", "))
 		err := t.vngcloudRepo.UpdateListener(ctx, lbId, currentListener.UUID, updateOptions)
 		if err != nil {
-			t.logger.Error("Failed to update listener: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "update listener %s on LB %s", currentListener.UUID, lbId)
 		}
 
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "wait LB %s active after updating listener %s", lbId, currentListener.UUID)
 		}
 	}
 
@@ -173,8 +169,7 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 	if listenerSpec.CertificateDefault != nil {
 		certId, err := t.findListenerCertificateId(ctx, *listenerSpec.CertificateDefault, createdCerts)
 		if err != nil {
-			t.logger.Errorf("failed to find default certificate %+v: %v", listenerSpec.CertificateDefault, err)
-			return nil, err
+			return nil, errors.Wrapf(err, "find default certificate %+v", listenerSpec.CertificateDefault)
 		}
 		createRequest.WithDefaultCertificateAuthority(&certId)
 	}
@@ -184,8 +179,7 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 		for _, ca := range listenerSpec.CertificateAuthorities {
 			certId, err := t.findListenerCertificateId(ctx, ca, createdCerts)
 			if err != nil {
-				t.logger.Errorf("failed to find certificate authority %+v: %v", ca, err)
-				return nil, err
+				return nil, errors.Wrapf(err, "find certificate authority %+v", ca)
 			}
 			certificateAuthorities = append(certificateAuthorities, certId)
 		}

@@ -22,7 +22,7 @@ func (m *vngCloudRepository) ListLoadBalancers(ctx context.Context, tags []strin
 	logger := contexts.NewContext(ctx).Log()
 	lbs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancers(loadbalancerv2.NewListLoadBalancersRequest(defaultOffset, defaultPageSize).WithTags(tags...).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListLoadBalancers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListLoadBalancers: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return lbs, nil
@@ -31,7 +31,7 @@ func (m *vngCloudRepository) GetLoadBalancerByID(ctx context.Context, lbID strin
 	logger := contexts.NewContext(ctx).Log()
 	lb, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetLoadBalancerById(loadbalancerv2.NewGetLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - GetLoadBalancerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("GetLoadBalancerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return lb, nil
@@ -52,40 +52,41 @@ func (m *vngCloudRepository) GetLoadBalancerByName(ctx context.Context, name str
 
 func (m *vngCloudRepository) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", domain.RequestIcon)
+	logger.Infof("Request create load balancer %v", lbOptions.ToMap()["name"])
 	newLB, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - CreateLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("CreateLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return newLB, nil
 }
 func (m *vngCloudRepository) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s", domain.RequestIcon, lbID)
+	logger.Infof("Request delete load balancer %s", lbID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteLoadBalancerById(loadbalancerv2.NewDeleteLoadBalancerByIdRequest(lbID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - DeleteLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("DeleteLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil
 }
 func (m *vngCloudRepository) ResizeLoadBalancer(ctx context.Context, lbID, packageID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request resize load balancer %s to package %s", domain.RequestIcon, lbID, packageID)
+	logger.Infof("Request resize load balancer %s to package %s", lbID, packageID)
 
 	opt := loadbalancerv2.NewResizeLoadBalancerRequest(lbID, packageID)
 	_, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ResizeLoadBalancer(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ResizeLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ResizeLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil
 }
 func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for load balancer %s to be ready", domain.WaitIcon, lbID)
+	logger.Debugf("Waiting for load balancer %s to be ready", lbID)
 	var resultLb *entityv2.LoadBalancer
+	var lastStatus string
 
 	err := wait.ExponentialBackoff(wait.Backoff{
 		Duration: 5 * time.Second,
@@ -94,27 +95,28 @@ func (m *vngCloudRepository) WaitForLBActive(ctx context.Context, lbID string) (
 	}, func() (done bool, err error) {
 		lb, err := m.GetLoadBalancerByID(ctx, lbID)
 		if err != nil {
-			logger.Errorf("Error getting load balancer %s when wait active: %v", lbID, err)
+			logger.Debugf("Error getting load balancer %s when wait active: %v", lbID, err)
 			return false, err
 		}
+		lastStatus = lb.DisplayStatus
 		if strings.ToUpper(lb.DisplayStatus) == consts.ACTIVE_LOADBALANCER_STATUS &&
 			strings.ToUpper(lb.ProgressStatus) == consts.CREATED_LOADBALANCER_STATUS {
-			logger.Infof("%s Load balancer %s is ready", domain.ReadyIcon, lbID)
+			logger.Debugf("Load balancer %s is ready", lbID)
 			resultLb = lb
 			return true, nil
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ERROR_LOADBALANCER_STATUS {
-			logger.Errorf("Load balancer %s is in error status", lbID)
+			logger.Debugf("Load balancer %s is in error status", lbID)
 			resultLb = lb
 			return true, domain.ErrorLoadBalancerStatusError
 		}
 
-		logger.Infof("%s Load balancer %s is not ready yet, waiting...", domain.WaitIcon, lbID)
+		logger.Debugf("Load balancer %s is not ready yet, waiting...", lbID)
 		return false, nil
 	})
 
 	if wait.Interrupted(err) {
-		logger.Errorf("timeout waiting for the loadbalancer %s with lb status %s", lbID, resultLb.Status)
+		logger.Errorf("timeout waiting for load balancer %s to become active, last status %q", lbID, lastStatus)
 	}
 
 	return resultLb, err
@@ -126,7 +128,7 @@ func (m *vngCloudRepository) ListLoadBalancerPackageByZone(ctx context.Context, 
 	opt := loadbalancerv2.NewListLoadBalancerPackagesRequest()
 	packages, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListLoadBalancerPackages(opt.AddUserAgent(m.userAgent).WithZoneId(zone))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListLoadBalancerPackageByZone: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListLoadBalancerPackageByZone: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return packages, nil
@@ -138,11 +140,11 @@ func (m *vngCloudRepository) CreateInterLoadBalancer(ctx context.Context, lbOpti
 	}
 
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create INTERVPC load balancer.", domain.RequestIcon)
+	logger.Infof("Request create INTERVPC load balancer %v", lbOptions.ToMap()["name"])
 	newLB, sdkErr := m.superClient.VLBGateway().Internal().LoadBalancerService().
 		CreateLoadBalancer(lbOptions.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - CreateInterLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("CreateInterLoadBalancer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return newLB, nil

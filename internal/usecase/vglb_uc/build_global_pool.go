@@ -37,8 +37,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	for _, port := range ports {
 		newPool, err := t.buildPool(ctx, port, targetNodeLabels)
 		if err != nil {
-			t.logger.Errorf("failed to build pool for port %d: %v", port.Port, err)
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("build pool for port %d: %w", port.Port, err)
 		}
 
 		allPools = append(allPools, *newPool)
@@ -81,15 +80,13 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 			k8s.NamespacedName(t.vglb), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("resolve node port endpoints for service %s port %d: %w", k8s.NamespacedName(t.vglb), port.Port, err)
 		}
 	} else {
 		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 			k8s.NamespacedName(t.vglb), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("resolve pod endpoints for service %s port %d: %w", k8s.NamespacedName(t.vglb), port.Port, err)
 		}
 	}
 
@@ -208,8 +205,8 @@ func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckPort)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckPort, err)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
@@ -233,8 +230,9 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *global.Gl
 		string(global.GlobalPoolAlgorithmSourceIP):
 		return ptr.To(global.GlobalPoolAlgorithm(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Warnf("Invalid annotation \"%s\" value %q, must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixPoolAlgorithm,
+			option,
 			global.GlobalPoolAlgorithmRoundRobin,
 			global.GlobalPoolAlgorithmLeastConn,
 			global.GlobalPoolAlgorithmSourceIP)
@@ -249,8 +247,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutClient)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutClient, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -263,8 +261,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutMember)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutMember, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -277,8 +275,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutConnection)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutConnection, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -327,8 +325,8 @@ func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthyThresholdCount)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -341,8 +339,8 @@ func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Conte
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixUnhealthyThresholdCount)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixUnhealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -355,8 +353,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Co
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckIntervalSeconds)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckIntervalSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -369,8 +367,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Con
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckTimeoutSeconds)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckTimeoutSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -391,8 +389,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.C
 		string(global.GlobalPoolHealthCheckMethodPOST):
 		return ptr.To(global.GlobalPoolHealthCheckMethod(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Warnf("Invalid annotation \"%s\" value %q, must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpMethod,
+			option,
 			global.GlobalPoolHealthCheckMethodGET,
 			global.GlobalPoolHealthCheckMethodPUT,
 			global.GlobalPoolHealthCheckMethodPOST)
@@ -429,8 +428,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.
 		string(global.GlobalPoolHealthCheckHttpVersionHttp1Minor1):
 		return ptr.To(global.GlobalPoolHealthCheckHttpVersion(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
+		t.logger.Warnf("Invalid annotation \"%s\" value %q, must be \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpVersion,
+			option,
 			global.GlobalPoolHealthCheckHttpVersionHttp1,
 			global.GlobalPoolHealthCheckHttpVersionHttp1Minor1)
 	}

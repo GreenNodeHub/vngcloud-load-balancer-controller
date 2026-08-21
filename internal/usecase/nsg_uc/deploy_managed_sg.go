@@ -2,6 +2,7 @@ package nsg_uc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/anngdinh/operator-helper/contexts"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -39,8 +40,7 @@ func (uc *nsgUseCase) doEnsureManagedSecurityGroup(ctx context.Context, nsgObjec
 	// find default secgroup
 	secgroup, exists, err := uc.findSecgroupByName(ctx, nsgObject.Spec.ManagedSecurityGroup.Name)
 	if err != nil {
-		logger.Error("Fail to find default secgroup by name", err)
-		return status, err
+		return status, fmt.Errorf("failed to find managed secgroup by name %q: %w", nsgObject.Spec.ManagedSecurityGroup.Name, err)
 	}
 
 	if !exists {
@@ -51,13 +51,11 @@ func (uc *nsgUseCase) doEnsureManagedSecurityGroup(ctx context.Context, nsgObjec
 		}
 		created, err := uc.vngcloudRepo.CreateSecurityGroup(ctx, nsgObject.Spec.ManagedSecurityGroup.Name, description)
 		if err != nil {
-			logger.Error("Fail to create default secgroup", err)
-			return status, err
+			return status, fmt.Errorf("failed to create managed secgroup %q: %w", nsgObject.Spec.ManagedSecurityGroup.Name, err)
 		}
 		secgroup, err = uc.vngcloudRepo.GetSecurityGroup(ctx, created.Id)
 		if err != nil {
-			logger.Error("Fail to get default secgroup", err)
-			return status, err
+			return status, fmt.Errorf("failed to get managed secgroup %s: %w", created.Id, err)
 		}
 	}
 
@@ -69,36 +67,26 @@ func (uc *nsgUseCase) doEnsureManagedSecurityGroup(ctx context.Context, nsgObjec
 	// get all secgroup rules of default secgroup
 	rules, err := uc.vngcloudRepo.ListSecurityGroupRules(ctx, secgroup.Id)
 	if err != nil {
-		logger.Error("Fail to list secgroup rules: ", err)
-		return status, err
+		return status, fmt.Errorf("failed to list rules of secgroup %s: %w", secgroup.Id, err)
 	}
 	if rules == nil || rules.Items == nil {
 		rules = &entityv2.ListSecgroupRules{Items: []*entityv2.SecgroupRule{}}
 	}
 
-	logger.Debug("Ensure secgroup rules: ")
-	for _, rule := range rules.Items {
-		logger.Debugf("   - current: %v", rule)
-	}
+	// ensure secgroup rules; compareSecgroupRule never returns an error (nolint:unparam)
+	needDelete, needCreate, _ := uc.compareSecgroupRule(ctx, rules.Items, nsgObject.Spec.ManagedSecurityGroup.Rules)
 
-	// ensure secgroup rules
-	needDelete, needCreate, err := uc.compareSecgroupRule(ctx, rules.Items, nsgObject.Spec.ManagedSecurityGroup.Rules)
-	if err != nil {
-		logger.Error("Fail to compare secgroup rules", err)
-		return status, err
-	}
-
+	logger.Debugf("Ensure rules of secgroup %s: current=%d delete=%d create=%d", secgroup.Id, len(rules.Items), len(needDelete), len(needCreate))
 	for _, rule := range needDelete {
-		logger.Debugf("   - delete : %v", rule)
+		logger.Debugf("  - delete: %v", rule)
 	}
 	for _, rule := range needCreate {
-		logger.Debugf("   - create : %v", rule)
+		logger.Debugf("  - create: %v", rule)
 	}
 
 	for _, rule := range needDelete {
 		if err := uc.vngcloudRepo.DeleteSecurityGroupRule(ctx, secgroup.Id, rule.Id); err != nil {
-			logger.Error("Fail to delete secgroup rule", err)
-			return status, err
+			return status, fmt.Errorf("failed to delete rule %s of secgroup %s: %w", rule.Id, secgroup.Id, err)
 		}
 	}
 
@@ -115,8 +103,8 @@ func (uc *nsgUseCase) doEnsureManagedSecurityGroup(ctx context.Context, nsgObjec
 				rule.Description,
 			))
 		if err != nil {
-			logger.Error("Fail to create secgroup rule: ", err)
-			return status, err
+			return status, fmt.Errorf("failed to create rule (%s %s %s %d-%d %s) in secgroup %s: %w",
+				rule.Direction, rule.EtherType, rule.Protocol, rule.FromPort, rule.ToPort, rule.CIDR, secgroup.Id, err)
 		}
 	}
 

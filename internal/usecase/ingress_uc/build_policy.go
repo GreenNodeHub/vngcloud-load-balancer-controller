@@ -141,7 +141,7 @@ func (t *defaultModelBuildTask) buildPolicyByRegex(ctx context.Context, _, polic
 		}
 	}
 
-	t.logger.Warnf("No implementation specific config found for host '%s' and path '%s'.", host, path.Path)
+	t.logger.Debugf("No implementation specific config found for host '%s' and path '%s'.", host, path.Path)
 
 	return nil, domain.ErrorNoImplementationSpecificConfigFound
 }
@@ -173,8 +173,8 @@ func (t *defaultModelBuildTask) buildImplementationSpecificConfigs(_ context.Con
 		return option
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object.",
-			annotations.SuffixImplementationSpecificParams)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be a JSON object: %v",
+			annotations.SuffixImplementationSpecificParams, err)
 		return option
 	}
 	return option

@@ -48,16 +48,14 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		}
 		_lis, err := t.vngcloudRepo.CreateGlobalListener(ctx, lbId, createRequest)
 		if err != nil {
-			t.logger.Error("Failed to create listener: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "create listener port %d on LB %s", listenerSpec.ProtocolPort, lbId)
 		}
 		if err := t.statusAddListener(ctx, _lis.ID, listenerSpec.ProtocolPort, listenerSpec.Name); err != nil {
 			return nil, err
 		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "wait LB %s active after creating listener %s", lbId, _lis.ID)
 		}
 		currentListener, err = t.vngcloudRepo.GetGlobalListener(ctx, lbId, _lis.ID)
 		if err != nil {
@@ -66,8 +64,8 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	}
 
 	if currentListener.Protocol != string(listenerSpec.Protocol) {
-		t.logger.Error("Listener protocol mismatch: ", currentListener.Protocol, listenerSpec.Protocol)
-		return nil, errors.New("listener port " + fmt.Sprint(listenerSpec.ProtocolPort) + " protocol mismatch, please delete listener first in portal")
+		return nil, errors.Errorf("listener %s port %d protocol mismatch (current %s, want %s), please delete listener first in portal",
+			currentListener.ID, listenerSpec.ProtocolPort, currentListener.Protocol, listenerSpec.Protocol)
 	}
 
 	// update exist listener
@@ -76,19 +74,17 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		return nil, err
 	}
 	if updateOptions != nil {
-		t.logger.Info("Need update listener: ", strings.Join(message, ", "))
+		t.logger.Infof("Need update listener %s (port %d) on LB %s: %s", currentListener.ID, currentListener.Port, lbId, strings.Join(message, ", "))
 		err := t.vngcloudRepo.UpdateGlobalListener(ctx, lbId, currentListener.ID, updateOptions)
 		if err != nil {
-			t.logger.Error("Failed to update listener: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "update listener %s on LB %s", currentListener.ID, lbId)
 		}
 		if err := t.statusAddListener(ctx, currentListener.ID, currentListener.Port, currentListener.Name); err != nil {
 			return nil, err
 		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, errors.Wrapf(err, "wait LB %s active after updating listener %s", lbId, currentListener.ID)
 		}
 	}
 

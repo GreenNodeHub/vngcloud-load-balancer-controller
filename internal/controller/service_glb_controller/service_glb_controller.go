@@ -101,7 +101,7 @@ type ServiceGLBReconciler struct {
 
 func (r *ServiceGLBReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
-		ctrl.Log.Info("Init not done yet, requeueing...")
+		ctrl.Log.V(1).Info("init not done yet, requeueing", "controller", controllerName)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -133,11 +133,10 @@ func (r *ServiceGLBReconciler) reconcile(ctx context.Context, req ctrl.Request) 
 		if r.serviceGLBUtils.IsServiceGLBPendingFinalization(svc) {
 			err := r.reconcileDelete(ctx, req, svc)
 			if err != nil {
-				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 				r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				return err
 			}
-			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
+			logger.Info("Delete successful")
 			r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Deleted", key)
 			return nil
 		}
@@ -146,11 +145,10 @@ func (r *ServiceGLBReconciler) reconcile(ctx context.Context, req ctrl.Request) 
 
 	err = r.reconcileEnsure(ctx, req, svc)
 	if err != nil {
-		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(svc, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
-	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
+	logger.Debug("Ensure successful")
 	r.eventRecorder.Event(svc, corev1.EventTypeNormal, "Ensured", key)
 	return nil
 }
@@ -178,7 +176,7 @@ func (r *ServiceGLBReconciler) reconcileEnsure(ctx context.Context, req ctrl.Req
 func (r *ServiceGLBReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
 	if !k8s.HasFinalizer(obj, domain.ServiceGLBFinalizer) {
-		logger.Warn("Finalizer is not found, return.")
+		logger.Debug("Finalizer not found, skip delete")
 		return nil
 	}
 
@@ -200,7 +198,7 @@ func (r *ServiceGLBReconciler) reconcileDelete(ctx context.Context, req ctrl.Req
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceGLBReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		log := ctrl.Log.WithName("init")
+		log := ctrl.Log.WithName(controllerName).WithName("init")
 		log.Info("Running ServiceGLB initialization...")
 
 		if err := r.serviceGLBUseCase.InitServiceGLBUseCase(ctx); err != nil {

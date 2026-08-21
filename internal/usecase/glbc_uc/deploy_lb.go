@@ -178,14 +178,12 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context) (string
 				return "", err
 			}
 			if err := t.vngcloudRepo.DeleteGlobalLoadBalancer(ctx, lbEntity.ID); err != nil {
-				t.logger.Error("Failed to delete loadbalancer: ", err)
-				return "", err
+				return "", errors.Wrapf(err, "delete load balancer %s after status error", lbEntity.ID)
 			}
 			t.logger.Infof("Delete loadbalancer \"%s\" because of status error, recreate now.", lbEntity.ID)
 			return "", errs.NewRequeueNeeded("loadbalancer status is error, delete and recreate")
 		}
-		t.logger.Error("Failed to wait for loadbalancer active: ", err)
-		return "", err
+		return "", errors.Wrapf(err, "wait LB %s active after create", lbEntity.ID)
 	}
 
 	t.logger.Infof("Created load balancer with ID %s", lbEntity.ID)
@@ -276,13 +274,12 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 		return nil
 	}
 
-	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.Package, *t.lbConfig.Spec.PackageId)
+	t.logger.Infof("Need resize loadbalancer %s from package %s -> %s", lbEntity.ID, lbEntity.Package, *t.lbConfig.Spec.PackageId)
 	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.ID, *t.lbConfig.Spec.PackageId); err != nil {
 		return err
 	}
 	if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbEntity.ID); err != nil {
-		t.logger.Error("Failed to wait for loadbalancer active: ", err)
-		return err
+		return errors.Wrapf(err, "wait LB %s active after resize", lbEntity.ID)
 	}
 	return nil
 }

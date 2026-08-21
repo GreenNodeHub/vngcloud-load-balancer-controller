@@ -71,14 +71,13 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 	secgroupRules := make([]v1alpha1.NodeSecurityGroupRule, 0)
 
 	// find service
+	// buildPool already logs unresolvable backends for the same reconcile, so stay quiet here.
 	findService, err := t.k8sRepo.GetService(ctx, types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			t.logger.Warnf("service %s/%s not found, skipping its security group rules", t.ingress.GetNamespace(), service.Name)
 			return nil, fmt.Errorf("%w: %s/%s", errBackendUnresolvable, t.ingress.GetNamespace(), service.Name)
 		}
-		t.logger.Errorf("failed to get service %s/%s: %v", t.ingress.GetNamespace(), service.Name, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 	}
 
 	// find service port
@@ -94,8 +93,6 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 		}
 	}
 	if servicePort == nil {
-		t.logger.Warnf("service %s/%s does not expose port %s, skipping its security group rules",
-			t.ingress.GetNamespace(), service.Name, backendPortDescription(service.Port))
 		return nil, fmt.Errorf("%w: %s/%s has no port %s", errBackendUnresolvable,
 			t.ingress.GetNamespace(), service.Name, backendPortDescription(service.Port))
 	}
@@ -111,8 +108,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 			types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name}, serviceBackendToIntOrString(service.Port), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve node port endpoints for service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 		}
 
 		// if cniMode is cilium native routing:
@@ -149,8 +145,7 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 			types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name}, serviceBackendToIntOrString(service.Port), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve pod endpoints for service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 		}
 	}
 
@@ -267,16 +262,14 @@ func (t *defaultModelBuildTask) getAllSubnetCidrs(ctx context.Context) ([]string
 	nodes := &corev1.NodeList{}
 	err := t.k8sRepo.ListNode(ctx, nodes)
 	if err != nil {
-		t.logger.Errorf("failed to list nodes: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
 	providerIds := utils.GetListProviderIdFromNodeList(nodes)
 	for _, providerId := range providerIds {
 		_, _, _, cidr, err := t.vngcloudRepo.GetServerNetworkInfo(ctx, providerId)
 		if err != nil {
-			t.logger.Errorf("failed to get server network info for providerId %s: %v", providerId, err)
-			return nil, err
+			return nil, fmt.Errorf("failed to get server network info for providerId %s: %w", providerId, err)
 		}
 		if cidr == "" {
 			continue

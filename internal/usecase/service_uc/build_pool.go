@@ -2,6 +2,7 @@ package service_uc
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -36,8 +37,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	for _, port := range ports {
 		newPool, err := t.buildPool(ctx, port, targetNodeLabels)
 		if err != nil {
-			t.logger.Errorf("failed to build pool for port %d: %v", port.Port, err)
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("failed to build pool for port %d: %w", port.Port, err)
 		}
 
 		allPools = append(allPools, *newPool)
@@ -80,15 +80,13 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, port corev1.Servi
 		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 			k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve node port endpoints: %w", err)
 		}
 	} else {
 		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 			k8s.NamespacedName(t.service), intstr.FromInt(int(port.Port)), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve pod endpoints: %w", err)
 		}
 	}
 
@@ -179,12 +177,12 @@ func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckPort)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckPort, err)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
-		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535.",
+		t.logger.Debugf("Invalid annotation \"%s\" value %d, must be in range 1-65535.",
 			annotations.SuffixHealthcheckPort, optionsInt64)
 		return nil
 	}
@@ -204,8 +202,9 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *loadbalan
 		string(loadbalancerv2.PoolAlgorithmSourceIP):
 		return ptr.To(loadbalancerv2.PoolAlgorithm(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixPoolAlgorithm,
+			option,
 			loadbalancerv2.PoolAlgorithmLeastConn,
 			loadbalancerv2.PoolAlgorithmRoundRobin,
 			loadbalancerv2.PoolAlgorithmSourceIP)
@@ -220,8 +219,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutClient)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutClient, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -234,8 +233,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutMember)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutMember, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -248,8 +247,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutConnection)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutConnection, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -304,8 +303,8 @@ func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthyThresholdCount)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -318,8 +317,8 @@ func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Conte
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixUnhealthyThresholdCount)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixUnhealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -332,8 +331,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Co
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckIntervalSeconds)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckIntervalSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -346,8 +345,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Con
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckTimeoutSeconds)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckTimeoutSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))

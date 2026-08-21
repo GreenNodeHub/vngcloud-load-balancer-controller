@@ -22,8 +22,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.C
 		string(loadbalancerv2.HealthCheckMethodPOST):
 		return ptr.To(loadbalancerv2.HealthCheckMethod(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpMethod,
+			option,
 			loadbalancerv2.HealthCheckMethodGET,
 			loadbalancerv2.HealthCheckMethodPUT,
 			loadbalancerv2.HealthCheckMethodPOST)
@@ -60,8 +61,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.
 		string(loadbalancerv2.HealthCheckHttpVersionHttp1Minor1):
 		return ptr.To(loadbalancerv2.HealthCheckHttpVersion(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpVersion,
+			option,
 			loadbalancerv2.HealthCheckHttpVersionHttp1,
 			loadbalancerv2.HealthCheckHttpVersionHttp1Minor1)
 	}

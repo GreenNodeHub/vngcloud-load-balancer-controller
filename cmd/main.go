@@ -143,11 +143,15 @@ func main() { //nolint:gocyclo
 			"Lower it if drift needs correcting sooner and the project has API budget to spare. "+
 			"Examples: 5m, 30m, 1h.")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
+	// --log-level drives both logging stacks; --zap-log-level still wins for zap if set.
+	if opts.Level == nil {
+		opts.Level = logging.ZapLevel(logLevel)
+	}
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// Setup logrus logger
@@ -183,9 +187,7 @@ func main() { //nolint:gocyclo
 		}
 	}
 
-	setupLog.Info(fmt.Sprintf(
-		"The commit is [%s], version is [%s], chartVersion is [%s]",
-		version.Commit, version.Version, conf.ChartVersion))
+	setupLog.Info("build info", "commit", version.Commit, "version", version.Version, "chartVersion", conf.ChartVersion)
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -193,7 +195,7 @@ func main() { //nolint:gocyclo
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
+		setupLog.V(1).Info("disabling http/2")
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -461,12 +463,12 @@ func main() { //nolint:gocyclo
 	}
 
 	go func() {
-		setupLog.Info("starting collect cache size")
+		setupLog.V(1).Info("starting collect cache size")
 		lbcMetricsCollector.StartCollectCacheSize(ctx)
 	}()
 
 	go func() {
-		setupLog.Info("starting collect top talkers")
+		setupLog.V(1).Info("starting collect top talkers")
 		lbcMetricsCollector.StartCollectTopTalkers(ctx)
 	}()
 

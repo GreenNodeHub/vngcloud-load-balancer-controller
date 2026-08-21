@@ -3,6 +3,7 @@ package service_uc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -63,8 +64,7 @@ func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 	nodes := &corev1.NodeList{}
 	err := uc.k8sRepo.ListNode(ctx, nodes)
 	if err != nil {
-		logger.Errorf("failed to list nodes: %v", err)
-		return err
+		return fmt.Errorf("failed to list nodes: %w", err)
 	}
 	if len(nodes.Items) == 0 {
 		return errors.New("no nodes found in cluster")
@@ -80,8 +80,7 @@ func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 		}
 		uc.defaultZone, uc.defaultNetworkId, uc.defaultSubnetId, uc.defaultSubnetCIDR, err = uc.vngcloudRepo.GetServerNetworkInfo(ctx, firstProviderId)
 		if err != nil {
-			logger.Errorf("failed to get default network info: %v", err)
-			return err
+			return fmt.Errorf("failed to get default network info from node %s: %w", firstProviderId, err)
 		}
 		if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
 			return errors.New("default network info is incomplete")
@@ -107,8 +106,7 @@ func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 	// init cni mode
 	cniMode, err := uc.cniDetector.DetectCNIType(ctx)
 	if err != nil {
-		logger.Errorf("failed to detect CNI type: %v", err)
-		return err
+		return fmt.Errorf("failed to detect CNI type: %w", err)
 	}
 	logger.Infof("Detected CNI type: %s", cniMode)
 	return nil
@@ -139,7 +137,7 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 	var isIgnore bool
 	_, _ = uc.annotationParser.ParseBoolAnnotation(annotations.SuffixIgnore, &isIgnore, svc.Annotations)
 	if isIgnore {
-		logger.Info("Service has ignore load balancer config annotation, skip.")
+		logger.Debug("Service has ignore load balancer config annotation, skip.")
 		return nil
 	}
 
@@ -173,9 +171,6 @@ func (uc *serviceUseCase) DeleteServiceUseCase(ctx context.Context, req ctrl.Req
 
 	// If there are real errors, return them immediately
 	if len(realErrs) > 0 {
-		for _, err := range realErrs {
-			logger.Errorf("failed to delete resources for service %s/%s: %v", svc.GetNamespace(), svc.GetName(), err)
-		}
 		return errors.Join(realErrs...)
 	}
 
@@ -233,8 +228,7 @@ func (uc *serviceUseCase) deleteLoadBalancerConfig(ctx context.Context, svc *cor
 		domain.LabelOwnerResourceUid:  string(svc.UID),
 	})
 	if err != nil {
-		logger.Errorf("failed to list LBCs by label: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list LoadBalancerConfigs by label: %w", err)
 	}
 
 	// If no LBCs found, nothing to delete
@@ -250,8 +244,7 @@ func (uc *serviceUseCase) deleteLoadBalancerConfig(ctx context.Context, svc *cor
 		if lbc.DeletionTimestamp.IsZero() {
 			err = uc.k8sRepo.DeleteLoadBalancerConfig(ctx, &lbc)
 			if client.IgnoreNotFound(err) != nil {
-				logger.Errorf("failed to delete LBC %s/%s: %v", lbc.Namespace, lbc.Name, err)
-				return nil, err
+				return nil, fmt.Errorf("failed to delete LoadBalancerConfig %s/%s: %w", lbc.Namespace, lbc.Name, err)
 			}
 		}
 
@@ -259,9 +252,6 @@ func (uc *serviceUseCase) deleteLoadBalancerConfig(ctx context.Context, svc *cor
 		stillExist = append(stillExist, "lbc:"+lbc.Namespace+"/"+lbc.Name)
 	}
 
-	if len(stillExist) == 0 {
-		logger.Info("All LoadBalancerConfigs successfully deleted")
-	}
 	return stillExist, nil
 }
 
@@ -275,8 +265,7 @@ func (uc *serviceUseCase) deleteNodeSecurityGroup(ctx context.Context, svc *core
 		domain.LabelOwnerResourceUid:  string(svc.UID),
 	})
 	if err != nil {
-		logger.Errorf("failed to list NodeSecurityGroups by label: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list NodeSecurityGroups by label: %w", err)
 	}
 
 	// If no NSGs found, nothing to delete
@@ -292,8 +281,7 @@ func (uc *serviceUseCase) deleteNodeSecurityGroup(ctx context.Context, svc *core
 		if secgroup.DeletionTimestamp.IsZero() {
 			err = uc.k8sRepo.DeleteNodeSecurityGroup(ctx, &secgroup)
 			if client.IgnoreNotFound(err) != nil {
-				logger.Errorf("failed to delete NodeSecurityGroup %s/%s: %v", secgroup.Namespace, secgroup.Name, err)
-				return nil, err
+				return nil, fmt.Errorf("failed to delete NodeSecurityGroup %s/%s: %w", secgroup.Namespace, secgroup.Name, err)
 			}
 		}
 
@@ -301,8 +289,5 @@ func (uc *serviceUseCase) deleteNodeSecurityGroup(ctx context.Context, svc *core
 		stillExist = append(stillExist, "nsg:"+secgroup.Namespace+"/"+secgroup.Name)
 	}
 
-	if len(stillExist) == 0 {
-		logger.Info("All NodeSecurityGroups successfully deleted")
-	}
 	return stillExist, nil
 }

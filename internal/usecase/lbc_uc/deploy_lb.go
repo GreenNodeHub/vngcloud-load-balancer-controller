@@ -216,14 +216,12 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 				return "", err
 			}
 			if err := t.vngcloudRepo.DeleteLoadBalancer(ctx, lbEntity.UUID); err != nil {
-				t.logger.Error("Failed to delete loadbalancer: ", err)
-				return "", err
+				return "", errors.Wrapf(err, "delete load balancer %s after status error", lbEntity.UUID)
 			}
 			t.logger.Infof("Delete loadbalancer \"%s\" because of status error, recreate now.", lbEntity.UUID)
 			return "", errs.NewRequeueNeeded("loadbalancer status is error, delete and recreate")
 		}
-		t.logger.Error("Failed to wait for loadbalancer active: ", err)
-		return "", err
+		return "", errors.Wrapf(err, "wait LB %s active after create", lbEntity.UUID)
 	}
 
 	t.logger.Infof("Created load balancer with ID %s", lbEntity.UUID)
@@ -407,17 +405,16 @@ func (t *defaultModelDeployTask) deployPackageId(ctx context.Context, lbEntity *
 	}
 
 	if lbEntity.AutoScalable {
-		t.logger.Infof("Loadbalancer is autoscaled, skip resizing.")
+		t.logger.Debugf("Load balancer %s is autoscaled, skip resizing", lbEntity.UUID)
 		return nil
 	}
 
-	t.logger.Infof("Need resize loadbalancer from package %s -> %s", lbEntity.PackageID, *t.lbConfig.Spec.PackageId)
+	t.logger.Infof("Need resize loadbalancer %s from package %s -> %s", lbEntity.UUID, lbEntity.PackageID, *t.lbConfig.Spec.PackageId)
 	if err := t.vngcloudRepo.ResizeLoadBalancer(ctx, lbEntity.UUID, *t.lbConfig.Spec.PackageId); err != nil {
 		return err
 	}
 	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbEntity.UUID); err != nil {
-		t.logger.Error("Failed to wait for loadbalancer active: ", err)
-		return err
+		return errors.Wrapf(err, "wait LB %s active after resize", lbEntity.UUID)
 	}
 	return nil
 }

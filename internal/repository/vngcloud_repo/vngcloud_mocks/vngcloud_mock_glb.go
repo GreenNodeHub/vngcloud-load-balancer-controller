@@ -116,7 +116,7 @@ func (m *MockProvider) GetGlobalLoadBalancerByName(ctx context.Context, glbID st
 
 func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions global.ICreateGlobalLoadBalancerRequest) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", domain.RequestIcon)
+	logger.Infof("Request create load balancer.")
 	if glbOptions == nil {
 		return nil, domain.ErrorInvalidInput
 	}
@@ -168,7 +168,7 @@ func (m *MockProvider) CreateGlobalLoadBalancer(ctx context.Context, glbOptions 
 
 func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s.", domain.RequestIcon, glbID)
+	logger.Infof("Request delete load balancer %s.", glbID)
 	newLBs := make([]*entityv2.GlobalLoadBalancer, 0)
 	for i := range m.glbs {
 		if m.glbs[i].ID != glbID {
@@ -186,7 +186,7 @@ func (m *MockProvider) DeleteGlobalLoadBalancer(ctx context.Context, glbID strin
 
 func (m *MockProvider) WaitGlobalLoadBalancerActive(ctx context.Context, glbID string) (*entityv2.GlobalLoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for global load balancer %s to be ready", domain.WaitIcon, glbID)
+	logger.Infof("Waiting for global load balancer %s to be ready", glbID)
 	var resultLB *entityv2.GlobalLoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -200,12 +200,12 @@ func (m *MockProvider) WaitGlobalLoadBalancerActive(ctx context.Context, glbID s
 			return false, err
 		}
 		if strings.ToUpper(lb.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Global load balancer %s is ready", domain.ReadyIcon, glbID)
+			logger.Infof("Global load balancer %s is ready", glbID)
 			resultLB = lb
 			return true, nil
 		}
 
-		logger.Infof("%s Global load balancer %s is `%s`, waiting...", domain.WaitIcon, glbID, lb.Status)
+		logger.Infof("Global load balancer %s is `%s`, waiting...", glbID, lb.Status)
 		return false, nil
 	})
 
@@ -230,7 +230,7 @@ func (m *MockProvider) ListGlobalPools(ctx context.Context, glbID string) (*enti
 
 func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt global.ICreateGlobalPoolRequest) (*entityv2.GlobalPool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create global pool of load balancer %s", domain.RequestIcon, glbID)
+	logger.Infof("Request create global pool of load balancer %s", glbID)
 	pool := opt.ToRequestBody().(*global.CreateGlobalPoolRequest)
 	newPool := &wrapGlobalPool{
 		lbID: glbID,
@@ -327,7 +327,7 @@ func (m *MockProvider) CreateGlobalPool(ctx context.Context, glbID string, opt g
 
 func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete global pool %s of load balancer %s", domain.RequestIcon, poolID, glbID)
+	logger.Infof("Request delete global pool %s of load balancer %s", poolID, glbID)
 	isFound := false
 	newPools := make([]*wrapGlobalPool, 0)
 	for i, p := range m.globalPools {
@@ -350,7 +350,7 @@ func (m *MockProvider) DeleteGlobalPool(ctx context.Context, glbID, poolID strin
 
 func (m *MockProvider) UpdateGlobalPool(ctx context.Context, glbID, poolID string, opt global.IUpdateGlobalPoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update global pool %s of load balancer %s", domain.RequestIcon, poolID, glbID)
+	logger.Infof("Request update global pool %s of load balancer %s", poolID, glbID)
 
 	req := opt.ToRequestBody().(*global.UpdateGlobalPoolRequest)
 
@@ -409,7 +409,7 @@ func (m *MockProvider) ListGlobalPoolMembers(ctx context.Context, glbID, poolID 
 
 func (m *MockProvider) PatchGlobalPoolMembers(ctx context.Context, glbID, poolID string, opt global.IPatchGlobalPoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request patch global pool member of load balancer %s", domain.RequestIcon, glbID)
+	logger.Infof("Request patch global pool member of load balancer %s", glbID)
 
 	patch := opt.ToRequestBody().(*global.PatchGlobalPoolMembersRequest)
 
@@ -604,7 +604,7 @@ func (m *MockProvider) GetGlobalListener(ctx context.Context, glbID, listenerID 
 
 func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, opt global.ICreateGlobalListenerRequest) (*entityv2.GlobalListener, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create global listener of load balancer %s", domain.RequestIcon, glbID)
+	logger.Infof("Request create global listener of load balancer %s", glbID)
 	listener := opt.ToRequestBody().(*global.CreateGlobalListenerRequest)
 
 	// Reject duplicate port on the same LB (matches real API behavior)
@@ -649,7 +649,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 	}, nil
 
 	// logger := contexts.NewContext(ctx).Log()
-	// logger.Infof("%s Request create listener of load balancer %s", domain.RequestIcon, lbID)
+	// logger.Infof("Request create listener of load balancer %s", lbID)
 	// listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	// newListener := &wrapListener{
 	// 	lbID: lbID,
@@ -718,7 +718,7 @@ func (m *MockProvider) CreateGlobalListener(ctx context.Context, glbID string, o
 
 func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listenerID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete global listener %s of load balancer %s", domain.RequestIcon, listenerID, glbID)
+	logger.Infof("Request delete global listener %s of load balancer %s", listenerID, glbID)
 	isFound := false
 	newListeners := make([]*wrapGlobalListener, 0)
 	for i, l := range m.globalListeners {
@@ -741,7 +741,7 @@ func (m *MockProvider) DeleteGlobalListener(ctx context.Context, glbID, listener
 
 func (m *MockProvider) UpdateGlobalListener(ctx context.Context, glbID, listenerID string, opt global.IUpdateGlobalListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update global listener %s of load balancer %s", domain.RequestIcon, listenerID, glbID)
+	logger.Infof("Request update global listener %s of load balancer %s", listenerID, glbID)
 
 	req := opt.ToRequestBody().(*global.UpdateGlobalListenerRequest)
 

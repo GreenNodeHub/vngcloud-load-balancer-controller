@@ -17,15 +17,6 @@ var (
 	ErrorSuperClientNotInitialized           = fmt.Errorf("super client not initialized, review your config") // when the super client is not initialized
 )
 
-const (
-	RequestIcon = "🌐"
-	WaitIcon    = "⏳"
-	ReadyIcon   = "👍"
-	SuccessIcon = "✅"
-	ErrorIcon   = "❌"
-	DebugIcon   = "🔰"
-)
-
 // if the error is due to load balancer not found
 func IsLoadBalancerNotFound(err error) bool {
 	// if have prefix "Cannot get load balancer with id" then consider as not found

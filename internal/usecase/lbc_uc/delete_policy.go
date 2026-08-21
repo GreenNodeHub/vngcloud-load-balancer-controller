@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"fmt"
 
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
@@ -67,12 +68,10 @@ func (t *defaultModelDeployTask) deployDeleteRedundantPoliciesFrom(ctx context.C
 		}
 
 		if err := t.vngcloudRepo.DeletePolicy(ctx, lbId, listenerId, candidateId); err != nil {
-			t.logger.Error("Failed to delete policy: ", err)
-			return err
+			return fmt.Errorf("delete policy %s of listener %s on LB %s: %w", candidateId, listenerId, lbId, err)
 		}
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return err
+			return fmt.Errorf("wait LB %s active after deleting policy %s: %w", lbId, candidateId, err)
 		}
 	}
 	return nil

@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap/zapcore"
 )
 
 // SetupLogger configures the global logrus logger with the specified log level.
@@ -55,4 +56,26 @@ func SetupLogger(levelStr string) error {
 	}
 
 	return err
+}
+
+// ZapLevel maps a logrus-style level string to the zap level used by the
+// controller-runtime (logr) half of the process, so --log-level drives both
+// logging stacks. Unknown values fall back to info, matching SetupLogger.
+func ZapLevel(levelStr string) zapcore.LevelEnabler {
+	level, err := logrus.ParseLevel(levelStr)
+	if err != nil {
+		return zapcore.InfoLevel
+	}
+	switch level {
+	case logrus.TraceLevel, logrus.DebugLevel:
+		return zapcore.DebugLevel
+	case logrus.InfoLevel:
+		return zapcore.InfoLevel
+	case logrus.WarnLevel:
+		return zapcore.WarnLevel
+	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }

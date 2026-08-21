@@ -47,7 +47,7 @@ func (t *defaultModelDeployTask) deployCert(ctx context.Context, reqCreateCert v
 	// check if certificate already exists
 	for _, cert := range currentCerts.Certificates {
 		if cert.Name == certName {
-			t.logger.Infof("certificate %s already exists with ID %s", cert.Name, cert.UUID)
+			t.logger.Debugf("certificate %s already exists with ID %s", cert.Name, cert.UUID)
 			return &v1alpha1.CreatedCertificate{
 				Id:              cert.UUID,
 				SecretName:      reqCreateCert.SecretName,
@@ -71,9 +71,6 @@ func (t *defaultModelDeployTask) deployCert(ctx context.Context, reqCreateCert v
 	}
 	certificateData := formatString(string(secret.Data[corev1.TLSCertKey]))
 	privateKeyData := formatString(string(secret.Data[corev1.TLSPrivateKeyKey]))
-
-	// t.logger.Debugf(" #################### Certificate data: %q #################### ", certificateData)
-	// t.logger.Debugf(" #################### Private key data: %q #################### ", privateKeyData)
 
 	// create certificate
 	createRequest := loadbalancerv2.CreateCertificateRequest{
@@ -110,7 +107,7 @@ func (t *defaultModelDeployTask) deployDeleteRedundantCerts(ctx context.Context)
 		for _, cert := range certList.Certificates {
 			if cert.UUID == createdCert.Id {
 				if cert.InUse {
-					t.logger.Infof("certificate %s is still in use, skipping deletion", cert.UUID)
+					t.logger.Debugf("certificate %s is still in use, skipping deletion", cert.UUID)
 					break
 				}
 				err = t.vngcloudRepo.DeleteCertificate(ctx, cert.UUID)

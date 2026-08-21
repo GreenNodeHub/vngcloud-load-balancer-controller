@@ -96,14 +96,12 @@ func (m *defaultFinalizerManager) RemoveFinalizers(ctx context.Context, obj clie
 			}
 
 			if !stillHasFinalizers {
-				// log.Info("Finalizers removed successfully", "object", obj.GetName())
 				return nil
 			}
 
 			// Wait for the next tick or timeout
 			select {
 			case <-timeout:
-				// log.Warn("Timeout while waiting for finalizers to be removed", "object", obj.GetName())
 				return errors.New("timeout while waiting for finalizers to be removed")
 			case <-ticker.C:
 				// Next iteration after the ticker interval
