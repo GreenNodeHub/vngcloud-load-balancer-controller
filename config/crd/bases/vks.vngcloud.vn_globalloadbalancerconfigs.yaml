@@ -388,7 +388,10 @@ spec:
                 - id
                 x-kubernetes-list-type: map
               createdPools:
-                description: CreatedPools is the list of created pool IDs
+                description: |-
+                  CreatedPools is the list of created pool IDs
+                  Keyed by id, not name: pool names are only unique within one load balancer, so
+                  migrating to another load balancer would collide on name.
                 items:
                   properties:
                     createdPoolMembers:
@@ -461,7 +464,7 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
-                - name
+                - id
                 x-kubernetes-list-type: map
               createdTags:
                 additionalProperties:

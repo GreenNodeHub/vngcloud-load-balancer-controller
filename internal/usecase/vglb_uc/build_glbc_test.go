@@ -11,16 +11,19 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
 func TestBuildLoadBalancerName(t *testing.T) {
 	tests := []struct {
-		name         string
-		vglbName     string
-		namespace    string
-		annotations  map[string]string
-		expectedName string
-		description  string
+		name        string
+		vglbName    string
+		namespace   string
+		annotations map[string]string
+		// wantAnnotationName is the name the annotation asks for; empty means the default is
+		// expected, which is whatever the name helper generates.
+		wantAnnotationName string
+		description        string
 	}{
 		{
 			name:      "with_custom_name_annotation",
@@ -29,16 +32,15 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			annotations: map[string]string{
 				domain.VGLB_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "custom-glb-name",
 			},
-			expectedName: "custom-glb-name",
-			description:  "should return the custom load balancer name from annotation",
+			wantAnnotationName: "custom-glb-name",
+			description:        "should return the custom load balancer name from annotation",
 		},
 		{
-			name:         "without_annotation_uses_default",
-			vglbName:     "my-vglb",
-			namespace:    "default",
-			annotations:  map[string]string{},
-			expectedName: "vks_default_my_vglb",
-			description:  "should return default name based on namespace and vglb name",
+			name:        "without_annotation_uses_default",
+			vglbName:    "my-vglb",
+			namespace:   "default",
+			annotations: map[string]string{},
+			description: "should return default name based on namespace and vglb name",
 		},
 		{
 			name:      "empty_annotation_uses_default",
@@ -47,16 +49,14 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			annotations: map[string]string{
 				domain.VGLB_ANNOTATION_PREFIX + "/" + annotations.SuffixLoadBalancerName: "",
 			},
-			expectedName: "vks_production_test_vglb",
-			description:  "should return default name when annotation is empty",
+			description: "should return default name when annotation is empty",
 		},
 		{
-			name:         "with_special_characters_in_name",
-			vglbName:     "my-test-vglb-123",
-			namespace:    "my-namespace",
-			annotations:  map[string]string{},
-			expectedName: "vks_my_namespace_my_test_vglb_123",
-			description:  "should handle names with hyphens and numbers",
+			name:        "with_special_characters_in_name",
+			vglbName:    "my-test-vglb-123",
+			namespace:   "my-namespace",
+			annotations: map[string]string{},
+			description: "should handle names with hyphens and numbers",
 		},
 	}
 
@@ -71,15 +71,23 @@ func TestBuildLoadBalancerName(t *testing.T) {
 			}
 
 			annotationParser := annotations.NewSuffixAnnotationParser(domain.VGLB_ANNOTATION_PREFIX)
+			// Built the way VngcloudGlobalLoadBalancerUseCase builds it; without it the
+			// default-name path dereferences a nil helper.
+			nameHelper := utils.NewNameHelper("k8s-10eafaef-56e8-4dfc-878d-dd1c86fcb810", "vglb", tt.namespace, tt.vglbName)
 
 			task := &defaultModelBuildTask{
 				vglb:             vglb,
 				annotationParser: annotationParser,
+				nameHelper:       nameHelper,
 			}
 
 			result := task.buildLoadBalancerName(context.Background())
 
-			assert.Equal(t, tt.expectedName, result, tt.description)
+			want := tt.wantAnnotationName
+			if want == "" {
+				want = nameHelper.GetLoadBalancerDefaultName()
+			}
+			assert.Equal(t, want, result, tt.description)
 		})
 	}
 }

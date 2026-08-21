@@ -425,6 +425,14 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	LoadBalancerId *string `json:"loadBalancerId,omitempty"`
 
+	// CreatedLoadBalancerId is the load balancer this LBC created, as opposed to one it
+	// adopted. It is what lets the controller tell a load balancer of its own making from one
+	// the user brought, which must never be deleted. Recorded here so that the durable record
+	// on the load balancer itself - the created-by-cluster tag - can still be written on a
+	// later reconcile if the first attempt fails.
+	// +optional
+	CreatedLoadBalancerId *string `json:"createdLoadBalancerId,omitempty"`
+
 	// LoadBalancerName is the actual name of the load balancer in VNG Cloud,
 	// observed from the cloud after creation/adoption. May differ from Spec.LoadBalancerName
 	// when an existing load balancer is adopted via the load-balancer-id annotation.
@@ -447,10 +455,12 @@ type LoadBalancerConfigStatus struct {
 	// +optional
 	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
-	// CreatedListeners is the list of created listener IDs
+	// CreatedPools is the list of created pool IDs
+	// Keyed by id, not name: pool names are only unique within one load balancer, so
+	// migrating an Ingress to another load balancer would collide on name.
 	// +optional
 	// +listType=map
-	// +listMapKey=name
+	// +listMapKey=id
 	CreatedPools []CreatedPool `json:"createdPools,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
@@ -487,7 +497,7 @@ type LoadBalancerConfigStatus struct {
 type CreatedPool struct {
 	// Id is the ID of the created pool
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Name is the name of the created pool
 	// +required
@@ -518,7 +528,7 @@ func (a CreatedPool) Equal(b CreatedPool) bool {
 type CreatedListener struct {
 	// Id is the ID of the created listener
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Port is the port number of the created listener
 	// +required
@@ -550,7 +560,7 @@ func (a CreatedListener) Equal(b CreatedListener) bool {
 type CreatedPolicy struct {
 	// Id is the ID of the created policy
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 }
 
 // Equal compares two CreatedPolicy for equality
@@ -569,7 +579,7 @@ type CreatedCertificate struct {
 
 	// Id is the ID of the created certificate
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// CertificateName is the name of the created certificate
 	// +optional

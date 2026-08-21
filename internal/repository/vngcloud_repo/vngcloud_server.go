@@ -21,7 +21,7 @@ func (r *vngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subne
 	subnet, sdkErr := r.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(r.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return subnet, nil
 }
@@ -32,6 +32,10 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 	if instanceID == "" {
 		logger.Error("[ERROR] - GetServerNetworkInfo: serverID is empty")
 		return "", "", "", "", domain.ErrorInvalidInput
+	}
+
+	if cached, ok := m.serverNetworkCache.get(instanceID); ok {
+		return cached.zoneID, cached.networkID, cached.subnetID, cached.subnetCIDR, nil
 	}
 
 	server, sdkErr := m.GetServerByID(ctx, instanceID)
@@ -57,6 +61,15 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 		return "", "", "", "", err
 	}
 
+	// Only successful lookups are remembered: caching a NotFound would keep a node that
+	// is still being created unreachable for the whole TTL.
+	m.serverNetworkCache.put(instanceID, serverNetworkInfo{
+		zoneID:     zoneID,
+		networkID:  networkID,
+		subnetID:   subnetID,
+		subnetCIDR: subnetCIDR,
+	})
+
 	return zoneID, networkID, subnetID, subnetCIDR, nil
 }
 
@@ -67,7 +80,7 @@ func (m *vngCloudRepository) GetServerByID(ctx context.Context, serverID string)
 	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return server, nil
 }
@@ -90,7 +103,7 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
 		logger.Error("[ERROR] - ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
-		return nil, sdkErr.GetError()
+		return nil, domain.SDKError(sdkErr)
 	}
 	return servers, nil
 }

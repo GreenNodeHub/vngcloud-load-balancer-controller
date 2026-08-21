@@ -2,6 +2,8 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -42,6 +44,11 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 	}
 
 	// delete redundant listeners
+	// Same reasoning as deleteRedundantPools: the candidates are independent, so one that will
+	// not go must not stop the others from going. Failures are collected and returned at the
+	// end, which still fails the reconcile and retries it.
+	failures := make([]error, 0)
+
 	for _, candidateId := range deleteCandidates {
 		isExist, listener := isListenerExist(candidateId)
 		if !isExist {
@@ -51,17 +58,23 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 
 		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, listener, newCreatedPools)
 		if err != nil {
-			return err
+			failures = append(failures, fmt.Errorf("listener %s: %w", candidateId, err))
+			continue
 		}
 
 		if !isListenerInUse(candidateId) && canDeleteWhole {
-			if err := t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId); err != nil {
+			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+				return t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId)
+			})
+			if err != nil {
 				t.logger.Error("Failed to delete listener: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("listener %s: delete: %w", candidateId, err))
+				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("listener %s: wait after delete: %w", candidateId, err))
+				continue
 			}
 		} else {
 			// delete redundant policy
@@ -73,11 +86,15 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 				}
 			}
 			if err := t.deployDeleteRedundantPolicies(ctx, lbId, candidateId, newCreatedPolicies); err != nil {
-				return err
+				failures = append(failures, fmt.Errorf("listener %s: policies: %w", candidateId, err))
+				continue
 			}
 		}
 	}
 
+	if len(failures) > 0 {
+		return fmt.Errorf("%w: %w", errPartialDelete, errors.Join(failures...))
+	}
 	return nil
 }
 

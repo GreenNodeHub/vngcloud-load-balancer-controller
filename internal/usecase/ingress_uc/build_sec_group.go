@@ -2,19 +2,20 @@ package ingress_uc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
 	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
-	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
 )
 
@@ -39,7 +40,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 	isHaveDefaultBackend := t.ingress.Spec.DefaultBackend != nil
 	if isHaveDefaultBackend {
 		poolSecgroupRules, err := t.buildPoolSecgroupRule(ctx, t.ingress.Spec.DefaultBackend.Service, targetNodeLabels, subnetCidr)
-		if err != nil {
+		if err != nil && !errors.Is(err, errBackendUnresolvable) {
 			return nil, err
 		}
 		secgroupRules = append(secgroupRules, poolSecgroupRules...)
@@ -48,7 +49,7 @@ func (t *defaultModelBuildTask) buildDefaultSecurityGroupRule(ctx context.Contex
 	for _, rule := range t.ingress.Spec.Rules {
 		for _, path := range rule.HTTP.Paths {
 			poolSecgroupRules, err := t.buildPoolSecgroupRule(ctx, path.Backend.Service, targetNodeLabels, subnetCidr)
-			if err != nil {
+			if err != nil && !errors.Is(err, errBackendUnresolvable) {
 				return nil, err
 			}
 			secgroupRules = append(secgroupRules, poolSecgroupRules...)
@@ -72,6 +73,10 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 	// find service
 	findService, err := t.k8sRepo.GetService(ctx, types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			t.logger.Warnf("service %s/%s not found, skipping its security group rules", t.ingress.GetNamespace(), service.Name)
+			return nil, fmt.Errorf("%w: %s/%s", errBackendUnresolvable, t.ingress.GetNamespace(), service.Name)
+		}
 		t.logger.Errorf("failed to get service %s/%s: %v", t.ingress.GetNamespace(), service.Name, err)
 		return nil, err
 	}
@@ -89,7 +94,10 @@ func (t *defaultModelBuildTask) buildPoolSecgroupRule(ctx context.Context, servi
 		}
 	}
 	if servicePort == nil {
-		return nil, errs.NewNoNeedRequeue("service port not found")
+		t.logger.Warnf("service %s/%s does not expose port %s, skipping its security group rules",
+			t.ingress.GetNamespace(), service.Name, backendPortDescription(service.Port))
+		return nil, fmt.Errorf("%w: %s/%s has no port %s", errBackendUnresolvable,
+			t.ingress.GetNamespace(), service.Name, backendPortDescription(service.Port))
 	}
 
 	// Get members address, nodeIP or podIP

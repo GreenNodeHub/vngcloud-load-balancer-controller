@@ -10,6 +10,7 @@ import (
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/consts"
 )
 
 // newVGLBResource creates a minimal VngcloudGlobalLoadBalancer resource for testing.
@@ -18,6 +19,10 @@ func newVGLBResource(name, namespace string) *v1alpha1.VngcloudGlobalLoadBalance
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			// buildGLBC waits, rather than building anything, until the VGLB says which
+			// cluster owns its config and which fleet it belongs to.
+			Annotations: map[string]string{consts.ConfigClusterIdAnnotation: mockClusterID},
+			Labels:      map[string]string{consts.FleetIDLabel: "fleet-test"},
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "VngcloudGlobalLoadBalancer",

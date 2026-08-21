@@ -37,13 +37,32 @@ import (
 )
 
 const (
-	timeout         = time.Second * 5
+	timeout = time.Second * 5
+
+	// teardownTimeout is what the AfterEach checks get, and it is deliberately larger than
+	// timeout. Deleting a Service unwinds a chain in the cloud - detach the security groups
+	// from every node, delete the listeners, the pools, the load balancer, then the security
+	// group - and the controller works through it by requeueing every 2 seconds
+	// (service_uc.go, "waiting for resources to be deleted"). Five seconds is two attempts,
+	// which is why these checks were the ones that timed out whenever the machine was busy.
+	// Costs nothing when the suite is healthy: Eventually returns as soon as it is satisfied.
+	teardownTimeout = time.Second * 30
 	interval        = time.Millisecond * 250
 	testServiceName = "test-service"
 )
 
 var _ = Describe("Service Controller", func() {
 	AfterEach(func() {
+		// Registered before the assertions so it runs even when one of them fails. Otherwise a
+		// single timeout here skips the cleanup below and leaves its load balancers behind,
+		// which fails every spec that follows - one flake became seven.
+		DeferCleanup(func() {
+			cleanupAllEndpoints()
+			cleanupAllLBCs()
+			cleanupAllNSGs()
+			cleanupAllServices()
+		})
+
 		// Ensure clean state before each test
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
@@ -749,10 +768,10 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				loadbalancerUUID = loadbalancer.UUID
 
-				// Verify initial state: default VKS tag
+				// Verify initial state: default VKS tags + provenance
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(3))
+				g.Expect(tags.Items).Should(HaveLen(4))
 				tagsMap := make(map[string]string)
 				for _, tag := range tags.Items {
 					tagsMap[tag.Key] = tag.Value
@@ -814,13 +833,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (3 default VKS + 2 custom)
+			// Verify tags updated (3 default VKS + provenance + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout*2, interval).Should(Equal(5), "should have 5 tags after update")
+			}, timeout*2, interval).Should(Equal(6), "should have 6 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -853,10 +872,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 5 {
+				if err != nil || tags == nil || len(tags.Items) != 6 {
 					return false
 				}
-				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
+				expectKeys := []string{domain.ClusterTagKey, domain.CreatedByClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false
@@ -980,10 +999,10 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(loadbalancer).ShouldNot(BeNil())
 				loadbalancerUUID = loadbalancer.UUID
 
-				// Verify initial state: default VKS tag
+				// Verify initial state: default VKS tags + provenance
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
-				g.Expect(tags.Items).Should(HaveLen(3))
+				g.Expect(tags.Items).Should(HaveLen(4))
 				tagsMap := make(map[string]string)
 				for _, tag := range tags.Items {
 					tagsMap[tag.Key] = tag.Value
@@ -1044,13 +1063,13 @@ var _ = Describe("Service Controller", func() {
 				return k8sClient.Update(ctx, svc)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify tags updated (3 default VKS + 2 custom)
+			// Verify tags updated (3 default VKS + provenance + 2 custom)
 			tags, err := vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 			Eventually(func() int {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
 				Expect(err).ShouldNot(HaveOccurred())
 				return len(tags.Items)
-			}, timeout*2, interval).Should(Equal(5), "should have 5 tags after update")
+			}, timeout*2, interval).Should(Equal(6), "should have 6 tags after update")
 
 			// Verify default secgroup deleted, only 2 remain
 			Eventually(func() int {
@@ -1083,10 +1102,10 @@ var _ = Describe("Service Controller", func() {
 			// Verify tags updated
 			Eventually(func() bool {
 				tags, err = vngcloudRepo.ListTags(ctx, loadbalancerUUID)
-				if err != nil || tags == nil || len(tags.Items) != 5 {
+				if err != nil || tags == nil || len(tags.Items) != 6 {
 					return false
 				}
-				expectKeys := []string{domain.ClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
+				expectKeys := []string{domain.ClusterTagKey, domain.CreatedByClusterTagKey, "tag2", "tag3", domain.VpcTagKey, domain.BillingTagKey}
 				for _, tag := range tags.Items {
 					if !slices.Contains(expectKeys, tag.Key) {
 						return false

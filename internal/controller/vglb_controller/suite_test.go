@@ -64,7 +64,17 @@ var (
 	k8sClient    client.Client
 	vngcloudRepo *vngcloud_mocks.MockProvider
 
+	// The use case only builds a GLBC when the VGLB names this cluster as its config
+	// cluster, so the suite has to have an identity for newVGLBResource to point at.
+	mockClusterID = "k8s-00000000-0000-0000-0000-000000000000"
+
 	mockConfig = &config.Config{
+		Cluster: struct {
+			IsRunRemote bool   `mapstructure:"isRunRemote"`
+			Namespace   string `mapstructure:"namespace"`
+			ClusterID   string `mapstructure:"clusterID"`
+			Region      string `mapstructure:"region"`
+		}{ClusterID: mockClusterID},
 		GlobalLoadBalancerOpts: config.GlobalLoadBalancerOpts{
 			DefaultL4PackageName:      "glb-small",
 			DefaultPoolAlgorithm:      "ROUND_ROBIN",
@@ -209,6 +219,13 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
+
+	// Start() only kicks the manager off, so without this the first specs can run while the
+	// informers are still starting: a reconcile that lists nodes then gets an empty result or
+	// "failed waiting for *v1.Node Informer to sync", and the spec times out waiting for a
+	// load balancer nobody was ever going to build. That is what the flakiness in these
+	// suites looks like - always the earliest specs, and worse the slower the machine.
+	Expect(k8sManager.GetCache().WaitForCacheSync(ctx)).To(BeTrue(), "informer caches never synced")
 })
 
 var _ = AfterSuite(func() {

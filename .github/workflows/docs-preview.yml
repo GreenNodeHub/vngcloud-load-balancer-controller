@@ -1,0 +1,61 @@
+name: Deploy Documentation Preview
+
+# Per-PR docs preview. Each PR is built and published to gh-pages under
+# pr-preview/pr-<N>/ and a link is posted as a PR comment; the preview is
+# removed automatically when the PR is closed.
+#
+# Coexists with mike: mike only manages the version folders + versions.json,
+# pr-preview-action only manages the pr-preview/ umbrella, so they don't clash.
+#
+# Note: uses the `pull_request` event, so previews only deploy for PRs from
+# branches in this repo. Fork PRs get a read-only token and will skip the deploy.
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'Pipfile'
+      - '.github/workflows/docs-preview.yml'
+
+concurrency: docs-preview-${{ github.event.pull_request.number }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    # pr-preview-action still pins Node 20 nested actions (JamesIves/github-pages-deploy-action,
+    # marocchino/sticky-pull-request-comment). Opt them into Node 24 now to silence the deprecation
+    # warning; becomes a no-op once Node 24 is the runner default.
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        if: github.event.action != 'closed'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: github.event.action != 'closed'
+        run: pip install pipenv && pipenv install
+
+      - name: Build docs
+        if: github.event.action != 'closed'
+        run: pipenv run mkdocs build --site-dir site
+
+      - name: Deploy preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: site
+          umbrella-dir: pr-preview

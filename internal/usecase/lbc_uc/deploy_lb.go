@@ -166,6 +166,14 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 		}
 	}
 
+	// We made it, so it is ours to delete later - both branches above are creations, this
+	// function is only reached when no existing load balancer was found. Recorded before
+	// anything else can fail: a load balancer we created but do not recognise would be left
+	// behind for good.
+	if err := t.statusSetCreatedLoadBalancerId(ctx, lbEntity.UUID); err != nil {
+		return "", err
+	}
+
 	if err := t.statusAddLoadBalancerId(ctx, &lbEntity.UUID, &lbEntity.Address); err != nil {
 		return "", err
 	}
@@ -195,9 +203,53 @@ func (t *defaultModelDeployTask) createLoadBalancer(ctx context.Context, created
 
 // when update load balancer id to new value
 func (t *defaultModelDeployTask) migrateLoadBalancer(ctx context.Context, oldId, newId string) (string, error) {
-	// currently not do anything to old lb
 	t.logger.Infof("Migrate load balancer from %s to %s...", oldId, newId)
+
+	// Reclaim the old load balancer before touching the new one: status.createdListeners
+	// and status.createdPools are the only record of what we put there, and
+	// ensureExistLoadBalancer below overwrites them.
+	if err := t.teardownOnLoadBalancer(ctx, oldId); err != nil {
+		return "", err
+	}
+
 	return t.ensureExistLoadBalancer(ctx, newId, nil)
+}
+
+// teardownOnLoadBalancer removes the listeners, policies and pools this
+// LoadBalancerConfig created on lbId, then forgets them in status.
+//
+// Unlike deleteLoadBalancer it never deletes lbId itself. A load balancer reached
+// through spec.loadBalancerId belongs to the user and may still serve other
+// LoadBalancerConfigs, so removing it would take down unrelated traffic.
+func (t *defaultModelDeployTask) teardownOnLoadBalancer(ctx context.Context, lbId string) error {
+	if _, err := t.vngcloudRepo.GetLoadBalancerByID(ctx, lbId); err != nil {
+		if domain.IsLoadBalancerNotFound(err) {
+			return nil // already gone, nothing left to reclaim
+		}
+		return err
+	}
+
+	// Listeners first: deleteRedundantPools keeps any pool a policy still points at.
+	if err := t.deleteRedundantListeners(ctx, lbId, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}); err != nil {
+		return err
+	}
+	if err := t.deleteRedundantPools(ctx, lbId, []v1alpha1.CreatedPool{}); err != nil {
+		return err
+	}
+
+	// Stop claiming to use it. Nothing will ever come back to this load balancer - status now
+	// points at the new one - so a cluster id left in vng.vks.cluster.ids here stays for good,
+	// and the load balancer goes on looking like this cluster's. deleteRedundantTags keeps the
+	// id if a sibling LBC still uses the load balancer, and leaves the vpc, billing and
+	// provenance tags alone.
+	//
+	// Must run before the status is cleared: it reads status.createdTags to know which tags
+	// are this cluster's to drop.
+	if err := t.deleteRedundantTags(ctx, lbId); err != nil {
+		return err
+	}
+
+	return t.statusClearCreatedResources(ctx)
 }
 
 // ensure tag, package, ...

@@ -248,10 +248,24 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 	mergedPoolMembers := make([]v1alpha1.GlobalMember, 0)
 
 	// keep current member if it is in spec or not created by us
+	foreign := make([]string, 0)
 	for _, member := range currentMembers {
-		if checkIfPoolMemberExistByAddress(poolMemberSpec, &member) || !checkIfPoolMemberExistByAddress(createdMembers, &member) {
+		inSpec := checkIfPoolMemberExistByAddress(poolMemberSpec, &member)
+		ours := checkIfPoolMemberExistByAddress(createdMembers, &member)
+		if inSpec || !ours {
 			mergedPoolMembers = append(mergedPoolMembers, member)
 		}
+		if !inSpec && !ours {
+			foreign = append(foreign, fmt.Sprintf("%s:%d", member.Address, member.Port))
+		}
+	}
+
+	// Deliberate, and the same reasoning as in lbc_uc: a member this cluster did not create is
+	// somebody else's. But such members are never cleaned up either, so at least name them.
+	if len(foreign) > 0 {
+		t.logger.Infof("Keeping %d global pool member(s) not created by this cluster and not in spec: %s. "+
+			"They are left alone on purpose; if they are stale, remove them from the portal.",
+			len(foreign), strings.Join(foreign, ", "))
 	}
 
 	// add new members from spec that aren't already in merged (by address+port identity)
