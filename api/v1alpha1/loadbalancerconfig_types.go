@@ -497,7 +497,7 @@ type LoadBalancerConfigStatus struct {
 type CreatedPool struct {
 	// Id is the ID of the created pool
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Name is the name of the created pool
 	// +required
@@ -528,7 +528,7 @@ func (a CreatedPool) Equal(b CreatedPool) bool {
 type CreatedListener struct {
 	// Id is the ID of the created listener
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Port is the port number of the created listener
 	// +required
@@ -560,7 +560,7 @@ func (a CreatedListener) Equal(b CreatedListener) bool {
 type CreatedPolicy struct {
 	// Id is the ID of the created policy
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 }
 
 // Equal compares two CreatedPolicy for equality
@@ -579,7 +579,7 @@ type CreatedCertificate struct {
 
 	// Id is the ID of the created certificate
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// CertificateName is the name of the created certificate
 	// +optional

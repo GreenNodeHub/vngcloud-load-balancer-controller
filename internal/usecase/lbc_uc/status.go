@@ -5,12 +5,22 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/pkg/errors"
 	"k8s.io/utils/ptr"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
 func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int) error {
+	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
+	// find it, update it or delete it. Recording it with an empty id is worse than failing
+	// here, because id is the key of a map-list - the API server rejects the whole status
+	// patch, every reconcile, and the LBC never moves again. deployLoadBalancer already
+	// guards the load balancer's own id this way.
+	if listenerId == "" {
+		return errors.New("listener has no id after create, need to retry")
+	}
+
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, l := range obj.Status.CreatedListeners {
@@ -30,6 +40,15 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 }
 
 func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId string, port int, policyId string) error {
+	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
+	// find it, update it or delete it. Recording it with an empty id is worse than failing
+	// here, because id is the key of a map-list - the API server rejects the whole status
+	// patch, every reconcile, and the LBC never moves again. deployLoadBalancer already
+	// guards the load balancer's own id this way.
+	if policyId == "" {
+		return errors.New("policy has no id after create, need to retry")
+	}
+
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, l := range obj.Status.CreatedListeners {
@@ -59,6 +78,15 @@ func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId
 }
 
 func (t *defaultModelDeployTask) statusAddPool(ctx context.Context, poolId string, name string) error {
+	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
+	// find it, update it or delete it. Recording it with an empty id is worse than failing
+	// here, because id is the key of a map-list - the API server rejects the whole status
+	// patch, every reconcile, and the LBC never moves again. deployLoadBalancer already
+	// guards the load balancer's own id this way.
+	if poolId == "" {
+		return errors.New("pool has no id after create, need to retry")
+	}
+
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		// check on fresh copy if already exists with same values
 		for _, p := range obj.Status.CreatedPools {
