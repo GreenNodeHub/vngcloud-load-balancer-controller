@@ -19,6 +19,13 @@ import (
 // from a fresh read: removing this cluster's id from a stale list would resurrect an id
 // another cluster had just removed, or drop one it had just added.
 func (t *defaultModelDeployTask) deleteRedundantTags(ctx context.Context, lbId string) error {
+	return t.deleteRedundantTagsFrom(ctx, lbId, t.lbConfig.Status.CreatedTags)
+}
+
+// deleteRedundantTagsFrom is deleteRedundantTags with the created-tag record made explicit,
+// so a migration can release the retiring load balancer's tags from its snapshot after the
+// live status has moved on to the new load balancer.
+func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lbId string, recordedTags map[string]string) error {
 	// The cluster id belongs to the cluster, not to this LBC: sibling LBCs may still point at
 	// the same load balancer, and this path is reached precisely when the load balancer still
 	// has resources on it - possibly another LBC's. So the id may only come off once nothing
@@ -47,8 +54,8 @@ func (t *defaultModelDeployTask) deleteRedundantTags(ctx context.Context, lbId s
 	err := t.ensureTags(ctx, lbId, func(currentTags map[string]string) (map[string]string, map[string]string) {
 		ensuredTags := make(map[string]string)
 
-		createdTags := make(map[string]string, len(t.lbConfig.Status.CreatedTags))
-		for k, v := range t.lbConfig.Status.CreatedTags {
+		createdTags := make(map[string]string, len(recordedTags))
+		for k, v := range recordedTags {
 			createdTags[k] = v
 		}
 

@@ -417,6 +417,7 @@ func TestCanDeleteWholeListener(t *testing.T) {
 			canDelete, err := task.canDeleteWholeListener(
 				context.Background(),
 				"lb-123",
+				tt.createdListeners,
 				tt.listener,
 				tt.newCreatedPools,
 			)

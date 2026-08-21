@@ -14,9 +14,15 @@ import (
 // delete redundant listeners
 // newCreatedListeners is the listeners that are still in use
 func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, lbId string, newCreatedListeners []v1alpha1.CreatedListener, newCreatedPools []v1alpha1.CreatedPool) error {
+	return t.deleteRedundantListenersFrom(ctx, lbId, t.lbConfig.Status.CreatedListeners, newCreatedListeners, newCreatedPools)
+}
+
+// deleteRedundantListenersFrom is deleteRedundantListeners with the candidate set made
+// explicit; see deleteRedundantPoolsFrom for why.
+func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Context, lbId string, createdListeners []v1alpha1.CreatedListener, newCreatedListeners []v1alpha1.CreatedListener, newCreatedPools []v1alpha1.CreatedPool) error {
 	// delete candidates include all created listeners
 	deleteCandidates := make([]string, 0)
-	for _, listener := range t.lbConfig.Status.CreatedListeners {
+	for _, listener := range createdListeners {
 		deleteCandidates = append(deleteCandidates, listener.Id)
 	}
 
@@ -56,7 +62,7 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 			continue
 		}
 
-		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, listener, newCreatedPools)
+		canDeleteWhole, err := t.canDeleteWholeListener(ctx, lbId, createdListeners, listener, newCreatedPools)
 		if err != nil {
 			failures = append(failures, fmt.Errorf("listener %s: %w", candidateId, err))
 			continue
@@ -85,7 +91,7 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 					break
 				}
 			}
-			if err := t.deployDeleteRedundantPolicies(ctx, lbId, candidateId, newCreatedPolicies); err != nil {
+			if err := t.deployDeleteRedundantPoliciesFrom(ctx, lbId, createdListeners, candidateId, newCreatedPolicies); err != nil {
 				failures = append(failures, fmt.Errorf("listener %s: policies: %w", candidateId, err))
 				continue
 			}
@@ -102,7 +108,7 @@ func (t *defaultModelDeployTask) deleteRedundantListeners(ctx context.Context, l
 // conditions:
 // - all current policies must exist in old policies
 // - if default pool exists, can delete whole pool (case 2 ingress use same listener and default pool (merge their member), when delete one ingress, we should NOT delete whole listener)
-func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbId string, listener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool) (bool, error) {
+func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbId string, createdListeners []v1alpha1.CreatedListener, listener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool) (bool, error) {
 	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
 		t.logger.Debugf("Can delete whole listener %s, because it is layer4 listener.", listener.UUID)
 		return true, nil
@@ -115,7 +121,7 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 	}
 
 	createdPolicies := []v1alpha1.CreatedPolicy{}
-	for _, l := range t.lbConfig.Status.CreatedListeners {
+	for _, l := range createdListeners {
 		if l.Id == listener.UUID {
 			createdPolicies = l.CreatedPolicies
 			break

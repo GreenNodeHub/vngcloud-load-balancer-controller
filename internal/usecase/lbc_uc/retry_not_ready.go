@@ -31,6 +31,11 @@ func (t *defaultModelDeployTask) retryOnLoadBalancerNotReady(ctx context.Context
 			return err
 		}
 
+		if attempt == maxLoadBalancerBusyRetries {
+			// Out of attempts - waiting again would burn a full poll cycle only to return
+			// the error we already hold.
+			return err
+		}
 		t.logger.Warnf("load balancer %s was busy, waiting for it to settle and retrying (%d/%d)",
 			lbId, attempt, maxLoadBalancerBusyRetries)
 		if _, waitErr := t.vngcloudRepo.WaitForLBActive(ctx, lbId); waitErr != nil {

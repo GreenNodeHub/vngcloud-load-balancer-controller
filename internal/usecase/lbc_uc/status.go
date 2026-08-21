@@ -159,6 +159,45 @@ func (t *defaultModelDeployTask) statusSetCreatedLoadBalancerId(ctx context.Cont
 	return nil
 }
 
+// statusSetAdoptedLoadBalancerId records that this LBC adopted the load balancer - reached
+// through an annotation, not created by the controller - which is what makes it never this
+// cluster's to delete, even if the pin annotation is later removed. See createdByThisCluster.
+func (t *defaultModelDeployTask) statusSetAdoptedLoadBalancerId(ctx context.Context, lbId string) error {
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		if obj.Status.AdoptedLoadBalancerId != nil && *obj.Status.AdoptedLoadBalancerId == lbId {
+			return false // no change needed
+		}
+		obj.Status.AdoptedLoadBalancerId = &lbId
+		return true
+	})
+	if err != nil {
+		return err
+	}
+	// The patch helper mutates a fresh copy, never the object it was given, so keep the
+	// in-memory copy honest for the rest of this reconcile.
+	t.lbConfig.Status.AdoptedLoadBalancerId = &lbId
+	return nil
+}
+
+// statusSetRetiringLoadBalancer parks the record of the load balancer being migrated away
+// from - its id and everything this LBC created on it - so the old load balancer can keep
+// serving until the new one is fully deployed, and still be torn down afterwards even
+// across a controller restart. Passing nil clears the field once the teardown is done.
+func (t *defaultModelDeployTask) statusSetRetiringLoadBalancer(ctx context.Context, retiring *v1alpha1.RetiringLoadBalancer) error {
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		if obj.Status.RetiringLoadBalancer == nil && retiring == nil {
+			return false // no change needed
+		}
+		obj.Status.RetiringLoadBalancer = retiring
+		return true
+	})
+	if err != nil {
+		return err
+	}
+	t.lbConfig.Status.RetiringLoadBalancer = retiring
+	return nil
+}
+
 func (t *defaultModelDeployTask) statusAddCreatedTags(ctx context.Context, tags map[string]string) error {
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		// check on fresh copy if already equal
@@ -217,7 +256,7 @@ func createdCertificatesEqual(a, b []v1alpha1.CreatedCertificate) bool {
 // when the config moves to another load balancer: entries left behind describe
 // resources on the old one, and their names would collide with the new one's.
 func (t *defaultModelDeployTask) statusClearCreatedResources(ctx context.Context) error {
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		if len(obj.Status.CreatedListeners) == 0 && len(obj.Status.CreatedPools) == 0 &&
 			len(obj.Status.CreatedTags) == 0 {
 			return false // no change needed
@@ -230,4 +269,16 @@ func (t *defaultModelDeployTask) statusClearCreatedResources(ctx context.Context
 		obj.Status.CreatedTags = nil
 		return true
 	})
+	if err != nil {
+		return err
+	}
+	// The patch helper mutates a fresh copy, never the object it was given. A migration
+	// continues in this same reconcile into deployTags on the NEW load balancer, and a stale
+	// in-memory createdTags there would be treated as this cluster's keys to drop - deleting
+	// tags on the new load balancer that were never ours, including another cluster's
+	// provenance tag.
+	t.lbConfig.Status.CreatedListeners = nil
+	t.lbConfig.Status.CreatedPools = nil
+	t.lbConfig.Status.CreatedTags = nil
+	return nil
 }

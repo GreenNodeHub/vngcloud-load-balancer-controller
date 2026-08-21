@@ -19,8 +19,15 @@ var errPartialDelete = errors.New("some pools could not be cleaned up")
 // delete pools created not in use anymore
 // should check if pool is used by other listeners or policies (user use) then ignore
 func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId string, newCreatedPools []v1alpha1.CreatedPool) error {
+	return t.deleteRedundantPoolsFrom(ctx, lbId, t.lbConfig.Status.CreatedPools, newCreatedPools)
+}
+
+// deleteRedundantPoolsFrom is deleteRedundantPools with the candidate set made explicit,
+// so a migration can clean up the retiring load balancer from its status snapshot after
+// the live created* lists have moved on to the new one.
+func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, lbId string, createdPools []v1alpha1.CreatedPool, newCreatedPools []v1alpha1.CreatedPool) error {
 	deleteCandidates := make([]string, 0)
-	for _, pool := range t.lbConfig.Status.CreatedPools {
+	for _, pool := range createdPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
 	}
 
@@ -83,7 +90,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		}
 
 		createdMembers := []v1alpha1.PoolMember{}
-		for _, m := range t.lbConfig.Status.CreatedPools {
+		for _, m := range createdPools {
 			if m.Id == candidateId && len(m.CreatedMembers) > 0 {
 				createdMembers = m.CreatedMembers
 				break
@@ -101,7 +108,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, candidateId)
 		if err != nil {
 			t.logger.Errorf("Failed to get pool members for pool %s: %v", candidateId, err)
-			failures = append(failures, fmt.Errorf("pool %s: get members: %s", candidateId, err.Error()))
+			failures = append(failures, fmt.Errorf("pool %s: get members: %w", candidateId, err))
 			continue
 		}
 
@@ -114,12 +121,12 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 			})
 			if err != nil {
 				t.logger.Error("Failed to delete pool: ", err)
-				failures = append(failures, fmt.Errorf("pool %s: delete: %s", candidateId, err.Error()))
+				failures = append(failures, fmt.Errorf("pool %s: delete: %w", candidateId, err))
 				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				failures = append(failures, fmt.Errorf("pool %s: wait after delete: %s", candidateId, err.Error()))
+				failures = append(failures, fmt.Errorf("pool %s: wait after delete: %w", candidateId, err))
 				continue
 			}
 		} else if updateMemberOption != nil {
@@ -130,12 +137,12 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 			})
 			if err != nil {
 				t.logger.Error("Failed to update pool members: ", err)
-				failures = append(failures, fmt.Errorf("pool %s: update members: %s", candidateId, err.Error()))
+				failures = append(failures, fmt.Errorf("pool %s: update members: %w", candidateId, err))
 				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				failures = append(failures, fmt.Errorf("pool %s: wait after update: %s", candidateId, err.Error()))
+				failures = append(failures, fmt.Errorf("pool %s: wait after update: %w", candidateId, err))
 				continue
 			}
 		}

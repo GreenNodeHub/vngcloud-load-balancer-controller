@@ -11,6 +11,18 @@ import (
 )
 
 func (t *defaultModelDeployTask) delete(ctx context.Context) error {
+	// An LBC deleted mid-migration still owes the retiring load balancer its teardown -
+	// without this, deleting the LBC quickly after re-pinning leaks everything the LBC
+	// created on the old load balancer.
+	if retiring := t.lbConfig.Status.RetiringLoadBalancer; retiring != nil {
+		if err := t.teardownRetiringLoadBalancer(ctx, retiring); err != nil {
+			return err
+		}
+		if err := t.statusSetRetiringLoadBalancer(ctx, nil); err != nil {
+			return err
+		}
+	}
+
 	// if status.lbId is empty, skip
 	if t.lbConfig.Status.LoadBalancerId == nil || *t.lbConfig.Status.LoadBalancerId == "" {
 		t.logger.Infof("LBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
@@ -41,10 +53,7 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 	if err != nil {
 		return err
 	}
-	currentTags := make(map[string]string, len(tags.Items))
-	for _, tag := range tags.Items {
-		currentTags[tag.Key] = tag.Value
-	}
+	currentTags := tagsToMap(tags)
 	ours := t.createdByThisCluster(lbId, currentTags)
 	if !ours {
 		t.logger.Infof("Load balancer %s was not created by this cluster, it will be left in place for LBC %s/%s",

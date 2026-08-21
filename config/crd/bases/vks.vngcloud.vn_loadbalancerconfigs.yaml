@@ -442,6 +442,15 @@ spec:
                 description: Address is the DNS name or IP address assigned to the
                   load balancer
                 type: string
+              adoptedLoadBalancerId:
+                description: |-
+                  AdoptedLoadBalancerId is the load balancer this LBC adopted - reached through the
+                  load-balancer-id or load-balancer-name annotation rather than created by the
+                  controller. It is the negative counterpart of CreatedLoadBalancerId: an adopted load
+                  balancer is never this cluster's to delete, even if the pin annotation is later
+                  removed. Nil on objects from before this field existed, which deliberately leaves
+                  their delete behavior unchanged.
+                type: string
               conditions:
                 description: |-
                   Conditions represent the current state of the LoadBalancerConfig resource.
@@ -662,6 +671,107 @@ spec:
                   recently observed spec
                 format: int64
                 type: integer
+              retiringLoadBalancer:
+                description: |-
+                  RetiringLoadBalancer is the load balancer this LBC is migrating away from, along
+                  with the record of what this LBC created on it. Written when spec.loadBalancerId is
+                  repointed; the old load balancer keeps serving until the new one is fully deployed,
+                  and only then is it torn down from this snapshot and the field cleared. Kept in
+                  status so the teardown survives controller restarts.
+                properties:
+                  createdListeners:
+                    description: CreatedListeners this LBC created on the retiring
+                      load balancer
+                    items:
+                      properties:
+                        createdPolicies:
+                          description: CreatedPolicies is the list of created policy
+                            IDs
+                          items:
+                            properties:
+                              id:
+                                description: Id is the ID of the created policy
+                                type: string
+                            required:
+                            - id
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - id
+                          x-kubernetes-list-type: map
+                        id:
+                          description: Id is the ID of the created listener
+                          type: string
+                        port:
+                          description: Port is the port number of the created listener
+                          type: integer
+                      required:
+                      - id
+                      - port
+                      type: object
+                    type: array
+                  createdPools:
+                    description: CreatedPools this LBC created on the retiring load
+                      balancer
+                    items:
+                      properties:
+                        createdMembers:
+                          description: CreatedMembers is the list of created member
+                            IDs
+                          items:
+                            description: PoolMember defines a member of a load balancer
+                              pool
+                            properties:
+                              backup:
+                                description: Backup indicates if the member is a backup
+                                  member
+                                type: boolean
+                              ip:
+                                description: IP is the IP address of the pool member
+                                type: string
+                              monitorPort:
+                                description: MonitorPort is the monitor port of the
+                                  pool member
+                                type: integer
+                              name:
+                                description: Name is an optional name for the pool
+                                  member
+                                type: string
+                              port:
+                                description: Port is the port number of the pool member
+                                type: integer
+                              weight:
+                                description: Weight is the weight of the pool member
+                                type: integer
+                            required:
+                            - ip
+                            - monitorPort
+                            - port
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        id:
+                          description: Id is the ID of the created pool
+                          type: string
+                        name:
+                          description: Name is the name of the created pool
+                          type: string
+                      required:
+                      - id
+                      - name
+                      type: object
+                    type: array
+                  createdTags:
+                    additionalProperties:
+                      type: string
+                    description: CreatedTags this LBC wrote on the retiring load balancer
+                    type: object
+                  id:
+                    description: Id is the load balancer being migrated away from
+                    type: string
+                required:
+                - id
+                type: object
               subnetId:
                 description: SubnetId is the actual subnet of the load balancer in
                   VNG Cloud, observed from the cloud.
