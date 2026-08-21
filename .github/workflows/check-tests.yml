@@ -1,0 +1,59 @@
+# go test ./... — the gate that was missing.
+#
+# Nothing ran tests before this: lint and govulncheck are opt-in behind a "[build]" commit
+# message, and no workflow ran the suite at all. A pull request that broke an envtest, or one
+# that merged half a change, had nothing to stop it - and both happened.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: unit + envtest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install envtest binaries
+        run: |
+          make envtest
+          # KUBEBUILDER_ASSETS must be absolute: each package's tests run from its own
+          # directory, and a relative path leaves every suite dying in BeforeSuite.
+          echo "KUBEBUILDER_ASSETS=$(./bin/setup-envtest use 1.31.0 --bin-dir "$(pwd)/bin" -p path)" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: |
+          # One package per invocation, on purpose. Controller suites each start their own
+          # API server, and running two of them in a single "go test" flakes on
+          # "failed waiting for *v1.Node Informer to sync". Isolation also means the log says
+          # which package failed instead of one wall of output.
+          failed=()
+          while read -r pkg; do
+            echo "::group::$pkg"
+            if go test -count=1 "$pkg"; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::$pkg failed"
+              failed+=("$pkg")
+            fi
+          done < <(go list ./... | grep -v /test/e2e)
+
+          if [ ${#failed[@]} -ne 0 ]; then
+            printf 'failed packages:\n'
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi
