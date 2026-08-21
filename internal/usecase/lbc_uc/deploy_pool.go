@@ -389,10 +389,26 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 	mergedPoolMembers := make([]v1alpha1.PoolMember, 0)
 
 	// keep current member if it is in spec or not created by us
+	foreign := make([]string, 0)
 	for _, member := range currentMembers {
-		if t.checkIfPoolMemberExist(poolMemberSpec, &member) || !t.checkIfPoolMemberExist(createdMembers, &member) {
+		inSpec := t.checkIfPoolMemberExist(poolMemberSpec, &member)
+		ours := t.checkIfPoolMemberExist(createdMembers, &member)
+		if inSpec || !ours {
 			mergedPoolMembers = append(mergedPoolMembers, member)
 		}
+		if !inSpec && !ours {
+			foreign = append(foreign, fmt.Sprintf("%s:%d", member.IP, member.Port))
+		}
+	}
+
+	// Deliberate: a member this cluster did not create is somebody else's, and removing it
+	// would take traffic away from whoever added it. But it also means such members are never
+	// cleaned up, and finding them has so far meant comparing the portal against the node list
+	// by hand - which is how 19 stale members on one pool went unnoticed. Say so instead.
+	if len(foreign) > 0 {
+		t.logger.Infof("Keeping %d pool member(s) not created by this cluster and not in spec: %s. "+
+			"They are left alone on purpose; if they are stale, remove them from the portal.",
+			len(foreign), strings.Join(foreign, ", "))
 	}
 
 	// add new members from spec
