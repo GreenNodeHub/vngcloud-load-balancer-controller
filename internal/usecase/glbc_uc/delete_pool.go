@@ -2,6 +2,7 @@ package glbc_uc
 
 import (
 	"context"
+	"fmt"
 
 	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 
@@ -18,8 +19,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 
 	currentPools, err := t.vngcloudRepo.ListGlobalPools(ctx, lbId)
 	if err != nil {
-		t.logger.Error("Failed to list pools of load balancer: ", err)
-		return err
+		return fmt.Errorf("list pools of LB %s: %w", lbId, err)
 	}
 	isPoolExist := func(poolId string) bool {
 		for _, p := range currentPools.Items {
@@ -34,8 +34,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 	mapPoolInUse := make(map[string]bool)
 	currentListeners, err := t.vngcloudRepo.ListGlobalListeners(ctx, lbId)
 	if err != nil {
-		t.logger.Error("Failed to list listeners of load balancer: ", err)
-		return err
+		return fmt.Errorf("list listeners of LB %s: %w", lbId, err)
 	}
 	for _, listener := range currentListeners.Items {
 		mapPoolInUse[listener.GlobalPoolID] = true
@@ -50,7 +49,7 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 
 	for _, candidateId := range deleteCandidates {
 		if !isPoolExist(candidateId) {
-			t.logger.Warnf("Pool %s not found in load balancer %s, skip delete", candidateId, lbId)
+			t.logger.Debugf("Pool %s not found in load balancer %s, skip delete", candidateId, lbId)
 			continue
 		}
 
@@ -79,23 +78,19 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 			// delete pool
 			err := t.vngcloudRepo.DeleteGlobalPool(ctx, lbId, candidateId)
 			if err != nil {
-				t.logger.Error("Failed to delete pool: ", err)
-				return err
+				return fmt.Errorf("delete pool %s on LB %s: %w", candidateId, lbId, err)
 			}
 			if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				return fmt.Errorf("wait LB %s active after deleting pool %s: %w", lbId, candidateId, err)
 			}
 		} else if updateMemberOption != nil {
 			// update to delete redundant pool members
-			t.logger.Debugf("Update pool %s to remove redundant pool members", candidateId)
+			t.logger.Infof("Updating pool %s on LB %s to remove redundant pool members", candidateId, lbId)
 			if err = t.vngcloudRepo.PatchGlobalPoolMembers(ctx, lbId, candidateId, updateMemberOption); err != nil {
-				t.logger.Error("Failed to patch pool members: ", err)
-				return err
+				return fmt.Errorf("patch members of pool %s on LB %s: %w", candidateId, lbId, err)
 			}
 			if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
-				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				return fmt.Errorf("wait LB %s active after patching members of pool %s: %w", lbId, candidateId, err)
 			}
 		}
 	}
@@ -109,8 +104,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 	// ensure pool members
 	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 	if err != nil {
-		t.logger.Error("Failed to list pool members: ", err)
-		return false, nil, err
+		return false, nil, fmt.Errorf("list members of pool %s on LB %s: %w", poolId, lbId, err)
 	}
 
 	// Extract created pool member names
@@ -135,7 +129,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 	}
 
 	if len(poolMembersToKeep) == 0 {
-		t.logger.Infof("Can delete whole pool %s, all pool members are created by us and not in new created members", poolId)
+		t.logger.Debugf("Can delete whole pool %s, all pool members are created by us and not in new created members", poolId)
 		return true, nil, nil
 	}
 
@@ -146,7 +140,7 @@ func (t *defaultModelDeployTask) canDeleteWholePool(ctx context.Context, lbId, p
 		for _, pm := range currentPoolMembers.Items {
 			// Delete pool members that were created by us and are not in new spec
 			if createdPoolMemberNames[pm.Name] && !newCreatedPoolMemberNames[pm.Name] {
-				t.logger.Debugf("Will delete pool member %s from pool %s", pm.Name, poolId)
+				t.logger.Infof("Will delete pool member %s from pool %s", pm.Name, poolId)
 				bulkRequests = append(bulkRequests, global.NewPatchGlobalPoolDeleteBulkActionRequest(pm.ID))
 			}
 		}

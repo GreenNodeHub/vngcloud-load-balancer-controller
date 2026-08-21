@@ -43,7 +43,7 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	var defaultPool *v1alpha1.Pool
 	var err error
 	if isHaveDefaultBackend {
-		t.logger.Debugf("ingress %s/%s has default backend, building default pool.", t.ingress.Namespace, t.ingress.Name)
+		t.logger.Debug("ingress has default backend, building default pool")
 		defaultPool, err = t.buildPool(ctx, t.ingress.Spec.DefaultBackend.Service, targetNodeLabels)
 		switch {
 		case errors.Is(err, errBackendUnresolvable):
@@ -196,8 +196,7 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, service *networki
 			t.logger.Warnf("service %s/%s not found, skipping this backend", t.ingress.GetNamespace(), service.Name)
 			return nil, fmt.Errorf("%w: %s/%s", errBackendUnresolvable, t.ingress.GetNamespace(), service.Name)
 		}
-		t.logger.Errorf("failed to get service %s/%s: %v", t.ingress.GetNamespace(), service.Name, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 	}
 
 	// find service port
@@ -232,15 +231,13 @@ func (t *defaultModelBuildTask) buildPool(ctx context.Context, service *networki
 		membersAddr, err = t.endpointResolver.ResolveNodePortEndpoints(ctx,
 			types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name}, serviceBackendToIntOrString(service.Port), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve node port endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve node port endpoints for service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 		}
 	} else {
 		membersAddr, err = t.endpointResolver.ResolvePodEndpoints(ctx,
 			types.NamespacedName{Namespace: t.ingress.GetNamespace(), Name: service.Name}, serviceBackendToIntOrString(service.Port), resolveOpts...)
 		if err != nil {
-			t.logger.Errorf("failed to resolve pod endpoints: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to resolve pod endpoints for service %s/%s: %w", t.ingress.GetNamespace(), service.Name, err)
 		}
 	}
 
@@ -323,12 +320,12 @@ func (t *defaultModelBuildTask) buildHealthcheckPort(_ context.Context) *int {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckPort)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckPort, err)
 		return nil
 	}
 	if optionsInt64 <= 0 || optionsInt64 > 65535 {
-		t.logger.Warnf("Invalid annotation \"%s\" value %d, must be in range 1-65535.",
+		t.logger.Debugf("Invalid annotation \"%s\" value %d, must be in range 1-65535.",
 			annotations.SuffixHealthcheckPort, optionsInt64)
 		return nil
 	}
@@ -348,8 +345,9 @@ func (t *defaultModelBuildTask) buildPoolAlgorithm(_ context.Context) *loadbalan
 		string(loadbalancerv2.PoolAlgorithmSourceIP):
 		return ptr.To(loadbalancerv2.PoolAlgorithm(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixPoolAlgorithm,
+			option,
 			loadbalancerv2.PoolAlgorithmLeastConn,
 			loadbalancerv2.PoolAlgorithmRoundRobin,
 			loadbalancerv2.PoolAlgorithmSourceIP)
@@ -364,8 +362,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutClient(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutClient)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutClient, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -378,8 +376,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutMember(_ context.Context) *int32
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutMember)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutMember, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -392,8 +390,8 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixIdleTimeoutConnection)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixIdleTimeoutConnection, err)
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
@@ -439,8 +437,8 @@ func (t *defaultModelBuildTask) buildPoolHealthyThresholdCount(_ context.Context
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthyThresholdCount)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -453,8 +451,8 @@ func (t *defaultModelBuildTask) buildPoolUnhealthyThresholdCount(_ context.Conte
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixUnhealthyThresholdCount)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixUnhealthyThresholdCount, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -467,8 +465,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckIntervalSeconds(_ context.Co
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckIntervalSeconds)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckIntervalSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -481,8 +479,8 @@ func (t *defaultModelBuildTask) buildPoolHealthcheckTimeoutSeconds(_ context.Con
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be an integer.",
-			annotations.SuffixHealthcheckTimeoutSeconds)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be an integer: %v",
+			annotations.SuffixHealthcheckTimeoutSeconds, err)
 		return nil
 	}
 	return ptr.To(int(optionsInt64))
@@ -495,8 +493,8 @@ func (t *defaultModelBuildTask) buildPoolStickiness(_ context.Context) *bool {
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean.",
-			annotations.SuffixEnableStickySession)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be a boolean: %v",
+			annotations.SuffixEnableStickySession, err)
 		return nil
 	}
 	return &option
@@ -509,8 +507,8 @@ func (t *defaultModelBuildTask) buildPoolTLSEncryption(_ context.Context) *bool 
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean.",
-			annotations.SuffixEnableTLSEncryption)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be a boolean: %v",
+			annotations.SuffixEnableTLSEncryption, err)
 		return nil
 	}
 	return &option

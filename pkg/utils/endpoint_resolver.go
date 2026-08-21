@@ -113,7 +113,7 @@ func (r *defaultEndpointResolver) ResolvePodEndpoints(
 		}
 	}
 
-	logger.Debugf("found %d endpoints for service %s: %v", len(podEndpoints), svcKey, podEndpoints)
+	logger.Debugf("resolved %d pod endpoints for service %s", len(podEndpoints), svcKey)
 
 	return podEndpoints, nil
 }
@@ -166,7 +166,7 @@ func (r *defaultEndpointResolver) ResolveNodePortEndpoints(
 		endpoints = append(endpoints, r.buildNodePortEndpoint(nodeIP, node.Name, svcNodePort))
 	}
 
-	logger.Debugf("found %d endpoints for service %s: %v", len(endpoints), svcKey, endpoints)
+	logger.Debugf("resolved %d nodeport endpoints for service %s", len(endpoints), svcKey)
 
 	return endpoints, nil
 }

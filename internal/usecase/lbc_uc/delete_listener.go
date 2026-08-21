@@ -58,7 +58,7 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 	for _, candidateId := range deleteCandidates {
 		isExist, listener := isListenerExist(candidateId)
 		if !isExist {
-			t.logger.Warnf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
+			t.logger.Debugf("Listener %s not found in load balancer %s, skip delete", candidateId, lbId)
 			continue
 		}
 
@@ -73,12 +73,10 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 				return t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId)
 			})
 			if err != nil {
-				t.logger.Error("Failed to delete listener: ", err)
 				failures = append(failures, fmt.Errorf("listener %s: delete: %w", candidateId, err))
 				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-				t.logger.Error("Failed to wait for loadbalancer active: ", err)
 				failures = append(failures, fmt.Errorf("listener %s: wait after delete: %w", candidateId, err))
 				continue
 			}
@@ -116,8 +114,7 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 
 	currentPolicies, err := t.vngcloudRepo.ListPolicyOfListener(ctx, lbId, listener.UUID)
 	if err != nil {
-		t.logger.Errorf("Failed to list policies of listener %s: %v", listener.UUID, err)
-		return false, err
+		return false, fmt.Errorf("list policies of listener %s on LB %s: %w", listener.UUID, lbId, err)
 	}
 
 	createdPolicies := []v1alpha1.CreatedPolicy{}
@@ -170,8 +167,7 @@ func (t *defaultModelDeployTask) canDeleteWholeListener(ctx context.Context, lbI
 		// compare pool members
 		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, listener.DefaultPoolId)
 		if err != nil {
-			t.logger.Errorf("Failed to get members of pool %s: %v", listener.DefaultPoolId, err)
-			return false, err
+			return false, fmt.Errorf("get members of pool %s on LB %s: %w", listener.DefaultPoolId, lbId, err)
 		}
 		canDeleteWhole, _ := t.canDeleteWholePool(ctx, lbId, listener.DefaultPoolId, currentListMembers, createdPool.CreatedMembers, []v1alpha1.PoolMember{})
 		if !canDeleteWhole {

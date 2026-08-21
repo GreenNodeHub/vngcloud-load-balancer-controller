@@ -12,7 +12,7 @@ import (
 func (t *defaultModelDeployTask) delete(ctx context.Context) error {
 	// if status.lbId is empty, skip
 	if t.lbConfig.Status.LoadBalancerId == nil || *t.lbConfig.Status.LoadBalancerId == "" {
-		t.logger.Infof("LBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
+		t.logger.Debugf("GLBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
 		return nil
 	}
 
@@ -179,7 +179,7 @@ func (t *defaultModelDeployTask) canDeleteWholeLoadBalancer(ctx context.Context,
 		return false, nil
 	}
 
-	t.logger.Debug("Can delete whole loadbalancer")
+	t.logger.Debugf("Can delete whole load balancer %s", lbId)
 	return true, nil
 }
 

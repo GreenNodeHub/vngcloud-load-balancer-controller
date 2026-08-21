@@ -220,16 +220,14 @@ func (t *defaultModelBuildTask) getAllSubnetCidrs(ctx context.Context) ([]string
 	nodes := &corev1.NodeList{}
 	err := t.k8sRepo.ListNode(ctx, nodes)
 	if err != nil {
-		t.logger.Errorf("failed to list nodes: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
 	providerIds := utils.GetListProviderIdFromNodeList(nodes)
 	for _, providerId := range providerIds {
 		_, _, _, cidr, err := t.vngcloudRepo.GetServerNetworkInfo(ctx, providerId)
 		if err != nil {
-			t.logger.Errorf("failed to get server network info for providerId %s: %v", providerId, err)
-			return nil, err
+			return nil, fmt.Errorf("failed to get server network info for providerId %s: %w", providerId, err)
 		}
 		if cidr == "" {
 			continue

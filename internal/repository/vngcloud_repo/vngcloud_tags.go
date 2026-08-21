@@ -42,7 +42,7 @@ func (m *vngCloudRepository) ListTags(ctx context.Context, resourceID string) (*
 	opt := loadbalancerv2.NewListTagsRequest(resourceID)
 	tags, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 
@@ -88,7 +88,7 @@ func (m *vngCloudRepository) CreateTags(ctx context.Context, resourceID string, 
 	defer m.tagCache.invalidate(resourceID)
 
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create tags for resource %s", domain.RequestIcon, resourceID)
+	logger.Infof("Request create tags for resource %s", resourceID)
 	opt := loadbalancerv2.NewCreateTagsRequest(resourceID)
 	arr := make([]string, 0)
 	for k, v := range tags {
@@ -99,7 +99,7 @@ func (m *vngCloudRepository) CreateTags(ctx context.Context, resourceID string, 
 
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - CreateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("CreateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil
@@ -111,7 +111,7 @@ func (m *vngCloudRepository) UpdateTags(ctx context.Context, resourceID string, 
 	defer m.tagCache.invalidate(resourceID)
 
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update tags for resource %s", domain.RequestIcon, resourceID)
+	logger.Infof("Request update tags for resource %s", resourceID)
 	opt := loadbalancerv2.NewUpdateTagsRequest(resourceID)
 	arr := make([]string, 0)
 	for k, v := range tags {
@@ -122,7 +122,7 @@ func (m *vngCloudRepository) UpdateTags(ctx context.Context, resourceID string, 
 
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().UpdateTags(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - UpdateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("UpdateTags: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil

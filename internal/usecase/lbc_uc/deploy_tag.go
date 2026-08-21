@@ -196,20 +196,17 @@ func (t *defaultModelDeployTask) deployTags(ctx context.Context, lbId string) er
 }
 
 func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTags, newTags map[string]string) (bool, map[string]string) {
-	r.logger.Debug("EnsureTags: ")
-	r.logger.Debugf("   - oldTags:   %v", oldTags)
-	r.logger.Debugf("   - curTags:   %v", currentTags)
-	r.logger.Debugf("   - newTags:   %v", newTags)
+	r.logger.Debugf("EnsureTags: old=%v current=%v new=%v", oldTags, currentTags, newTags)
 
 	// merge tags
 	mergeTags := make(map[string]string)
 	for k, v := range currentTags {
 		if len(k) < 3 || len(k) > 255 {
-			r.logger.Warnf("Tag key \"%s\" required value must length from 3 to 255", k)
+			r.logger.Debugf("Skipping current tag: key %q must be 3-255 characters long", k)
 			continue
 		}
 		if len(v) < 3 || len(v) > 255 {
-			r.logger.Warnf("Tag value \"%s\" required value must length from 3 to 255", v)
+			r.logger.Debugf("Skipping current tag %q: value %q must be 3-255 characters long", k, v)
 			continue
 		}
 		mergeTags[k] = v
@@ -219,11 +216,11 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	}
 	for k, v := range newTags {
 		if len(k) < 3 || len(k) > 255 {
-			r.logger.Warnf("Tag key \"%s\" required value must length from 3 to 255", k)
+			r.logger.Debugf("Skipping desired tag: key %q must be 3-255 characters long", k)
 			continue
 		}
 		if len(v) < 3 || len(v) > 255 {
-			r.logger.Warnf("Tag value \"%s\" required value must length from 3 to 255", v)
+			r.logger.Debugf("Skipping desired tag %q: value %q must be 3-255 characters long", k, v)
 			continue
 		}
 		mergeTags[k] = v
@@ -235,7 +232,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	isNeedUpdate := false
 	for k, v := range mergeTags {
 		if !strings.EqualFold(currentTags[k], v) {
-			r.logger.Infof("Tag diff: key=%s, current=%q, wanted=%q", k, currentTags[k], v)
+			r.logger.Debugf("Tag diff: key=%s, current=%q, wanted=%q", k, currentTags[k], v)
 			isNeedUpdate = true
 			break
 		}
@@ -252,7 +249,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 	if !isNeedUpdate {
 		if _, wanted := mergeTags[domain.ClusterTagKey]; !wanted {
 			if current, present := currentTags[domain.ClusterTagKey]; present {
-				r.logger.Infof("Tag diff: key=%s must be removed, current=%q", domain.ClusterTagKey, current)
+				r.logger.Debugf("Tag diff: key=%s must be removed, current=%q", domain.ClusterTagKey, current)
 				isNeedUpdate = true
 			}
 		}
@@ -271,7 +268,7 @@ func (r *defaultModelDeployTask) buildTag(_ context.Context, currentTags, oldTag
 		return false, nil
 	}
 
-	r.logger.Debugf("   - mergeTags:   %v", mergeTags)
+	r.logger.Debugf("EnsureTags: merged=%v", mergeTags)
 	return true, mergeTags
 }
 

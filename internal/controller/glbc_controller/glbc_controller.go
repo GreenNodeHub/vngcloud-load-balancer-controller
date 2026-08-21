@@ -98,7 +98,7 @@ type GlobalLoadBalancerConfigReconciler struct {
 
 func (r *GlobalLoadBalancerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if !r.initDone.Load() {
-		ctrl.Log.Info("Init not done yet, requeueing...")
+		ctrl.Log.V(1).Info("init not done yet, requeueing", "controller", controllerName)
 		return ctrl.Result{RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -130,12 +130,11 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcile(ctx context.Context, req 
 		if r.glbcUtils.IsPendingFinalization(object) {
 			err := r.reconcileDelete(ctx, req, object)
 			if err != nil {
-				logger.Errorf("%s Delete failed: %v", domain.ErrorIcon, err)
 				r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeWarning, "FailedDelete", err.Error())
 				return err
 			}
-			logger.Infof("%s Delete successfully.", domain.SuccessIcon)
+			logger.Info("Delete successful")
 			r.eventRecorder.Event(object, corev1.EventTypeNormal, "Deleted", key)
 			ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeNormal, "Deleted", key)
 			return nil
@@ -145,12 +144,11 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcile(ctx context.Context, req 
 
 	err = r.reconcileEnsure(ctx, req, object)
 	if err != nil {
-		logger.Errorf("%s Ensure failed: %v", domain.ErrorIcon, err)
 		r.eventRecorder.Event(object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeWarning, "FailedEnsure", err.Error())
 		return err
 	}
-	logger.Infof("%s Ensure successfully.", domain.SuccessIcon)
+	logger.Debug("Ensure successful")
 	r.eventRecorder.Event(object, corev1.EventTypeNormal, "Ensured", key)
 	ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, object, corev1.EventTypeNormal, "Ensured", key)
 	return nil
@@ -179,7 +177,7 @@ func (r *GlobalLoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context
 func (r *GlobalLoadBalancerConfigReconciler) reconcileDelete(ctx context.Context, req ctrl.Request, obj client.Object) error {
 	logger := contexts.NewContext(ctx).Log()
 	if !k8s.HasFinalizer(obj, domain.GlbcFinalizer) {
-		logger.Warn("Finalizer is not found, return.")
+		logger.Debug("Finalizer not found, skip delete")
 		return nil
 	}
 
@@ -203,7 +201,7 @@ func (r *GlobalLoadBalancerConfigReconciler) SetupWithManager(ctx context.Contex
 	r.restMapper = mgr.GetRESTMapper()
 
 	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		log := ctrl.Log.WithName("init")
+		log := ctrl.Log.WithName(controllerName).WithName("init")
 		log.Info("Running initialization...")
 
 		if err := r.glbcUseCase.InitGlobalLoadBalancerConfigUseCase(ctx); err != nil {

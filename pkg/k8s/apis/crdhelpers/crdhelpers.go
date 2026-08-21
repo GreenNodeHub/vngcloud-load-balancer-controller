@@ -18,16 +18,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	// "github.com/cilium/cilium/pkg/logging"
-	// "github.com/cilium/cilium/pkg/logging/logfields"
-
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/versioncheck"
 )
 
-// log is the k8s package logger object.
-var log = logrus.New()
-
-// logging.DefaultLogger.WithField(logfields.LogSubsys, subsysK8s)
+// log is the k8s package logger object, backed by the process-wide logrus
+// logger so --log-level applies here too.
+var log = logrus.StandardLogger()
 
 // CreateUpdateCRD ensures the CRD object is installed into the K8s cluster. It
 // will create or update the CRD and its validation schema as necessary. This
@@ -70,7 +66,7 @@ func CreateUpdateCRD(
 		return err
 	}
 
-	scopedLog.Info("CRD (CustomResourceDefinition) is installed and up-to-date")
+	scopedLog.Debug("CRD (CustomResourceDefinition) is installed and up-to-date")
 
 	return nil
 }
@@ -151,7 +147,7 @@ func updateV1CRD(
 					return true, nil
 				}
 
-				scopedLog.WithError(err).Debug("Unable to update CRD validation")
+				scopedLog.WithError(err).Warn("Unable to update CRD validation")
 
 				return false, err
 			}

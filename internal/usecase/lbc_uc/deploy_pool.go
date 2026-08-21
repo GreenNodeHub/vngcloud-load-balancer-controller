@@ -36,7 +36,6 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 			// Keep going. The pools are independent, and returning here abandoned every
 			// pool behind this one - so whichever pool followed a failure never got
 			// deployed in that pass, every pass.
-			t.logger.Errorf("Failed to deploy pool %s: %v", pool.Name, err)
 			failures = append(failures, fmt.Errorf("pool %s: %w", pool.Name, err))
 			continue
 		}
@@ -104,26 +103,23 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	// ensure exist pool
 	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, pool, currentPool)
 	if updateOptions != nil {
-		t.logger.Info("Need update pool: ", strings.Join(message, ", "))
+		t.logger.Infof("Need update pool %s on LB %s: %s", currentPool.UUID, lbId, strings.Join(message, ", "))
 		err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 			return t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
 		})
 		if err != nil {
-			t.logger.Error("Failed to update pool: ", err)
-			return nil, err
+			return nil, fmt.Errorf("update pool %s on LB %s: %w", currentPool.UUID, lbId, err)
 		}
 
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, fmt.Errorf("wait LB %s active after updating pool %s: %w", lbId, currentPool.UUID, err)
 		}
 	}
 
 	// ensure pool members
 	currentPoolMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, currentPool.UUID)
 	if err != nil {
-		t.logger.Error("Failed to get pool members: ", err)
-		return nil, err
+		return nil, fmt.Errorf("get members of pool %s on LB %s: %w", currentPool.UUID, lbId, err)
 	}
 
 	// get created members for this pool from status
@@ -147,19 +143,18 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		}
 		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, currentPool.UUID).WithMembers(convertMembers...)
 
-		t.logger.Info("Need update pool members: ", updateMembers)
+		t.logger.Infof("Updating pool %s on LB %s to %d member(s)", currentPool.UUID, lbId, len(updateMembers))
+		t.logger.Debugf("Pool %s desired members: %+v", currentPool.UUID, updateMembers)
 		if err = t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 			return t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions)
 		}); err != nil {
-			t.logger.Error("Failed to update pool members: ", err)
-			return nil, err
+			return nil, fmt.Errorf("update members of pool %s on LB %s: %w", currentPool.UUID, lbId, err)
 		}
 		if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
 			return nil, err
 		}
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, fmt.Errorf("wait LB %s active after updating members of pool %s: %w", lbId, currentPool.UUID, err)
 		}
 	}
 	return &v1alpha1.CreatedPool{
@@ -406,9 +401,7 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 	// cleaned up, and finding them has so far meant comparing the portal against the node list
 	// by hand - which is how 19 stale members on one pool went unnoticed. Say so instead.
 	if len(foreign) > 0 {
-		t.logger.Infof("Keeping %d pool member(s) not created by this cluster and not in spec: %s. "+
-			"They are left alone on purpose; if they are stale, remove them from the portal.",
-			len(foreign), strings.Join(foreign, ", "))
+		t.logger.Debugf("Keeping %d pool member(s) not created by this cluster and not in spec: %s", len(foreign), strings.Join(foreign, ", "))
 	}
 
 	// add new members from spec

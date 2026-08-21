@@ -2,6 +2,7 @@ package service_glb_uc
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/pkg/errors"
@@ -60,8 +61,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 			address,
 		)
 		if err != nil {
-			t.logger.Errorf("failed to update Service status address: %v", err)
-			return err
+			return fmt.Errorf("failed to update Service status address: %w", err)
 		}
 	}
 	return nil
@@ -80,11 +80,9 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		},
 	)
 	if err != nil {
-		t.logger.Errorf("failed to list GLBC: %v", err)
-		return err
+		return fmt.Errorf("failed to list GLBC: %w", err)
 	}
 	if len(glbcList.Items) > 1 {
-		t.logger.Errorf("found multiple GLBC for Service %s/%s", t.service.Namespace, t.service.Name)
 		return errors.New("found multiple GLBC for Service " + t.service.Namespace + "/" + t.service.Name)
 	}
 
@@ -125,7 +123,6 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 	// Build pools and listeners from Service ports
 	pools, listeners, err := t.buildPoolsAndListeners(ctx, nil)
 	if err != nil {
-		t.logger.Errorf("failed to build pools and listeners: %v", err)
 		return err
 	}
 	glbConfig.Spec.GlobalPools = pools
@@ -135,15 +132,13 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 	if !isCreated {
 		err = t.k8sRepo.CreateGlobalLoadBalancerConfig(ctx, glbConfig)
 		if err != nil {
-			t.logger.Errorf("failed to create GLBC: %v", err)
-			return err
+			return fmt.Errorf("failed to create GLBC: %w", err)
 		}
 	} else {
 		if !glbcSpecEqual(oldGLBConfig.Spec, glbConfig.Spec) {
 			err = t.k8sRepo.PatchGlobalLoadBalancerConfig(ctx, glbConfig, client.MergeFrom(oldGLBConfig))
 			if err != nil {
-				t.logger.Errorf("failed to patch GLBC: %v", err)
-				return err
+				return fmt.Errorf("failed to patch GLBC: %w", err)
 			}
 		}
 	}
@@ -204,7 +199,6 @@ func (t *defaultModelBuildTask) getGLBCAddress(ctx context.Context) string {
 		},
 	)
 	if err != nil {
-		t.logger.Warnf("failed to list GLBC: %v", err)
 		return ""
 	}
 	if len(glbcList.Items) != 1 {

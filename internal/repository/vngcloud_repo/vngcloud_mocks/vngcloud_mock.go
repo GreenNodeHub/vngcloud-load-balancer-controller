@@ -355,7 +355,7 @@ func (m *MockProvider) ListSecurityGroups(ctx context.Context) (*entityv2.ListSe
 
 func (m *MockProvider) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update security groups of server %s", domain.RequestIcon, instanceID)
+	logger.Infof("Request update security groups of server %s", instanceID)
 
 	var server *entityv2.Server
 	for _, s := range m.servers {
@@ -399,7 +399,7 @@ func (m *MockProvider) GetSecurityGroup(ctx context.Context, secgroupID string) 
 
 func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group %s", domain.RequestIcon, secgroupID)
+	logger.Infof("Request delete security group %s", secgroupID)
 	// valid secgroupID
 	servers, err := m.ListServerBySecgroupID(ctx, secgroupID)
 	if err != nil {
@@ -426,7 +426,7 @@ func (m *MockProvider) DeleteSecurityGroup(ctx context.Context, secgroupID strin
 
 func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group %s", domain.RequestIcon, name)
+	logger.Infof("Request create security group %s", name)
 
 	secgroupID := "secgroup-" + randID()
 	newSecgroup := &wrapSecgroup{
@@ -446,7 +446,7 @@ func (m *MockProvider) CreateSecurityGroup(ctx context.Context, name string, des
 
 func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group rule for security group %s", domain.RequestIcon, secgroupID)
+	logger.Infof("Request create security group rule for security group %s", secgroupID)
 
 	// valid secgroupID
 	_, err := m.GetSecurityGroup(ctx, secgroupID)
@@ -477,7 +477,7 @@ func (m *MockProvider) CreateSecurityGroupRule(ctx context.Context, secgroupID s
 
 func (m *MockProvider) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group rule %s of security group %s", domain.RequestIcon, ruleID, secgroupID)
+	logger.Infof("Request delete security group rule %s of security group %s", ruleID, secgroupID)
 
 	// valid secgroupID
 	_, err := m.GetSecurityGroup(ctx, secgroupID)
@@ -551,7 +551,7 @@ func (m *MockProvider) ListTags(ctx context.Context, resourceID string) (*entity
 
 func (m *MockProvider) CreateTags(ctx context.Context, resourceID string, tags map[string]string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create tags for resource %s", domain.RequestIcon, resourceID)
+	logger.Infof("Request create tags for resource %s", resourceID)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.tags == nil {
@@ -608,7 +608,7 @@ func (m *MockProvider) GetServerByID(ctx context.Context, serverID string) (*ent
 
 func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for server %s to be ready", domain.WaitIcon, serverID)
+	logger.Infof("Waiting for server %s to be ready", serverID)
 
 	var server *entityv2.Server
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -623,7 +623,7 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 			return false, _err
 		}
 		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Server %s is ready", domain.ReadyIcon, serverID)
+			logger.Infof("Server %s is ready", serverID)
 			return true, nil
 		}
 		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
@@ -631,7 +631,7 @@ func (m *MockProvider) WaitForServerActive(ctx context.Context, serverID string)
 			return true, errors.New("server status is error")
 		}
 
-		logger.Infof("%s Server %s is not ready yet, waiting...", domain.WaitIcon, serverID)
+		logger.Infof("Server %s is not ready yet, waiting...", serverID)
 		return false, nil
 	})
 
@@ -702,7 +702,7 @@ func (m *MockProvider) GetLoadBalancerByName(ctx context.Context, name string) (
 
 func (m *MockProvider) CreateLoadBalancer(ctx context.Context, lbOptions loadbalancerv2.ICreateLoadBalancerRequest) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create load balancer.", domain.RequestIcon)
+	logger.Infof("Request create load balancer.")
 	if lbOptions == nil {
 		return nil, domain.ErrorInvalidInput
 	}
@@ -821,7 +821,7 @@ func (m *MockProvider) readyAfterTime(lbID string) {
 
 func (m *MockProvider) DeleteLoadBalancer(ctx context.Context, lbID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete load balancer %s", domain.RequestIcon, lbID)
+	logger.Infof("Request delete load balancer %s", lbID)
 	newListeners := make([]*wrapListener, 0)
 	for i, lb := range m.listeners {
 		if lb.lbID != lbID {
@@ -862,7 +862,7 @@ func (m *MockProvider) ResizeLoadBalancer(ctx context.Context, lbID, packageID s
 }
 func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entityv2.LoadBalancer, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for load balancer %s to be ready", domain.WaitIcon, lbID)
+	logger.Infof("Waiting for load balancer %s to be ready", lbID)
 	var resultLb *entityv2.LoadBalancer
 
 	err := wait.ExponentialBackoff(wait.Backoff{
@@ -877,7 +877,7 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 		}
 		if strings.ToUpper(lb.DisplayStatus) == consts.ACTIVE_LOADBALANCER_STATUS &&
 			strings.ToUpper(lb.ProgressStatus) == consts.CREATED_LOADBALANCER_STATUS {
-			logger.Infof("%s Load balancer %s is ready", domain.ReadyIcon, lbID)
+			logger.Infof("Load balancer %s is ready", lbID)
 			resultLb = lb
 			return true, nil
 		}
@@ -887,7 +887,7 @@ func (m *MockProvider) WaitForLBActive(ctx context.Context, lbID string) (*entit
 			return true, domain.ErrorLoadBalancerStatusError
 		}
 
-		logger.Infof("%s Load balancer %s is not ready yet, waiting...", domain.WaitIcon, lbID)
+		logger.Infof("Load balancer %s is not ready yet, waiting...", lbID)
 		return false, nil
 	})
 
@@ -923,7 +923,7 @@ func (m *MockProvider) GetListenerById(ctx context.Context, lbID, listenerID str
 //	}
 func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt loadbalancerv2.ICreateListenerRequest) (*entityv2.Listener, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create listener of load balancer %s", domain.RequestIcon, lbID)
+	logger.Infof("Request create listener of load balancer %s", lbID)
 	listener := opt.ToRequestBody().(*loadbalancerv2.CreateListenerRequest)
 	newListener := &wrapListener{
 		lbID: lbID,
@@ -1002,7 +1002,7 @@ func (m *MockProvider) ListListenerOfLB(ctx context.Context, lbID string) (*enti
 }
 func (m *MockProvider) DeleteListener(ctx context.Context, lbID, listenerID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
+	logger.Infof("Request delete listener %s of load balancer %s", listenerID, lbID)
 	isFound := false
 	newListeners := make([]*wrapListener, 0)
 	for i, l := range m.listeners {
@@ -1024,7 +1024,7 @@ func (m *MockProvider) DeleteListener(ctx context.Context, lbID, listenerID stri
 }
 func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.IUpdateListenerRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
+	logger.Infof("Request update listener %s of load balancer %s", listenerID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdateListenerRequest)
 	var listener *wrapListener
 	for _, l := range m.listeners {
@@ -1077,7 +1077,7 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 //	}
 func (m *MockProvider) CreatePolicy(ctx context.Context, lbID, listenerID string, opt loadbalancerv2.ICreatePolicyRequest) (*entityv2.Policy, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create policy of listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
+	logger.Infof("Request create policy of listener %s of load balancer %s", listenerID, lbID)
 	lb, err := m.GetLoadBalancerByID(ctx, lbID)
 	if err != nil {
 		return nil, err
@@ -1189,7 +1189,7 @@ func (m *MockProvider) ListPolicyOfListener(ctx context.Context, lbID, listenerI
 //	}
 func (m *MockProvider) UpdatePolicy(ctx context.Context, lbID, listenerID, policyID string, opt loadbalancerv2.IUpdatePolicyRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update policy %s of listener %s of load balancer %s", domain.RequestIcon, policyID, listenerID, lbID)
+	logger.Infof("Request update policy %s of listener %s of load balancer %s", policyID, listenerID, lbID)
 	updateOpt := opt.(*loadbalancerv2.UpdatePolicyRequest)
 	var policy *wrapPolicy
 	for _, p := range m.policies {
@@ -1248,7 +1248,7 @@ func (m *MockProvider) DeletePolicy(ctx context.Context, lbID, listenerID, polic
 
 func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID string, policyIDs []string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request reorder policies of listener %s of load balancer %s", domain.RequestIcon, listenerID, lbID)
+	logger.Infof("Request reorder policies of listener %s of load balancer %s", listenerID, lbID)
 	var listener *wrapListener
 	for _, l := range m.listeners {
 		if l.lbID == lbID && l.GetId() == listenerID {
@@ -1313,7 +1313,7 @@ func (m *MockProvider) ReorderPolicies(ctx context.Context, lbID, listenerID str
 //	}
 func (m *MockProvider) CreatePool(ctx context.Context, lbID string, opt loadbalancerv2.ICreatePoolRequest) (*entityv2.Pool, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create pool of load balancer %s", domain.RequestIcon, lbID)
+	logger.Infof("Request create pool of load balancer %s", lbID)
 	var (
 		pool          *loadbalancerv2.CreatePoolRequest
 		healthMonitor *loadbalancerv2.HealthMonitor
@@ -1435,7 +1435,7 @@ func (m *MockProvider) ListPool(ctx context.Context, lbID string) (*entityv2.Lis
 }
 func (m *MockProvider) UpdatePoolMembers(ctx context.Context, lbID, poolID string, members loadbalancerv2.IUpdatePoolMembersRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool members %s of load balancer %s", domain.RequestIcon, poolID, lbID)
+	logger.Infof("Request update pool members %s of load balancer %s", poolID, lbID)
 	updateOpt := members.(*loadbalancerv2.UpdatePoolMembersRequest)
 	var pool *wrapPool
 	for _, p := range m.pools {
@@ -1500,7 +1500,7 @@ func (m *MockProvider) GetPoolMembers(ctx context.Context, lbID, poolID string) 
 
 func (m *MockProvider) DeletePool(ctx context.Context, lbID, poolID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete pool %s of load balancer %s", domain.RequestIcon, poolID, lbID)
+	logger.Infof("Request delete pool %s of load balancer %s", poolID, lbID)
 	isFound := false
 	newPools := make([]*wrapPool, 0)
 	for i, p := range m.pools {
@@ -1523,7 +1523,7 @@ func (m *MockProvider) DeletePool(ctx context.Context, lbID, poolID string) erro
 
 func (m *MockProvider) UpdatePool(ctx context.Context, lbID, poolID string, opt loadbalancerv2.IUpdatePoolRequest) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update pool %s of load balancer %s", domain.RequestIcon, poolID, lbID)
+	logger.Infof("Request update pool %s of load balancer %s", poolID, lbID)
 	updateOpt := opt.ToRequestBody().(*loadbalancerv2.UpdatePoolRequest)
 	var pool *wrapPool
 	for _, p := range m.pools {
@@ -1590,7 +1590,7 @@ func (m *MockProvider) GetCertificateByID(ctx context.Context, certID string) (*
 
 func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request import certificate", domain.RequestIcon)
+	logger.Infof("Request import certificate")
 	cert := opt.ToRequestBody().(*loadbalancerv2.CreateCertificateRequest)
 	newCert := &wrapCertificate{
 		Certificate: &entityv2.Certificate{
@@ -1610,7 +1610,7 @@ func (m *MockProvider) ImportCertificate(ctx context.Context, opt loadbalancerv2
 
 func (m *MockProvider) DeleteCertificate(ctx context.Context, certID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete certificate %s", domain.RequestIcon, certID)
+	logger.Infof("Request delete certificate %s", certID)
 	isFound := false
 	newCerts := make([]*wrapCertificate, 0)
 	for i, c := range m.certs {

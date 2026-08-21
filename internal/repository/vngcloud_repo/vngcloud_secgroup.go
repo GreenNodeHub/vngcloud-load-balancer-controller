@@ -20,7 +20,7 @@ func (m *vngCloudRepository) ListSecurityGroups(ctx context.Context) (*entityv2.
 
 	secgroups, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroup(networkv2.NewListSecgroupRequest().AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListSecurityGroups: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListSecurityGroups: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return secgroups, nil
@@ -28,7 +28,7 @@ func (m *vngCloudRepository) ListSecurityGroups(ctx context.Context) (*entityv2.
 
 func (m *vngCloudRepository) UpdateSecGroupsOfServer(ctx context.Context, instanceID string, secgroups []string) (*entityv2.Server, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request update security groups of server %s", domain.RequestIcon, instanceID)
+	logger.Infof("Request update security groups of server %s", instanceID)
 
 	opt := computev2.NewUpdateServerSecgroupsRequest(instanceID, secgroups...)
 	IsServerNotReady := func(err error) bool {
@@ -41,11 +41,11 @@ func (m *vngCloudRepository) UpdateSecGroupsOfServer(ctx context.Context, instan
 		server, sdkErr = m.client.VServerGateway().V2().ComputeService().UpdateServerSecgroupsByServerId(opt.AddUserAgent(m.userAgent))
 		if sdkErr != nil {
 			if IsServerNotReady(domain.SDKError(sdkErr)) {
-				logger.Infof("%s Server %s is not ready yet, waiting...", domain.WaitIcon, instanceID)
+				logger.Debugf("Server %s is not ready yet, waiting...", instanceID)
 				time.Sleep(5 * time.Second)
 				continue
 			} else {
-				logger.Error("[ERROR] - UpdateSecGroupsOfServer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+				logger.Debug("UpdateSecGroupsOfServer: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 				return nil, domain.SDKError(sdkErr)
 			}
 		} else {
@@ -60,7 +60,7 @@ func (m *vngCloudRepository) GetSecurityGroup(ctx context.Context, secgroupID st
 
 	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().GetSecgroupById(networkv2.NewGetSecgroupByIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - GetSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("GetSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return secgroup, nil
@@ -68,11 +68,11 @@ func (m *vngCloudRepository) GetSecurityGroup(ctx context.Context, secgroupID st
 
 func (m *vngCloudRepository) DeleteSecurityGroup(ctx context.Context, secgroupID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group %s", domain.RequestIcon, secgroupID)
+	logger.Infof("Request delete security group %s", secgroupID)
 
 	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupById(networkv2.NewDeleteSecgroupByIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - DeleteSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("DeleteSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil
@@ -80,12 +80,12 @@ func (m *vngCloudRepository) DeleteSecurityGroup(ctx context.Context, secgroupID
 
 func (m *vngCloudRepository) CreateSecurityGroup(ctx context.Context, name string, description string) (*entityv2.Secgroup, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group %s", domain.RequestIcon, name)
+	logger.Infof("Request create security group %s", name)
 
 	opt := networkv2.NewCreateSecgroupRequest(name, description)
 	secgroup, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroup(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - CreateSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("CreateSecurityGroup: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return secgroup, nil
@@ -93,11 +93,11 @@ func (m *vngCloudRepository) CreateSecurityGroup(ctx context.Context, name strin
 
 func (m *vngCloudRepository) CreateSecurityGroupRule(ctx context.Context, secgroupID string, opts networkv2.ICreateSecgroupRuleRequest) (*entityv2.SecgroupRule, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request create security group rule of security group %s", domain.RequestIcon, secgroupID)
+	logger.Infof("Request create security group rule of security group %s", secgroupID)
 
 	rule, sdkErr := m.client.VServerGateway().V2().NetworkService().CreateSecgroupRule(opts.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - CreateSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("CreateSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return rule, nil
@@ -105,11 +105,11 @@ func (m *vngCloudRepository) CreateSecurityGroupRule(ctx context.Context, secgro
 
 func (m *vngCloudRepository) DeleteSecurityGroupRule(ctx context.Context, secgroupID string, ruleID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete security group rule %s of security group %s", domain.RequestIcon, ruleID, secgroupID)
+	logger.Infof("Request delete security group rule %s of security group %s", ruleID, secgroupID)
 
 	sdkErr := m.client.VServerGateway().V2().NetworkService().DeleteSecgroupRuleById(networkv2.NewDeleteSecgroupRuleByIdRequest(ruleID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - DeleteSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("DeleteSecurityGroupRule: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil
@@ -120,7 +120,7 @@ func (m *vngCloudRepository) ListSecurityGroupRules(ctx context.Context, secgrou
 
 	rules, sdkErr := m.client.VServerGateway().V2().NetworkService().ListSecgroupRulesBySecgroupId(networkv2.NewListSecgroupRulesBySecgroupIdRequest(secgroupID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListSecurityGroupRules: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListSecurityGroupRules: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return rules, nil

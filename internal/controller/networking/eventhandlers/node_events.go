@@ -62,14 +62,14 @@ func (h *enqueueRequestsForNodeEvent) Generic(ctx context.Context, e event.Gener
 }
 
 func (h *enqueueRequestsForNodeEvent) enqueueAllSupportedIngresss(ctx context.Context, queue workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	// List all ingresss
+	// List all ingresses
 	svcList := &networkingv1.IngressList{}
 	if err := h.k8sClient.List(ctx, svcList); err != nil {
-		h.logger.Error(err, "failed to list ingresss for node event")
+		h.logger.Error(err, "failed to list ingresses for node event")
 		return
 	}
 
-	// Enqueue all supported ingresss
+	// Enqueue all supported ingresses
 	for _, svc := range svcList.Items {
 		if !h.ingressUtils.IsIngressPendingFinalization(&svc) && !h.ingressUtils.IsIngressSupported(&svc) {
 			continue

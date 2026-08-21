@@ -2,6 +2,7 @@ package nsg_uc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/anngdinh/operator-helper/contexts"
@@ -313,9 +314,7 @@ func (uc *nsgUseCase) listNodeBySelector(ctx context.Context, selector map[strin
 	nodes := &corev1.NodeList{}
 	err := uc.k8sRepo.ListNode(ctx, nodes, client.MatchingLabels(selector))
 	if err != nil {
-		logger := contexts.NewContext(ctx).Log()
-		logger.Error("Fail to list nodes: ", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to list nodes by selector %v: %w", selector, err)
 	}
 	return nodes, nil
 }
@@ -328,7 +327,7 @@ func (uc *nsgUseCase) DeleteNodeSecurityGroupUseCase(ctx context.Context, req ct
 
 	// detach security groups from all selected servers
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("Detach security groups: %v", nsgObject.Status.ServerSecurityGroups)
+	logger.Debugf("Detaching security groups: %v", nsgObject.Status.ServerSecurityGroups)
 	errorsList := make([]error, 0)
 	for _, server_secgroup := range nsgObject.Status.ServerSecurityGroups {
 		err := uc.ensureSecgroupForInstance(ctx, nsgObject, server_secgroup.ServerId, []string{})
@@ -363,7 +362,7 @@ func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, se
 	// check if secgroup is exists
 	if _, err := uc.vngcloudRepo.GetSecurityGroup(ctx, secgroupID); err != nil {
 		if domain.IsSecurityGroupNotFound(err) {
-			logger.Infof("Security group %s not found, skip delete", secgroupID)
+			logger.Debugf("Security group %s not found, skip delete", secgroupID)
 			return true, nil
 		}
 		return false, err
@@ -386,7 +385,7 @@ func (uc *nsgUseCase) deleteManagedSecurityGroupIfUnused(ctx context.Context, se
 		for _, server := range serverList.Items {
 			serverIds = append(serverIds, server.Uuid)
 		}
-		logger.Infof("Security group %s is still attached to servers: %v. Skip delete.", secgroupID, serverIds)
+		logger.Debugf("Security group %s is still attached to %d servers: %v, skip delete", secgroupID, len(serverIds), serverIds)
 		return false, nil
 	}
 
@@ -404,7 +403,8 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 	// get security groups of instance
 	instance, err := m.vngcloudRepo.GetServerByID(ctx, instanceID)
 	if err != nil {
-		logger.Error("Fail to get instance: ", err)
+		// Return unwrapped: callers detect server-gone via domain.IsServerNotFound,
+		// which prefix-matches the SDK error text (the instance ID is already in it).
 		return err
 	}
 
@@ -430,15 +430,13 @@ func (m *nsgUseCase) ensureSecgroupForInstance(ctx context.Context, nsgObject *v
 	logger.Infof("Update security groups of instance %s: %v -> %v", instanceID, currentSecgroupIds, newSecgroupIds)
 	_, err = m.vngcloudRepo.UpdateSecGroupsOfServer(ctx, instanceID, newSecgroupIds)
 	if err != nil {
-		logger.Error("Fail to update security groups of instance: ", err)
-		return err
+		return fmt.Errorf("failed to update security groups of instance %s: %w", instanceID, err)
 	}
 
 	// wait until the server is active
 	err = m.vngcloudRepo.WaitForServerActive(ctx, instanceID)
 	if err != nil {
-		logger.Error("Fail to wait for server active: ", err)
-		return err
+		return fmt.Errorf("failed to wait for server %s active: %w", instanceID, err)
 	}
 
 	return nil
@@ -457,9 +455,7 @@ func errorToStringPtr(err error) *string {
 // returns the merged array and a boolean indicating if there was any change
 func mergeStringArray(ctx context.Context, current, remove, add []string) ([]string, bool) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("  - current: %v", current)
-	logger.Debugf("  - remove:  %v", remove)
-	logger.Debugf("  - add:     %v", add)
+	logger.Debugf("mergeStringArray: current=%v remove=%v add=%v", current, remove, add)
 
 	mapCurrent := make(map[string]bool)
 	for _, c := range current {
@@ -515,8 +511,7 @@ func resolveStringArrayChange(ctx context.Context, oldArr, newArr []string) (rem
 	}
 
 	logger := contexts.NewContext(ctx).Log()
-	logger.Debugf("- old array: %v, new array: %v", oldArr, newArr)
-	logger.Debugf("- remove %v, not change %v, add %v", removeArr, notChangeArr, addArr)
+	logger.Debugf("diff arrays: old=%v new=%v -> remove=%v keep=%v add=%v", oldArr, newArr, removeArr, notChangeArr, addArr)
 
 	return removeArr, notChangeArr, addArr
 }

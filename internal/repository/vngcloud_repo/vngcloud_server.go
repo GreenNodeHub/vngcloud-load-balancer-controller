@@ -2,11 +2,11 @@ package vngcloud_repo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/anngdinh/operator-helper/contexts"
-	"github.com/pkg/errors"
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	computev2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/compute/v2"
@@ -20,7 +20,7 @@ func (r *vngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subne
 	logger := contexts.NewContext(ctx).Log()
 	subnet, sdkErr := r.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(r.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return subnet, nil
@@ -30,7 +30,7 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 	logger := contexts.NewContext(ctx).Log()
 
 	if instanceID == "" {
-		logger.Error("[ERROR] - GetServerNetworkInfo: serverID is empty")
+		logger.Debug("GetServerNetworkInfo: serverID is empty")
 		return "", "", "", "", domain.ErrorInvalidInput
 	}
 
@@ -51,13 +51,12 @@ func (m *vngCloudRepository) GetServerNetworkInfo(ctx context.Context, instanceI
 	zoneID = common.Zone(server.ZoneId)
 
 	if subnetID == "" {
-		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get network information, subnetID: %s", subnetID)
+		logger.Debugf("GetServerNetworkInfo: server %s has no subnet ID on its first interface", instanceID)
 		return "", "", "", "", domain.ErrorNotFound
 	}
 
 	subnetCIDR, err = m.getSubnetCIDR(ctx, networkID, subnetID)
 	if err != nil {
-		logger.Errorf("[ERROR] - GetServerNetworkInfo: failed to get subnet CIDR: %v", err)
 		return "", "", "", "", err
 	}
 
@@ -79,7 +78,7 @@ func (m *vngCloudRepository) GetServerByID(ctx context.Context, serverID string)
 	opt := computev2.NewGetServerByIdRequest(serverID)
 	server, sdkErr := m.client.VServerGateway().V2().ComputeService().GetServerById(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("GetServerByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return server, nil
@@ -102,7 +101,7 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 	opt := networkv2.NewListAllServersBySecgroupIdRequest(secgroupID)
 	servers, sdkErr := m.client.VServerGateway().V2().NetworkService().ListAllServersBySecgroupId(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListServerBySecgroupID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return servers, nil
@@ -110,35 +109,34 @@ func (m *vngCloudRepository) ListServerBySecgroupID(ctx context.Context, secgrou
 
 func (m *vngCloudRepository) WaitForServerActive(ctx context.Context, serverID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Waiting for server %s to be ready", domain.WaitIcon, serverID)
+	logger.Debugf("Waiting for server %s to be ready", serverID)
 
-	var server *entityv2.Server
+	var lastStatus string
 	err := wait.ExponentialBackoff(wait.Backoff{
 		Duration: 5 * time.Second,
 		Factor:   1.2,
 		Steps:    30,
 	}, func() (done bool, err error) {
-		var _err error
-		server, _err = m.GetServerByID(ctx, serverID)
+		server, _err := m.GetServerByID(ctx, serverID)
 		if _err != nil {
-			logger.Errorf("Error getting server %s when wait active: %v", serverID, _err)
+			logger.Debugf("Error getting server %s when wait active: %v", serverID, _err)
 			return false, _err
 		}
+		lastStatus = server.Status
 		if strings.ToUpper(server.Status) == consts.ACTIVE_LOADBALANCER_STATUS {
-			logger.Infof("%s Server %s is ready", domain.ReadyIcon, serverID)
+			logger.Debugf("Server %s is ready", serverID)
 			return true, nil
 		}
 		if strings.ToUpper(server.Status) == consts.ERROR_LOADBALANCER_STATUS {
-			logger.Errorf("Server %s is in error status", serverID)
-			return true, errors.New("server status is error")
+			return true, fmt.Errorf("server %s status is ERROR", serverID)
 		}
 
-		logger.Infof("%s Server %s is not ready yet, waiting...", domain.WaitIcon, serverID)
+		logger.Debugf("Server %s is not ready yet, waiting...", serverID)
 		return false, nil
 	})
 
 	if wait.Interrupted(err) {
-		logger.Errorf("timeout waiting for the loadbalancer %s with lb status %s", serverID, server.Status)
+		logger.Errorf("timeout waiting for server %s to become active, last status %q", serverID, lastStatus)
 	}
 
 	return err

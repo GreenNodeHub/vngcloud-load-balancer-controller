@@ -66,3 +66,16 @@ If they fall out of sync, the API server will silently strip new fields when the
 User-facing knobs are `vks.vngcloud.vn/*` annotations on Ingress/Service. Constants in `pkg/annotations/constants.go`; parsing in `pkg/annotations/parser.go` (`ParseStringAnnotation` returns `bool`, **not** `(bool, error)` — different from `ParseBoolAnnotation`).
 
 Controllers can be individually disabled via `--disable-{service,ingress,load-balancer-config,node-security-group}-controller` flags (see commented-out flags in `make run`).
+
+## Logging conventions
+
+One knob: `--log-level` drives both logging stacks (logrus for reconcile paths via `contexts.NewContext(ctx).Log()`, zap/logr for setup + eventhandlers; `--zap-log-level` still overrides zap if set explicitly). No emoji, English messages, always include resource IDs (lbID, poolID, instanceID...).
+
+Levels:
+
+- **Error** — logged exactly once per failure, by `errs.HandleReconcileError` at the controller boundary. Layers below (usecase, repository) must NOT log-and-return: wrap instead (`fmt.Errorf("update pool %s on LB %s: %w", ...)`) so the single Error line carries the whole chain. The only other Errors allowed: swallowed-but-critical failures and startup fatals.
+- **Warn** — abnormal but handled, low-rate: rate-limit hits, swallowed status-patch failures, one-shot invalid user annotations (must include the offending value).
+- **Info** — real mutations (cloud API writes, CR create/delete), state transitions, startup facts, destructive decisions (e.g. removing pool members).
+- **Debug** — everything per-reconcile happy-path: "Ensure successful", requeue reasons, wait-poll progress, no-op decisions (`canDeleteWholePool`...), diffs/dumps, per-port annotation validation, repository request/error detail.
+
+Poll loops (`WaitForLBActive` etc.) log progress at Debug only and track `lastStatus` for a nil-safe timeout message. Eventhandler "Enqueue ..." lines are logr `V(1)` — hidden at info level.

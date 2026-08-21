@@ -150,8 +150,8 @@ func (t *defaultModelBuildTask) buildAnnotationInsertHeaders(_ context.Context) 
 		return option
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a JSON object, using default value %v",
-			annotations.SuffixInsertHeaders, option)
+		t.logger.Debugf("Invalid annotation \"%s\" value, must be a JSON object (%v), using default value %v",
+			annotations.SuffixInsertHeaders, err, option)
 		return option
 	}
 	if option.Http == nil {
@@ -176,8 +176,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpMethod(_ context.C
 		string(loadbalancerv2.HealthCheckMethodPOST):
 		return ptr.To(loadbalancerv2.HealthCheckMethod(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\", \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\", \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpMethod,
+			option,
 			loadbalancerv2.HealthCheckMethodGET,
 			loadbalancerv2.HealthCheckMethodPUT,
 			loadbalancerv2.HealthCheckMethodPOST)
@@ -214,8 +215,9 @@ func (t *defaultModelBuildTask) buildAnnotationHealthcheckHttpVersion(_ context.
 		string(loadbalancerv2.HealthCheckHttpVersionHttp1Minor1):
 		return ptr.To(loadbalancerv2.HealthCheckHttpVersion(option))
 	default:
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be \"%s\" or \"%s\"",
+		t.logger.Debugf("Invalid annotation \"%s\" value \"%s\", must be \"%s\" or \"%s\"",
 			annotations.SuffixHealthcheckHttpVersion,
+			option,
 			loadbalancerv2.HealthCheckHttpVersionHttp1,
 			loadbalancerv2.HealthCheckHttpVersionHttp1Minor1)
 	}
@@ -238,8 +240,8 @@ func (t *defaultModelBuildTask) buildAnnotationAutoReorderPolicies(_ context.Con
 		return nil
 	}
 	if err != nil {
-		t.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean.",
-			annotations.SuffixAutoReorderPolicies)
+		t.logger.Warnf("Invalid annotation \"%s\" value, must be a boolean: %v",
+			annotations.SuffixAutoReorderPolicies, err)
 		return nil
 	}
 	return &option

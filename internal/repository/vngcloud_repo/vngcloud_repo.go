@@ -115,7 +115,7 @@ func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 	// [cuongdm3] Get the under project ID from the metadata service
 	projectID, err := pmetadataService.GetProjectID()
 	if err != nil {
-		logger.Errorf("[ERROR] - setupProjectId: failed to get project ID from metadata service: %v", err)
+		logger.Errorf("setupProjectId: failed to get project ID from metadata service: %v", err)
 		return err
 	}
 
@@ -130,13 +130,12 @@ func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 	portalResp, sdkErr := cloudClient.VServerGateway().V1().
 		PortalService().GetPortalInfo(portalv1.NewGetPortalInfoRequest(projectID))
 	if sdkErr != nil {
-		logger.Errorf("[ERROR] - setupProjectId: failed to get portal information: %v", sdkErr)
+		logger.Errorf("setupProjectId: failed to get portal information: %v", sdkErr)
 		return domain.SDKError(sdkErr)
 	}
 
 	// [cuongdm3] Congratulation, everything is OK
-	// llog.V(5).Infof("[INFO] - setupProjectId: the portal information is %+v", portalResp)
-	logger.Infof("[INFO] - setupProjectId: the portal information is %+v", portalResp)
+	logger.Infof("setupProjectId: resolved project ID %s, user ID %d", portalResp.ProjectID, portalResp.UserID)
 	m.projectId = portalResp.ProjectID
 	m.userId = portalResp.UserID
 	return nil

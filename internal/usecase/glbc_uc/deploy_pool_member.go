@@ -14,16 +14,14 @@ import (
 func (t *defaultModelDeployTask) deployPoolMembers(ctx context.Context, lbId, poolId, poolName string, poolMembersSpec []v1alpha1.GlobalPoolMember) ([]v1alpha1.CreatedGlobalPoolMember, error) {
 	currentPoolMembers, err := t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 	if err != nil {
-		t.logger.Error("Failed to get pool members: ", err)
-		return nil, err
+		return nil, fmt.Errorf("list members of pool %s on LB %s: %w", poolId, lbId, err)
 	}
 
 	patchRequest, allActionMessages := t.buildPatchGlobalPoolMemberRequest(ctx, lbId, poolId, currentPoolMembers, poolMembersSpec)
 	if patchRequest != nil {
-		t.logger.Info("Need to update pool members: ", strings.Join(allActionMessages, "; "))
+		t.logger.Infof("Updating pool %s members on LB %s: %s", poolId, lbId, strings.Join(allActionMessages, "; "))
 		if err := t.vngcloudRepo.PatchGlobalPoolMembers(ctx, lbId, poolId, patchRequest); err != nil {
-			t.logger.Error("Failed to patch pool members: ", err)
-			return nil, err
+			return nil, fmt.Errorf("patch members of pool %s on LB %s: %w", poolId, lbId, err)
 		}
 
 		if _, err := t.vngcloudRepo.WaitGlobalLoadBalancerActive(ctx, lbId); err != nil {
@@ -32,8 +30,7 @@ func (t *defaultModelDeployTask) deployPoolMembers(ctx context.Context, lbId, po
 
 		currentPoolMembers, err = t.vngcloudRepo.ListGlobalPoolMembers(ctx, lbId, poolId)
 		if err != nil {
-			t.logger.Error("Failed to get pool members after patching: ", err)
-			return nil, err
+			return nil, fmt.Errorf("list members of pool %s on LB %s after patching: %w", poolId, lbId, err)
 		}
 	}
 
@@ -263,9 +260,7 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 	// Deliberate, and the same reasoning as in lbc_uc: a member this cluster did not create is
 	// somebody else's. But such members are never cleaned up either, so at least name them.
 	if len(foreign) > 0 {
-		t.logger.Infof("Keeping %d global pool member(s) not created by this cluster and not in spec: %s. "+
-			"They are left alone on purpose; if they are stale, remove them from the portal.",
-			len(foreign), strings.Join(foreign, ", "))
+		t.logger.Debugf("Keeping %d global pool member(s) not created by this cluster and not in spec: %s", len(foreign), strings.Join(foreign, ", "))
 	}
 
 	// add new members from spec that aren't already in merged (by address+port identity)

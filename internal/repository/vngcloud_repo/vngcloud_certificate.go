@@ -15,7 +15,7 @@ func (m *vngCloudRepository) ListCertificates(ctx context.Context) (*entityv2.Li
 	logger := contexts.NewContext(ctx).Log()
 	certs, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().ListCertificates(loadbalancerv2.NewListCertificatesRequest().AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ListCertificates: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ListCertificates: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return certs, nil
@@ -25,7 +25,7 @@ func (m *vngCloudRepository) GetCertificateByID(ctx context.Context, certID stri
 	logger := contexts.NewContext(ctx).Log()
 	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().GetCertificateById(loadbalancerv2.NewGetCertificateByIdRequest(certID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - GetCertificateByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("GetCertificateByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return cert, nil
@@ -33,10 +33,10 @@ func (m *vngCloudRepository) GetCertificateByID(ctx context.Context, certID stri
 
 func (m *vngCloudRepository) ImportCertificate(ctx context.Context, opt loadbalancerv2.ICreateCertificateRequest) (*entityv2.Certificate, error) {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request import certificate", domain.RequestIcon)
+	logger.Infof("Request import certificate %v", opt.ToMap()["name"])
 	cert, sdkErr := m.client.VLBGateway().V2().LoadBalancerService().CreateCertificate(opt.AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - ImportCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("ImportCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
 	}
 	return cert, nil
@@ -44,10 +44,10 @@ func (m *vngCloudRepository) ImportCertificate(ctx context.Context, opt loadbala
 
 func (m *vngCloudRepository) DeleteCertificate(ctx context.Context, certID string) error {
 	logger := contexts.NewContext(ctx).Log()
-	logger.Infof("%s Request delete certificate %s", domain.RequestIcon, certID)
+	logger.Infof("Request delete certificate %s", certID)
 	sdkErr := m.client.VLBGateway().V2().LoadBalancerService().DeleteCertificateById(loadbalancerv2.NewDeleteCertificateByIdRequest(certID).AddUserAgent(m.userAgent))
 	if sdkErr != nil {
-		logger.Error("[ERROR] - DeleteCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
+		logger.Debug("DeleteCertificate: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return domain.SDKError(sdkErr)
 	}
 	return nil

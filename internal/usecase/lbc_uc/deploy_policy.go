@@ -55,8 +55,7 @@ func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listene
 		}
 
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-			t.logger.Error("Failed to wait for loadbalancer active: ", err)
-			return nil, err
+			return nil, fmt.Errorf("wait LB %s active after creating policy %s: %w", lbId, newPolicy.UUID, err)
 		}
 		return &v1alpha1.CreatedPolicy{Id: newPolicy.UUID}, nil
 	} else {
@@ -74,8 +73,7 @@ func (t *defaultModelDeployTask) deployPolicy(ctx context.Context, lbId, listene
 			}
 
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
-				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return nil, err
+				return nil, fmt.Errorf("wait LB %s active after updating policy %s: %w", lbId, currentPolicy.UUID, err)
 			}
 		}
 	}

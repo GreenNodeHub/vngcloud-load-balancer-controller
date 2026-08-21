@@ -1,6 +1,8 @@
 package metadata
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"k8s.io/klog/v2"
 )
 
 func GetMetadataProvider(order string) IMetadata {
@@ -62,7 +62,7 @@ func getFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	mntdir := os.TempDir()
 	defer func() { _ = os.Remove(mntdir) }()
 
-	klog.V(4).Infof("getFromConfigDrive; attempting to mount configdrive on %s", mntdir)
+	logrus.Debugf("getFromConfigDrive; attempting to mount configdrive on %s", mntdir)
 
 	configDrivePath := getConfigDrivePath(metadataVersion)
 	f, err := os.Open(
@@ -96,7 +96,7 @@ func parseMetadata(r io.Reader) (*Metadata, error) {
 func getFromMetadataService(metadataVersion string) (*Metadata, error) {
 	// Try to get JSON from metadata server.
 	metadataURL := getMetadataURL(metadataVersion)
-	klog.V(4).Infof("getFromMetadataService; attempting to fetch metadata from %s, ignoring proxy settings", metadataURL)
+	logrus.Debugf("getFromMetadataService; attempting to fetch metadata from %s, ignoring proxy settings", metadataURL)
 	resp, err := noProxyHTTPClient().Get(metadataURL)
 	if err != nil {
 		return nil, fmt.Errorf("getFromMetadataService; error fetching metadata from URL %s; ERR: %v", metadataURL, err)

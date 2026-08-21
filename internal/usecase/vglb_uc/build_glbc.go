@@ -57,8 +57,7 @@ func (t *defaultModelBuildTask) run(ctx context.Context) error {
 			return true
 		})
 		if err != nil {
-			t.logger.Errorf("failed to update VGLB status address: %v", err)
-			return err
+			return errors.Wrapf(err, "update VGLB %s/%s status address", t.vglb.Namespace, t.vglb.Name)
 		}
 	}
 	return nil
@@ -101,11 +100,9 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		domain.LabelOwnerResourceUid:  string(t.vglb.UID),
 	})
 	if err != nil {
-		t.logger.Errorf("failed to list GLBC: %v", err)
-		return err
+		return errors.Wrapf(err, "list GLBCs owned by VGLB %s/%s", t.vglb.Namespace, t.vglb.Name)
 	}
 	if len(glbcList.Items) > 1 {
-		t.logger.Errorf("found multiple GLBC for VGLB %s/%s", t.vglb.Namespace, t.vglb.Name)
 		return errors.New("found multiple GLBC for VGLB " + t.vglb.Namespace + "/" + t.vglb.Name)
 	}
 
@@ -146,7 +143,6 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 	t.servicePointer = svc
 	pools, listeners, err := t.buildPoolsAndListeners(ctx, nil)
 	if err != nil {
-		t.logger.Errorf("failed to build pools and listeners: %v", err)
 		return err
 	}
 	glbConfig.Spec.GlobalPools = pools
@@ -158,22 +154,20 @@ func (t *defaultModelBuildTask) buildGlobalLoadBalancerConfig(ctx context.Contex
 		// Other clusters skip and wait for the config cluster to provision it first.
 		if glbConfig.Spec.LoadBalancerId == nil {
 			if t.vglb.Annotations[consts.ConfigClusterIdAnnotation] != t.cfg.Cluster.ClusterID {
-				t.logger.Infof("No LB ID yet — waiting for config cluster %q to create the loadbalancer.", t.vglb.Annotations[consts.ConfigClusterIdAnnotation])
+				t.logger.Debugf("No LB ID yet, waiting for config cluster %q to create the load balancer", t.vglb.Annotations[consts.ConfigClusterIdAnnotation])
 				return nil
 			}
 		}
 		err = t.k8sRepo.CreateGlobalLoadBalancerConfig(ctx, glbConfig)
 		if err != nil {
-			t.logger.Errorf("failed to create GLBC: %v", err)
-			return err
+			return errors.Wrapf(err, "create GLBC for VGLB %s/%s", t.vglb.Namespace, t.vglb.Name)
 		}
 	} else {
 		// Only patch if spec actually changed to avoid unnecessary generation increments
 		if !glbcSpecEqual(oldGLBConfig.Spec, glbConfig.Spec) {
 			err = t.k8sRepo.PatchGlobalLoadBalancerConfig(ctx, glbConfig, client.MergeFrom(oldGLBConfig))
 			if err != nil {
-				t.logger.Errorf("failed to patch GLBC: %v", err)
-				return err
+				return errors.Wrapf(err, "patch GLBC %s/%s", glbConfig.Namespace, glbConfig.Name)
 			}
 		}
 	}
