@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
@@ -105,7 +106,9 @@ func TestMergePoolMembers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			task := &defaultModelDeployTask{}
+			// mergePoolMembers logs the members it keeps that this cluster did not create, so
+			// the task needs a logger the way the real one always has.
+			task := &defaultModelDeployTask{logger: logrus.NewEntry(logrus.New())}
 			result := task.mergePoolMembers(context.Background(), tt.created, tt.current, tt.spec)
 			assert.Len(t, result, tt.wantLen)
 			tt.check(t, result)
