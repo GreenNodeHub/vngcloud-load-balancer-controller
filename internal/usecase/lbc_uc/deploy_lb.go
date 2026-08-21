@@ -237,6 +237,18 @@ func (t *defaultModelDeployTask) teardownOnLoadBalancer(ctx context.Context, lbI
 		return err
 	}
 
+	// Stop claiming to use it. Nothing will ever come back to this load balancer - status now
+	// points at the new one - so a cluster id left in vng.vks.cluster.ids here stays for good,
+	// and the load balancer goes on looking like this cluster's. deleteRedundantTags keeps the
+	// id if a sibling LBC still uses the load balancer, and leaves the vpc, billing and
+	// provenance tags alone.
+	//
+	// Must run before the status is cleared: it reads status.createdTags to know which tags
+	// are this cluster's to drop.
+	if err := t.deleteRedundantTags(ctx, lbId); err != nil {
+		return err
+	}
+
 	return t.statusClearCreatedResources(ctx)
 }
 

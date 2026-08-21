@@ -190,11 +190,16 @@ func createdCertificatesEqual(a, b []v1alpha1.CreatedCertificate) bool {
 // resources on the old one, and their names would collide with the new one's.
 func (t *defaultModelDeployTask) statusClearCreatedResources(ctx context.Context) error {
 	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
-		if len(obj.Status.CreatedListeners) == 0 && len(obj.Status.CreatedPools) == 0 {
+		if len(obj.Status.CreatedListeners) == 0 && len(obj.Status.CreatedPools) == 0 &&
+			len(obj.Status.CreatedTags) == 0 {
 			return false // no change needed
 		}
 		obj.Status.CreatedListeners = nil
 		obj.Status.CreatedPools = nil
+		// createdTags too: it records what was written on the load balancer being left behind,
+		// and buildTag treats those keys as this cluster's to drop. Carried into the next load
+		// balancer it would take keys off that one which were never written by us.
+		obj.Status.CreatedTags = nil
 		return true
 	})
 }
