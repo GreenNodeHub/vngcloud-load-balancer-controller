@@ -30,6 +30,8 @@ func TestTTLCacheExpires(t *testing.T) {
 	now := time.Now()
 	c := newTTLCache[string](10*time.Minute, 16)
 	c.now = func() time.Time { return now }
+	// pinned so the boundaries below are exact; the jitter itself is asserted separately
+	c.jitter = func(d time.Duration) time.Duration { return d }
 
 	c.put("k1", "v1")
 	_, ok := c.get("k1")
@@ -60,6 +62,30 @@ func TestTTLCacheInvalidate(t *testing.T) {
 	assert.Equal(t, "v2", got)
 
 	c.invalidate("absent") // must not panic
+}
+
+// Entries warmed together must not expire together: the caches are filled in sweeps, and a
+// shared expiry turns the first reconcile after it into a fleet-wide re-read burst against
+// the same request budget the cache exists to protect.
+func TestTTLCachePutSpreadsExpiries(t *testing.T) {
+	now := time.Now()
+	c := newTTLCache[string](time.Hour, 256)
+	c.now = func() time.Time { return now }
+
+	for i := 0; i < 100; i++ {
+		c.put(fmt.Sprintf("k%d", i), "v")
+	}
+
+	distinct := map[time.Time]bool{}
+	for _, e := range c.entries {
+		assert.GreaterOrEqual(t, e.expiresAt.Sub(now), time.Hour,
+			"jitter must only stretch the TTL - an entry is always good for at least what the cache promises")
+		assert.LessOrEqual(t, e.expiresAt.Sub(now), time.Duration(float64(time.Hour)*(1+ttlJitterFactor)),
+			"the stretch is bounded by the jitter factor")
+		distinct[e.expiresAt] = true
+	}
+	assert.Greater(t, len(distinct), 50,
+		"100 entries warmed in one sweep must land on many different expiries, not one cliff")
 }
 
 // A cache that grows without a bound is a memory leak wearing a hat.
