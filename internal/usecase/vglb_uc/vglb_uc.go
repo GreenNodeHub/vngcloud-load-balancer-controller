@@ -79,7 +79,8 @@ func (uc *vglbUseCase) InitVngcloudGlobalLoadBalancerUseCase(ctx context.Context
 	}
 
 	// Read network info from node labels
-	firstNode := &nodes.Items[0]
+	// Deterministically, not whichever node the cache handed back first - see FirstNodeByName.
+	firstNode := utils.FirstNodeByName(nodes)
 	rawZone := firstNode.Labels[labelMgmtZone]
 	uc.defaultNetworkId = firstNode.Labels[labelNetworkId]
 	uc.defaultSubnetId = firstNode.Labels[labelSubnetId]
