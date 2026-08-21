@@ -890,6 +890,11 @@ func (in *LoadBalancerConfigStatus) DeepCopyInto(out *LoadBalancerConfigStatus) 
 		*out = new(string)
 		**out = **in
 	}
+	if in.CreatedLoadBalancerId != nil {
+		in, out := &in.CreatedLoadBalancerId, &out.CreatedLoadBalancerId
+		*out = new(string)
+		**out = **in
+	}
 	if in.LoadBalancerName != nil {
 		in, out := &in.LoadBalancerName, &out.LoadBalancerName
 		*out = new(string)

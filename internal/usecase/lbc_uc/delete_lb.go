@@ -35,11 +35,27 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		return err
 	}
 
+	// Only a load balancer this cluster created is ours to delete. Reading the tags is how
+	// provenance is established, and the read is cached - deployTags has just made it.
+	tags, err := t.vngcloudRepo.ListTags(ctx, lbId)
+	if err != nil {
+		return err
+	}
+	currentTags := make(map[string]string, len(tags.Items))
+	for _, tag := range tags.Items {
+		currentTags[tag.Key] = tag.Value
+	}
+	ours := t.createdByThisCluster(lbId, currentTags)
+	if !ours {
+		t.logger.Infof("Load balancer %s was not created by this cluster, it will be left in place for LBC %s/%s",
+			lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+	}
+
 	canDelete, err := t.canDeleteWholeLoadBalancer(ctx, lbId, t.lbConfig.Spec.Type)
 	if err != nil {
 		return err
 	}
-	if canDelete {
+	if canDelete && ours {
 		t.logger.Infof("Deleting load balancer %s in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 		err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 		if err != nil {
@@ -62,7 +78,7 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		if err != nil {
 			return err
 		}
-		if isEmpty {
+		if isEmpty && ours {
 			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
 			if err != nil {

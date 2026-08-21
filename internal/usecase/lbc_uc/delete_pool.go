@@ -2,12 +2,19 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
+
+// errPartialDelete marks a pass in which some pools were cleaned up and others were not. The
+// caller must still treat it as a failure - the load balancer is not in the state we asked for
+// - but the pools that did come off stay off, and the next pass has less to do.
+var errPartialDelete = errors.New("some pools could not be cleaned up")
 
 // delete pools created not in use anymore
 // should check if pool is used by other listeners or policies (user use) then ignore
@@ -62,6 +69,13 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		return false
 	}
 
+	// One stubborn pool must not shield the others. Each candidate is independent - different
+	// pool, different members - and the failure that showed up in production was one pool
+	// returning VngCloudVLBLoadBalancerNotReady, which aborted the loop before the remaining
+	// four were touched and then aborted at the same pool on every retry. Failures are
+	// collected and returned at the end, so the reconcile still retries.
+	failures := make([]error, 0)
+
 	for _, candidateId := range deleteCandidates {
 		if !isPoolExist(candidateId) {
 			t.logger.Warnf("Pool %s not found in load balancer %s, skip delete", candidateId, lbId)
@@ -87,34 +101,48 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 		currentListMembers, err := t.vngcloudRepo.GetPoolMembers(ctx, lbId, candidateId)
 		if err != nil {
 			t.logger.Errorf("Failed to get pool members for pool %s: %v", candidateId, err)
-			return err
+			failures = append(failures, fmt.Errorf("pool %s: get members: %s", candidateId, err.Error()))
+			continue
 		}
 
 		canDeleteWhole, updateMemberOption := t.canDeleteWholePool(ctx, lbId, candidateId, currentListMembers, createdMembers, newCreatedMembers)
 
 		if !isPoolInUse(candidateId) && canDeleteWhole {
 			// delete pool
-			err := t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
+			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+				return t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
+			})
 			if err != nil {
 				t.logger.Error("Failed to delete pool: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("pool %s: delete: %s", candidateId, err.Error()))
+				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("pool %s: wait after delete: %s", candidateId, err.Error()))
+				continue
 			}
 		} else if updateMemberOption != nil {
 			// update to delete redundant members
 			t.logger.Debugf("Update pool %s members to remove redundant members", candidateId)
-			if err = t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, candidateId, updateMemberOption); err != nil {
+			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+				return t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, candidateId, updateMemberOption)
+			})
+			if err != nil {
 				t.logger.Error("Failed to update pool members: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("pool %s: update members: %s", candidateId, err.Error()))
+				continue
 			}
 			if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 				t.logger.Error("Failed to wait for loadbalancer active: ", err)
-				return err
+				failures = append(failures, fmt.Errorf("pool %s: wait after update: %s", candidateId, err.Error()))
+				continue
 			}
 		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("%w: %w", errPartialDelete, errors.Join(failures...))
 	}
 	return nil
 }

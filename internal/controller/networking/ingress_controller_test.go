@@ -845,7 +845,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
+				g.Expect((tags.Items)).Should(HaveLen(4))
 				// TODO: verify 3 tags
 				// g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				// g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
@@ -925,7 +925,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
+				g.Expect((tags.Items)).Should(HaveLen(4))
 				// TODO
 				// g.Expect(tags.Items[0].Key).Should(Equal(domain.ClusterTagKey))
 				// g.Expect(tags.Items[0].Value).Should(Equal(mockConfig.Cluster.ClusterID))
@@ -979,7 +979,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(5))
+				g.Expect((tags.Items)).Should(HaveLen(6))
 				tagKeys := make([]string, 0)
 				tagValues := make([]string, 0)
 				for _, tag := range tags.Items {
@@ -1050,7 +1050,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(5))
+				g.Expect((tags.Items)).Should(HaveLen(6))
 				tagKeys := make([]string, 0)
 				tagValues := make([]string, 0)
 				for _, tag := range tags.Items {
@@ -1207,7 +1207,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(3))
+				g.Expect((tags.Items)).Should(HaveLen(4))
 				tagKeys := make([]string, 0)
 				for _, tag := range tags.Items {
 					tagKeys = append(tagKeys, tag.Key)
@@ -1291,7 +1291,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(5))
+				g.Expect((tags.Items)).Should(HaveLen(6))
 				tagKeys := make([]string, 0)
 				for _, tag := range tags.Items {
 					tagKeys = append(tagKeys, tag.Key)
@@ -1342,7 +1342,7 @@ var _ = Describe("Ingress Controller", func() {
 				tags, err := vngcloudRepo.ListTags(ctx, loadbalancer.UUID)
 				g.Expect(err).ShouldNot(HaveOccurred())
 				g.Expect(tags).ShouldNot(BeNil())
-				g.Expect((tags.Items)).Should(HaveLen(5))
+				g.Expect((tags.Items)).Should(HaveLen(6))
 				tagKeys := make([]string, 0)
 				for _, tag := range tags.Items {
 					tagKeys = append(tagKeys, tag.Key)

@@ -3,17 +3,19 @@ name: govulncheck
 on:
   pull_request:
   push:
-    branches:
-      - '**'
+    branches: [main]
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Scan for Vulnerabilities in Code
-        uses: golang/govulncheck-action@b625fbe08f3bccbe446d94fbf87fcc875a4f50ee # v1.0.4
+        # Pinned to master HEAD: latest v1.0.4 tag transitively pulls actions/checkout@v4.1.1
+        # and actions/setup-go@v5.0.0 (Node 20). master HEAD pins them to v6.0.2 / v6.2.0 (Node 24).
+        # Switch back to a tagged release once upstream cuts v1.0.5+.
+        uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd # master @ 2026-02-26
         with:
-          go-version-input: 1.25.9
+          go-version-input: 1.25.13
           go-package: ./...

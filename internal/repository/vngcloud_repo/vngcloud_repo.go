@@ -8,8 +8,10 @@ import (
 	cuongpigerutils "github.com/cuongpiger/joat/utils"
 	"github.com/pkg/errors"
 	"github.com/vngcloud/vngcloud-go-sdk/v2/client"
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	portalv1 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/portal/v1"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils/metadata"
@@ -28,6 +30,9 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 	}
 	vngcloudRepo := &vngCloudRepository{
 		cfg: cfg,
+		// built once per process, never per reconcile
+		serverNetworkCache: newTTLCache[serverNetworkInfo](serverNetworkCacheTTL, serverNetworkCacheMaxSize),
+		tagCache:           newTTLCache[[]entityv2.Tag](tagCacheTTL, tagCacheMaxSize),
 	}
 
 	metadator := metadata.GetMetadataProvider(vngcloudRepo.cfg.Metadata.SearchOrder)
@@ -78,6 +83,12 @@ type vngCloudRepository struct {
 	// client to manage INTERVPC load balancer
 	superClient client.IClient
 
+	// where each node sits on the network; see serverNetworkInfo
+	serverNetworkCache *ttlCache[serverNetworkInfo]
+
+	// a load balancer's tags; see ListTags
+	tagCache *ttlCache[[]entityv2.Tag]
+
 	// zoneID     common.Zone
 	// netID      string
 	// netCIDR    string
@@ -120,7 +131,7 @@ func (m *vngCloudRepository) setupProjectId(ctx context.Context, pmetadataServic
 		PortalService().GetPortalInfo(portalv1.NewGetPortalInfoRequest(projectID))
 	if sdkErr != nil {
 		logger.Errorf("[ERROR] - setupProjectId: failed to get portal information: %v", sdkErr)
-		return sdkErr.GetError()
+		return domain.SDKError(sdkErr)
 	}
 
 	// [cuongdm3] Congratulation, everything is OK

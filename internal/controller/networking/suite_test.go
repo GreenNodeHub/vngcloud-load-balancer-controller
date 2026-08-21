@@ -244,6 +244,13 @@ var _ = BeforeSuite(func() {
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
 
+	// Start() only kicks the manager off, so without this the first specs can run while the
+	// informers are still starting: a reconcile that lists nodes then gets an empty result or
+	// "failed waiting for *v1.Node Informer to sync", and the spec times out waiting for a
+	// load balancer nobody was ever going to build. That is what the flakiness in these
+	// suites looks like - always the earliest specs, and worse the slower the machine.
+	Expect(k8sManager.GetCache().WaitForCacheSync(ctx)).To(BeTrue(), "informer caches never synced")
+
 	// Create mock nodes
 	err = k8sClient.Create(ctx, vngcloud_mocks.MockNode1)
 	Expect(err).ToNot(HaveOccurred())

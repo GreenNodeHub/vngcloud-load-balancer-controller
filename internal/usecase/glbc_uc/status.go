@@ -132,3 +132,17 @@ func createdGlobalPoolMembersEqual(a, b []v1alpha1.CreatedGlobalPoolMember) bool
 	}
 	return true
 }
+
+// statusClearCreatedResources forgets the listeners and pools recorded in status. Used
+// when the config moves to another load balancer: entries left behind describe
+// resources on the old one, and their names would collide with the new one's.
+func (t *defaultModelDeployTask) statusClearCreatedResources(ctx context.Context) error {
+	return t.k8sRepo.PatchMutateStatusGlobalLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.GlobalLoadBalancerConfig) bool {
+		if len(obj.Status.CreatedListeners) == 0 && len(obj.Status.CreatedPools) == 0 {
+			return false // no change needed
+		}
+		obj.Status.CreatedListeners = nil
+		obj.Status.CreatedPools = nil
+		return true
+	})
+}

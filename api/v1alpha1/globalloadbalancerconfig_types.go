@@ -326,9 +326,11 @@ type GlobalLoadBalancerConfigStatus struct {
 	CreatedTags map[string]string `json:"createdTags,omitempty"`
 
 	// CreatedPools is the list of created pool IDs
+	// Keyed by id, not name: pool names are only unique within one load balancer, so
+	// migrating to another load balancer would collide on name.
 	// +optional
 	// +listType=map
-	// +listMapKey=name
+	// +listMapKey=id
 	CreatedPools []CreatedGlobalPool `json:"createdPools,omitempty"`
 
 	// CreatedListeners is the list of created listener IDs
@@ -375,7 +377,7 @@ func (a GlobalLoadBalancerVIPStatus) Equal(b GlobalLoadBalancerVIPStatus) bool {
 type CreatedGlobalListener struct {
 	// Id is the ID of the created listener
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Port is the port number of the created listener
 	// +required
@@ -394,7 +396,7 @@ func (a CreatedGlobalListener) Equal(b CreatedGlobalListener) bool {
 type CreatedGlobalPool struct {
 	// Id is the ID of the created pool
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Name is the name of the created pool
 	// +required
@@ -425,7 +427,7 @@ func (a CreatedGlobalPool) Equal(b CreatedGlobalPool) bool {
 type CreatedGlobalPoolMember struct {
 	// Id is the ID of the created member
 	// +required
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
 	// Name is the name of the created member
 	// +required

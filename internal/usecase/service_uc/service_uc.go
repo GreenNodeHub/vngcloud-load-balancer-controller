@@ -73,7 +73,8 @@ func (uc *serviceUseCase) InitServiceUseCase(ctx context.Context) error {
 	// check if network info is available
 	if uc.defaultNetworkId == "" || uc.defaultSubnetId == "" || uc.defaultSubnetCIDR == "" || uc.defaultZone == "" {
 		// get provider ID from first node
-		firstProviderId := utils.GetProviderIdFromNode(&nodes.Items[0])
+		// Deterministically, not whichever node the cache handed back first - see FirstNodeByName.
+		firstProviderId := utils.GetProviderIdFromNode(utils.FirstNodeByName(nodes))
 		if firstProviderId == "" {
 			return errors.New("failed to get provider ID from node")
 		}

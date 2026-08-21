@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,6 +17,11 @@ import (
 // oldPools are in Status
 // newPools are in Spec
 // ensure them to portal. Don't delete old pool because some listener is using them
+// errPartialDeploy marks a pass in which some pools were deployed and others were not. The
+// caller must not treat the returned list as the desired state: it is missing the pools that
+// failed, and handing it to deleteRedundantPools would delete exactly those.
+var errPartialDeploy = errors.New("some pools could not be deployed")
+
 func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) ([]v1alpha1.CreatedPool, error) {
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
 	if err != nil {
@@ -23,12 +29,22 @@ func (t *defaultModelDeployTask) deployPools(ctx context.Context, lbId string) (
 	}
 
 	createdPools := make([]v1alpha1.CreatedPool, 0)
+	failures := make([]error, 0)
 	for _, pool := range t.lbConfig.Spec.Pools {
-		if createdPool, err := t.deployPool(ctx, lbId, &pool, currentPools); err != nil {
-			return nil, err
-		} else {
-			createdPools = append(createdPools, *createdPool)
+		createdPool, err := t.deployPool(ctx, lbId, &pool, currentPools)
+		if err != nil {
+			// Keep going. The pools are independent, and returning here abandoned every
+			// pool behind this one - so whichever pool followed a failure never got
+			// deployed in that pass, every pass.
+			t.logger.Errorf("Failed to deploy pool %s: %v", pool.Name, err)
+			failures = append(failures, fmt.Errorf("pool %s: %w", pool.Name, err))
+			continue
 		}
+		createdPools = append(createdPools, *createdPool)
+	}
+
+	if len(failures) > 0 {
+		return createdPools, fmt.Errorf("%w: %w", errPartialDeploy, errors.Join(failures...))
 	}
 	return createdPools, nil
 }
@@ -46,9 +62,14 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	currentPool := searchPoolByName(pool.Name)
 	if currentPool == nil {
 		// Create new pool
-		_pool, err := t.vngcloudRepo.CreatePool(ctx, lbId,
-			t.buildCreatePoolRequest(ctx, lbId, pool),
-		)
+		var _pool *entityv2.Pool
+		err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			var createErr error
+			_pool, createErr = t.vngcloudRepo.CreatePool(ctx, lbId,
+				t.buildCreatePoolRequest(ctx, lbId, pool),
+			)
+			return createErr
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +105,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	updateOptions, message := t.buildPoolUpdateRequest(ctx, lbId, pool, currentPool)
 	if updateOptions != nil {
 		t.logger.Info("Need update pool: ", strings.Join(message, ", "))
-		err := t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
+		err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			return t.vngcloudRepo.UpdatePool(ctx, lbId, currentPool.UUID, updateOptions)
+		})
 		if err != nil {
 			t.logger.Error("Failed to update pool: ", err)
 			return nil, err
@@ -125,7 +148,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		updateMemberOptions := loadbalancerv2.NewUpdatePoolMembersRequest(lbId, currentPool.UUID).WithMembers(convertMembers...)
 
 		t.logger.Info("Need update pool members: ", updateMembers)
-		if err = t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions); err != nil {
+		if err = t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+			return t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, currentPool.UUID, updateMemberOptions)
+		}); err != nil {
 			t.logger.Error("Failed to update pool members: ", err)
 			return nil, err
 		}
@@ -364,10 +389,26 @@ func (t *defaultModelDeployTask) mergePoolMembers(_ context.Context, createdMemb
 	mergedPoolMembers := make([]v1alpha1.PoolMember, 0)
 
 	// keep current member if it is in spec or not created by us
+	foreign := make([]string, 0)
 	for _, member := range currentMembers {
-		if t.checkIfPoolMemberExist(poolMemberSpec, &member) || !t.checkIfPoolMemberExist(createdMembers, &member) {
+		inSpec := t.checkIfPoolMemberExist(poolMemberSpec, &member)
+		ours := t.checkIfPoolMemberExist(createdMembers, &member)
+		if inSpec || !ours {
 			mergedPoolMembers = append(mergedPoolMembers, member)
 		}
+		if !inSpec && !ours {
+			foreign = append(foreign, fmt.Sprintf("%s:%d", member.IP, member.Port))
+		}
+	}
+
+	// Deliberate: a member this cluster did not create is somebody else's, and removing it
+	// would take traffic away from whoever added it. But it also means such members are never
+	// cleaned up, and finding them has so far meant comparing the portal against the node list
+	// by hand - which is how 19 stale members on one pool went unnoticed. Say so instead.
+	if len(foreign) > 0 {
+		t.logger.Infof("Keeping %d pool member(s) not created by this cluster and not in spec: %s. "+
+			"They are left alone on purpose; if they are stale, remove them from the portal.",
+			len(foreign), strings.Join(foreign, ", "))
 	}
 
 	// add new members from spec

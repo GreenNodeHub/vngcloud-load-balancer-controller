@@ -83,11 +83,17 @@ var _ = Describe("VngcloudGlobalLoadBalancer Controller", func() {
 				foundGLBC = glbc
 			}, vglbTimeout, vglbInterval).Should(Succeed())
 
-			// Assert GLBC spec: name uses vks_ prefix with underscores
-			Expect(strings.Contains(foundGLBC.Spec.Name, "vks_")).To(BeTrue(),
-				"Expected GLBC Name to contain 'vks_', got: %s", foundGLBC.Spec.Name)
-			Expect(strings.Contains(foundGLBC.Spec.Name, "vglb_create_test")).To(BeTrue(),
-				"Expected GLBC Name to contain service name with underscores, got: %s", foundGLBC.Spec.Name)
+			// The generated name is built from prefix, cluster, namespace and resource, each
+			// trimmed, and then run through ValidateName - which replaces anything that is not
+			// a letter, digit, "-" or "." with "-". So the separators are dashes, not the
+			// underscores the builder starts with.
+			Expect(strings.HasPrefix(foundGLBC.Spec.Name, "vks-")).To(BeTrue(),
+				"Expected GLBC Name to start with 'vks-', got: %s", foundGLBC.Spec.Name)
+			Expect(strings.Contains(foundGLBC.Spec.Name, ns)).To(BeTrue(),
+				"Expected GLBC Name to contain the namespace, got: %s", foundGLBC.Spec.Name)
+			Expect(strings.Contains(foundGLBC.Spec.Name, "vglb-creat")).To(BeTrue(),
+				"Expected GLBC Name to contain the resource name trimmed to 10 characters, got: %s",
+				foundGLBC.Spec.Name)
 
 			// Assert: 1 pool
 			Expect(foundGLBC.Spec.GlobalPools).To(HaveLen(1),

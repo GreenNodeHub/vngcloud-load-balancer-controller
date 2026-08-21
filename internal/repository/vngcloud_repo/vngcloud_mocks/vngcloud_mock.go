@@ -527,6 +527,10 @@ func (m *MockProvider) ListSecurityGroupRules(ctx context.Context, secgroupID st
 
 // // --------------------------- Tags ---------------------------
 
+// InvalidateTagsCache is a no-op: this mock answers ListTags from its own in-memory tags,
+// so there is nothing cached to forget.
+func (m *MockProvider) InvalidateTagsCache(resourceID string) {}
+
 func (m *MockProvider) ListTags(ctx context.Context, resourceID string) (*entityv2.ListTags, error) {
 	tags := make(map[string]string)
 	if t, ok := m.tags[resourceID]; ok {
