@@ -25,11 +25,11 @@ func notReadyErr() error {
 // transient, and treating it as fatal is what aborts the reconcile before the cleanup runs.
 func TestRetryOnLoadBalancerNotReady(t *testing.T) {
 	tests := []struct {
-		name       string
-		errs       []error // one per attempt
-		wantCalls  int
-		wantWaits  int
-		wantErr    bool
+		name      string
+		errs      []error // one per attempt
+		wantCalls int
+		wantWaits int
+		wantErr   bool
 	}{
 		{
 			name:      "accepted first time - no wait, no retry",
