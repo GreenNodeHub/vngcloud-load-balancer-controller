@@ -42,8 +42,20 @@ jobs:
           # which package failed instead of one wall of output.
           failed=()
           while read -r pkg; do
+            args=()
+            case "$pkg" in
+              */internal/controller/*)
+                # Ginkgo suites only - a plain test binary rejects these flags. If a spec runs
+                # long, Ginkgo dumps what it is waiting on and the goroutine stacks, instead of
+                # just "Timed out after 20s". These suites flake rarely and have so far proved
+                # unreproducible on demand; the next time it happens the log should say which
+                # reconcile was stuck rather than leaving us to guess.
+                args=(-ginkgo.poll-progress-after=45s -ginkgo.poll-progress-interval=30s)
+                ;;
+            esac
+
             echo "::group::$pkg"
-            if go test -count=1 "$pkg"; then
+            if go test -count=1 "$pkg" "${args[@]}"; then
               echo "::endgroup::"
             else
               echo "::endgroup::"

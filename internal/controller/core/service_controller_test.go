@@ -37,13 +37,32 @@ import (
 )
 
 const (
-	timeout         = time.Second * 5
+	timeout = time.Second * 5
+
+	// teardownTimeout is what the AfterEach checks get, and it is deliberately larger than
+	// timeout. Deleting a Service unwinds a chain in the cloud - detach the security groups
+	// from every node, delete the listeners, the pools, the load balancer, then the security
+	// group - and the controller works through it by requeueing every 2 seconds
+	// (service_uc.go, "waiting for resources to be deleted"). Five seconds is two attempts,
+	// which is why these checks were the ones that timed out whenever the machine was busy.
+	// Costs nothing when the suite is healthy: Eventually returns as soon as it is satisfied.
+	teardownTimeout = time.Second * 30
 	interval        = time.Millisecond * 250
 	testServiceName = "test-service"
 )
 
 var _ = Describe("Service Controller", func() {
 	AfterEach(func() {
+		// Registered before the assertions so it runs even when one of them fails. Otherwise a
+		// single timeout here skips the cleanup below and leaves its load balancers behind,
+		// which fails every spec that follows - one flake became seven.
+		DeferCleanup(func() {
+			cleanupAllEndpoints()
+			cleanupAllLBCs()
+			cleanupAllNSGs()
+			cleanupAllServices()
+		})
+
 		// Ensure clean state before each test
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
