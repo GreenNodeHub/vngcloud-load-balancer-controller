@@ -8,12 +8,9 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-func (t *defaultModelDeployTask) deployDeleteRedundantPolicies(ctx context.Context, lbId, listenerId string, newCreatedPolicies []v1alpha1.CreatedPolicy) error {
-	return t.deployDeleteRedundantPoliciesFrom(ctx, lbId, t.lbConfig.Status.CreatedListeners, listenerId, newCreatedPolicies)
-}
-
-// deployDeleteRedundantPoliciesFrom is deployDeleteRedundantPolicies with the created-listener
-// record made explicit; see deleteRedundantPoolsFrom for why.
+// deployDeleteRedundantPoliciesFrom removes the listener's policies this LBC created and no
+// longer wants. The created-listener record is a parameter rather than read from status; see
+// deleteRedundantPoolsFrom for why.
 func (t *defaultModelDeployTask) deployDeleteRedundantPoliciesFrom(ctx context.Context, lbId string, createdListeners []v1alpha1.CreatedListener, listenerId string, newCreatedPolicies []v1alpha1.CreatedPolicy) error {
 	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
 		return nil

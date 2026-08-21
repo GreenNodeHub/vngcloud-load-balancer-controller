@@ -2,10 +2,10 @@ package lbc_uc
 
 import (
 	"context"
-
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	"slices"
 	"strings"
+
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
