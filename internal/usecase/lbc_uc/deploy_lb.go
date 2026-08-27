@@ -68,7 +68,7 @@ func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	err = t.deployDeleteRedundantCerts(ctx)
+	err = t.deleteRedundantCerts(ctx, createdCerts)
 	if err != nil {
 		return err
 	}
