@@ -23,19 +23,21 @@ func (t *defaultModelDeployTask) delete(ctx context.Context) error {
 		}
 	}
 
-	// if status.lbId is empty, skip
-	if t.lbConfig.Status.LoadBalancerId == nil || *t.lbConfig.Status.LoadBalancerId == "" {
+	if lbId := t.lbConfig.Status.LoadBalancerId; lbId != nil && *lbId != "" {
+		if err := t.deleteLoadBalancer(ctx, *lbId); err != nil {
+			return err
+		}
+	} else {
 		t.logger.Debugf("LBC %s/%s has no LoadBalancerId in status, skip deleting load balancer in VNGCloud", t.lbConfig.Namespace, t.lbConfig.Name)
-		return nil
 	}
 
-	lbId := *t.lbConfig.Status.LoadBalancerId
-
-	if err := t.deleteLoadBalancer(ctx, lbId); err != nil {
-		return err
-	}
-
-	return nil
+	// Certificates are not owned by the load balancer, so they outlive its teardown and the
+	// sweep has to run either way: deployCerts runs before deployLoadBalancer, so a reconcile
+	// can import a certificate and then fail to get a load balancer at all, leaving status
+	// holding a certificate and no id. Sweeping last is what makes the delete safe - by now
+	// nothing this LBC created still references them, so the ones another owner shares stay
+	// in use and are left alone.
+	return t.deleteRedundantCerts(ctx, nil)
 }
 
 func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId string) error {
