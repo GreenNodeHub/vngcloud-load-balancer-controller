@@ -99,49 +99,72 @@ func (t *defaultModelDeployTask) deployCert(ctx context.Context, reqCreateCert v
 	}, nil
 }
 
-// Delete created certificates that are no longer needed
-func (t *defaultModelDeployTask) deployDeleteRedundantCerts(ctx context.Context) error {
+// deleteRedundantCerts removes certificates this LBC imported and no longer wants. keep is the
+// set this reconcile resolved, and passing it explicitly is what keeps a live certificate off
+// the candidate list: deletion is decided from desired state, never from the cloud's inUse flag
+// alone. That flag is read right after the listener update it follows, so a reading that lags
+// would otherwise delete the certificate the listener is serving - and now that one certificate
+// backs every Ingress sharing a secret, that would break TLS for all of them at once.
+//
+// A candidate the cloud still reports in use is left in place; inUse remains the guard for
+// anything outside this LBC's own bookkeeping.
+func (t *defaultModelDeployTask) deleteRedundantCerts(ctx context.Context, keep []v1alpha1.CreatedCertificate) error {
+	wanted := make(map[string]bool, len(keep))
+	for _, cert := range keep {
+		wanted[cert.Id] = true
+	}
+
+	candidates := make([]string, 0, len(t.lbConfig.Status.CreatedCertificates))
+	for _, held := range t.lbConfig.Status.CreatedCertificates {
+		if !wanted[held.Id] {
+			candidates = append(candidates, held.Id)
+		}
+	}
+	if len(candidates) < 1 {
+		return nil
+	}
+
 	certList, err := t.vngcloudRepo.ListCertificates(ctx)
 	if err != nil {
 		return err
 	}
+	onCloud := make(map[string]*entity.Certificate, len(certList.Certificates))
+	for i := range certList.Certificates {
+		onCloud[certList.Certificates[i].UUID] = &certList.Certificates[i]
+	}
 
-	for _, createdCert := range t.lbConfig.Status.CreatedCertificates {
-		for _, cert := range certList.Certificates {
-			if cert.UUID == createdCert.Id {
-				if cert.InUse {
-					t.logger.Infof("certificate %s is still in use, skipping deletion", cert.UUID)
-					break
-				}
-				err = t.vngcloudRepo.DeleteCertificate(ctx, cert.UUID)
-				if err != nil {
-					return err
-				}
-			}
+	for _, candidateId := range candidates {
+		cert, found := onCloud[candidateId]
+		if !found {
+			t.logger.Infof("certificate %s not found on the cloud, skipping deletion", candidateId)
+			continue
+		}
+		if cert.InUse {
+			t.logger.Infof("certificate %s is still in use, skipping deletion", candidateId)
+			continue
+		}
+		if err := t.vngcloudRepo.DeleteCertificate(ctx, candidateId); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// this function is used to generate certificate name based on secret name and resource version
+// generateCertName names the cloud certificate after the Kubernetes secret it is imported
+// from - cluster, namespace, secret name and the secret's resourceVersion - and deliberately
+// not after the Ingress that references it. Several Ingresses may share one TLS secret on one
+// shared load balancer; naming per Ingress gave each LBC its own copy of the same certificate,
+// and the two then overwrote the listener's single defaultCertificateAuthority with their own
+// id on every reconcile, forever.
 func (t *defaultModelDeployTask) generateCertName(secretName string, resourceVersion string) string {
 	clusterId := ""
 	if t.lbConfig.Spec.ClusterId != nil {
 		clusterId = *t.lbConfig.Spec.ClusterId
 	}
-	ingressName := ""
-	// try to get from annotation first
-	if val, ok := t.lbConfig.GetLabels()[domain.LabelOwnerResourceName]; ok {
-		ingressName = val
-	}
 
-	generateHash := func() string {
-		fullName := fmt.Sprintf("%s_%s_%s_%s", clusterId, t.lbConfig.GetNamespace(), ingressName, "ingress")
-		hash := utils.HashString(fullName)
-		return utils.TrimString(hash, domain.DEFAULT_HASH_NAME_LENGTH)
-	}
-	hash := generateHash()
+	fullName := fmt.Sprintf("%s_%s_%s", clusterId, t.lbConfig.GetNamespace(), "ingress")
+	hash := utils.TrimString(utils.HashString(fullName), domain.DEFAULT_HASH_NAME_LENGTH)
 	hashSecret := utils.TrimString(utils.HashString(secretName), domain.DEFAULT_HASH_NAME_LENGTH)
 
 	name := fmt.Sprintf("%s-%s-%s-%s",
