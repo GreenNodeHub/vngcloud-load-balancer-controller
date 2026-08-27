@@ -89,7 +89,7 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:v0.3.24
+        image: vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller:v0.3.25
         imagePullPolicy: Always
         name: manager
         securityContext:
