@@ -121,24 +121,20 @@ func (t *defaultModelDeployTask) deployDeleteRedundantCerts(ctx context.Context)
 	return nil
 }
 
-// this function is used to generate certificate name based on secret name and resource version
+// generateCertName names the cloud certificate after the Kubernetes secret it is imported
+// from - cluster, namespace, secret name and the secret's resourceVersion - and deliberately
+// not after the Ingress that references it. Several Ingresses may share one TLS secret on one
+// shared load balancer; naming per Ingress gave each LBC its own copy of the same certificate,
+// and the two then overwrote the listener's single defaultCertificateAuthority with their own
+// id on every reconcile, forever.
 func (t *defaultModelDeployTask) generateCertName(secretName string, resourceVersion string) string {
 	clusterId := ""
 	if t.lbConfig.Spec.ClusterId != nil {
 		clusterId = *t.lbConfig.Spec.ClusterId
 	}
-	ingressName := ""
-	// try to get from annotation first
-	if val, ok := t.lbConfig.GetLabels()[domain.LabelOwnerResourceName]; ok {
-		ingressName = val
-	}
 
-	generateHash := func() string {
-		fullName := fmt.Sprintf("%s_%s_%s_%s", clusterId, t.lbConfig.GetNamespace(), ingressName, "ingress")
-		hash := utils.HashString(fullName)
-		return utils.TrimString(hash, domain.DEFAULT_HASH_NAME_LENGTH)
-	}
-	hash := generateHash()
+	fullName := fmt.Sprintf("%s_%s_%s", clusterId, t.lbConfig.GetNamespace(), "ingress")
+	hash := utils.TrimString(utils.HashString(fullName), domain.DEFAULT_HASH_NAME_LENGTH)
 	hashSecret := utils.TrimString(utils.HashString(secretName), domain.DEFAULT_HASH_NAME_LENGTH)
 
 	name := fmt.Sprintf("%s-%s-%s-%s",
