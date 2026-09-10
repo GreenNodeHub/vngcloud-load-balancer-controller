@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -96,28 +98,62 @@ func (t *defaultModelDeployTask) deployCert(ctx context.Context, reqCreateCert v
 	}, nil
 }
 
-// Delete created certificates that are no longer needed
-func (t *defaultModelDeployTask) deployDeleteRedundantCerts(ctx context.Context) error {
+// deleteRedundantCerts removes certificates this LBC imported and no longer wants. keep is the
+// set this reconcile resolved; passing it explicitly is what keeps a live certificate off the
+// candidate list, so a lagging inUse flag on the cloud can never take down the certificate the
+// listener is currently serving. One certificate now backs every Ingress sharing a secret, so
+// that mistake would break TLS for all of them at once. The delete path passes nothing -
+// everything the LBC still holds is redundant by then.
+//
+// A candidate the cloud still reports in use is another owner's: it is left alone, and that
+// owner - which holds the same id in its own status - cleans it up when it is done.
+func (t *defaultModelDeployTask) deleteRedundantCerts(ctx context.Context, keep []v1alpha1.CreatedCertificate) error {
+	wanted := sets.New[string]()
+	for _, cert := range keep {
+		wanted.Insert(cert.Id)
+	}
+
+	candidates := make([]string, 0, len(t.lbConfig.Status.CreatedCertificates))
+	for _, held := range t.lbConfig.Status.CreatedCertificates {
+		if !wanted.Has(held.Id) {
+			candidates = append(candidates, held.Id)
+		}
+	}
+	if len(candidates) < 1 {
+		return nil
+	}
+
 	certList, err := t.vngcloudRepo.ListCertificates(ctx)
 	if err != nil {
 		return err
 	}
+	onCloud := make(map[string]*entity.Certificate, len(certList.Certificates))
+	for i := range certList.Certificates {
+		onCloud[certList.Certificates[i].UUID] = &certList.Certificates[i]
+	}
 
-	for _, createdCert := range t.lbConfig.Status.CreatedCertificates {
-		for _, cert := range certList.Certificates {
-			if cert.UUID == createdCert.Id {
-				if cert.InUse {
-					t.logger.Debugf("certificate %s is still in use, skipping deletion", cert.UUID)
-					break
-				}
-				err = t.vngcloudRepo.DeleteCertificate(ctx, cert.UUID)
-				if err != nil {
-					return err
-				}
-			}
+	// Same reasoning as deleteRedundantPools: the candidates are independent, so one that will
+	// not go must not stop the others from going. Failures are collected and returned at the
+	// end, which still fails the reconcile and retries it.
+	failures := make([]error, 0)
+	for _, candidateId := range candidates {
+		cert, onCloudNow := onCloud[candidateId]
+		if !onCloudNow {
+			t.logger.Debugf("certificate %s not found on the cloud, skip delete", candidateId)
+			continue
+		}
+		if cert.InUse {
+			t.logger.Debugf("certificate %s is still in use, skip delete", candidateId)
+			continue
+		}
+		if err := t.vngcloudRepo.DeleteCertificate(ctx, candidateId); err != nil {
+			failures = append(failures, fmt.Errorf("certificate %s: delete: %w", candidateId, err))
 		}
 	}
 
+	if len(failures) > 0 {
+		return fmt.Errorf("%w: %w", errPartialDelete, errors.Join(failures...))
+	}
 	return nil
 }
 

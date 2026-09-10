@@ -145,3 +145,69 @@ func TestDeployCertsAdoptsTheCertificateImportedByTheOtherOwner(t *testing.T) {
 	assert.Equal(t, certSecretName, createdCerts[0].SecretName)
 	assert.Equal(t, certSecretRV, createdCerts[0].ResourceVersion)
 }
+
+// ---------------------------------------------------------------------------
+// Cleanup of certificates this LBC imported.
+// ---------------------------------------------------------------------------
+
+// certTaskWithStatus is certTask plus the previous generation recorded in status - the set the
+// sweep walks.
+func certTaskWithStatus(owner string, vngcloudRepo *repository.MockVngCloudRepository, held ...v1alpha1.CreatedCertificate) *defaultModelDeployTask {
+	task := certTask(owner, vngcloudRepo, nil)
+	task.lbConfig.Status.CreatedCertificates = held
+	return task
+}
+
+func heldCert(id string) v1alpha1.CreatedCertificate {
+	return v1alpha1.CreatedCertificate{Id: id, SecretName: certSecretName, ResourceVersion: certSecretRV}
+}
+
+func cloudCert(id string, inUse bool) entityv2.Certificate {
+	return entityv2.Certificate{UUID: id, Name: certNameForDefaultNs, CertificateType: "TLS/SSL", InUse: inUse}
+}
+
+// The sweep must decide from desired state, not from the cloud's inUse flag. A certificate this
+// reconcile still wants is not a deletion candidate at all - so a stale or lagging inUse=false
+// cannot take down the listener's live certificate. With one certificate now shared by every
+// Ingress on the load balancer, that mistake would break TLS for all of them at once.
+func TestDeleteRedundantCertsKeepsACertificateStillWanted(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	task := certTaskWithStatus("repro", vngcloudRepo, heldCert("secret-live"))
+
+	// Nothing is declared on the mock at all: with no candidate to consider there is no reason
+	// to ask the cloud anything, so ListCertificates going uncalled is part of the assertion,
+	// and a DeleteCertificate would fail the test outright.
+	assert.NoError(t, task.deleteRedundantCerts(context.Background(), []v1alpha1.CreatedCertificate{heldCert("secret-live")}))
+}
+
+// The certificate left behind by a previous generation - a rotated secret, or the rename this
+// branch causes - is what the sweep is for.
+func TestDeleteRedundantCertsDeletesTheOneNoLongerWanted(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	task := certTaskWithStatus("repro", vngcloudRepo, heldCert("secret-old"))
+
+	vngcloudRepo.EXPECT().
+		ListCertificates(mock.Anything).
+		Return(&entityv2.ListCertificates{Certificates: []entityv2.Certificate{cloudCert("secret-old", false)}}, nil).
+		Once()
+	vngcloudRepo.EXPECT().
+		DeleteCertificate(mock.Anything, "secret-old").
+		Return(nil).
+		Once()
+
+	assert.NoError(t, task.deleteRedundantCerts(context.Background(), []v1alpha1.CreatedCertificate{heldCert("secret-new")}))
+}
+
+// A certificate this LBC no longer wants but another owner still has attached is not ours to
+// remove; that owner holds it in its own status and will clean it up when it is done.
+func TestDeleteRedundantCertsLeavesOneAnotherOwnerStillUses(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	task := certTaskWithStatus("repro", vngcloudRepo, heldCert("secret-shared"))
+
+	vngcloudRepo.EXPECT().
+		ListCertificates(mock.Anything).
+		Return(&entityv2.ListCertificates{Certificates: []entityv2.Certificate{cloudCert("secret-shared", true)}}, nil).
+		Once()
+
+	assert.NoError(t, task.deleteRedundantCerts(context.Background(), nil))
+}
