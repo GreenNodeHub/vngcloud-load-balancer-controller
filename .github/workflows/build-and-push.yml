@@ -1,0 +1,116 @@
+name: Build and Push Image
+
+# Reusable workflow. Registry config comes from the GitHub Environment named by
+# inputs.environment, so the job declares `environment: ${{ inputs.environment }}` and
+# secrets REGISTRY_USERNAME / REGISTRY_PASSWORD plus vars.IMAGE_REGISTRY resolve against it.
+# Callers must pass `secrets: inherit`.
+#
+# Differences from manage-csi's version, both forced by this repo:
+#   - the image is built with buildx (docker/build-push-action), not `make build-local-images`
+#   - a Helm chart is published alongside the image, which manage-csi does not do
+#
+# The chart's values.yaml carries image.repository and image.tag as literals, set by hand at
+# release time. Packaging it unchanged for a dev build would publish a chart that pulls the
+# *production* image - a real trap: chart 0.3.25 once shipped pointing at v0.3.24. So both
+# fields are rewritten from the inputs before packaging, for every environment.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: "GitHub Environment holding the registry config (develop | production)"
+      tag:
+        required: true
+        type: string
+        description: "Image tag, e.g. v0.0.0-dev-a1b2c3d"
+      chart_version:
+        required: true
+        type: string
+        description: "Helm chart version; must be valid SemVer2, e.g. 0.0.0-dev-a1b2c3d"
+      ref:
+        required: false
+        type: string
+        default: ''
+        description: "Git ref to check out; empty = default for the event"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Verify environment config
+        run: |
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Registry:    ${{ vars.IMAGE_REGISTRY }}"
+          echo "Image tag:   ${{ inputs.tag }}"
+          echo "Chart ver:   ${{ inputs.chart_version }}"
+          if [ -z "${{ vars.IMAGE_REGISTRY }}" ]; then
+            echo "::error::vars.IMAGE_REGISTRY is not set on environment '${{ inputs.environment }}'"
+            exit 1
+          fi
+          if [ -z "${{ secrets.REGISTRY_USERNAME }}" ] || [ -z "${{ secrets.REGISTRY_PASSWORD }}" ]; then
+            echo "::error::REGISTRY_USERNAME / REGISTRY_PASSWORD are not set on environment '${{ inputs.environment }}'"
+            exit 1
+          fi
+
+      - name: Derive registry host
+        id: reg
+        run: |
+          # vars.IMAGE_REGISTRY is host/project (e.g. vcr.vngcloud.vn/60108-annd2-ingress).
+          # docker/login-action wants the host alone; helm push wants the full path.
+          echo "host=${IMAGE_REGISTRY%%/*}" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
+
+      - name: Login to container registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ${{ steps.reg.outputs.host }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Set short git commit SHA
+        id: vars
+        run: echo "COMMIT_SHORT_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build and push image
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1 # v6.16.0
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ inputs.tag }}
+            COMMIT=${{ env.COMMIT_SHORT_SHA }}
+          tags: |
+            ${{ vars.IMAGE_REGISTRY }}/vngcloud-load-balancer-controller:${{ inputs.tag }}
+            ${{ vars.IMAGE_REGISTRY }}/vngcloud-load-balancer-controller:${{ env.COMMIT_SHORT_SHA }}
+
+      - name: Point the chart at the image just built
+        run: |
+          set -euo pipefail
+          v=charts/vngcloud-load-balancer-controller/values.yaml
+          # Anchored to the two literals the release bump writes, so a miss fails loudly here
+          # instead of publishing a chart that quietly pulls the wrong image.
+          grep -q '^      repository: ' "$v"
+          grep -q '^      tag: ' "$v"
+          sed -i -E "s#^(      repository: ).*#\1${{ vars.IMAGE_REGISTRY }}/vngcloud-load-balancer-controller#" "$v"
+          sed -i -E "s#^(      tag: ).*#\1\"${{ inputs.tag }}\"#" "$v"
+          echo "--- values.yaml image block ---"
+          grep -A2 '^    image:' "$v"
+
+      - name: Package and push chart
+        run: |
+          set -euo pipefail
+          helm package ./charts/vngcloud-load-balancer-controller \
+            --version "${{ inputs.chart_version }}" --app-version "${{ inputs.tag }}"
+          helm push ./*.tgz "oci://${{ vars.IMAGE_REGISTRY }}/vks-helm-charts"

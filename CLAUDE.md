@@ -11,7 +11,21 @@ make run             # run controller locally against current kubeconfig
 make generate manifests   # regenerate deepcopy + CRDs after editing api/v1alpha1/*.go
 ```
 
-`make test` writes its envtest binaries via `setup-envtest` into `bin/`. PRs target the `main` branch.
+`make test` writes its envtest binaries via `setup-envtest` into `bin/`.
+
+## Branches
+
+- **`main`** — what PRs target, and the only branch releases are cut from. Tag it (`0.3.25`,
+  no `v`) and `publish.yaml` builds the image and chart into the production registry.
+- **`develop`** — a sandbox for getting a testable image onto a dev cluster. Every push builds:
+  `deploy-dev.yml` runs `ci.yml`, then publishes `v0.0.0-dev-<sha7>` and a matching chart to the
+  dev registry. There is no `[build]` commit marker any more.
+
+  **`develop` is never merged back into `main`.** Merge feature branches into it freely and reset
+  it when it drifts: `git push --force origin main:develop`.
+
+Branch protection should require the single job **`CI OK`** from `ci.yml`. Adding or removing a
+check inside that workflow then needs no protection change.
 
 ### Running a single test
 
