@@ -1,0 +1,45 @@
+name: Deploy DEV
+
+# develop is a sandbox: merge a feature branch into it to get a testable image.
+# EVERY push to develop builds - the "[build]" commit-message marker is gone.
+# develop is never merged back into main; reset it periodically:
+#   git push --force origin main:develop
+#
+# Production is not built here. Releases still come from a tag on main via publish.yaml.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      chart_version: ${{ steps.tag.outputs.chart_version }}
+    steps:
+      - id: tag
+        run: |
+          # One tag per commit, so a dev cluster's image always says which commit it runs.
+          # The old workflow reused v0.0.1 for every build, which made "what is deployed?"
+          # unanswerable. Chart versions must be valid SemVer2, hence no leading "v".
+          sha="${GITHUB_SHA::7}"
+          echo "tag=v0.0.0-dev-${sha}" >> "$GITHUB_OUTPUT"
+          echo "chart_version=0.0.0-dev-${sha}" >> "$GITHUB_OUTPUT"
+
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build-and-push:
+    needs: [prepare, ci]
+    uses: ./.github/workflows/build-and-push.yml
+    with:
+      environment: develop
+      tag: ${{ needs.prepare.outputs.tag }}
+      chart_version: ${{ needs.prepare.outputs.chart_version }}
+    secrets: inherit

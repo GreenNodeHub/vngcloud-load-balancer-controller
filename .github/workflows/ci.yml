@@ -1,0 +1,140 @@
+name: CI
+
+# One gate for branch protection: the job "CI OK". Adding or removing a check below does not
+# require touching protection settings.
+#
+# Callable via workflow_call so deploy-dev runs the same checks before it builds anything.
+# develop gets its CI that way, which is why the push trigger only lists main - triggering on
+# both would run every check twice for one push.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+        default: ''
+        description: "Git ref to check out; empty = default for the event"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: unit + envtest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install envtest binaries
+        run: |
+          make envtest
+          # KUBEBUILDER_ASSETS must be absolute: each package's tests run from its own
+          # directory, and a relative path leaves every suite dying in BeforeSuite.
+          echo "KUBEBUILDER_ASSETS=$(./bin/setup-envtest use 1.31.0 --bin-dir "$(pwd)/bin" -p path)" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: |
+          # One package per invocation, on purpose. Controller suites each start their own
+          # API server, and running two of them in a single "go test" flakes on
+          # "failed waiting for *v1.Node Informer to sync". Isolation also means the log says
+          # which package failed instead of one wall of output.
+          failed=()
+          while read -r pkg; do
+            args=()
+            case "$pkg" in
+              */internal/controller/*)
+                # Ginkgo suites only - a plain test binary rejects these flags. If a spec runs
+                # long, Ginkgo dumps what it is waiting on and the goroutine stacks, instead of
+                # just "Timed out after 20s". These suites flake rarely and have so far proved
+                # unreproducible on demand; the next time it happens the log should say which
+                # reconcile was stuck rather than leaving us to guess.
+                args=(-ginkgo.poll-progress-after=45s -ginkgo.poll-progress-interval=30s)
+                ;;
+            esac
+
+            echo "::group::$pkg"
+            if go test -count=1 "$pkg" "${args[@]}"; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::$pkg failed"
+              failed+=("$pkg")
+            fi
+          done < <(go list ./... | grep -v /test/e2e)
+
+          if [ ${#failed[@]} -ne 0 ]; then
+            printf 'failed packages:\n'
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi
+
+  lint:
+    name: lint-codebase
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.5.0
+          args: --timeout 15m0s --verbose
+
+  analyze:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Scan for Vulnerabilities in Code
+        # Pinned to master HEAD: latest v1.0.4 tag transitively pulls actions/checkout@v4.1.1
+        # and actions/setup-go@v5.0.0 (Node 20). master HEAD pins them to v6.0.2 / v6.2.0 (Node 24).
+        # Switch back to a tagged release once upstream cuts v1.0.5+.
+        uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd # master @ 2026-02-26
+        with:
+          go-version-input: 1.25.13
+          go-package: ./...
+
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    needs: [test, lint, analyze]
+    if: always()
+    steps:
+      - name: Fail if any check failed
+        run: |
+          # needs.*.result is 'success', 'failure', 'cancelled' or 'skipped'. Anything other
+          # than success has to fail this job, or a cancelled check would read as a pass.
+          for r in '${{ needs.test.result }}' '${{ needs.lint.result }}' '${{ needs.analyze.result }}'; do
+            if [ "$r" != "success" ]; then
+              echo "::error::a required check did not succeed (test=${{ needs.test.result }} lint=${{ needs.lint.result }} analyze=${{ needs.analyze.result }})"
+              exit 1
+            fi
+          done
+          echo "all checks passed"
