@@ -118,7 +118,11 @@ jobs:
         # Switch back to a tagged release once upstream cuts v1.0.5+.
         uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd # master @ 2026-02-26
         with:
-          go-version-input: 1.25.13
+          # No go-version-input on purpose, so the action's default (stable + check-latest)
+          # applies. It installs govulncheck@latest under GOTOOLCHAIN=local, so pinning the
+          # toolchain to this repo's Go version breaks the moment x/vuln raises its own
+          # minimum: 1.25.13 died on "x/vuln@v1.8.0 requires go >= 1.26.0". The toolchain here
+          # only builds the scanner - the code is compiled against go.mod either way.
           go-package: ./...
 
   ci-ok:
