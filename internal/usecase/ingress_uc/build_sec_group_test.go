@@ -34,6 +34,11 @@ import (
 const (
 	secGroupNamespace = "magnet-common-sit"
 	secGroupSubnet    = "192.168.1.0/24"
+
+	// The two Services that resolve, and the one the Ingress names by mistake.
+	svcCheckout = "checkout"
+	svcSearch   = "search"
+	svcMissing  = "nfk"
 )
 
 // ingressWithPaths builds an Ingress whose rule points at each named backend in turn, so a test
@@ -143,9 +148,9 @@ func secGroupTask(t *testing.T, ingress *networkingv1.Ingress, k8sRepo *reposito
 // expected rules cannot drift apart.
 func nodePortOf(service string) int {
 	switch service {
-	case "checkout":
+	case svcCheckout:
 		return 30080
-	case "search":
+	case svcSearch:
 		return 30081
 	}
 	return 0
@@ -160,18 +165,18 @@ func TestBuildDefaultSecurityGroupRuleSkipsAnUnresolvableBackend(t *testing.T) {
 		GetService(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, key types.NamespacedName) (*corev1.Service, error) {
 			switch key.Name {
-			case "checkout":
-				return serviceWithNodePort("checkout", 80, 30080), nil
-			case "search":
-				return serviceWithNodePort("search", 8080, 30081), nil
+			case svcCheckout:
+				return serviceWithNodePort(svcCheckout, 80, 30080), nil
+			case svcSearch:
+				return serviceWithNodePort(svcSearch, 8080, 30081), nil
 			}
 			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "services"}, key.Name)
 		})
 
 	task := secGroupTask(t, ingressWithPaths(
-		backend("checkout", 80),
-		backend("nfk", 443), // the typo: no such Service
-		backend("search", 8080),
+		backend(svcCheckout, 80),
+		backend(svcMissing, 443), // the typo: no such Service
+		backend(svcSearch, 8080),
 	), k8sRepo)
 
 	rules, err := task.buildDefaultSecurityGroupRule(context.Background(), secGroupSubnet, nil)
@@ -189,14 +194,14 @@ func TestBuildDefaultSecurityGroupRuleSkipsAnUnresolvableDefaultBackend(t *testi
 	k8sRepo.EXPECT().
 		GetService(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, key types.NamespacedName) (*corev1.Service, error) {
-			if key.Name == "checkout" {
-				return serviceWithNodePort("checkout", 80, 30080), nil
+			if key.Name == svcCheckout {
+				return serviceWithNodePort(svcCheckout, 80, 30080), nil
 			}
 			return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "services"}, key.Name)
 		})
 
-	ingress := ingressWithPaths(backend("checkout", 80))
-	missing := backend("nfk", 443)
+	ingress := ingressWithPaths(backend(svcCheckout, 80))
+	missing := backend(svcMissing, 443)
 	ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{Service: &missing}
 
 	task := secGroupTask(t, ingress, k8sRepo)
@@ -215,14 +220,14 @@ func TestBuildDefaultSecurityGroupRuleFailsOnAnErrorThatIsNotTheIngressAuthorsFa
 	k8sRepo.EXPECT().
 		GetService(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, key types.NamespacedName) (*corev1.Service, error) {
-			if key.Name == "checkout" {
-				return serviceWithNodePort("checkout", 80, 30080), nil
+			if key.Name == svcCheckout {
+				return serviceWithNodePort(svcCheckout, 80, 30080), nil
 			}
 			return nil, apierrors.NewForbidden(schema.GroupResource{Resource: "services"}, key.Name, errors.New("nope"))
 		})
 
 	task := secGroupTask(t, ingressWithPaths(
-		backend("checkout", 80),
+		backend(svcCheckout, 80),
 		backend("locked-down", 443),
 	), k8sRepo)
 
