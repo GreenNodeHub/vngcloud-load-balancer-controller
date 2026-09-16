@@ -64,7 +64,10 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			return nil, err
 		}
 	} else {
-		if err := t.statusAddListener(ctx, currentListener.UUID, currentListener.ProtocolPort); err != nil {
+		// Found by port, which is the only thing matched on - so this listener may well be the
+		// one the load balancer was created with. Record it as adopted, along with the default
+		// pool we are about to displace, so the teardown can leave it as it found it.
+		if err := t.statusAdoptListener(ctx, currentListener.UUID, currentListener.ProtocolPort, currentListener.DefaultPoolId); err != nil {
 			return nil, err
 		}
 	}

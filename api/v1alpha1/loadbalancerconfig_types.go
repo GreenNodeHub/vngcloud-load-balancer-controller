@@ -577,11 +577,31 @@ type CreatedListener struct {
 	// +listType=map
 	// +listMapKey=id
 	CreatedPolicies []CreatedPolicy `json:"createdPolicies,omitempty"`
+
+	// Adopted marks a listener that was already on the load balancer when this LBC first
+	// matched it by port, rather than one the controller created. Every load balancer created
+	// on the portal arrives with a listener on port 80, so a pinned Ingress lands on the
+	// user's listener - and it is no more ours to delete than the load balancer itself.
+	// +optional
+	Adopted bool `json:"adopted,omitempty"`
+
+	// OriginalDefaultPoolId is the listener's defaultPoolId at the moment it was adopted, so
+	// the teardown can put back what it displaced. Recorded once and never rewritten: by the
+	// second reconcile the listener is already serving this LBC's pools, and recording again
+	// would overwrite the original with what we ourselves set.
+	// +optional
+	OriginalDefaultPoolId *string `json:"originalDefaultPoolId,omitempty"`
 }
 
 // Equal compares two CreatedListener for equality (order-independent for policies)
 func (a CreatedListener) Equal(b CreatedListener) bool {
-	if a.Id != b.Id || a.Port != b.Port {
+	if a.Id != b.Id || a.Port != b.Port || a.Adopted != b.Adopted {
+		return false
+	}
+	if (a.OriginalDefaultPoolId == nil) != (b.OriginalDefaultPoolId == nil) {
+		return false
+	}
+	if a.OriginalDefaultPoolId != nil && *a.OriginalDefaultPoolId != *b.OriginalDefaultPoolId {
 		return false
 	}
 	if len(a.CreatedPolicies) != len(b.CreatedPolicies) {
