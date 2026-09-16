@@ -22,14 +22,45 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       chart_version: ${{ steps.tag.outputs.chart_version }}
     steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
       - id: tag
         run: |
-          # One tag per commit, so a dev cluster's image always says which commit it runs.
-          # The old workflow reused v0.0.1 for every build, which made "what is deployed?"
-          # unanswerable. Chart versions must be valid SemVer2, hence no leading "v".
+          set -euo pipefail
+          # One version per commit, so a dev cluster always says which commit it runs. The old
+          # workflow reused v0.0.1 for every build, which made "what is deployed?" unanswerable.
+          #
+          # The version cannot simply start at 0.0.0. The controller installs its own CRDs at
+          # startup and labels them vks.vngcloud.vn/crd-schema-version with the CHART version;
+          # it then only updates a CRD whose label is LOWER than the chart being installed.
+          # A chart of 0.0.0-dev-<sha> is lower than any release, so on a cluster that already
+          # had 0.3.23 the CRDs were left untouched - and the API server then silently stripped
+          # every status field added since, which is not visible anywhere except by reading the
+          # CRD. adoptedLoadBalancerId, createdLoadBalancerId and retiringLoadBalancer all went
+          # missing this way, and createdPools kept its old listMapKey.
+          #
+          # So a dev version has to outrank every release it might be installed over. Bump the
+          # chart's minor and mark it a prerelease:
+          #
+          #   Chart.yaml 0.3.24  ->  0.4.0-dev.<sha>
+          #
+          # which sorts above every 0.3.x release, and below a real 0.4.0 so that release still
+          # wins. A dev cluster left on this will not take a later 0.3.x CRD - reset it instead,
+          # which is what develop is for.
+          base=$(grep -E '^version:' charts/vngcloud-load-balancer-controller/Chart.yaml \
+                 | head -1 | sed -E 's/^version:[[:space:]]*"?([0-9]+\.[0-9]+\.[0-9]+)"?.*/\1/')
+          if [ -z "$base" ]; then
+            echo "::error::could not read version from Chart.yaml"
+            exit 1
+          fi
+          major=${base%%.*}
+          minor=$(echo "$base" | cut -d. -f2)
           sha="${GITHUB_SHA::7}"
-          echo "tag=v0.0.0-dev-${sha}" >> "$GITHUB_OUTPUT"
-          echo "chart_version=0.0.0-dev-${sha}" >> "$GITHUB_OUTPUT"
+          chart="${major}.$((minor + 1)).0-dev.${sha}"
+          echo "Chart.yaml base : $base"
+          echo "dev version     : $chart"
+          echo "tag=v${chart}" >> "$GITHUB_OUTPUT"
+          echo "chart_version=${chart}" >> "$GITHUB_OUTPUT"
 
   ci:
     uses: ./.github/workflows/ci.yml
