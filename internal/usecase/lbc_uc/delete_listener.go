@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
@@ -55,6 +56,17 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 	// end, which still fails the reconcile and retries it.
 	failures := make([]error, 0)
 
+	// adoptedRecord returns the status entry for a candidate, which is where a listener says
+	// whether this LBC created it or merely found it.
+	adoptedRecord := func(listenerId string) *v1alpha1.CreatedListener {
+		for i := range createdListeners {
+			if createdListeners[i].Id == listenerId && createdListeners[i].Adopted {
+				return &createdListeners[i]
+			}
+		}
+		return nil
+	}
+
 	for _, candidateId := range deleteCandidates {
 		isExist, listener := isListenerExist(candidateId)
 		if !isExist {
@@ -68,7 +80,17 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 			continue
 		}
 
-		if !isListenerInUse(candidateId) && canDeleteWhole {
+		// An adopted listener was on the load balancer before this LBC was, so it is not ours to
+		// remove - canDeleteWholeListener only asks whether the policies on it are all ours,
+		// which a listener created with the load balancer trivially satisfies because it has
+		// none. Take the policy-cleanup path instead and hand the listener back as found.
+		adopted := adoptedRecord(candidateId)
+		if adopted != nil && !isListenerInUse(candidateId) {
+			t.logger.Infof("Listener %s on load balancer %s was not created by this cluster, it will be left in place for LBC %s/%s",
+				candidateId, lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+		}
+
+		if !isListenerInUse(candidateId) && canDeleteWhole && adopted == nil {
 			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 				return t.vngcloudRepo.DeleteListener(ctx, lbId, candidateId)
 			})
@@ -93,6 +115,16 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 				failures = append(failures, fmt.Errorf("listener %s: policies: %w", candidateId, err))
 				continue
 			}
+
+			// Putting the policies back is not enough: deployListener also cleared the default
+			// pool the listener came with. Left like that the user gets their listener back
+			// serving nothing, and the pool it pointed at orphaned.
+			if adopted != nil && !isListenerInUse(candidateId) {
+				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId); err != nil {
+					failures = append(failures, fmt.Errorf("listener %s: restore default pool: %w", candidateId, err))
+					continue
+				}
+			}
 		}
 	}
 
@@ -100,6 +132,42 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 		return fmt.Errorf("%w: %w", errPartialDelete, errors.Join(failures...))
 	}
 	return nil
+}
+
+// restoreAdoptedListener puts back the default pool this LBC displaced when it adopted the
+// listener, so a load balancer handed back to its owner is in the state they left it. Every other
+// field is copied from the listener as it stands, so nothing else is disturbed.
+func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string) error {
+	original := ""
+	if originalDefaultPoolId != nil {
+		original = *originalDefaultPoolId
+	}
+	if listener.DefaultPoolId == original {
+		return nil // nothing was displaced, or it has already been put back
+	}
+
+	opt := &loadbalancerv2.UpdateListenerRequest{
+		LoadBalancerCommon: common.LoadBalancerCommon{LoadBalancerId: lbId},
+		ListenerCommon:     common.ListenerCommon{ListenerId: listener.UUID},
+		AllowedCidrs:       listener.AllowedCidrs,
+		TimeoutClient:      listener.TimeoutClient,
+		TimeoutMember:      listener.TimeoutMember,
+		TimeoutConnection:  listener.TimeoutConnection,
+		InsertHeaders:      &listener.InsertHeaders,
+	}
+	if listener.Protocol == string(loadbalancerv2.ListenerProtocolHTTPS) {
+		opt.DefaultCertificateAuthority = listener.DefaultCertificateAuthority
+		opt.CertificateAuthorities = &listener.CertificateAuthorities
+		opt.ClientCertificate = listener.ClientCertificateAuthentication
+	}
+	opt.WithDefaultPoolId(original)
+
+	t.logger.Infof("Restoring default pool (%s -> %s) on adopted listener %s of load balancer %s",
+		listener.DefaultPoolId, original, listener.UUID, lbId)
+
+	return t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+		return t.vngcloudRepo.UpdateListener(ctx, lbId, listener.UUID, opt)
+	})
 }
 
 // canDeleteWholeListener checks if we can delete the whole listener

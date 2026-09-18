@@ -552,6 +552,13 @@ spec:
                 description: CreatedListeners is the list of created listener IDs
                 items:
                   properties:
+                    adopted:
+                      description: |-
+                        Adopted marks a listener that was already on the load balancer when this LBC first
+                        matched it by port, rather than one the controller created. Every load balancer created
+                        on the portal arrives with a listener on port 80, so a pinned Ingress lands on the
+                        user's listener - and it is no more ours to delete than the load balancer itself.
+                      type: boolean
                     createdPolicies:
                       description: CreatedPolicies is the list of created policy IDs
                       items:
@@ -568,6 +575,13 @@ spec:
                       x-kubernetes-list-type: map
                     id:
                       description: Id is the ID of the created listener
+                      type: string
+                    originalDefaultPoolId:
+                      description: |-
+                        OriginalDefaultPoolId is the listener's defaultPoolId at the moment it was adopted, so
+                        the teardown can put back what it displaced. Recorded once and never rewritten: by the
+                        second reconcile the listener is already serving this LBC's pools, and recording again
+                        would overwrite the original with what we ourselves set.
                       type: string
                     port:
                       description: Port is the port number of the created listener
@@ -684,6 +698,13 @@ spec:
                       load balancer
                     items:
                       properties:
+                        adopted:
+                          description: |-
+                            Adopted marks a listener that was already on the load balancer when this LBC first
+                            matched it by port, rather than one the controller created. Every load balancer created
+                            on the portal arrives with a listener on port 80, so a pinned Ingress lands on the
+                            user's listener - and it is no more ours to delete than the load balancer itself.
+                          type: boolean
                         createdPolicies:
                           description: CreatedPolicies is the list of created policy
                             IDs
@@ -701,6 +722,13 @@ spec:
                           x-kubernetes-list-type: map
                         id:
                           description: Id is the ID of the created listener
+                          type: string
+                        originalDefaultPoolId:
+                          description: |-
+                            OriginalDefaultPoolId is the listener's defaultPoolId at the moment it was adopted, so
+                            the teardown can put back what it displaced. Recorded once and never rewritten: by the
+                            second reconcile the listener is already serving this LBC's pools, and recording again
+                            would overwrite the original with what we ourselves set.
                           type: string
                         port:
                           description: Port is the port number of the created listener

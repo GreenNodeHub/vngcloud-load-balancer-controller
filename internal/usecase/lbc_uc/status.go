@@ -39,6 +39,43 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 	})
 }
 
+// statusAdoptListener records a listener this LBC found already on the load balancer, matched by
+// port, rather than one it created. The distinction is what keeps the teardown off it: a listener
+// that predates us is no more ours to delete than the load balancer it sits on, and every load
+// balancer created on the portal comes with one on port 80.
+//
+// originalDefaultPoolId is kept so the teardown can put back what deployListener displaced.
+// Recorded only when the listener is not already on our books: by the second reconcile it is
+// serving this LBC's pools, so recording again would overwrite the original with our own value -
+// and a listener already in status is one we created, which must stay deletable.
+func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listenerId string, port int, originalDefaultPoolId string) error {
+	if listenerId == "" {
+		return errors.New("listener has no id after create, need to retry")
+	}
+
+	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		for i := range obj.Status.CreatedListeners {
+			if obj.Status.CreatedListeners[i].Id != listenerId {
+				continue
+			}
+			// Already ours - only the port may need catching up, exactly as statusAddListener
+			// would do. Adoption is decided once, on first sight.
+			if obj.Status.CreatedListeners[i].Port == port {
+				return false
+			}
+			obj.Status.CreatedListeners[i].Port = port
+			return true
+		}
+
+		adopted := v1alpha1.CreatedListener{Id: listenerId, Port: port, Adopted: true}
+		if originalDefaultPoolId != "" {
+			adopted.OriginalDefaultPoolId = &originalDefaultPoolId
+		}
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, adopted)
+		return true
+	})
+}
+
 func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId string, port int, policyId string) error {
 	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
 	// find it, update it or delete it. Recording it with an empty id is worse than failing
