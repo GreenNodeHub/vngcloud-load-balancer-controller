@@ -27,26 +27,26 @@ jobs:
       - id: tag
         run: |
           set -euo pipefail
-          # One version per commit, so a dev cluster always says which commit it runs. The old
-          # workflow reused v0.0.1 for every build, which made "what is deployed?" unanswerable.
+          # One version per build, and it has to actually upgrade the CRDs.
           #
-          # The version cannot simply start at 0.0.0. The controller installs its own CRDs at
-          # startup and labels them vks.vngcloud.vn/crd-schema-version with the CHART version;
-          # it then only updates a CRD whose label is LOWER than the chart being installed.
-          # A chart of 0.0.0-dev-<sha> is lower than any release, so on a cluster that already
-          # had 0.3.23 the CRDs were left untouched - and the API server then silently stripped
-          # every status field added since, which is not visible anywhere except by reading the
-          # CRD. adoptedLoadBalancerId, createdLoadBalancerId and retiringLoadBalancer all went
-          # missing this way, and createdPools kept its old listMapKey.
+          # The controller labels the CRDs it installs with the CHART version and only updates a
+          # CRD whose label is lower. But the two sides of that comparison are parsed by different
+          # functions: the label on the cluster goes through versioncheck.Version, which STRIPS a
+          # prerelease unless it contains rc/beta/alpha/snapshot, while the chart version keeps
+          # its prerelease. So a chart of 0.4.0-dev.<sha> is written to the label, read back as
+          # plain 0.4.0, and 0.4.0 outranks 0.4.0-dev.<anything> - the next dev build is skipped,
+          # silently, and the API server strips every status field added since.
           #
-          # So a dev version has to outrank every release it might be installed over. Bump the
-          # chart's minor and mark it a prerelease:
+          # That is why this is numbered in the PATCH and carries no prerelease at all:
           #
-          #   Chart.yaml 0.3.24  ->  0.4.0-dev.<sha>
+          #   Chart.yaml 0.3.24  ->  0.4.<run number>
           #
-          # which sorts above every 0.3.x release, and below a real 0.4.0 so that release still
-          # wins. A dev cluster left on this will not take a later 0.3.x CRD - reset it instead,
-          # which is what develop is for.
+          # above every 0.3.x release, below a real 0.4.x, and strictly increasing build over
+          # build. pkg/k8s/apis/crdhelpers/schema_version_test.go pins the comparison.
+          #
+          # The commit is not in the version any more, so it is carried two other ways: the image
+          # gets a second tag of the short sha (build-and-push), and the controller prints
+          # commit + chartVersion in its "build info" line at startup.
           base=$(grep -E '^version:' charts/vngcloud-load-balancer-controller/Chart.yaml \
                  | head -1 | sed -E 's/^version:[[:space:]]*"?([0-9]+\.[0-9]+\.[0-9]+)"?.*/\1/')
           if [ -z "$base" ]; then
@@ -55,9 +55,9 @@ jobs:
           fi
           major=${base%%.*}
           minor=$(echo "$base" | cut -d. -f2)
-          sha="${GITHUB_SHA::7}"
-          chart="${major}.$((minor + 1)).0-dev.${sha}"
+          chart="${major}.$((minor + 1)).${GITHUB_RUN_NUMBER}"
           echo "Chart.yaml base : $base"
+          echo "commit          : ${GITHUB_SHA::7}"
           echo "dev version     : $chart"
           echo "tag=v${chart}" >> "$GITHUB_OUTPUT"
           echo "chart_version=${chart}" >> "$GITHUB_OUTPUT"

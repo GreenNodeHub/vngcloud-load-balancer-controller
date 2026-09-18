@@ -18,8 +18,14 @@ make generate manifests   # regenerate deepcopy + CRDs after editing api/v1alpha
 - **`main`** — what PRs target, and the only branch releases are cut from. Tag it (`0.3.25`,
   no `v`) and `publish.yaml` builds the image and chart into the production registry.
 - **`develop`** — a sandbox for getting a testable image onto a dev cluster. Every push builds:
-  `deploy-dev.yml` runs `ci.yml`, then publishes `v0.0.0-dev-<sha7>` and a matching chart to the
-  dev registry. There is no `[build]` commit marker any more.
+  `deploy-dev.yml` runs `ci.yml`, then publishes `v0.<minor+1>.<run number>` and a matching chart
+  to the dev registry. There is no `[build]` commit marker any more.
+
+  The version is numbered in the patch and carries **no prerelease**, because the controller only
+  upgrades a CRD whose schema-version label is lower than the chart being installed — and the
+  label is read back with the prerelease stripped, so `-dev.<sha>` can never beat itself. Get this
+  wrong and the CRDs silently stay behind while the API server drops every new status field.
+  The commit is carried by the image's second tag and by the `build info` log line.
 
   **`develop` is never merged back into `main`.** Merge feature branches into it freely and reset
   it when it drifts: `git push --force origin main:develop`.
