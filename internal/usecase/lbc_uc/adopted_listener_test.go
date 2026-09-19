@@ -156,12 +156,19 @@ func applyStatusPatch(k8sRepo *repository.MockK8sRepository) {
 		})
 }
 
+// taskWithListeners models an LBC on a load balancer this cluster ADOPTED - the user's ALB. That
+// is the only situation in which a listener can belong to someone else, so it is the setup every
+// adoption test needs; on a load balancer of our own making adoption is impossible by definition.
 func taskWithListeners(k8sRepo *repository.MockK8sRepository, listeners ...v1alpha1.CreatedListener) *defaultModelDeployTask {
 	return &defaultModelDeployTask{
 		logger:  logrus.NewEntry(logrus.New()),
 		k8sRepo: k8sRepo,
 		lbConfig: &v1alpha1.LoadBalancerConfig{
-			Status: v1alpha1.LoadBalancerConfigStatus{CreatedListeners: listeners},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId:        ptrTo("lb-user"),
+				AdoptedLoadBalancerId: ptrTo("lb-user"),
+				CreatedListeners:      listeners,
+			},
 		},
 	}
 }
@@ -212,4 +219,232 @@ func TestAdoptingAListenerRefusesAnEmptyId(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "need to retry")
+}
+
+// ---------------------------------------------------------------------------
+// The adoption has to survive the end of the reconcile
+// ---------------------------------------------------------------------------
+
+// deploy() finishes by overwriting status.createdListeners wholesale with what deployListeners
+// returned. So it is not enough for statusAdoptListener to write the adoption: the value
+// deployListener hands back has to carry it too, or the record lives only between those two
+// writes and the teardown - a later reconcile - reads a listener with Adopted false and deletes
+// the user's listener exactly as before.
+//
+// Measured on a pristine ALB with the first version of this fix: status showed adopted=true
+// mid-reconcile, and the listener was deleted anyway.
+func TestDeployListenerCarriesTheAdoptionIntoWhatStatusIsOverwrittenWith(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+
+	// Stripping the user's default pool is an update, which is what displaces it in the first place.
+	vngcloudRepo.EXPECT().
+		UpdateListener(mock.Anything, "lb-user", usersListenerId, mock.Anything).
+		Return(nil).Once()
+	vngcloudRepo.EXPECT().
+		WaitForLBActive(mock.Anything, "lb-user").
+		Return(&entityv2.LoadBalancer{UUID: "lb-user"}, nil)
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloudRepo,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				ClusterId:      ptrTo(thisClusterId),
+				Type:           loadbalancerv2.LoadBalancerTypeLayer4,
+				LoadBalancerId: ptrTo("lb-user"),
+			},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId:        ptrTo("lb-user"),
+				AdoptedLoadBalancerId: ptrTo("lb-user"),
+			},
+		},
+	}
+
+	// The load balancer already has a listener on this port, carrying the user's default pool.
+	onLB := &entityv2.ListListeners{Items: []*entityv2.Listener{{
+		UUID:          usersListenerId,
+		ProtocolPort:  80,
+		Protocol:      string(loadbalancerv2.ListenerProtocolTCP),
+		DefaultPoolId: usersPoolId,
+	}}}
+
+	got, err := task.deployListener(context.Background(), "lb-user",
+		v1alpha1.Listener{Protocol: loadbalancerv2.ListenerProtocolTCP, ProtocolPort: 80},
+		onLB, []v1alpha1.CreatedPool{}, []v1alpha1.CreatedCertificate{})
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Adopted,
+		"the value deploy() writes over status with must say the listener was adopted")
+	require.NotNil(t, got.OriginalDefaultPoolId,
+		"and must carry the default pool it displaced, or the teardown has nothing to restore")
+	assert.Equal(t, usersPoolId, *got.OriginalDefaultPoolId)
+}
+
+// On the second reconcile the listener is found by port again, but by then it carries this LBC's
+// pools - so the original must come from the record already in status, never from what the
+// listener looks like now.
+func TestDeployListenerKeepsTheOriginalDefaultPoolFromStatusOnLaterPasses(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	vngcloudRepo.EXPECT().
+		WaitForLBActive(mock.Anything, "lb-user").
+		Return(&entityv2.LoadBalancer{UUID: "lb-user"}, nil).Maybe()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloudRepo,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				ClusterId: ptrTo(thisClusterId),
+				Type:      loadbalancerv2.LoadBalancerTypeLayer4,
+			},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId:        ptrTo("lb-user"),
+				AdoptedLoadBalancerId: ptrTo("lb-user"),
+				CreatedListeners: []v1alpha1.CreatedListener{{
+					Id:                    usersListenerId,
+					Port:                  80,
+					Adopted:               true,
+					OriginalDefaultPoolId: ptrTo(usersPoolId),
+				}},
+			},
+		},
+	}
+
+	// The listener as it stands now: our pool, not the user's.
+	onLB := &entityv2.ListListeners{Items: []*entityv2.Listener{{
+		UUID:          usersListenerId,
+		ProtocolPort:  80,
+		Protocol:      string(loadbalancerv2.ListenerProtocolTCP),
+		DefaultPoolId: "",
+	}}}
+
+	got, err := task.deployListener(context.Background(), "lb-user",
+		v1alpha1.Listener{Protocol: loadbalancerv2.ListenerProtocolTCP, ProtocolPort: 80},
+		onLB, []v1alpha1.CreatedPool{}, []v1alpha1.CreatedCertificate{})
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Adopted)
+	require.NotNil(t, got.OriginalDefaultPoolId)
+	assert.Equal(t, usersPoolId, *got.OriginalDefaultPoolId,
+		"the original is whatever was recorded at adoption, not what the listener carries now")
+}
+
+// applyStatusPatchToFresh models what the patch helper really does: it mutates a FRESH copy read
+// from the API server, not the object it was handed. The two disagree whenever the in-memory copy
+// predates a write - which is the normal state of affairs partway through a reconcile.
+func applyStatusPatchToFresh(k8sRepo *repository.MockK8sRepository, fresh *v1alpha1.LoadBalancerConfig) {
+	k8sRepo.EXPECT().
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(ctx context.Context, _ *v1alpha1.LoadBalancerConfig,
+			mutate func(context.Context, *v1alpha1.LoadBalancerConfig) bool) error {
+			mutate(ctx, fresh)
+			return nil
+		})
+}
+
+// The break this catches, measured in the core envtest suite: a listener the controller had
+// created was marked adopted and then left in place, so changing a Service's port left the old
+// listener behind and the suite failed on finding two.
+//
+// It happens when the in-memory copy is stale. The mutation runs against the fresh object, sees
+// the listener already recorded, and correctly changes nothing - but the in-memory copy still
+// lacks it, so deciding again from that copy reads "not on our books yet" and adopts a listener
+// that is ours. The decision has to be made once, on the fresh object, and carried out.
+func TestAdoptingNeverMarksAListenerTheControllerCreatedWhenTheInMemoryCopyIsStale(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+
+	// what the API server holds: the listener this LBC created, two reconciles ago
+	fresh := &v1alpha1.LoadBalancerConfig{
+		Status: v1alpha1.LoadBalancerConfigStatus{
+			CreatedListeners: []v1alpha1.CreatedListener{{Id: "lis-ours", Port: 80}},
+		},
+	}
+	applyStatusPatchToFresh(k8sRepo, fresh)
+
+	// what this reconcile is holding: nothing yet
+	task := taskWithListeners(k8sRepo)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), "lis-ours", 80, "pool-ours"))
+
+	require.Len(t, fresh.Status.CreatedListeners, 1, "the fresh object must not gain a duplicate")
+	assert.False(t, fresh.Status.CreatedListeners[0].Adopted,
+		"a listener already on our books was created by us")
+
+	require.Len(t, task.lbConfig.Status.CreatedListeners, 1)
+	assert.False(t, task.lbConfig.Status.CreatedListeners[0].Adopted,
+		"and the in-memory copy must agree, or deployListener carries a false adoption into status")
+	assert.Nil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
+}
+
+// The same seam the other way: a listener that really is new to us is adopted, and the in-memory
+// copy learns it, so deployListener can carry it into the value deploy() overwrites status with.
+func TestAdoptingRecordsANewListenerOnBothCopies(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	fresh := &v1alpha1.LoadBalancerConfig{}
+	applyStatusPatchToFresh(k8sRepo, fresh)
+	task := taskWithListeners(k8sRepo)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), usersListenerId, 80, usersPoolId))
+
+	for name, ls := range map[string][]v1alpha1.CreatedListener{
+		"fresh":     fresh.Status.CreatedListeners,
+		"in-memory": task.lbConfig.Status.CreatedListeners,
+	} {
+		require.Len(t, ls, 1, name)
+		assert.True(t, ls[0].Adopted, name)
+		require.NotNil(t, ls[0].OriginalDefaultPoolId, name)
+		assert.Equal(t, usersPoolId, *ls[0].OriginalDefaultPoolId, name)
+	}
+}
+
+// Absence from status is not evidence of foreign ownership. status.createdListeners is rewritten
+// wholesale at the end of every deploy, so a pass that resolves no listeners empties it - and the
+// next pass then finds this LBC's own listener on the load balancer with nothing on the books.
+//
+// Measured in the core envtest suite: freshHas=0, and a listener the controller had created was
+// adopted and left behind, so changing a Service's port left two listeners on the load balancer.
+//
+// What is actually reliable is the load balancer's own provenance. Nothing on a load balancer this
+// cluster created can belong to anyone else, so adoption is impossible there whatever status says.
+func TestAdoptionIsImpossibleOnALoadBalancerThisClusterCreated(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	fresh := &v1alpha1.LoadBalancerConfig{} // status wiped: no listeners recorded
+	applyStatusPatchToFresh(k8sRepo, fresh)
+
+	task := taskWithListeners(k8sRepo)
+	task.lbConfig.Status.LoadBalancerId = ptrTo("lb-ours")
+	task.lbConfig.Status.AdoptedLoadBalancerId = nil
+	task.lbConfig.Status.CreatedLoadBalancerId = ptrTo("lb-ours")
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), "lis-ours", 80, "pool-ours"))
+
+	require.Len(t, task.lbConfig.Status.CreatedListeners, 1)
+	assert.False(t, task.lbConfig.Status.CreatedListeners[0].Adopted,
+		"this cluster created the load balancer, so the listener on it cannot be someone else's")
+	assert.Nil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
+}
+
+// And the case the whole change exists for: on a load balancer this LBC adopted, a listener it has
+// never recorded is the user's - that is the port-80 listener every portal-created ALB ships with.
+func TestAdoptionStillHappensOnALoadBalancerThisClusterAdopted(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	fresh := &v1alpha1.LoadBalancerConfig{}
+	applyStatusPatchToFresh(k8sRepo, fresh)
+
+	task := taskWithListeners(k8sRepo)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), usersListenerId, 80, usersPoolId))
+
+	require.Len(t, task.lbConfig.Status.CreatedListeners, 1)
+	assert.True(t, task.lbConfig.Status.CreatedListeners[0].Adopted)
+	require.NotNil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
+	assert.Equal(t, usersPoolId, *task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 }

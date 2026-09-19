@@ -53,27 +53,86 @@ func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listen
 		return errors.New("listener has no id after create, need to retry")
 	}
 
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+	// The decision is made once, inside the mutation, because only the object the mutation runs
+	// against is authoritative - it is a fresh read, while t.lbConfig can be several writes
+	// behind. Deciding again from the stale copy afterwards marked listeners the controller had
+	// created as adopted, which then left them on the load balancer forever.
+	var decided v1alpha1.CreatedListener
+
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id != listenerId {
 				continue
 			}
-			// Already ours - only the port may need catching up, exactly as statusAddListener
-			// would do. Adoption is decided once, on first sight.
-			if obj.Status.CreatedListeners[i].Port == port {
-				return false
+			// Already on our books, so it is one we created - or one adopted on an earlier
+			// pass, whose record must be carried forward untouched. Adoption is decided on
+			// first sight and never revisited.
+			if obj.Status.CreatedListeners[i].Port != port {
+				obj.Status.CreatedListeners[i].Port = port
+				decided = obj.Status.CreatedListeners[i]
+				return true
 			}
-			obj.Status.CreatedListeners[i].Port = port
-			return true
+			decided = obj.Status.CreatedListeners[i]
+			return false
 		}
 
-		adopted := v1alpha1.CreatedListener{Id: listenerId, Port: port, Adopted: true}
-		if originalDefaultPoolId != "" {
-			adopted.OriginalDefaultPoolId = &originalDefaultPoolId
+		// Not on the books - but that is not evidence of anything on its own, because
+		// status.createdListeners is rewritten wholesale at the end of every deploy and a pass
+		// that resolves no listeners empties it. What decides is the load balancer: nothing on
+		// one this cluster created can belong to anyone else.
+		if t.loadBalancerIsOurs() {
+			decided = v1alpha1.CreatedListener{Id: listenerId, Port: port}
+		} else {
+			decided = newAdoptedListener(listenerId, port, originalDefaultPoolId)
 		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, adopted)
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, decided)
 		return true
 	})
+	if err != nil {
+		return err
+	}
+
+	// deployListener reads this back within the same reconcile - it has to, because deploy() ends
+	// by overwriting status.createdListeners wholesale with what deployListeners returned - and
+	// the patch helper never touches the object it was given. Carry the decision, do not remake it.
+	for i := range t.lbConfig.Status.CreatedListeners {
+		if t.lbConfig.Status.CreatedListeners[i].Id == listenerId {
+			t.lbConfig.Status.CreatedListeners[i] = decided
+			return nil
+		}
+	}
+	t.lbConfig.Status.CreatedListeners = append(t.lbConfig.Status.CreatedListeners, decided)
+	return nil
+}
+
+// loadBalancerIsOurs reports whether this cluster created the load balancer, from the records
+// deployLoadBalancer keeps. It is createdByThisCluster without the tag lookup, which deployListener
+// has no reason to make: the question here is only whether a listener could possibly belong to
+// someone else, and on a load balancer of our own making it cannot.
+//
+// The unknown case - no record either way, no pin - follows createdByThisCluster: an unpinned load
+// balancer with no provenance is treated as ours, so its listeners stay deletable.
+func (t *defaultModelDeployTask) loadBalancerIsOurs() bool {
+	lbId := ""
+	if t.lbConfig.Status.LoadBalancerId != nil {
+		lbId = *t.lbConfig.Status.LoadBalancerId
+	}
+	if created := t.lbConfig.Status.CreatedLoadBalancerId; created != nil && (*created == lbId || lbId == "") {
+		return true
+	}
+	if adopted := t.lbConfig.Status.AdoptedLoadBalancerId; adopted != nil && (*adopted == lbId || lbId == "") {
+		return false
+	}
+	pinned := t.lbConfig.Spec.LoadBalancerId != nil && *t.lbConfig.Spec.LoadBalancerId != ""
+	return !pinned
+}
+
+func newAdoptedListener(listenerId string, port int, originalDefaultPoolId string) v1alpha1.CreatedListener {
+	adopted := v1alpha1.CreatedListener{Id: listenerId, Port: port, Adopted: true}
+	if originalDefaultPoolId != "" {
+		adopted.OriginalDefaultPoolId = &originalDefaultPoolId
+	}
+	return adopted
 }
 
 func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId string, port int, policyId string) error {
