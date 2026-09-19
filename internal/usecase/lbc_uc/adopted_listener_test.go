@@ -213,3 +213,112 @@ func TestAdoptingAListenerRefusesAnEmptyId(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "need to retry")
 }
+
+// ---------------------------------------------------------------------------
+// The adoption has to survive the end of the reconcile
+// ---------------------------------------------------------------------------
+
+// deploy() finishes by overwriting status.createdListeners wholesale with what deployListeners
+// returned. So it is not enough for statusAdoptListener to write the adoption: the value
+// deployListener hands back has to carry it too, or the record lives only between those two
+// writes and the teardown - a later reconcile - reads a listener with Adopted false and deletes
+// the user's listener exactly as before.
+//
+// Measured on a pristine ALB with the first version of this fix: status showed adopted=true
+// mid-reconcile, and the listener was deleted anyway.
+func TestDeployListenerCarriesTheAdoptionIntoWhatStatusIsOverwrittenWith(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+
+	// Stripping the user's default pool is an update, which is what displaces it in the first place.
+	vngcloudRepo.EXPECT().
+		UpdateListener(mock.Anything, "lb-user", usersListenerId, mock.Anything).
+		Return(nil).Once()
+	vngcloudRepo.EXPECT().
+		WaitForLBActive(mock.Anything, "lb-user").
+		Return(&entityv2.LoadBalancer{UUID: "lb-user"}, nil)
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloudRepo,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				ClusterId: ptrTo(thisClusterId),
+				Type:      loadbalancerv2.LoadBalancerTypeLayer4,
+			},
+		},
+	}
+
+	// The load balancer already has a listener on this port, carrying the user's default pool.
+	onLB := &entityv2.ListListeners{Items: []*entityv2.Listener{{
+		UUID:          usersListenerId,
+		ProtocolPort:  80,
+		Protocol:      string(loadbalancerv2.ListenerProtocolTCP),
+		DefaultPoolId: usersPoolId,
+	}}}
+
+	got, err := task.deployListener(context.Background(), "lb-user",
+		v1alpha1.Listener{Protocol: loadbalancerv2.ListenerProtocolTCP, ProtocolPort: 80},
+		onLB, []v1alpha1.CreatedPool{}, []v1alpha1.CreatedCertificate{})
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Adopted,
+		"the value deploy() writes over status with must say the listener was adopted")
+	require.NotNil(t, got.OriginalDefaultPoolId,
+		"and must carry the default pool it displaced, or the teardown has nothing to restore")
+	assert.Equal(t, usersPoolId, *got.OriginalDefaultPoolId)
+}
+
+// On the second reconcile the listener is found by port again, but by then it carries this LBC's
+// pools - so the original must come from the record already in status, never from what the
+// listener looks like now.
+func TestDeployListenerKeepsTheOriginalDefaultPoolFromStatusOnLaterPasses(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	vngcloudRepo.EXPECT().
+		WaitForLBActive(mock.Anything, "lb-user").
+		Return(&entityv2.LoadBalancer{UUID: "lb-user"}, nil).Maybe()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloudRepo,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				ClusterId: ptrTo(thisClusterId),
+				Type:      loadbalancerv2.LoadBalancerTypeLayer4,
+			},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				CreatedListeners: []v1alpha1.CreatedListener{{
+					Id:                    usersListenerId,
+					Port:                  80,
+					Adopted:               true,
+					OriginalDefaultPoolId: ptrTo(usersPoolId),
+				}},
+			},
+		},
+	}
+
+	// The listener as it stands now: our pool, not the user's.
+	onLB := &entityv2.ListListeners{Items: []*entityv2.Listener{{
+		UUID:          usersListenerId,
+		ProtocolPort:  80,
+		Protocol:      string(loadbalancerv2.ListenerProtocolTCP),
+		DefaultPoolId: "",
+	}}}
+
+	got, err := task.deployListener(context.Background(), "lb-user",
+		v1alpha1.Listener{Protocol: loadbalancerv2.ListenerProtocolTCP, ProtocolPort: 80},
+		onLB, []v1alpha1.CreatedPool{}, []v1alpha1.CreatedCertificate{})
+
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.True(t, got.Adopted)
+	require.NotNil(t, got.OriginalDefaultPoolId)
+	assert.Equal(t, usersPoolId, *got.OriginalDefaultPoolId,
+		"the original is whatever was recorded at adoption, not what the listener carries now")
+}
