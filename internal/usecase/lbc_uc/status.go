@@ -53,7 +53,7 @@ func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listen
 		return errors.New("listener has no id after create, need to retry")
 	}
 
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id != listenerId {
 				continue
@@ -67,13 +67,33 @@ func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listen
 			return true
 		}
 
-		adopted := v1alpha1.CreatedListener{Id: listenerId, Port: port, Adopted: true}
-		if originalDefaultPoolId != "" {
-			adopted.OriginalDefaultPoolId = &originalDefaultPoolId
-		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, adopted)
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, newAdoptedListener(listenerId, port, originalDefaultPoolId))
 		return true
 	})
+	if err != nil {
+		return err
+	}
+
+	// The patch helper mutates a fresh copy, never the object it was given. deployListener reads
+	// the record back within this same reconcile - it has to, because deploy() ends by
+	// overwriting status.createdListeners wholesale with what deployListeners returned - so keep
+	// the in-memory copy honest, the same way statusSetAdoptedLoadBalancerId does.
+	for i := range t.lbConfig.Status.CreatedListeners {
+		if t.lbConfig.Status.CreatedListeners[i].Id == listenerId {
+			return nil
+		}
+	}
+	t.lbConfig.Status.CreatedListeners = append(t.lbConfig.Status.CreatedListeners,
+		newAdoptedListener(listenerId, port, originalDefaultPoolId))
+	return nil
+}
+
+func newAdoptedListener(listenerId string, port int, originalDefaultPoolId string) v1alpha1.CreatedListener {
+	adopted := v1alpha1.CreatedListener{Id: listenerId, Port: port, Adopted: true}
+	if originalDefaultPoolId != "" {
+		adopted.OriginalDefaultPoolId = &originalDefaultPoolId
+	}
+	return adopted
 }
 
 func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId string, port int, policyId string) error {

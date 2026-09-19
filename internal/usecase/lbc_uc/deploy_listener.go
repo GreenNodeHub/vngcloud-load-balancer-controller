@@ -96,10 +96,12 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 
 	// skip policy for layer4 listener
 	if t.lbConfig.Spec.Type == loadbalancerv2.LoadBalancerTypeLayer4 {
-		return &v1alpha1.CreatedListener{
+		created := &v1alpha1.CreatedListener{
 			Id:   currentListener.UUID,
 			Port: currentListener.ProtocolPort,
-		}, nil
+		}
+		t.carryAdoption(created)
+		return created, nil
 	}
 
 	// ensure policy
@@ -113,11 +115,30 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		return nil, err
 	}
 
-	return &v1alpha1.CreatedListener{
+	created := &v1alpha1.CreatedListener{
 		Id:              currentListener.UUID,
 		Port:            currentListener.ProtocolPort,
 		CreatedPolicies: createdPolicies,
-	}, nil
+	}
+	t.carryAdoption(created)
+	return created, nil
+}
+
+// carryAdoption copies the adoption record onto the value deployListener returns. deploy() ends
+// by replacing status.createdListeners with exactly these values, so an adoption that is only
+// written by statusAdoptListener survives until that write and no longer - and the teardown, a
+// later reconcile, would then read Adopted false and delete the user's listener.
+//
+// The record is the source of truth, never the listener as it stands: by the second reconcile it
+// carries this LBC's pools, so re-deriving the original default pool from it would record ours.
+func (t *defaultModelDeployTask) carryAdoption(created *v1alpha1.CreatedListener) {
+	for _, rec := range t.lbConfig.Status.CreatedListeners {
+		if rec.Id == created.Id && rec.Adopted {
+			created.Adopted = true
+			created.OriginalDefaultPoolId = rec.OriginalDefaultPoolId
+			return
+		}
+	}
 }
 
 func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.ICreateListenerRequest, error) {
