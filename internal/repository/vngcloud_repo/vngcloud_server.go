@@ -16,12 +16,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+// GetSubnetByID returns the subnet, from cache when one is remembered.
+//
+// The callers read only ZoneID, Id and Cidr - build_lbc resolves a backend or preferred subnet
+// down to those three - and none of them changes while the subnet exists. The remaining fields
+// are carried along as they were at the time of the read, so anything mutable (Status, the ACL
+// policy, the route table) must not be trusted from a cached answer. This was the third largest
+// source of rate-limited requests behind ListTags and GetServerNetworkInfo.
 func (r *vngCloudRepository) GetSubnetByID(ctx context.Context, networkID, subnetID string) (*entityv2.Subnet, error) {
 	logger := contexts.NewContext(ctx).Log()
+
+	key := subnetCacheKey(networkID, subnetID)
+	if cached, ok := r.subnetCache.get(key); ok {
+		return cached, nil
+	}
+
 	subnet, sdkErr := r.client.VServerGateway().V2().NetworkService().GetSubnetById(networkv2.NewGetSubnetByIdRequest(networkID, subnetID).AddUserAgent(r.userAgent))
 	if sdkErr != nil {
 		logger.Debug("GetSubnetByID: ", sdkErr, ", params: ", sdkErr.GetListParameters())
 		return nil, domain.SDKError(sdkErr)
+	}
+	if subnet != nil {
+		r.subnetCache.put(key, subnet)
 	}
 	return subnet, nil
 }
