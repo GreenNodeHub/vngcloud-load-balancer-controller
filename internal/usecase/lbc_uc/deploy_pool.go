@@ -85,10 +85,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			CreatedMembers: pool.Members,
 		}, nil
 	} else {
+		// Only the identity here. The members are recorded further down, once the load
+		// balancer actually holds them - see the comment at that call.
 		if err := t.statusAddPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
-			return nil, err
-		}
-		if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
 			return nil, err
 		}
 	}
@@ -150,13 +149,24 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		}); err != nil {
 			return nil, fmt.Errorf("update members of pool %s on LB %s: %w", currentPool.UUID, lbId, err)
 		}
-		if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
-			return nil, err
-		}
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			return nil, fmt.Errorf("wait LB %s active after updating members of pool %s: %w", lbId, currentPool.UUID, err)
 		}
 	}
+
+	// Record the members only now, because every path that reaches here has left the load
+	// balancer holding them: either the update succeeded, or there was nothing to update.
+	//
+	// The order matters. mergePoolMembers decides whether a member is ours to remove by looking
+	// it up in this list; anything absent from it is treated as somebody else's and kept. So
+	// recording the new desired set before the push means a failed push leaves status ahead of
+	// the load balancer, and the member that was dropped from spec is off our books for good.
+	// That is how pools ended up holding 84 members for a 38-node cluster after
+	// UpdatePoolMembers was rejected on MEMBER_PER_POOL quota.
+	if err := t.statusAddPoolMember(ctx, currentPool.UUID, currentPool.Name, pool.Members); err != nil {
+		return nil, err
+	}
+
 	return &v1alpha1.CreatedPool{
 		Id:             currentPool.UUID,
 		Name:           currentPool.Name,
