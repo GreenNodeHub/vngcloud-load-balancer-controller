@@ -33,6 +33,7 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 		// built once per process, never per reconcile
 		serverNetworkCache: newTTLCache[serverNetworkInfo](serverNetworkCacheTTL, serverNetworkCacheMaxSize),
 		tagCache:           newTTLCache[[]entityv2.Tag](tagCacheTTL, tagCacheMaxSize),
+		subnetCache:        newTTLCache[*entityv2.Subnet](subnetCacheTTL, subnetCacheMaxSize),
 	}
 
 	metadator := metadata.GetMetadataProvider(vngcloudRepo.cfg.Metadata.SearchOrder)
@@ -88,6 +89,9 @@ type vngCloudRepository struct {
 
 	// a load balancer's tags; see ListTags
 	tagCache *ttlCache[[]entityv2.Tag]
+
+	// a subnet's zone and CIDR; see GetSubnetByID
+	subnetCache *ttlCache[*entityv2.Subnet]
 
 	// zoneID     common.Zone
 	// netID      string
