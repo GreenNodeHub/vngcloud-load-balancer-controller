@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.13
 
 require (
-	github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.21.1-0.20261001131210-de4e06987db2
+	github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.22.0
 	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cuongpiger/joat v1.0.17
