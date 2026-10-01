@@ -448,3 +448,31 @@ func TestAdoptionStillHappensOnALoadBalancerThisClusterAdopted(t *testing.T) {
 	require.NotNil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 	assert.Equal(t, usersPoolId, *task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 }
+
+// The owner gets back the ACL they had, not ours; a field we never held is left out of the PUT.
+func TestRestoringAnAdoptedListenerPutsItsAclBack(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t)
+	var sent *loadbalancerv2.UpdateListenerRequest
+	vng.EXPECT().UpdateListener(mock.Anything, "lb-user", usersListenerId, mock.Anything).
+		RunAndReturn(func(_ context.Context, _, _ string, o loadbalancerv2.IUpdateListenerRequest) error {
+			sent = o.(*loadbalancerv2.UpdateListenerRequest)
+			return nil
+		}).Once()
+	task := adoptedListenerTask(vng, repository.NewMockK8sRepository(t), true)
+
+	err := task.restoreAdoptedListener(context.Background(), "lb-user",
+		&entityv2.Listener{UUID: usersListenerId, DefaultPoolId: "", AllowedCidrs: "0.0.0.0/0", BlockedCidrs: "203.0.113.9/32", DefaultAction: "drop"},
+		ptrTo(usersPoolId), &v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/32")})
+
+	require.NoError(t, err)
+	assert.Equal(t, "192.0.2.1/32", *sent.BlockedCidrs)
+	assert.Nil(t, sent.DefaultAction, "a field we never held is left out, so vLB keeps it")
+}
+
+func TestRestoringAnAdoptedListenerWithNothingDisplacedSendsNothing(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t) // UpdateListener undeclared: a call fails the test
+	task := adoptedListenerTask(vng, repository.NewMockK8sRepository(t), true)
+	require.NoError(t, task.restoreAdoptedListener(context.Background(), "lb-user",
+		&entityv2.Listener{UUID: usersListenerId, DefaultPoolId: usersPoolId, BlockedCidrs: "192.0.2.1/32"},
+		ptrTo(usersPoolId), &v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/32")}))
+}
