@@ -49,21 +49,30 @@ func tcp80(blocked *string) v1alpha1.Listener {
 // the only copy of what to put back.
 func TestAclRecordIsWrittenBeforeThePut(t *testing.T) {
 	vng, k8s := repository.NewMockVngCloudRepository(t), repository.NewMockK8sRepository(t)
-	applyStatusPatch(k8s)
 	onListener(vng, entityv2.Listener{AllowedCidrs: "0.0.0.0/0", BlockedCidrs: "192.0.2.1/32", DefaultAction: "accept"})
 	task := aclTask(vng, k8s, tcp80(ptrTo("203.0.113.9/32")), nil)
+	stored, _ := storedStatusPatch(k8s, task)
+	persistedBlocked := func() *string {
+		require.Len(t, stored.Status.CreatedListeners, 1)
+		rec := stored.Status.CreatedListeners[0].OriginalAcl
+		require.NotNil(t, rec, "record must be persisted")
+		return rec.BlockedCidrs
+	}
 
 	vng.EXPECT().UpdateListener(mock.Anything, "lb-acl", aclListenerId, mock.Anything).
 		RunAndReturn(func(context.Context, string, string, loadbalancerv2.IUpdateListenerRequest) error {
-			rec := task.originalAclOf(aclListenerId)
-			require.NotNil(t, rec, "record must exist when the PUT is sent")
-			assert.Equal(t, "192.0.2.1/32", *rec.BlockedCidrs)
+			got := persistedBlocked()
+			require.NotNil(t, got, "the displaced value must be on the stored object when the PUT is sent")
+			assert.Equal(t, "192.0.2.1/32", *got)
 			return errors.New("boom")
 		}).Once()
 
 	_, err := task.deployListeners(context.Background(), "lb-acl", nil, nil)
 	require.Error(t, err)
-	assert.Equal(t, "192.0.2.1/32", *task.originalAclOf(aclListenerId).BlockedCidrs, "a failed PUT keeps the record")
+	got := persistedBlocked()
+	require.NotNil(t, got)
+	assert.Equal(t, "192.0.2.1/32", *got, "a failed PUT keeps the persisted record")
+	assert.Equal(t, "192.0.2.1/32", *task.originalAclOf(aclListenerId).BlockedCidrs, "and the in-memory mirror")
 }
 
 // vLB keeps fields a PUT leaves out, so an unrelated update must not touch the ACL at all - sending
