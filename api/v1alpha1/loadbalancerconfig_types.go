@@ -256,6 +256,15 @@ type Listener struct {
 	// +optional
 	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
 
+	// BlockedCidrs defines CIDR blocks dropped before AllowedCidrs is consulted
+	// +optional
+	BlockedCidrs *string `json:"blockedCidrs,omitempty"`
+
+	// DefaultAction applies to traffic that matches neither BlockedCidrs nor AllowedCidrs
+	// +optional
+	// +kubebuilder:validation:Enum=accept;drop
+	DefaultAction *string `json:"defaultAction,omitempty"`
+
 	// InsertHeaders defines headers to insert into requests
 	// +optional
 	// +listType=atomic
@@ -563,6 +572,38 @@ func (a CreatedPool) Equal(b CreatedPool) bool {
 	return true
 }
 
+// ListenerAcl holds, for each ACL field the controller has taken over on a listener, the value it
+// had before - which is what the controller writes back when the annotation is removed. A nil
+// field is one the controller does not hold.
+type ListenerAcl struct {
+	// +optional
+	AllowedCidrs *string `json:"allowedCidrs,omitempty"`
+	// +optional
+	BlockedCidrs *string `json:"blockedCidrs,omitempty"`
+	// +optional
+	DefaultAction *string `json:"defaultAction,omitempty"`
+}
+
+func (a *ListenerAcl) IsEmpty() bool {
+	return a == nil || (a.AllowedCidrs == nil && a.BlockedCidrs == nil && a.DefaultAction == nil)
+}
+
+func (a *ListenerAcl) Equal(b *ListenerAcl) bool {
+	if a.IsEmpty() || b.IsEmpty() {
+		return a.IsEmpty() == b.IsEmpty()
+	}
+	return ptrStrEqual(a.AllowedCidrs, b.AllowedCidrs) &&
+		ptrStrEqual(a.BlockedCidrs, b.BlockedCidrs) &&
+		ptrStrEqual(a.DefaultAction, b.DefaultAction)
+}
+
+func ptrStrEqual(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
 type CreatedListener struct {
 	// Id is the ID of the created listener
 	// +required
@@ -591,6 +632,12 @@ type CreatedListener struct {
 	// would overwrite the original with what we ourselves set.
 	// +optional
 	OriginalDefaultPoolId *string `json:"originalDefaultPoolId,omitempty"`
+
+	// OriginalAcl records the ACL values this LBC displaced, field by field, so removing the
+	// annotation puts them back. Written before the update that displaces them, never rewritten
+	// while held. See ListenerAcl.
+	// +optional
+	OriginalAcl *ListenerAcl `json:"originalAcl,omitempty"`
 }
 
 // Equal compares two CreatedListener for equality (order-independent for policies)
@@ -602,6 +649,9 @@ func (a CreatedListener) Equal(b CreatedListener) bool {
 		return false
 	}
 	if a.OriginalDefaultPoolId != nil && *a.OriginalDefaultPoolId != *b.OriginalDefaultPoolId {
+		return false
+	}
+	if !a.OriginalAcl.Equal(b.OriginalAcl) {
 		return false
 	}
 	if len(a.CreatedPolicies) != len(b.CreatedPolicies) {
