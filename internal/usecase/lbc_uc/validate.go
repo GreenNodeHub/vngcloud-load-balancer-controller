@@ -206,9 +206,10 @@ func (t *defaultModelDeployTask) validateCrossListenerDefaultPools(_ context.Con
 	return nil
 }
 
-// validateCrossListenerAcl checks that LBCs sharing a listener port do not declare different ACL
-// values, since the listener and its ACL are shared. It records which fields other LBCs declare in
-// t.aclPeers, and warns when this LBC leaves a field unset that a peer sets.
+// validateCrossListenerAcl checks that LBCs sharing a listener port do not declare different blocked
+// CIDRs or default actions, since the listener and its ACL are shared. Different allowed CIDRs only
+// warn, as they did not stop reconciling before ACL support. It records which fields other LBCs
+// declare in t.aclPeers, and warns when this LBC leaves a field unset that a peer sets.
 func (t *defaultModelDeployTask) validateCrossListenerAcl(_ context.Context, lbId string, allLBCs *v1alpha1.LoadBalancerConfigList) error {
 	selfName := fmt.Sprintf("%s/%s", t.lbConfig.Namespace, t.lbConfig.Name)
 	declared := make(map[int32]map[aclField][]aclDeclaration)
@@ -271,10 +272,21 @@ func (t *defaultModelDeployTask) validateCrossListenerAcl(_ context.Context, lbI
 			}
 			a := decls[0]
 			for _, b := range decls[1:] {
-				if !aclValueEqual(f, &a.value, &b.value) {
-					return errs.NewNoNeedRequeue(fmt.Sprintf("port %d has different %s on load balancer %s: %s uses '%s', %s uses '%s'. Listeners on the same port share one ACL; declare it on one Ingress/Service or make them equal",
-						port, f, lbId, a.lbcName, a.value, b.lbcName, b.value))
+				if aclValueEqual(f, &a.value, &b.value) {
+					continue
 				}
+				// Shared load balancers with different inbound-cidrs predate ACL support and must
+				// keep reconciling, so this one only warns. Self is collected first, so a is self
+				// when this LBC declares the field.
+				if f == aclAllowed {
+					if a.lbcName == selfName {
+						t.warnings = append(t.warnings, fmt.Sprintf("port %d: %s on load balancer %s differ: this resource uses '%s', %s uses '%s'; the listener is shared, so it follows whichever applied last",
+							port, f, lbId, a.value, b.lbcName, b.value))
+					}
+					continue
+				}
+				return errs.NewNoNeedRequeue(fmt.Sprintf("port %d has different %s on load balancer %s: %s uses '%s', %s uses '%s'. Listeners on the same port share one ACL; declare it on one Ingress/Service or make them equal",
+					port, f, lbId, a.lbcName, a.value, b.lbcName, b.value))
 			}
 
 			idx := slices.IndexFunc(decls, func(d aclDeclaration) bool { return d.lbcName != selfName })

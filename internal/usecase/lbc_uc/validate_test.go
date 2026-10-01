@@ -644,7 +644,7 @@ func TestValidateCrossListenerAcl(t *testing.T) {
 		return task, task.validateCrossListenerAcl(context.Background(), "lb-1", list)
 	}
 
-	t.Run("two different non-nil values conflict", func(t *testing.T) {
+	t.Run("different blocked cidrs conflict", func(t *testing.T) {
 		_, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), mk("default", "b", ptr.To("198.51.100.2/32")))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "port 80")
@@ -666,6 +666,35 @@ func TestValidateCrossListenerAcl(t *testing.T) {
 		task, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), mk("default", "b", nil))
 		require.NoError(t, err)
 		assert.Empty(t, task.warnings)
+	})
+	withListener := func(ns, name string, l v1alpha1.Listener) v1alpha1.LoadBalancerConfig {
+		lbc := mk(ns, name, nil)
+		l.Name, l.Protocol, l.ProtocolPort = "http", "HTTP", 80
+		lbc.Spec.Listeners = []v1alpha1.Listener{l}
+		return lbc
+	}
+	// Shared LBs with different inbound-cidrs exist today; they must keep reconciling.
+	t.Run("different allowed cidrs only warn", func(t *testing.T) {
+		task, err := run(withListener("default", "a", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.0/24")}),
+			withListener("default", "b", v1alpha1.Listener{AllowedCidrs: ptr.To("198.51.100.0/24")}))
+		require.NoError(t, err)
+		require.Len(t, task.warnings, 1)
+		for _, want := range []string{"port 80", "allowed cidrs", "default/b", "192.0.2.0/24", "198.51.100.0/24"} {
+			assert.Contains(t, task.warnings[0], want)
+		}
+	})
+	t.Run("equal allowed cidrs in another form do not warn", func(t *testing.T) {
+		task, err := run(withListener("default", "a", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.1")}),
+			withListener("default", "b", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.1/32")}))
+		require.NoError(t, err)
+		assert.Empty(t, task.warnings)
+	})
+	t.Run("different default actions conflict", func(t *testing.T) {
+		_, err := run(withListener("default", "a", v1alpha1.Listener{DefaultAction: ptr.To("drop")}),
+			withListener("default", "b", v1alpha1.Listener{DefaultAction: ptr.To("accept")}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "default action")
+		assert.Contains(t, err.Error(), "default/b")
 	})
 	t.Run("other load balancers are ignored", func(t *testing.T) {
 		other := mk("default", "b", ptr.To("198.51.100.2/32"))
