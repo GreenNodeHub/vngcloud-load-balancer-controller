@@ -73,14 +73,30 @@ test: manifests generate fmt vet envtest ## Run tests.
 	# in parallel, which shows up as a dozen unrelated timeouts. See CLAUDE.md.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -p=1 $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
+# verify-fast: quick pre-finish check (vet + lint + unit tests). Excluded, because each one
+# starts an envtest API server (needs downloaded kube-apiserver/etcd binaries and minutes of
+# runtime) and they are covered by `make test` / CI:
+#   - ./internal/controller/... (Ginkgo envtest suites)
+#   - ./test/e2e (needs a Kind cluster)
+#   - tests named *Integration* (e.g. nsg_uc envtest integration test), via -skip
+# Unlike `test`, it does not regenerate manifests/deepcopy.
+.PHONY: verify-fast
+verify-fast: vet lint ## Quick check before finishing a change: vet, lint (new code), unit tests without envtest.
+	go test -skip 'Integration' $$(go list ./... | grep -v -e /internal/controller/ -e /test/e2e)
+
 # Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
 .PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
 test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
+# LINT_BASE: lint reports only issues in code that is new relative to this ref, so
+# pre-existing findings in old code do not fail it. CI lints the whole tree with the same
+# version and .golangci.yml.
+LINT_BASE ?= origin/main
+
 .PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) run
+lint: golangci-lint ## Run golangci-lint on code new vs LINT_BASE (default origin/main)
+	$(GOLANGCI_LINT) run --allow-parallel-runners --new-from-rev=$(LINT_BASE)
 
 .PHONY: lint-fix
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
@@ -193,9 +209,9 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.3
-CONTROLLER_TOOLS_VERSION ?= v0.16.1
+CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v1.59.1
+GOLANGCI_LINT_VERSION ?= v2.5.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
@@ -215,7 +231,7 @@ $(ENVTEST): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary

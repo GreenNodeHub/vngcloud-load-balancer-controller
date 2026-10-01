@@ -7,11 +7,46 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
   - node
+  - nodes
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - events
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints/finalizers
+  - nodes/finalizers
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - endpoints/status
+  - nodes/status
+  - services/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -48,48 +83,6 @@ rules:
   - cluster.x-k8s.io
   resources:
   - clusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  - events
-  - secrets
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - endpoints/finalizers
-  - nodes/finalizers
-  - services/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - endpoints/status
-  - nodes/status
-  - services/status
   verbs:
   - get
   - patch
