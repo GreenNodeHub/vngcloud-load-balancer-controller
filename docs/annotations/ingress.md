@@ -39,14 +39,16 @@ Applied to every listener of this resource. The first matching rule wins: droppe
 
 Removing an annotation puts back the value the listener had before the controller changed it. ACL values set on the portal are left alone while no annotation manages them.
 
-**Shared load balancers.** Ingresses sharing a load balancer share its port 80/443 listeners, and so one ACL. Declare the ACL on one Ingress; two different values on the same port are rejected. A resource without the annotations on such a listener receives a `SharedListenerAcl` warning event. If the Ingress holding the original is removed first, the last value can remain; set `dropped-cidrs: ""` to clear it.
+**Shared load balancers.** Ingresses sharing a load balancer share its port 80/443 listeners, and so one ACL. Declare the ACL on one Ingress; different dropped CIDRs or default actions (including the `drop` that `inbound-cidrs` implies) on the same port are rejected. Different inbound CIDRs only produce a `SharedListenerAcl` warning event, and the listener follows whichever Ingress applied last. A resource without the annotations on such a listener also receives a `SharedListenerAcl` warning event.
+
+If the Ingress holding the original is removed first, the last value can remain on the listener. To clear it, remove the annotation from the remaining Ingress, then clear the leftover value on the portal. Alternatively, keep `vks.vngcloud.vn/dropped-cidrs: ""` on the remaining Ingress permanently: it records the leftover value as the original, so removing it later puts the block back.
 
 | Goal | Annotations |
 |---|---|
-| Drop a few addresses | `dropped-cidrs: "203.0.113.9/32,198.51.100.0/24"` |
-| Allow only some ranges | `inbound-cidrs: "192.0.2.0/24"` |
-| Allow a range except a few addresses | `inbound-cidrs: "192.0.2.0/24"` + `dropped-cidrs: "192.0.2.13/32"` (dropped is checked first) |
-| Drop everything | `dropped-cidrs: "0.0.0.0/0"` |
+| Drop a few addresses | `vks.vngcloud.vn/dropped-cidrs: "203.0.113.9/32,198.51.100.0/24"` |
+| Allow only some ranges | `vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"` |
+| Allow a range except a few addresses | `vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"` + `vks.vngcloud.vn/dropped-cidrs: "192.0.2.13/32"` (dropped is checked first) |
+| Drop everything | `vks.vngcloud.vn/dropped-cidrs: "0.0.0.0/0"` |
 
 ## Health Checks
 
