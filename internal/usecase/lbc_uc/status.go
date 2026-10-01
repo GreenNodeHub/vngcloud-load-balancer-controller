@@ -73,10 +73,13 @@ func (t *defaultModelDeployTask) statusSetOriginalAcl(ctx context.Context, liste
 	if t.originalAclOf(listenerId).Equal(rec) {
 		return nil
 	}
+	found := false
 	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		found = false
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id == listenerId {
 				obj.Status.CreatedListeners[i].OriginalAcl = rec.DeepCopy()
+				found = true
 				return true
 			}
 		}
@@ -84,6 +87,10 @@ func (t *defaultModelDeployTask) statusSetOriginalAcl(ctx context.Context, liste
 	})
 	if err != nil {
 		return err
+	}
+	// Without the entry the record was not persisted, and the PUT it guards must not go ahead.
+	if !found {
+		return errors.Errorf("listener %s not in status, need to retry", listenerId)
 	}
 	for i := range t.lbConfig.Status.CreatedListeners {
 		if t.lbConfig.Status.CreatedListeners[i].Id == listenerId {

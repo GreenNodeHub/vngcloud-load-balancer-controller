@@ -123,7 +123,7 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 			// serving nothing, and the pool it pointed at orphaned.
 			if adopted != nil && !isListenerInUse(candidateId) {
 				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId, adopted.OriginalAcl); err != nil {
-					failures = append(failures, fmt.Errorf("listener %s: restore default pool: %w", candidateId, err))
+					failures = append(failures, fmt.Errorf("listener %s: restore default pool and ACL: %w", candidateId, err))
 					continue
 				}
 			}

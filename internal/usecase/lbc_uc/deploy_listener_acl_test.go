@@ -265,3 +265,17 @@ func TestAdoptedListenerGetsNoNeutralRecord(t *testing.T) {
 	require.NotNil(t, got.OriginalDefaultPoolId)
 	assert.Equal(t, "pool-users", *got.OriginalDefaultPoolId)
 }
+
+// The record guards the PUT that follows it; if it could not be stored, the PUT must not go ahead.
+func TestAclRecordFailsWhenTheListenerIsMissingFromStoredStatus(t *testing.T) {
+	k8s := repository.NewMockK8sRepository(t)
+	task := aclTask(nil, k8s, tcp80(ptrTo("203.0.113.9/32")), nil)
+	stored, writes := storedStatusPatch(k8s, task)
+	stored.Status.CreatedListeners = nil
+
+	err := task.statusSetOriginalAcl(context.Background(), aclListenerId, &v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/32")})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not in status, need to retry")
+	assert.Equal(t, 0, *writes)
+	assert.Nil(t, task.originalAclOf(aclListenerId), "the in-memory copy must not claim a record that was not stored")
+}
