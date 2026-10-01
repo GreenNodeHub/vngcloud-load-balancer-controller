@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
+	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -416,6 +417,95 @@ var _ = Describe("Service Controller", func() {
 				g.Expect(listener.TimeoutClient).Should(Equal(99))
 				g.Expect(listener.TimeoutConnection).Should(Equal(101))
 				g.Expect(listener.TimeoutMember).Should(Equal(100))
+			}, timeout*2, interval).Should(Succeed())
+
+			// Cleanup
+			Expect(k8sClient.Delete(ctx, service)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, endpoint)).Should(Succeed())
+		})
+	})
+
+	Context("When a service declares dropped CIDRs", func() {
+		It("keeps the ACL record across reconciles and restores on removal", func() {
+			serviceName := testServiceName
+			namespace := testDefaultNamespace
+			droppedKey := fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixDroppedCIDRs)
+			idleClientKey := fmt.Sprintf("%s/%s", domain.SERVICE_ANNOTATION_PREFIX, annotations.SuffixIdleTimeoutClient)
+			const droppedCidr = "203.0.113.9/32"
+
+			endpoint := newEndpointResource(serviceName, namespace)
+			Expect(k8sClient.Create(ctx, endpoint)).Should(Succeed())
+
+			service := newServiceResource(serviceName, namespace)
+			service.Annotations = map[string]string{droppedKey: droppedCidr}
+			Expect(k8sClient.Create(ctx, service)).Should(Succeed())
+
+			// observe reads the port-80 listener from the mock cloud together with its entry in the
+			// LBC status, which is where the ACL record lives.
+			observe := func(g Gomega) (listener entityv2.Listener, created v1alpha1.CreatedListener) {
+				lbcList, err := getLBCListForService(serviceName, namespace)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(lbcList.Items).Should(HaveLen(1))
+				lbc := &lbcList.Items[0]
+				g.Expect(lbc.Status.LoadBalancerId).ShouldNot(BeNil())
+
+				listeners, err := vngcloudRepo.ListListenerOfLB(ctx, *lbc.Status.LoadBalancerId)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				g.Expect(listeners).ShouldNot(BeNil())
+				g.Expect(listeners.Items).Should(HaveLen(1))
+				listener = *listeners.Items[0]
+
+				g.Expect(lbc.Status.CreatedListeners).Should(HaveLen(1))
+				created = lbc.Status.CreatedListeners[0]
+				g.Expect(created.Id).Should(Equal(listener.UUID))
+				return listener, created
+			}
+
+			// The listener is created blocking the CIDR; the controller created it, so what it
+			// displaced is the neutral original: a non-nil, empty BlockedCidrs.
+			Eventually(func(g Gomega) {
+				listener, created := observe(g)
+				g.Expect(listener.BlockedCidrs).Should(Equal(droppedCidr))
+				g.Expect(created.OriginalAcl).ShouldNot(BeNil())
+				g.Expect(created.OriginalAcl.BlockedCidrs).ShouldNot(BeNil())
+				g.Expect(*created.OriginalAcl.BlockedCidrs).Should(BeEmpty())
+			}, timeout*2, interval).Should(Succeed())
+
+			// An unrelated change reconciles the listener again; the record and the block stay.
+			Eventually(func() error {
+				svc, err := getServiceResource(serviceName, namespace)
+				if err != nil {
+					return err
+				}
+				svc.Annotations[idleClientKey] = "60"
+				return k8sClient.Update(ctx, svc)
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				listener, _ := observe(g)
+				g.Expect(listener.TimeoutClient).Should(Equal(60))
+			}, timeout*2, interval).Should(Succeed())
+
+			Consistently(func(g Gomega) {
+				listener, created := observe(g)
+				g.Expect(listener.BlockedCidrs).Should(Equal(droppedCidr))
+				g.Expect(created.OriginalAcl).ShouldNot(BeNil())
+			}, 5*time.Second, interval).Should(Succeed())
+
+			// Dropping the annotation puts the original back and clears the record.
+			Eventually(func() error {
+				svc, err := getServiceResource(serviceName, namespace)
+				if err != nil {
+					return err
+				}
+				delete(svc.Annotations, droppedKey)
+				return k8sClient.Update(ctx, svc)
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				listener, created := observe(g)
+				g.Expect(listener.BlockedCidrs).Should(BeEmpty())
+				g.Expect(created.OriginalAcl).Should(BeNil())
 			}, timeout*2, interval).Should(Succeed())
 
 			// Cleanup
