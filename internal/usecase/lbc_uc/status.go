@@ -145,6 +145,16 @@ func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listen
 		// one this cluster created can belong to anyone else.
 		if t.loadBalancerIsOurs() {
 			decided = v1alpha1.CreatedListener{Id: listenerId, Port: port}
+			// A listener first seen on our own load balancer was created by this controller,
+			// inline with CreateLoadBalancer, so it already carries the spec's ACL and its
+			// original is the neutral listener. Without the record, removing the annotation
+			// would leave it as the annotation set it.
+			for _, ls := range t.lbConfig.Spec.Listeners {
+				if int(ls.ProtocolPort) == port {
+					decided.OriginalAcl = neutralAcl(specAcl(ls), t.cfg.LoadBalancerOpts.DefaultAllowedCidrs)
+					break
+				}
+			}
 		} else {
 			decided = newAdoptedListener(listenerId, port, originalDefaultPoolId)
 		}

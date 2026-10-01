@@ -203,3 +203,56 @@ func TestAclRecordUnchangedIsNotRewritten(t *testing.T) {
 	assert.Equal(t, 0, *writes)
 	assert.Equal(t, "192.0.2.1/32", *created[0].OriginalAcl.BlockedCidrs)
 }
+
+// The first listener of a load balancer this controller creates is created inline with the load
+// balancer, so deployListener finds it by port and never reaches the create branch that writes the
+// neutral record. Without the record here, removing the annotation would leave it blocked forever.
+func TestListenerCreatedWithOurLoadBalancerGetsTheNeutralRecord(t *testing.T) {
+	k8s := repository.NewMockK8sRepository(t)
+	task := aclTask(nil, k8s, tcp80(ptrTo("203.0.113.9/32")), nil)
+	task.lbConfig.Status.CreatedListeners = nil
+	stored, _ := storedStatusPatch(k8s, task)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), aclListenerId, 80, ""))
+
+	require.Len(t, stored.Status.CreatedListeners, 1)
+	got := stored.Status.CreatedListeners[0]
+	assert.False(t, got.Adopted)
+	require.NotNil(t, got.OriginalAcl)
+	require.NotNil(t, got.OriginalAcl.BlockedCidrs)
+	assert.Equal(t, "", *got.OriginalAcl.BlockedCidrs, "recorded in the persisted status")
+	assert.Equal(t, got, task.lbConfig.Status.CreatedListeners[0], "the in-memory entry matches what was persisted")
+}
+
+func TestListenerCreatedWithOurLoadBalancerHasNoRecordWithoutAcl(t *testing.T) {
+	k8s := repository.NewMockK8sRepository(t)
+	task := aclTask(nil, k8s, tcp80(nil), nil)
+	task.lbConfig.Status.CreatedListeners = nil
+	stored, _ := storedStatusPatch(k8s, task)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), aclListenerId, 80, ""))
+
+	require.Len(t, stored.Status.CreatedListeners, 1)
+	assert.Nil(t, stored.Status.CreatedListeners[0].OriginalAcl)
+	assert.Nil(t, task.lbConfig.Status.CreatedListeners[0].OriginalAcl)
+}
+
+// A listener found on someone else's load balancer is adopted, and its ACL is left alone: the
+// record only ever covers values this controller displaced.
+func TestAdoptedListenerGetsNoNeutralRecord(t *testing.T) {
+	k8s := repository.NewMockK8sRepository(t)
+	task := aclTask(nil, k8s, tcp80(ptrTo("203.0.113.9/32")), nil)
+	task.lbConfig.Status.CreatedListeners = nil
+	task.lbConfig.Status.CreatedLoadBalancerId = nil
+	task.lbConfig.Status.AdoptedLoadBalancerId = ptrTo("lb-acl")
+	stored, _ := storedStatusPatch(k8s, task)
+
+	require.NoError(t, task.statusAdoptListener(context.Background(), aclListenerId, 80, "pool-users"))
+
+	require.Len(t, stored.Status.CreatedListeners, 1)
+	got := stored.Status.CreatedListeners[0]
+	assert.True(t, got.Adopted)
+	assert.Nil(t, got.OriginalAcl)
+	require.NotNil(t, got.OriginalDefaultPoolId)
+	assert.Equal(t, "pool-users", *got.OriginalDefaultPoolId)
+}
