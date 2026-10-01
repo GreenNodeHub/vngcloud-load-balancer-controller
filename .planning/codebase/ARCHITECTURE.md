@@ -33,7 +33,7 @@ Characteristics:**
 - Purpose: Abstracts all I/O — Kubernetes API reads/writes via `K8sRepository` and VNGCloud API calls via `VngCloudRepository`
 - Location: `internal/repository/`
 - Contains: Interface definitions in `internal/repository/contracts.go`; implementations in `internal/repository/k8s_repo/` and `internal/repository/vngcloud_repo/`
-- Depends on: `github.com/vngcloud/vngcloud-go-sdk/v2`, `sigs.k8s.io/controller-runtime/pkg/client`
+- Depends on: `github.com/GreenNodeHub/vngcloud-go-sdk/v2`, `sigs.k8s.io/controller-runtime/pkg/client`
 - Used by: UseCase layer only
 
 **Domain Layer:**

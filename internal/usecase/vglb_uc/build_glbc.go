@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"time"
 
+	global "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"

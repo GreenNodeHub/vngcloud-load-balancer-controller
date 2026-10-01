@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	v2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	v2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/listeneracl"

@@ -3,7 +3,7 @@ package service_glb_uc
 import (
 	"fmt"
 
-	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	global "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 

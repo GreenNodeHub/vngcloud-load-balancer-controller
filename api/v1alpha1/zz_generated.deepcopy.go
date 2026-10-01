@@ -21,9 +21,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
