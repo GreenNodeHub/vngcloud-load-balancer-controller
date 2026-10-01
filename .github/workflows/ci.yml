@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # The SDK is a private module: go fetches it from git, bypassing the public proxy and sumdb.
+  GOPRIVATE: github.com/GreenNodeHub/*
+
 jobs:
   test:
     name: unit + envtest
@@ -33,6 +37,17 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Grant git access to the private SDK
+        env:
+          # org secret: read access to GreenNodeHub/vngcloud-go-sdk
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: |
+          if [ -z "$GO_PRIVATE_TOKEN" ]; then
+            echo "::error::secret GO_PRIVATE_TOKEN is not available; go cannot fetch github.com/GreenNodeHub/vngcloud-go-sdk"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${GO_PRIVATE_TOKEN}@github.com/GreenNodeHub/".insteadOf "https://github.com/GreenNodeHub/"
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -92,6 +107,16 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Grant git access to the private SDK
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: |
+          if [ -z "$GO_PRIVATE_TOKEN" ]; then
+            echo "::error::secret GO_PRIVATE_TOKEN is not available; go cannot fetch github.com/GreenNodeHub/vngcloud-go-sdk"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${GO_PRIVATE_TOKEN}@github.com/GreenNodeHub/".insteadOf "https://github.com/GreenNodeHub/"
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -111,6 +136,16 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+
+      - name: Grant git access to the private SDK
+        env:
+          GO_PRIVATE_TOKEN: ${{ secrets.GO_PRIVATE_TOKEN }}
+        run: |
+          if [ -z "$GO_PRIVATE_TOKEN" ]; then
+            echo "::error::secret GO_PRIVATE_TOKEN is not available; go cannot fetch github.com/GreenNodeHub/vngcloud-go-sdk"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${GO_PRIVATE_TOKEN}@github.com/GreenNodeHub/".insteadOf "https://github.com/GreenNodeHub/"
 
       - name: Scan for Vulnerabilities in Code
         # Pinned to master HEAD: latest v1.0.4 tag transitively pulls actions/checkout@v4.1.1

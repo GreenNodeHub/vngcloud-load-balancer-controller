@@ -13,6 +13,11 @@ make generate manifests   # regenerate deepcopy + CRDs after editing api/v1alpha
 
 `make test` writes its envtest binaries via `setup-envtest` into `bin/`.
 
+The SDK is the private module `github.com/GreenNodeHub/vngcloud-go-sdk/v2`: every go command needs
+`GOPRIVATE=github.com/GreenNodeHub/*` and git access to that repo. Image builds take a token via
+`GH_TOKEN=$(gh auth token) make docker-build` (BuildKit secret `gh_token`); CI uses the org secret
+`GO_PRIVATE_TOKEN`.
+
 ## Branches
 
 - **`main`** — what PRs target, and the only branch releases are cut from. Tag it (`0.3.25`,
