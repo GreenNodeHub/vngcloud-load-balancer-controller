@@ -80,6 +80,28 @@ func TestPlanAclComparesCidrsAsSets(t *testing.T) {
 	assert.Nil(t, p.Desired.BlockedCidrs)
 }
 
+// Final review R9: the validator accepts a bare IP and host bits; vLB may echo either back in
+// canonical form, which must not read as a change on every reconcile.
+func TestPlanAclTreatsABareIPAsSlash32(t *testing.T) {
+	p := planListenerAcl(v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1")},
+		cur("0.0.0.0/0", "192.0.2.1/32", "accept"), nil, noPeers)
+	assert.Nil(t, p.Desired.BlockedCidrs)
+	assert.Nil(t, p.RecordBefore)
+}
+
+func TestPlanAclIgnoresHostBitsInACidr(t *testing.T) {
+	p := planListenerAcl(v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/22")},
+		cur("0.0.0.0/0", "192.0.2.0/22", "accept"), nil, noPeers)
+	assert.Nil(t, p.Desired.BlockedCidrs)
+	assert.Nil(t, p.RecordBefore)
+}
+
+func TestPlanAclStillSeesADifferentBlock(t *testing.T) {
+	p := planListenerAcl(v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/22")},
+		cur("0.0.0.0/0", "192.0.2.0/24", "accept"), nil, noPeers)
+	assert.Equal(t, "192.0.2.1/22", *p.Desired.BlockedCidrs, "the user's text is what is sent")
+}
+
 // Review Focus 3: a listener from before ACL existed reports no default action.
 func TestPlanAclRecordsAcceptForAListenerWithNoDefaultAction(t *testing.T) {
 	p := planListenerAcl(v1alpha1.ListenerAcl{DefaultAction: ptrTo("drop")}, cur("192.0.2.0/24", "", ""), nil, noPeers)

@@ -2,6 +2,7 @@ package lbc_uc
 
 import (
 	"fmt"
+	"net"
 	"slices"
 	"strings"
 
@@ -132,7 +133,8 @@ func planListenerAcl(spec, current v1alpha1.ListenerAcl, record *v1alpha1.Listen
 	return plan
 }
 
-// aclValueEqual compares CIDR lists as sets, since vLB may echo a list back reformatted.
+// aclValueEqual compares CIDR lists as sets of canonical networks, since vLB may echo a list back
+// reformatted. The user's text is still what gets sent.
 func aclValueEqual(f aclField, a, b *string) bool {
 	if f == aclDefaultAction {
 		return deref(a) == deref(b)
@@ -144,11 +146,23 @@ func cidrSet(s string) []string {
 	out := []string{}
 	for _, p := range strings.Split(s, ",") {
 		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
+			out = append(out, canonicalCidr(p))
 		}
 	}
 	slices.Sort(out)
 	return slices.Compact(out)
+}
+
+// canonicalCidr drops host bits ("192.0.2.1/22" -> "192.0.2.0/22") and writes a bare IPv4
+// address as a /32. Anything else is compared as written.
+func canonicalCidr(s string) string {
+	if _, n, err := net.ParseCIDR(s); err == nil {
+		return n.String()
+	}
+	if ip := net.ParseIP(s); ip != nil && ip.To4() != nil {
+		return ip.String() + "/32"
+	}
+	return s
 }
 
 func cloneAcl(a *v1alpha1.ListenerAcl) *v1alpha1.ListenerAcl {
