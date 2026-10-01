@@ -78,6 +78,15 @@ func neutralAcl(spec v1alpha1.ListenerAcl, defaultAllowed string) *v1alpha1.List
 	return rec
 }
 
+// aclDeclaration is one ACL field another LBC on the same load balancer declares for a listener.
+type aclDeclaration struct{ lbcName, value string }
+
+// peerDeclaresAcl reports, for the listener on port, whether another LBC declares a field - the
+// planner then leaves that field to the peer instead of restoring it.
+func (t *defaultModelDeployTask) peerDeclaresAcl(port int32) func(aclField) bool {
+	return func(f aclField) bool { return t.aclPeers[port][f] != nil }
+}
+
 type aclPlan struct {
 	Desired      v1alpha1.ListenerAcl  // value to PUT; nil = keep the current one
 	RecordBefore *v1alpha1.ListenerAcl // record to store BEFORE the PUT

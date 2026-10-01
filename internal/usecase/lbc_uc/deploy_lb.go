@@ -26,6 +26,10 @@ type defaultModelDeployTask struct {
 	vngcloudRepo repository.VngCloudRepository
 	k8sRepo      repository.K8sRepository
 	lbConfig     *v1alpha1.LoadBalancerConfig
+
+	// aclPeers holds, per listener port, which ACL fields another LBC sharing the load balancer
+	// declares. Not filled yet, so no field is ever held by a peer.
+	aclPeers map[int32]map[aclField]*aclDeclaration
 }
 
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {
