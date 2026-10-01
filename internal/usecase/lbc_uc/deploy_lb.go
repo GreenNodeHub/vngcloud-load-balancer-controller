@@ -28,8 +28,11 @@ type defaultModelDeployTask struct {
 	lbConfig     *v1alpha1.LoadBalancerConfig
 
 	// aclPeers holds, per listener port, which ACL fields another LBC sharing the load balancer
-	// declares. Not filled yet, so no field is ever held by a peer.
+	// declares. Filled by validateCrossListenerAcl.
 	aclPeers map[int32]map[aclField]*aclDeclaration
+
+	// warnings are reported to the user as events; they do not fail the reconcile.
+	warnings []string
 }
 
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {

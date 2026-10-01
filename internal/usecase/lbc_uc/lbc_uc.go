@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"
@@ -76,7 +77,7 @@ func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req c
 	}
 
 	// Perform the actual reconciliation
-	err = uc.ensure(ctx, lbConfig)
+	warnings, err := uc.ensure(ctx, lbConfig)
 
 	// Update reconciliation tracking fields and conditions
 	now := metav1.Now()
@@ -122,10 +123,15 @@ func (uc *lbcUseCase) EnsureLoadBalancerConfigUseCase(ctx context.Context, req c
 		logger.Warnf("Failed to update reconciliation tracking fields: %v", statusErr)
 	}
 
+	// Warnings do not fail the reconcile: Ready stays True and the caller turns them into events.
+	if err == nil && len(warnings) > 0 {
+		return &domain.ReconcileWarning{Messages: warnings}
+	}
 	return err
 }
 
-func (uc *lbcUseCase) ensure(ctx context.Context, lbConfig *v1alpha1.LoadBalancerConfig) error {
+// ensure deploys the LBC and returns the warnings to report to the user.
+func (uc *lbcUseCase) ensure(ctx context.Context, lbConfig *v1alpha1.LoadBalancerConfig) ([]string, error) {
 	logger := contexts.NewContext(ctx).Log()
 	task := &defaultModelDeployTask{
 		logger:       logger,
@@ -136,10 +142,10 @@ func (uc *lbcUseCase) ensure(ctx context.Context, lbConfig *v1alpha1.LoadBalance
 	}
 
 	if err := task.deploy(ctx); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return task.warnings, nil
 }
 
 func (uc *lbcUseCase) DeleteLoadBalancerConfigUseCase(ctx context.Context, req ctrl.Request) error {
