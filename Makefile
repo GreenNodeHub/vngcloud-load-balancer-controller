@@ -123,18 +123,9 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-#
-# The image build fetches the private SDK module (github.com/GreenNodeHub/vngcloud-go-sdk), so it
-# needs a GitHub token with read access to that repo. Pass it through GH_TOKEN, e.g.
-#   GH_TOKEN=$$(gh auth token) make docker-build
-# It reaches the build as the BuildKit secret gh_token, never as a build arg. Without GH_TOKEN the
-# targets still run, but `go mod download` fails on the private module.
-comma := ,
-DOCKER_SECRET_ARGS = $(if $(GH_TOKEN),--secret id=gh_token$(comma)env=GH_TOKEN)
-
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager (set GH_TOKEN for the private SDK module).
-	$(CONTAINER_TOOL) build $(DOCKER_SECRET_ARGS) --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
+docker-build: ## Build docker image with the manager.
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -148,12 +139,12 @@ docker-push: ## Push docker image with the manager.
 # To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support (set GH_TOKEN for the private SDK module)
+docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name vngcloud-load-balancer-controller-builder
 	$(CONTAINER_TOOL) buildx use vngcloud-load-balancer-controller-builder
-	- $(CONTAINER_TOOL) buildx build $(DOCKER_SECRET_ARGS) --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm vngcloud-load-balancer-controller-builder
 	rm Dockerfile.cross
 
@@ -263,5 +254,5 @@ exec:
 
 .PHONY: stg
 stg:
-	$(CONTAINER_TOOL) build $(DOCKER_SECRET_ARGS) --build-arg VERSION=v0.0.1 --build-arg COMMIT=stg -t vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1 .
+	$(CONTAINER_TOOL) build --build-arg VERSION=v0.0.1 --build-arg COMMIT=stg -t vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1 .
 	$(CONTAINER_TOOL) push vcr.vngcloud.vn/60108-annd2-ingress/vngcloud-load-balancer-controller:v0.0.1

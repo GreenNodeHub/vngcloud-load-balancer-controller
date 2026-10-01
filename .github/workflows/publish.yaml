@@ -50,9 +50,6 @@ jobs:
         with:
           context: .
           push: true
-          # org secret: read access to GreenNodeHub/vngcloud-go-sdk (the Dockerfile's go mod download)
-          secrets: |
-            gh_token=${{ secrets.GO_PRIVATE_TOKEN }}
           build-args: |
             VERSION=v${{ github.ref_name }}
             COMMIT=${{ env.COMMIT_SHORT_SHA }}

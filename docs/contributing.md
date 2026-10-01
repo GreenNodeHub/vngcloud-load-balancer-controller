@@ -10,22 +10,6 @@ We welcome contributions to the VNGCloud Load Balancer Controller!
 - Docker
 - `kubectl` and access to a Kubernetes cluster
 - `make`
-- Read access to the private repository `GreenNodeHub/vngcloud-go-sdk`
-
-### Private SDK module
-
-The controller depends on `github.com/GreenNodeHub/vngcloud-go-sdk/v2`, a private module. Go has to
-fetch it straight from git, so set `GOPRIVATE` and make sure git can authenticate to GitHub (SSH key
-or a token with read access to that repository):
-
-```bash
-export GOPRIVATE='github.com/GreenNodeHub/*'
-# for example, to use SSH for GitHub:
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
-
-Image builds fetch it inside Docker, from a GitHub token passed as the BuildKit secret `gh_token`
-(see [Building](#building)). CI uses the organization secret `GO_PRIVATE_TOKEN`.
 
 ### Clone the repository
 
@@ -85,8 +69,8 @@ mockery
 ## Building
 
 ```bash
-# Build and push image (GH_TOKEN lets the build fetch the private SDK module)
-GH_TOKEN=$(gh auth token) make docker-build docker-push IMG=<registry>/vngcloud-load-balancer-controller:<tag>
+# Build and push image
+make docker-build docker-push IMG=<registry>/vngcloud-load-balancer-controller:<tag>
 
 # Deploy to cluster
 make deploy IMG=<registry>/vngcloud-load-balancer-controller:<tag>

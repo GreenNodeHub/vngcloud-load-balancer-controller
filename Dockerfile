@@ -5,29 +5,13 @@ ARG TARGETARCH
 ARG VERSION
 ARG COMMIT
 
-# The SDK is a private module: fetch it straight from git, bypassing the public proxy and
-# checksum database.
-ENV GOPRIVATE=github.com/GreenNodeHub/*
-
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-#
-# Credentials for the private SDK come from the BuildKit secret gh_token (a GitHub token with read
-# access to GreenNodeHub/vngcloud-go-sdk), e.g. `docker build --secret id=gh_token,env=GH_TOKEN`.
-# They are handed to git through GIT_CONFIG_* for this RUN only, so the token is never written to
-# a layer or to /root/.gitconfig. Without the secret the download fails on the private module.
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=secret,id=gh_token,required=false \
-    if [ -s /run/secrets/gh_token ]; then \
-      export GIT_CONFIG_COUNT=1 \
-        GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/gh_token)@github.com/GreenNodeHub/.insteadOf" \
-        GIT_CONFIG_VALUE_0="https://github.com/GreenNodeHub/"; \
-    fi; \
-    CGO_ENABLED=0 go mod download
+RUN --mount=type=cache,target=/go/pkg/mod CGO_ENABLED=0 go mod download
 
 # Copy the go source
 COPY Makefile ./
