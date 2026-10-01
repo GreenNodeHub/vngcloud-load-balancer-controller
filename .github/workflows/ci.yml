@@ -53,6 +53,8 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          # No cache: the module cache would expose the private SDK source to fork PRs.
+          cache: false
 
       - name: Install envtest binaries
         run: |
@@ -121,12 +123,16 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          # No cache: the module cache would expose the private SDK source to fork PRs.
+          cache: false
 
       - name: Run linter
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.5.0
           args: --timeout 15m0s --verbose
+          # No cache: it holds analysis data derived from the private SDK, readable by fork PRs.
+          skip-cache: true
 
   analyze:
     name: govulncheck
@@ -159,6 +165,8 @@ jobs:
           # minimum: 1.25.13 died on "x/vuln@v1.8.0 requires go >= 1.26.0". The toolchain here
           # only builds the scanner - the code is compiled against go.mod either way.
           go-package: ./...
+          # No cache: the module cache would expose the private SDK source to fork PRs.
+          cache: false
 
   ci-ok:
     name: CI OK

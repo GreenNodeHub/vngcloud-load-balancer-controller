@@ -26,6 +26,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       export GIT_CONFIG_COUNT=1 \
         GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/gh_token)@github.com/GreenNodeHub/.insteadOf" \
         GIT_CONFIG_VALUE_0="https://github.com/GreenNodeHub/"; \
+    else \
+      echo "gh_token secret not provided; private module github.com/GreenNodeHub/vngcloud-go-sdk cannot be downloaded" >&2; \
     fi; \
     CGO_ENABLED=0 go mod download
 
@@ -41,7 +43,12 @@ COPY internal/ internal/
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN --mount=type=cache,target=/go/pkg/mod make build-pro CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} VERSION=${VERSION} COMMIT=${COMMIT}
+#
+# Every module comes from the cache filled above. GOPROXY=off plus GONOPROXY=none forbid any fetch
+# (GOPROXY=off alone still lets go clone GOPRIVATE modules straight from git, without credentials),
+# so a missing module fails here with "module lookup disabled by GOPROXY=off".
+RUN --mount=type=cache,target=/go/pkg/mod GOPROXY=off GONOPROXY=none GOFLAGS=-mod=readonly \
+    make build-pro CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} VERSION=${VERSION} COMMIT=${COMMIT}
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
