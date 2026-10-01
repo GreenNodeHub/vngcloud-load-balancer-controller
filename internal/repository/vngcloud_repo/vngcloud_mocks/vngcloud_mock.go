@@ -940,6 +940,8 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			TimeoutMember:                   listener.TimeoutMember,
 			TimeoutConnection:               listener.TimeoutConnection,
 			AllowedCidrs:                    listener.AllowedCidrs,
+			BlockedCidrs:                    listener.BlockedCidrs,
+			DefaultAction:                   string(listener.DefaultAction),
 			DisplayStatus:                   consts.ACTIVE_LOADBALANCER_STATUS,
 			CreatedAt:                       time.Now().Format(time.RFC3339),
 			UpdatedAt:                       time.Now().Format(time.RFC3339),
@@ -1041,6 +1043,13 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 	listener.TimeoutConnection = updateOpt.TimeoutConnection
 	listener.TimeoutMember = updateOpt.TimeoutMember
 	listener.AllowedCidrs = updateOpt.AllowedCidrs
+	// vLB keeps any field a PUT leaves null or out, so the mock does too.
+	if updateOpt.BlockedCidrs != nil {
+		listener.BlockedCidrs = *updateOpt.BlockedCidrs
+	}
+	if updateOpt.DefaultAction != nil {
+		listener.DefaultAction = string(*updateOpt.DefaultAction)
+	}
 
 	if listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
 		listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
