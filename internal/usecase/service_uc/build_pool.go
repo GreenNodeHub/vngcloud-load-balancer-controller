@@ -14,6 +14,7 @@ import (
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/listeneracl"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/k8s"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/utils"
@@ -31,7 +32,10 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 	defaultIdleTimeoutClient := t.buildIdleTimeoutClient(ctx)
 	defaultIdleTimeoutMember := t.buildIdleTimeoutMember(ctx)
 	defaultIdleTimeoutConnection := t.buildIdleTimeoutConnection(ctx)
-	defaultAllowedCidrs := t.buildInboundCIDRs(ctx)
+	acl, err := listeneracl.FromAnnotations(t.annotationParser, t.service.Annotations)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Build pool and listener
 	for _, port := range ports {
@@ -50,7 +54,9 @@ func (t *defaultModelBuildTask) buildPoolsAndListeners(ctx context.Context, targ
 			TimeoutClient:     defaultIdleTimeoutClient,
 			TimeoutMember:     defaultIdleTimeoutMember,
 			TimeoutConnection: defaultIdleTimeoutConnection,
-			AllowedCidrs:      defaultAllowedCidrs,
+			AllowedCidrs:      acl.AllowedCidrs,
+			BlockedCidrs:      acl.BlockedCidrs,
+			DefaultAction:     acl.DefaultAction,
 		}
 		allListeners = append(allListeners, newListener)
 	}
@@ -252,15 +258,6 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
-}
-
-func (t *defaultModelBuildTask) buildInboundCIDRs(_ context.Context) *string {
-	option := []string{}
-	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixInboundCIDRs, &option, t.service.Annotations)
-	if !exist {
-		return nil
-	}
-	return ptr.To(strings.Join(option, ","))
 }
 
 func (t *defaultModelBuildTask) buildEnableProxyProtocol(_ context.Context) []string {

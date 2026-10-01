@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -499,6 +500,99 @@ func TestBuildPoolsAndListeners(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newBuildTaskForAcl builds a task for a TCP Service on the given ports, with instance
+// targets, whose annotations are exactly anns plus the target type.
+func newBuildTaskForAcl(t *testing.T, anns map[string]string, ports ...int32) *defaultModelBuildTask {
+	t.Helper()
+
+	annotationsWithTarget := map[string]string{
+		domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixTargetType: string(domain.TargetTypeInstance),
+	}
+	for k, v := range anns {
+		annotationsWithTarget[k] = v
+	}
+
+	servicePorts := make([]corev1.ServicePort, 0, len(ports))
+	for _, p := range ports {
+		servicePorts = append(servicePorts, corev1.ServicePort{
+			Name:     fmt.Sprintf("p%d", p),
+			Port:     p,
+			Protocol: corev1.ProtocolTCP,
+			NodePort: 30000 + p,
+		})
+	}
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-service", Namespace: "default", Annotations: annotationsWithTarget},
+		Spec:       corev1.ServiceSpec{Ports: servicePorts},
+	}
+
+	mockEndpointResolver := utils.NewMockEndpointResolver(t)
+	mockEndpointResolver.EXPECT().
+		ResolveNodePortEndpoints(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return([]utils.EndpointAddress{{IP: "192.0.2.10", Port: 30080, Name: "node-1"}}, nil).
+		Maybe()
+
+	return &defaultModelBuildTask{
+		service:          service,
+		annotationParser: annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX),
+		nameHelper:       utils.NewNameHelper("test-cluster-id", "service", service.Namespace, service.Name),
+		endpointResolver: mockEndpointResolver,
+		logger:           logrus.New().WithField("test", "build_pool"),
+	}
+}
+
+func TestBuildListenersCarryTheAcl(t *testing.T) {
+	task := newBuildTaskForAcl(t, map[string]string{
+		domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixDroppedCIDRs:     "203.0.113.9/32",
+		domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixACLDefaultAction: "drop",
+	}, 80, 443)
+
+	_, listeners, err := task.buildPoolsAndListeners(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, listeners, 2)
+	for _, l := range listeners {
+		require.NotNil(t, l.BlockedCidrs)
+		require.NotNil(t, l.DefaultAction)
+		assert.Nil(t, l.AllowedCidrs)
+		assert.Equal(t, "203.0.113.9/32", *l.BlockedCidrs)
+		assert.Equal(t, "drop", *l.DefaultAction)
+	}
+}
+
+// An allow list alone means "nobody else", so the listener must carry the drop default.
+func TestBuildListenersDefaultToDropWhenOnlyAnAllowListIsSet(t *testing.T) {
+	task := newBuildTaskForAcl(t, map[string]string{
+		domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "198.51.100.0/24",
+	}, 80)
+
+	_, listeners, err := task.buildPoolsAndListeners(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, listeners, 1)
+	assert.Equal(t, ptr.To("198.51.100.0/24"), listeners[0].AllowedCidrs)
+	assert.Nil(t, listeners[0].BlockedCidrs)
+	assert.Equal(t, ptr.To("drop"), listeners[0].DefaultAction)
+}
+
+func TestBuildListenersWithoutAclAnnotationsLeaveTheAclUnmanaged(t *testing.T) {
+	task := newBuildTaskForAcl(t, nil, 80)
+
+	_, listeners, err := task.buildPoolsAndListeners(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, listeners, 1)
+	assert.Nil(t, listeners[0].AllowedCidrs)
+	assert.Nil(t, listeners[0].BlockedCidrs)
+	assert.Nil(t, listeners[0].DefaultAction)
+}
+
+func TestBuildListenersRejectsABadDroppedList(t *testing.T) {
+	task := newBuildTaskForAcl(t, map[string]string{
+		domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixDroppedCIDRs: "nope",
+	}, 80)
+
+	_, _, err := task.buildPoolsAndListeners(context.Background(), nil)
+	require.Error(t, err, "a bad block list must stop the build so the last good spec stays")
 }
 
 func TestBuildPoolsAndListeners_ErrorCases(t *testing.T) {
@@ -1081,73 +1175,6 @@ func TestBuildIdleTimeoutConnection(t *testing.T) {
 
 			// Assert
 			assert.Equal(t, tt.expectedTimeout, result)
-		})
-	}
-}
-
-func TestBuildInboundCIDRs(t *testing.T) {
-	tests := []struct {
-		name          string
-		service       *corev1.Service
-		expectedCIDRs *string
-	}{
-		{
-			name: "No inbound CIDRs annotation",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-service",
-					Namespace:   "default",
-					Annotations: map[string]string{},
-				},
-			},
-			expectedCIDRs: nil,
-		},
-		{
-			name: "Single inbound CIDR annotation",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-service",
-					Namespace: "default",
-					Annotations: map[string]string{
-						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24",
-					},
-				},
-			},
-			expectedCIDRs: ptr.To("192.168.1.0/24"),
-		},
-		{
-			name: "Multiple inbound CIDRs annotation",
-			service: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-service",
-					Namespace: "default",
-					Annotations: map[string]string{
-						domain.SERVICE_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "192.168.1.0/24,10.0.0.0/8",
-					},
-				},
-			},
-			expectedCIDRs: ptr.To("192.168.1.0/24,10.0.0.0/8"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create mocks
-			mockAnnotationParser := annotations.NewSuffixAnnotationParser(domain.SERVICE_ANNOTATION_PREFIX)
-
-			// Create the task
-			logger := logrus.New().WithField("test", "build_pool")
-			task := &defaultModelBuildTask{
-				service:          tt.service,
-				annotationParser: mockAnnotationParser,
-				logger:           logger,
-			}
-
-			// Call the function
-			result := task.buildInboundCIDRs(context.Background())
-
-			// Assert
-			assert.Equal(t, tt.expectedCIDRs, result)
 		})
 	}
 }

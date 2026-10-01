@@ -9,14 +9,18 @@ import (
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/usecase/listeneracl"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
-func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool) (*v1alpha1.Listener, error) { //nolint:unparam
+func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool) (*v1alpha1.Listener, error) {
 	defaultIdleTimeoutClient := t.buildIdleTimeoutClient(ctx)
 	defaultIdleTimeoutMember := t.buildIdleTimeoutMember(ctx)
 	defaultIdleTimeoutConnection := t.buildIdleTimeoutConnection(ctx)
-	defaultAllowedCidrs := t.buildInboundCIDRs(ctx)
+	acl, err := listeneracl.FromAnnotations(t.annotationParser, t.ingress.Annotations)
+	if err != nil {
+		return nil, err
+	}
 
 	opt := v1alpha1.Listener{
 		Name:              domain.DEFAULT_HTTP_LISTENER_NAME,
@@ -26,7 +30,9 @@ func (t *defaultModelBuildTask) buildListeners(ctx context.Context, isHttps bool
 		TimeoutClient:     defaultIdleTimeoutClient,
 		TimeoutMember:     defaultIdleTimeoutMember,
 		TimeoutConnection: defaultIdleTimeoutConnection,
-		AllowedCidrs:      defaultAllowedCidrs,
+		AllowedCidrs:      acl.AllowedCidrs,
+		BlockedCidrs:      acl.BlockedCidrs,
+		DefaultAction:     acl.DefaultAction,
 
 		CertificateDefault:     nil,
 		CertificateAuthorities: nil,
