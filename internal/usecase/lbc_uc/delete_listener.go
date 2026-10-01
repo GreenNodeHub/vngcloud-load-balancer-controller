@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"k8s.io/utils/ptr"
+
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
@@ -120,8 +122,8 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 			// pool the listener came with. Left like that the user gets their listener back
 			// serving nothing, and the pool it pointed at orphaned.
 			if adopted != nil && !isListenerInUse(candidateId) {
-				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId); err != nil {
-					failures = append(failures, fmt.Errorf("listener %s: restore default pool: %w", candidateId, err))
+				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId, adopted.OriginalAcl); err != nil {
+					failures = append(failures, fmt.Errorf("listener %s: restore default pool and ACL: %w", candidateId, err))
 					continue
 				}
 			}
@@ -134,15 +136,19 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 	return nil
 }
 
-// restoreAdoptedListener puts back the default pool this LBC displaced when it adopted the
-// listener, so a load balancer handed back to its owner is in the state they left it. Every other
-// field is copied from the listener as it stands, so nothing else is disturbed.
-func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string) error {
+// restoreAdoptedListener puts back the default pool and the ACL fields this LBC displaced when it
+// adopted the listener, so a load balancer handed back to its owner is in the state they left it.
+// Every other field is copied from the listener as it stands, so nothing else is disturbed.
+// blockedCidrs and defaultAction are only sent when the restore changes them: vLB keeps a field
+// that is absent from the PUT.
+func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string, originalAcl *v1alpha1.ListenerAcl) error {
 	original := ""
 	if originalDefaultPoolId != nil {
 		original = *originalDefaultPoolId
 	}
-	if listener.DefaultPoolId == original {
+	restore := planListenerAcl(v1alpha1.ListenerAcl{}, currentAcl(listener), originalAcl,
+		func(aclField) bool { return false })
+	if listener.DefaultPoolId == original && len(restore.Changes) == 0 {
 		return nil // nothing was displaced, or it has already been put back
 	}
 
@@ -160,10 +166,19 @@ func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbI
 		opt.CertificateAuthorities = &listener.CertificateAuthorities
 		opt.ClientCertificate = listener.ClientCertificateAuthentication
 	}
+	if v := restore.Desired.AllowedCidrs; v != nil {
+		opt.AllowedCidrs = *v
+	}
+	if v := restore.Desired.BlockedCidrs; v != nil {
+		opt.BlockedCidrs = ptr.To(*v)
+	}
+	if v := restore.Desired.DefaultAction; v != nil {
+		opt.DefaultAction = ptr.To(loadbalancerv2.ListenerDefaultAction(*v))
+	}
 	opt.WithDefaultPoolId(original)
 
-	t.logger.Infof("Restoring default pool (%s -> %s) on adopted listener %s of load balancer %s",
-		listener.DefaultPoolId, original, listener.UUID, lbId)
+	t.logger.Infof("Restoring default pool (%s -> %s) and ACL %v on adopted listener %s of load balancer %s",
+		listener.DefaultPoolId, original, restore.Changes, listener.UUID, lbId)
 
 	return t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 		return t.vngcloudRepo.UpdateListener(ctx, lbId, listener.UUID, opt)

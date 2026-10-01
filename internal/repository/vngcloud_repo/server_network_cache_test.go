@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/stretchr/testify/assert"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 )
 
 func testInfo(id string) serverNetworkInfo {

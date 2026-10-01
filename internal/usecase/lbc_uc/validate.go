@@ -3,9 +3,10 @@ package lbc_uc
 import (
 	"context"
 	"fmt"
+	"slices"
 
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/pkg/errors"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/errs"
@@ -68,6 +69,11 @@ func (t *defaultModelDeployTask) validateCrossLBCs(ctx context.Context, lbId str
 
 	// Validate that listeners on the same port have the same default pool
 	if err := t.validateCrossListenerDefaultPools(ctx, lbId, allLBCs); err != nil {
+		return err
+	}
+
+	// Validate that listeners on the same port do not declare different ACLs
+	if err := t.validateCrossListenerAcl(ctx, lbId, allLBCs); err != nil {
 		return err
 	}
 
@@ -193,6 +199,112 @@ func (t *defaultModelDeployTask) validateCrossListenerDefaultPools(_ context.Con
 				}
 				return errs.NewNoNeedRequeue(fmt.Sprintf("port %d has different default pools on load balancer %s: %s uses '%s', %s uses '%s'. All listeners on the same port must have the same default pool when sharing a load balancer",
 					port, lbId, poolInfos[0].lbcName, firstPoolDisplay, info.lbcName, infoPoolDisplay))
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateCrossListenerAcl checks that LBCs sharing a listener port do not declare different blocked
+// CIDRs or default actions, since the listener and its ACL are shared. Different allowed CIDRs only
+// warn, as they did not stop reconciling before ACL support. It records which fields other LBCs
+// declare in t.aclPeers, and warns when this LBC leaves a field unset that a peer sets.
+func (t *defaultModelDeployTask) validateCrossListenerAcl(_ context.Context, lbId string, allLBCs *v1alpha1.LoadBalancerConfigList) error {
+	selfName := fmt.Sprintf("%s/%s", t.lbConfig.Namespace, t.lbConfig.Name)
+	declared := make(map[int32]map[aclField][]aclDeclaration)
+	collect := func(lbcName string, listeners []v1alpha1.Listener) {
+		for _, listener := range listeners {
+			acl := specAcl(listener)
+			for _, f := range aclFields {
+				v := f.get(&acl)
+				if v == nil {
+					continue
+				}
+				if declared[listener.ProtocolPort] == nil {
+					declared[listener.ProtocolPort] = make(map[aclField][]aclDeclaration)
+				}
+				declared[listener.ProtocolPort][f] = append(declared[listener.ProtocolPort][f], aclDeclaration{lbcName: lbcName, value: *v})
+			}
+		}
+	}
+
+	// Self is taken from the object being reconciled, not from the possibly stale list copy.
+	collect(selfName, t.lbConfig.Spec.Listeners)
+	for _, lbc := range allLBCs.Items {
+		lbcName := fmt.Sprintf("%s/%s", lbc.Namespace, lbc.Name)
+		if lbcName == selfName {
+			continue
+		}
+
+		// Determine which load balancer this LBC references
+		lbcId := ""
+		if lbc.Spec.LoadBalancerId != nil && *lbc.Spec.LoadBalancerId != "" {
+			lbcId = *lbc.Spec.LoadBalancerId
+		} else if lbc.Status.LoadBalancerId != nil && *lbc.Status.LoadBalancerId != "" {
+			lbcId = *lbc.Status.LoadBalancerId
+		}
+
+		// Skip if this LBC uses a different load balancer
+		if lbcId == "" || lbcId != lbId {
+			continue
+		}
+		collect(lbcName, lbc.Spec.Listeners)
+	}
+
+	selfAcl := make(map[int32]v1alpha1.ListenerAcl)
+	for _, listener := range t.lbConfig.Spec.Listeners {
+		selfAcl[listener.ProtocolPort] = specAcl(listener)
+	}
+
+	// Sorted so that the error and warnings read the same on every reconcile.
+	ports := make([]int32, 0, len(declared))
+	for port := range declared {
+		ports = append(ports, port)
+	}
+	slices.Sort(ports)
+
+	for _, port := range ports {
+		for _, f := range aclFields {
+			decls := declared[port][f]
+			if len(decls) == 0 {
+				continue
+			}
+			a := decls[0]
+			for _, b := range decls[1:] {
+				if aclValueEqual(f, &a.value, &b.value) {
+					continue
+				}
+				// Shared load balancers with different inbound-cidrs predate ACL support and must
+				// keep reconciling, so this one only warns. Self is collected first, so a is self
+				// when this LBC declares the field.
+				if f == aclAllowed {
+					if a.lbcName == selfName {
+						t.warnings = append(t.warnings, fmt.Sprintf("port %d: %s on load balancer %s differ: this resource uses '%s', %s uses '%s'; the listener is shared, so it follows whichever applied last",
+							port, f, lbId, a.value, b.lbcName, b.value))
+					}
+					continue
+				}
+				return errs.NewNoNeedRequeue(fmt.Sprintf("port %d has different %s on load balancer %s: %s uses '%s', %s uses '%s'. Listeners on the same port share one ACL; declare it on one Ingress/Service or make them equal",
+					port, f, lbId, a.lbcName, a.value, b.lbcName, b.value))
+			}
+
+			idx := slices.IndexFunc(decls, func(d aclDeclaration) bool { return d.lbcName != selfName })
+			if idx < 0 {
+				continue
+			}
+			peer := decls[idx]
+			if t.aclPeers == nil {
+				t.aclPeers = make(map[int32]map[aclField]*aclDeclaration)
+			}
+			if t.aclPeers[port] == nil {
+				t.aclPeers[port] = make(map[aclField]*aclDeclaration)
+			}
+			t.aclPeers[port][f] = &peer
+
+			if own, ok := selfAcl[port]; ok && f.get(&own) == nil {
+				t.warnings = append(t.warnings, fmt.Sprintf("port %d: %s is set to '%s' by %s; the listener is shared, so it also filters traffic for this resource",
+					port, f, peer.value, peer.lbcName))
 			}
 		}
 	}

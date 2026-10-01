@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/sdk_error"
 	"github.com/stretchr/testify/assert"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/sdk_error"
 )
 
 func makeSDKErr(statusCode int, headers http.Header) sdk_error.IError {

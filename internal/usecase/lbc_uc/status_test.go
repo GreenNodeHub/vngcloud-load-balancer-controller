@@ -23,7 +23,7 @@ func TestStatusAddRefusesAnEmptyId(t *testing.T) {
 			return task.statusAddPool(context.Background(), "", "vks-a-b-80")
 		},
 		"listener": func(task *defaultModelDeployTask) error {
-			return task.statusAddListener(context.Background(), "", 80)
+			return task.statusAddListener(context.Background(), "", 80, nil)
 		},
 		"policy": func(task *defaultModelDeployTask) error {
 			return task.statusAddPolicy(context.Background(), "listener-1", 80, "")

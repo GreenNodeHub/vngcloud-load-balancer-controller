@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/stretchr/testify/assert"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 )
 
 // GetSubnetByID must answer from the cache without touching the SDK. The repository here has a

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/pkg/errors"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
@@ -52,7 +52,10 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		if err != nil {
 			return nil, errors.Wrapf(err, "create listener port %d on LB %s", listenerSpec.ProtocolPort, lbId)
 		}
-		if err := t.statusAddListener(ctx, _lis.UUID, int(listenerSpec.ProtocolPort)); err != nil {
+		// The record goes in with the listener: a listener we create starts neutral, so removing
+		// the annotations later opens it back up rather than leaving it where they set it.
+		if err := t.statusAddListener(ctx, _lis.UUID, int(listenerSpec.ProtocolPort),
+			neutralAcl(specAcl(listenerSpec), t.cfg.LoadBalancerOpts.DefaultAllowedCidrs)); err != nil {
 			return nil, err
 		}
 
@@ -77,8 +80,16 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 			currentListener.UUID, listenerSpec.ProtocolPort, currentListener.Protocol, listenerSpec.Protocol)
 	}
 
+	// The record of what the update displaces is written before the update, so a crash between
+	// the two cannot lose the only copy of what to put back.
+	acl := planListenerAcl(specAcl(listenerSpec), currentAcl(currentListener),
+		t.originalAclOf(currentListener.UUID), t.peerDeclaresAcl(listenerSpec.ProtocolPort))
+	if err := t.statusSetOriginalAcl(ctx, currentListener.UUID, acl.RecordBefore); err != nil {
+		return nil, err
+	}
+
 	// update exist listener
-	updateOptions, message, err := t.buildListenerUpdateRequest(ctx, lbId, listenerSpec, currentListener, newCreatedPools, createdCerts)
+	updateOptions, message, err := t.buildListenerUpdateRequest(ctx, lbId, listenerSpec, currentListener, newCreatedPools, createdCerts, acl)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +103,11 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 		if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
 			return nil, errors.Wrapf(err, "wait LB %s active after updating listener %s", lbId, currentListener.UUID)
 		}
+	}
+	// Released fields are dropped from the record only now - also when no update was needed,
+	// because the original was already back or a peer LBC holds the field.
+	if err := t.statusSetOriginalAcl(ctx, currentListener.UUID, acl.RecordAfter); err != nil {
+		return nil, err
 	}
 
 	// skip policy for layer4 listener
@@ -124,20 +140,26 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	return created, nil
 }
 
-// carryAdoption copies the adoption record onto the value deployListener returns. deploy() ends
-// by replacing status.createdListeners with exactly these values, so an adoption that is only
-// written by statusAdoptListener survives until that write and no longer - and the teardown, a
-// later reconcile, would then read Adopted false and delete the user's listener.
+// carryAdoption copies the adoption record and the ACL record onto the value deployListener
+// returns. deploy() ends by replacing status.createdListeners with exactly these values, so an
+// adoption that is only written by statusAdoptListener survives until that write and no longer -
+// and the teardown, a later reconcile, would then read Adopted false and delete the user's
+// listener.
 //
 // The record is the source of truth, never the listener as it stands: by the second reconcile it
 // carries this LBC's pools, so re-deriving the original default pool from it would record ours.
+// The ACL record is carried for every listener, adopted or created.
 func (t *defaultModelDeployTask) carryAdoption(created *v1alpha1.CreatedListener) {
 	for _, rec := range t.lbConfig.Status.CreatedListeners {
-		if rec.Id == created.Id && rec.Adopted {
+		if rec.Id != created.Id {
+			continue
+		}
+		created.OriginalAcl = rec.OriginalAcl.DeepCopy()
+		if rec.Adopted {
 			created.Adopted = true
 			created.OriginalDefaultPoolId = rec.OriginalDefaultPoolId
-			return
 		}
+		return
 	}
 }
 
@@ -152,8 +174,14 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 		WithTimeoutConnection(t.cfg.LoadBalancerOpts.DefaultTimeoutConnection).
 		WithLoadBalancerId(lbId)
 
-	if listenerSpec.AllowedCidrs != nil {
+	if listenerSpec.AllowedCidrs != nil && *listenerSpec.AllowedCidrs != "" {
 		createRequest.WithAllowedCidrs(*listenerSpec.AllowedCidrs)
+	}
+	if listenerSpec.BlockedCidrs != nil {
+		createRequest.WithBlockedCidrs(*listenerSpec.BlockedCidrs)
+	}
+	if listenerSpec.DefaultAction != nil {
+		createRequest.WithDefaultAction(loadbalancerv2.ListenerDefaultAction(*listenerSpec.DefaultAction))
 	}
 	if listenerSpec.TimeoutClient != nil {
 		createRequest.WithTimeoutClient(int(*listenerSpec.TimeoutClient))
@@ -219,7 +247,7 @@ func (t *defaultModelDeployTask) buildCreateListenerRequest(ctx context.Context,
 	return createRequest, nil
 }
 
-func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate) (loadbalancerv2.IUpdateListenerRequest, []string, error) { //nolint:gocyclo
+func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context, lbId string, listenerSpec v1alpha1.Listener, currentListener *entityv2.Listener, newCreatedPools []v1alpha1.CreatedPool, createdCerts []v1alpha1.CreatedCertificate, acl aclPlan) (loadbalancerv2.IUpdateListenerRequest, []string, error) { //nolint:gocyclo
 	isNeedUpdate := false
 	message := make([]string, 0)
 	updateOptions := &loadbalancerv2.UpdateListenerRequest{
@@ -246,9 +274,19 @@ func (t *defaultModelDeployTask) buildListenerUpdateRequest(ctx context.Context,
 		updateOptions.ClientCertificate = currentListener.ClientCertificateAuthentication
 	}
 
-	if listenerSpec.AllowedCidrs != nil && *listenerSpec.AllowedCidrs != "" && currentListener.AllowedCidrs != *listenerSpec.AllowedCidrs {
-		message = append(message, fmt.Sprintf("allowed cidrs (%v -> %v)", currentListener.AllowedCidrs, *listenerSpec.AllowedCidrs))
-		updateOptions.AllowedCidrs = *listenerSpec.AllowedCidrs
+	// The ACL goes in only where the plan changes it: vLB keeps a field the request leaves out,
+	// while sending the current value back would overwrite a portal edit made since we read it.
+	if v := acl.Desired.AllowedCidrs; v != nil {
+		updateOptions.AllowedCidrs = *v
+	}
+	if v := acl.Desired.BlockedCidrs; v != nil {
+		updateOptions.BlockedCidrs = ptr.To(*v)
+	}
+	if v := acl.Desired.DefaultAction; v != nil {
+		updateOptions.DefaultAction = ptr.To(loadbalancerv2.ListenerDefaultAction(*v))
+	}
+	if len(acl.Changes) > 0 {
+		message = append(message, acl.Changes...)
 		isNeedUpdate = true
 	}
 

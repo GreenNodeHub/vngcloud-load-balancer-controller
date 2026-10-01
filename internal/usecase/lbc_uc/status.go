@@ -11,7 +11,10 @@ import (
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
-func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int) error {
+// statusAddListener records a listener this LBC created, together with originalAcl - the record of
+// what the listener would have had without the ACL annotations - so the record is written in the
+// same patch as the listener and no crash can leave one without the other.
+func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listenerId string, port int, originalAcl *v1alpha1.ListenerAcl) error {
 	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
 	// find it, update it or delete it. Recording it with an empty id is worse than failing
 	// here, because id is the key of a map-list - the API server rejects the whole status
@@ -21,22 +24,89 @@ func (t *defaultModelDeployTask) statusAddListener(ctx context.Context, listener
 		return errors.New("listener has no id after create, need to retry")
 	}
 
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
-		// check on fresh copy if already exists with same values
-		for _, l := range obj.Status.CreatedListeners {
-			if l.Id == listenerId && l.Port == port {
-				return false // no change needed
+	var decided v1alpha1.CreatedListener
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		for i := range obj.Status.CreatedListeners {
+			l := &obj.Status.CreatedListeners[i]
+			if l.Id != listenerId {
+				continue
 			}
+			changed := false
+			if l.Port != port {
+				l.Port = port
+				changed = true
+			}
+			if l.OriginalAcl == nil && originalAcl != nil {
+				l.OriginalAcl = originalAcl.DeepCopy()
+				changed = true
+			}
+			decided = *l.DeepCopy()
+			return changed
 		}
+		decided = v1alpha1.CreatedListener{Id: listenerId, Port: port, OriginalAcl: originalAcl.DeepCopy()}
+		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, *decided.DeepCopy())
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
+	// The patch helper never touches the object it was given, and deployListener carries the
+	// record from t.lbConfig into the value deploy() writes back over status.createdListeners -
+	// so mirror the entry here, as statusAdoptListener does, or the record is lost by the end of
+	// this same reconcile.
+	for i := range t.lbConfig.Status.CreatedListeners {
+		if t.lbConfig.Status.CreatedListeners[i].Id == listenerId {
+			t.lbConfig.Status.CreatedListeners[i] = decided
+			return nil
+		}
+	}
+	t.lbConfig.Status.CreatedListeners = append(t.lbConfig.Status.CreatedListeners, decided)
+	return nil
+}
+
+// statusSetOriginalAcl persists the record of displaced ACL values for one listener. It is called
+// before the update that displaces them - so a crash after the update cannot lose them - and
+// again after an update that released fields. The in-memory copy is updated too, because deploy()
+// rebuilds status.createdListeners from what deployListener returns in this same reconcile.
+func (t *defaultModelDeployTask) statusSetOriginalAcl(ctx context.Context, listenerId string, rec *v1alpha1.ListenerAcl) error {
+	if t.originalAclOf(listenerId).Equal(rec) {
+		return nil
+	}
+	found := false
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
+		found = false
 		for i := range obj.Status.CreatedListeners {
 			if obj.Status.CreatedListeners[i].Id == listenerId {
-				obj.Status.CreatedListeners[i].Port = port
+				obj.Status.CreatedListeners[i].OriginalAcl = rec.DeepCopy()
+				found = true
 				return true
 			}
 		}
-		obj.Status.CreatedListeners = append(obj.Status.CreatedListeners, v1alpha1.CreatedListener{Id: listenerId, Port: port})
-		return true
+		return false
 	})
+	if err != nil {
+		return err
+	}
+	// Without the entry the record was not persisted, and the PUT it guards must not go ahead.
+	if !found {
+		return errors.Errorf("listener %s not in status, need to retry", listenerId)
+	}
+	for i := range t.lbConfig.Status.CreatedListeners {
+		if t.lbConfig.Status.CreatedListeners[i].Id == listenerId {
+			t.lbConfig.Status.CreatedListeners[i].OriginalAcl = rec.DeepCopy()
+		}
+	}
+	return nil
+}
+
+func (t *defaultModelDeployTask) originalAclOf(listenerId string) *v1alpha1.ListenerAcl {
+	for _, l := range t.lbConfig.Status.CreatedListeners {
+		if l.Id == listenerId {
+			return l.OriginalAcl
+		}
+	}
+	return nil
 }
 
 // statusAdoptListener records a listener this LBC found already on the load balancer, matched by
@@ -82,6 +152,16 @@ func (t *defaultModelDeployTask) statusAdoptListener(ctx context.Context, listen
 		// one this cluster created can belong to anyone else.
 		if t.loadBalancerIsOurs() {
 			decided = v1alpha1.CreatedListener{Id: listenerId, Port: port}
+			// A listener first seen on our own load balancer was created by this controller,
+			// inline with CreateLoadBalancer, so it already carries the spec's ACL and its
+			// original is the neutral listener. Without the record, removing the annotation
+			// would leave it as the annotation set it.
+			for _, ls := range t.lbConfig.Spec.Listeners {
+				if int(ls.ProtocolPort) == port {
+					decided.OriginalAcl = neutralAcl(specAcl(ls), t.cfg.LoadBalancerOpts.DefaultAllowedCidrs)
+					break
+				}
+			}
 		} else {
 			decided = newAdoptedListener(listenerId, port, originalDefaultPoolId)
 		}

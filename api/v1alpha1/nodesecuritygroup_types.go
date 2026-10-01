@@ -20,7 +20,7 @@ import (
 	"slices"
 	"sort"
 
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
+	networkv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

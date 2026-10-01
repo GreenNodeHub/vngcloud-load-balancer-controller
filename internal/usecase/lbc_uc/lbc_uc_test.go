@@ -13,7 +13,7 @@ package lbc_uc
 // 	"k8s.io/utils/ptr"
 // 	ctrl "sigs.k8s.io/controller-runtime"
 
-// 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+// 	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 // 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 // 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 // 	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/config"

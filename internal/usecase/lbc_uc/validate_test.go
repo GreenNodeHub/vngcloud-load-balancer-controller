@@ -6,10 +6,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 
@@ -627,4 +628,78 @@ func TestValidateSelfListenerPorts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateCrossListenerAcl(t *testing.T) {
+	mk := func(ns, name string, blocked *string) v1alpha1.LoadBalancerConfig {
+		return v1alpha1.LoadBalancerConfig{
+			ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: name},
+			Spec: v1alpha1.LoadBalancerConfigSpec{LoadBalancerId: ptr.To("lb-1"),
+				Listeners: []v1alpha1.Listener{{Name: "http", Protocol: "HTTP", ProtocolPort: 80, BlockedCidrs: blocked}}},
+		}
+	}
+	run := func(self v1alpha1.LoadBalancerConfig, others ...v1alpha1.LoadBalancerConfig) (*defaultModelDeployTask, error) {
+		task := &defaultModelDeployTask{logger: logrus.NewEntry(logrus.New()), lbConfig: &self}
+		list := &v1alpha1.LoadBalancerConfigList{Items: append([]v1alpha1.LoadBalancerConfig{self}, others...)}
+		return task, task.validateCrossListenerAcl(context.Background(), "lb-1", list)
+	}
+
+	t.Run("different blocked cidrs conflict", func(t *testing.T) {
+		_, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), mk("default", "b", ptr.To("198.51.100.2/32")))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "port 80")
+		assert.Contains(t, err.Error(), "default/b")
+	})
+	t.Run("same value from both is fine", func(t *testing.T) {
+		_, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), mk("default", "b", ptr.To("192.0.2.1/32")))
+		require.NoError(t, err)
+	})
+	// Existing setups: one Ingress whitelists, the other says nothing. Must keep reconciling.
+	t.Run("nil against a value is not a conflict, but the nil side is warned", func(t *testing.T) {
+		task, err := run(mk("default", "a", nil), mk("default", "b", ptr.To("192.0.2.1/32")))
+		require.NoError(t, err)
+		require.Len(t, task.warnings, 1)
+		assert.Contains(t, task.warnings[0], "default/b")
+		assert.True(t, task.peerDeclaresAcl(80)(aclBlocked))
+	})
+	t.Run("the declaring side is not warned", func(t *testing.T) {
+		task, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), mk("default", "b", nil))
+		require.NoError(t, err)
+		assert.Empty(t, task.warnings)
+	})
+	withListener := func(ns, name string, l v1alpha1.Listener) v1alpha1.LoadBalancerConfig {
+		lbc := mk(ns, name, nil)
+		l.Name, l.Protocol, l.ProtocolPort = "http", "HTTP", 80
+		lbc.Spec.Listeners = []v1alpha1.Listener{l}
+		return lbc
+	}
+	// Shared LBs with different inbound-cidrs exist today; they must keep reconciling.
+	t.Run("different allowed cidrs only warn", func(t *testing.T) {
+		task, err := run(withListener("default", "a", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.0/24")}),
+			withListener("default", "b", v1alpha1.Listener{AllowedCidrs: ptr.To("198.51.100.0/24")}))
+		require.NoError(t, err)
+		require.Len(t, task.warnings, 1)
+		for _, want := range []string{"port 80", "allowed cidrs", "default/b", "192.0.2.0/24", "198.51.100.0/24"} {
+			assert.Contains(t, task.warnings[0], want)
+		}
+	})
+	t.Run("equal allowed cidrs in another form do not warn", func(t *testing.T) {
+		task, err := run(withListener("default", "a", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.1")}),
+			withListener("default", "b", v1alpha1.Listener{AllowedCidrs: ptr.To("192.0.2.1/32")}))
+		require.NoError(t, err)
+		assert.Empty(t, task.warnings)
+	})
+	t.Run("different default actions conflict", func(t *testing.T) {
+		_, err := run(withListener("default", "a", v1alpha1.Listener{DefaultAction: ptr.To("drop")}),
+			withListener("default", "b", v1alpha1.Listener{DefaultAction: ptr.To("accept")}))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "default action")
+		assert.Contains(t, err.Error(), "default/b")
+	})
+	t.Run("other load balancers are ignored", func(t *testing.T) {
+		other := mk("default", "b", ptr.To("198.51.100.2/32"))
+		other.Spec.LoadBalancerId = ptr.To("lb-2")
+		_, err := run(mk("default", "a", ptr.To("192.0.2.1/32")), other)
+		require.NoError(t, err)
+	})
 }

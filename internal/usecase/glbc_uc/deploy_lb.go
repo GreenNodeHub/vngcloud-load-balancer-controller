@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	global "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"

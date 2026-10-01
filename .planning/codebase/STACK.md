@@ -53,7 +53,7 @@
 ## Key Dependencies
 
 **Critical:**
-- `github.com/vngcloud/vngcloud-go-sdk/v2 v2.17.4-0.20251225102644-877dacf16698` - VNGCloud platform SDK; provides VLB, VServer, GLB, portal, IAM clients; the primary integration point for all cloud resource management
+- `github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.22.0` - VNGCloud platform SDK; provides VLB, VServer, GLB, portal, IAM clients; the primary integration point for all cloud resource management
 - `github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c` - Internal helper for context/logging patterns used across the repository layer
 - `github.com/cuongpiger/joat v1.0.17` - Internal utility library (URL normalization and other helpers used in SDK configuration)
 

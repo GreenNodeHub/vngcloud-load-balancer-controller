@@ -5,6 +5,7 @@ go 1.25.0
 toolchain go1.25.13
 
 require (
+	github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.22.0
 	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cuongpiger/joat v1.0.17
@@ -21,7 +22,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.11.1
-	github.com/vngcloud/vngcloud-go-sdk/v2 v2.17.4-0.20251225102644-877dacf16698
 	golang.org/x/sync v0.21.0
 	k8s.io/api v0.31.3
 	k8s.io/apiextensions-apiserver v0.31.3
