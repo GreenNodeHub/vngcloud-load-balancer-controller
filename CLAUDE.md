@@ -1,17 +1,25 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+VNGCloud load balancer controller for VKS workload clusters (kubebuilder layout). It reconciles
+Ingress and Service objects into VNGCloud vLB load balancers, listeners, pools and members, and
+node security groups, through its own CRDs (`LoadBalancerConfig`, `NodeSecurityGroup`,
+`GlobalLoadBalancerConfig`, `VngCloudGlobalLoadBalancer`) that it installs at startup.
+
+Operational context (incidents, invariants, farms, the Redmine task workflow) lives in the **vks-harness** repo (`knowledge/`, `AGENTS.md`). Management farms are read-only for agents.
 
 ## Build / test / lint
 
 ```bash
+make verify-fast     # go vet + lint (new code only) + unit tests without envtest; run before finishing
 make test            # full unit + envtest (regenerates manifests + deepcopy first)
-make lint lint-fix   # golangci-lint
+make lint lint-fix   # golangci-lint, same version/config as CI; lint reports only code new vs LINT_BASE (origin/main)
+make build           # manager binary
 make run             # run controller locally against current kubeconfig
 make generate manifests   # regenerate deepcopy + CRDs after editing api/v1alpha1/*.go
 ```
 
-`make test` writes its envtest binaries via `setup-envtest` into `bin/`.
+Needs the Go version from `go.mod`. Tools (controller-gen, golangci-lint, setup-envtest) are pinned
+in the Makefile and installed into `bin/` on first use; `make test` also puts its envtest binaries there.
 
 ## Branches
 
@@ -99,3 +107,21 @@ Levels:
 - **Debug** — everything per-reconcile happy-path: "Ensure successful", requeue reasons, wait-poll progress, no-op decisions (`canDeleteWholePool`...), diffs/dumps, per-port annotation validation, repository request/error detail.
 
 Poll loops (`WaitForLBActive` etc.) log progress at Debug only and track `lastStatus` for a nil-safe timeout message. Eventhandler "Enqueue ..." lines are logr `V(1)` — hidden at info level.
+
+## Sensitive paths (review carefully, cover with tests)
+
+- Deleting cloud resources: `internal/usecase/lbc_uc/delete_*.go`. Never delete a LB, listener or pool
+  the controller did not create (pinned/BYO or adopted by name); `delete_lb_ownership_test.go` guards this.
+- Finalizers: `pkg/k8s/finalizer.go` and the `*_utils.go` helpers under `pkg/{ingress,service,lbc,nsg,glbc,vglb,service_glb}`,
+  used by the reconcilers in `internal/controller/`. A finalizer that can never be removed wedges deletion.
+- CRDs: `api/v1alpha1` -> `config/crd/bases` -> `pkg/k8s/apis/vks.vngcloud.vn/crds` (embedded, see above);
+  `api/v1alpha1/crd_schema_test.go` checks both copies. The CRD upgrade-on-startup logic is in `pkg/k8s/apis/crdhelpers`.
+- RBAC: `config/rbac/role.yaml` is generated from `+kubebuilder:rbac` markers; the chart copy is
+  `charts/vngcloud-load-balancer-controller/templates/manager-rbac.yaml` and is not regenerated automatically.
+- Chart values: `charts/vngcloud-load-balancer-controller/values.yaml`.
+
+## Conventions
+
+- English only in code, comments, logs, docs and commit messages.
+- Run `make verify-fast` before finishing a change; run `make test` when touching controllers or CRDs.
+- After `make manifests generate`, commit the regenerated CRDs (both copies), deepcopy and RBAC.
