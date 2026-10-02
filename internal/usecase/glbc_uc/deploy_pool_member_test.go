@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )
 

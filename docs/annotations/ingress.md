@@ -26,7 +26,29 @@ All Ingress annotations use the prefix `vks.vngcloud.vn`. Ingress resources must
 | `vks.vngcloud.vn/idle-timeout-client` | integer (seconds) | Client idle timeout |
 | `vks.vngcloud.vn/idle-timeout-member` | integer (seconds) | Member idle timeout |
 | `vks.vngcloud.vn/idle-timeout-connection` | integer (seconds) | Connection timeout |
-| `vks.vngcloud.vn/inbound-cidrs` | CIDR list | Restrict inbound traffic to these CIDRs |
+
+## Access control (ACL)
+
+Applied to every listener of this resource. The first matching rule wins: dropped CIDRs are checked first, then inbound (allowed) CIDRs; only traffic matching neither follows the default action. Dropped traffic is discarded silently (clients time out). IPv6 is not supported.
+
+| Annotation | Values | Description |
+|---|---|---|
+| `vks.vngcloud.vn/inbound-cidrs` | CIDR list | Allowed source CIDRs. Implies `acl-default-action: drop` unless set |
+| `vks.vngcloud.vn/dropped-cidrs` | comma-separated IPv4 CIDRs or addresses | Source CIDRs dropped first. `0.0.0.0/0` drops everything. `""` keeps the list managed and empty |
+| `vks.vngcloud.vn/acl-default-action` | `accept` \| `drop` | Action for traffic that matches no rule |
+
+Removing an annotation puts back the value the listener had before the controller changed it. ACL values set on the portal are left alone while no annotation manages them.
+
+**Shared load balancers.** Ingresses sharing a load balancer share its port 80/443 listeners, and so one ACL. Declare the ACL on one Ingress; different dropped CIDRs or default actions (including the `drop` that `inbound-cidrs` implies) on the same port are rejected. Different inbound CIDRs only produce a `SharedListenerAcl` warning event, and the listener follows whichever Ingress applied last. A resource without the annotations on such a listener also receives a `SharedListenerAcl` warning event.
+
+If the Ingress holding the original is removed first, the last value can remain on the listener. To clear it, remove the annotation from the remaining Ingress, then clear the leftover value on the portal. Alternatively, keep `vks.vngcloud.vn/dropped-cidrs: ""` on the remaining Ingress permanently: it records the leftover value as the original, so removing it later puts the block back.
+
+| Goal | Annotations |
+|---|---|
+| Drop a few addresses | `vks.vngcloud.vn/dropped-cidrs: "203.0.113.9/32,198.51.100.0/24"` |
+| Allow only some ranges | `vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"` |
+| Allow a range except a few addresses | `vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"` + `vks.vngcloud.vn/dropped-cidrs: "192.0.2.13/32"` (dropped is checked first) |
+| Drop everything | `vks.vngcloud.vn/dropped-cidrs: "0.0.0.0/0"` |
 
 ## Health Checks
 

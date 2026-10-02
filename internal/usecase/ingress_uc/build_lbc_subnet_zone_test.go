@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

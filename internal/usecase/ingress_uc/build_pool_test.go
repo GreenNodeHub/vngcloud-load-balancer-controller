@@ -8,14 +8,18 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/pkg/annotations"
 )
 
 // An Ingress may reference a Service that does not exist - a typo, or a chart whose
@@ -134,4 +138,62 @@ func TestBuildPoolReportsAPortTheServiceDoesNotServeAsSkippable(t *testing.T) {
 func TestBackendPortDescription(t *testing.T) {
 	assert.Equal(t, `"https"`, backendPortDescription(networkingv1.ServiceBackendPort{Name: "https"}))
 	assert.Equal(t, "8443", backendPortDescription(networkingv1.ServiceBackendPort{Number: 8443}))
+}
+
+func newBuildTaskForListenerAcl(anns map[string]string) *defaultModelBuildTask {
+	return &defaultModelBuildTask{
+		logger: logrus.NewEntry(logrus.New()),
+		ingress: &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{Name: "web", Namespace: "default", Annotations: anns},
+		},
+		annotationParser: annotations.NewSuffixAnnotationParser(domain.INGRESS_ANNOTATION_PREFIX),
+	}
+}
+
+// Both listeners of an Ingress carry the same ACL, so the HTTP and HTTPS front doors agree.
+func TestBuildListenersCarryTheAcl(t *testing.T) {
+	task := newBuildTaskForListenerAcl(map[string]string{
+		domain.INGRESS_ANNOTATION_PREFIX + "/" + annotations.SuffixDroppedCIDRs:     "203.0.113.9/32",
+		domain.INGRESS_ANNOTATION_PREFIX + "/" + annotations.SuffixACLDefaultAction: "drop",
+	})
+
+	for _, isHttps := range []bool{false, true} {
+		l, err := task.buildListeners(context.Background(), isHttps)
+		require.NoError(t, err)
+		assert.Nil(t, l.AllowedCidrs)
+		assert.Equal(t, ptr.To("203.0.113.9/32"), l.BlockedCidrs)
+		assert.Equal(t, ptr.To("drop"), l.DefaultAction)
+	}
+}
+
+// An allow list alone means "nobody else", so the listener must carry the drop default.
+func TestBuildListenersDefaultToDropWhenOnlyAnAllowListIsSet(t *testing.T) {
+	task := newBuildTaskForListenerAcl(map[string]string{
+		domain.INGRESS_ANNOTATION_PREFIX + "/" + annotations.SuffixInboundCIDRs: "198.51.100.0/24",
+	})
+
+	l, err := task.buildListeners(context.Background(), false)
+	require.NoError(t, err)
+	assert.Equal(t, ptr.To("198.51.100.0/24"), l.AllowedCidrs)
+	assert.Nil(t, l.BlockedCidrs)
+	assert.Equal(t, ptr.To("drop"), l.DefaultAction)
+}
+
+func TestBuildListenersWithoutAclAnnotationsLeaveTheAclUnmanaged(t *testing.T) {
+	task := newBuildTaskForListenerAcl(nil)
+
+	l, err := task.buildListeners(context.Background(), false)
+	require.NoError(t, err)
+	assert.Nil(t, l.AllowedCidrs)
+	assert.Nil(t, l.BlockedCidrs)
+	assert.Nil(t, l.DefaultAction)
+}
+
+func TestBuildListenersRejectsABadDroppedList(t *testing.T) {
+	task := newBuildTaskForListenerAcl(map[string]string{
+		domain.INGRESS_ANNOTATION_PREFIX + "/" + annotations.SuffixDroppedCIDRs: "nope",
+	})
+
+	_, err := task.buildListeners(context.Background(), false)
+	require.Error(t, err, "a bad block list must stop the build so the last good spec stays")
 }

@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/anngdinh/operator-helper/contexts"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
+	global "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"

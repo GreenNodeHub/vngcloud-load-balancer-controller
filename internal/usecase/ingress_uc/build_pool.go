@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -395,15 +395,6 @@ func (t *defaultModelBuildTask) buildIdleTimeoutConnection(_ context.Context) *i
 		return nil
 	}
 	return ptr.To(int32(optionsInt64))
-}
-
-func (t *defaultModelBuildTask) buildInboundCIDRs(_ context.Context) *string {
-	option := []string{}
-	exist := t.annotationParser.ParseStringSliceAnnotation(annotations.SuffixInboundCIDRs, &option, t.ingress.Annotations)
-	if !exist {
-		return nil
-	}
-	return ptr.To(strings.Join(option, ","))
 }
 
 func (t *defaultModelBuildTask) buildPoolHealthCheckProtocol(_ context.Context, pPoolProtocol corev1.Protocol) loadbalancerv2.HealthCheckProtocol {

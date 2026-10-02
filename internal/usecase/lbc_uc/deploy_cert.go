@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"

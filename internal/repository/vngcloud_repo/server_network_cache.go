@@ -3,7 +3,7 @@ package vngcloud_repo
 import (
 	"time"
 
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
 )
 
 const (

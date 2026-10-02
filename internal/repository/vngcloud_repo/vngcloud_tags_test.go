@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 )
 
 func tagRepo() *vngCloudRepository {
