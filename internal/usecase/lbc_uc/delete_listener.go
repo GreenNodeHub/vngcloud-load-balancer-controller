@@ -69,6 +69,9 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 		return nil
 	}
 
+	// Read on the first adopted listener that has an ACL to hand back, then reused.
+	peers := &adoptedAclPeers{t: t, lbId: lbId}
+
 	for _, candidateId := range deleteCandidates {
 		isExist, listener := isListenerExist(candidateId)
 		if !isExist {
@@ -122,7 +125,12 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 			// pool the listener came with. Left like that the user gets their listener back
 			// serving nothing, and the pool it pointed at orphaned.
 			if adopted != nil && !isListenerInUse(candidateId) {
-				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId, adopted.OriginalAcl); err != nil {
+				peerDeclares, err := peers.declaresOn(ctx, adopted, listener)
+				if err != nil {
+					failures = append(failures, fmt.Errorf("listener %s: restore ACL: %w", candidateId, err))
+					continue
+				}
+				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId, adopted.OriginalAcl, peerDeclares); err != nil {
 					failures = append(failures, fmt.Errorf("listener %s: restore default pool and ACL: %w", candidateId, err))
 					continue
 				}
@@ -136,18 +144,52 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 	return nil
 }
 
+// adoptedAclPeers tells the teardown which ACL fields other LBCs on the load balancer still declare
+// per port. The teardown does not run validateCrossLBCs, so t.aclPeers is not filled there; the
+// LBCs are listed here instead, once, and only when an adopted listener has an ACL to hand back.
+type adoptedAclPeers struct {
+	t      *defaultModelDeployTask
+	lbId   string
+	listed bool
+	peers  map[int32]map[aclField]*aclDeclaration
+	err    error
+}
+
+// declaresOn is peerDeclaresAcl for the port of an adopted listener being handed back. A failed
+// list is returned rather than treated as "no peer": putting the owner's ACL back blindly could
+// open a listener another LBC still filters.
+func (p *adoptedAclPeers) declaresOn(ctx context.Context, adopted *v1alpha1.CreatedListener, listener *entityv2.Listener) (func(aclField) bool, error) {
+	if adopted.OriginalAcl.IsEmpty() {
+		return func(aclField) bool { return false }, nil // nothing to restore, so no peer to defer to
+	}
+	if !p.listed {
+		p.listed = true
+		allLBCs := &v1alpha1.LoadBalancerConfigList{}
+		if err := p.t.k8sRepo.ListLoadBalancerConfig(ctx, allLBCs); err != nil {
+			p.err = fmt.Errorf("list LoadBalancerConfigs sharing load balancer %s: %w", p.lbId, err)
+		} else {
+			p.peers = p.t.collectAclPeers(p.lbId, allLBCs)
+		}
+	}
+	if p.err != nil {
+		return nil, p.err
+	}
+	port := int32(listener.ProtocolPort)
+	return func(f aclField) bool { return p.peers[port][f] != nil }, nil
+}
+
 // restoreAdoptedListener puts back the default pool and the ACL fields this LBC displaced when it
 // adopted the listener, so a load balancer handed back to its owner is in the state they left it.
 // Every other field is copied from the listener as it stands, so nothing else is disturbed.
 // blockedCidrs and defaultAction are only sent when the restore changes them: vLB keeps a field
-// that is absent from the PUT.
-func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string, originalAcl *v1alpha1.ListenerAcl) error {
+// that is absent from the PUT. A field another LBC still declares on the listener's port
+// (peerDeclares) is left as it stands and its record dropped, as on the deploy path.
+func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string, originalAcl *v1alpha1.ListenerAcl, peerDeclares func(aclField) bool) error {
 	original := ""
 	if originalDefaultPoolId != nil {
 		original = *originalDefaultPoolId
 	}
-	restore := planListenerAcl(v1alpha1.ListenerAcl{}, currentAcl(listener), originalAcl, nil,
-		func(aclField) bool { return false })
+	restore := planListenerAcl(v1alpha1.ListenerAcl{}, currentAcl(listener), originalAcl, nil, peerDeclares)
 	if listener.DefaultPoolId == original && len(restore.Changes) == 0 {
 		return nil // nothing was displaced, or it has already been put back
 	}
