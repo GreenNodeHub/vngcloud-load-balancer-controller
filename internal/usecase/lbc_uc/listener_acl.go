@@ -63,9 +63,10 @@ func currentAcl(l *entityv2.Listener) v1alpha1.ListenerAcl {
 }
 
 // neutralAcl is what a listener the controller creates would have had without the annotations,
-// recorded so that removing them later opens the listener back up.
+// recorded so that removing them later restores it. defaultAction is drop: a listener created through
+// the vLB API without defaultAction reports drop (measured 2026-10-01), so accept could fail open.
 func neutralAcl(spec v1alpha1.ListenerAcl, defaultAllowed string) *v1alpha1.ListenerAcl {
-	neutral := [...]string{defaultAllowed, "", listeneracl.ActionAccept}
+	neutral := [...]string{defaultAllowed, "", listeneracl.ActionDrop}
 	rec := &v1alpha1.ListenerAcl{}
 	for _, f := range aclFields {
 		if f.get(&spec) != nil {
@@ -107,12 +108,13 @@ func planListenerAcl(spec, current v1alpha1.ListenerAcl, record *v1alpha1.Listen
 				continue
 			}
 			if orig == nil {
-				// The value we are about to displace, or accept for a listener that predates ACL.
+				// The value we are about to displace, or drop for a listener reporting no defaultAction: a listener
+				// created through the vLB API without defaultAction reports drop (measured 2026-10-01).
 				o := ""
 				if have != nil {
 					o = *have
 				} else if f == aclDefaultAction {
-					o = listeneracl.ActionAccept
+					o = listeneracl.ActionDrop
 				}
 				f.set(before, &o)
 				f.set(after, &o)

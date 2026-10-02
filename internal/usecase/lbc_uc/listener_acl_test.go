@@ -102,11 +102,11 @@ func TestPlanAclStillSeesADifferentBlock(t *testing.T) {
 	assert.Equal(t, "192.0.2.1/22", *p.Desired.BlockedCidrs, "the user's text is what is sent")
 }
 
-// Review Focus 3: a listener from before ACL existed reports no default action.
-func TestPlanAclRecordsAcceptForAListenerWithNoDefaultAction(t *testing.T) {
+// Review Focus 3: a listener reporting no default action is recorded as drop (vLB API default, measured 2026-10-01).
+func TestPlanAclRecordsDropForAListenerWithNoDefaultAction(t *testing.T) {
 	p := planListenerAcl(v1alpha1.ListenerAcl{DefaultAction: ptrTo("drop")}, cur("192.0.2.0/24", "", ""), nil, noPeers)
 	assert.Equal(t, "drop", *p.Desired.DefaultAction)
-	assert.Equal(t, "accept", *p.RecordBefore.DefaultAction)
+	assert.Equal(t, "drop", *p.RecordBefore.DefaultAction)
 }
 
 func TestSpecAclTreatsAnEmptyAllowListAsUnmanaged(t *testing.T) {
@@ -117,5 +117,5 @@ func TestNeutralAclCoversOnlyTheFieldsTheSpecSets(t *testing.T) {
 	n := neutralAcl(v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("203.0.113.9/32"), DefaultAction: ptrTo("drop")}, "0.0.0.0/0")
 	assert.Nil(t, n.AllowedCidrs)
 	assert.Equal(t, "", *n.BlockedCidrs)
-	assert.Equal(t, "accept", *n.DefaultAction)
+	assert.Equal(t, "drop", *n.DefaultAction)
 }
