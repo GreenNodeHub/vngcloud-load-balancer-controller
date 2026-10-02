@@ -80,6 +80,23 @@ func neutralAcl(spec v1alpha1.ListenerAcl, defaultAllowed string) *v1alpha1.List
 	return rec
 }
 
+// neutralFallback is the original planListenerAcl records for a field with no record: the neutral
+// listener, for every field, when this controller created the listener - on its own load balancer
+// and not adopted. nil otherwise, so the value found on the listener is recorded.
+func (t *defaultModelDeployTask) neutralFallback(listenerId string) *v1alpha1.ListenerAcl {
+	if !t.loadBalancerIsOurs() {
+		return nil
+	}
+	for _, l := range t.lbConfig.Status.CreatedListeners {
+		if l.Id == listenerId && !l.Adopted {
+			all := ""
+			return neutralAcl(v1alpha1.ListenerAcl{AllowedCidrs: &all, BlockedCidrs: &all, DefaultAction: &all},
+				t.cfg.LoadBalancerOpts.DefaultAllowedCidrs)
+		}
+	}
+	return nil
+}
+
 // aclDeclaration is one ACL field another LBC on the same load balancer declares for a listener.
 type aclDeclaration struct{ lbcName, value string }
 
@@ -96,7 +113,10 @@ type aclPlan struct {
 	Changes      []string
 }
 
-func planListenerAcl(spec, current v1alpha1.ListenerAcl, record *v1alpha1.ListenerAcl, peerDeclares func(aclField) bool) aclPlan {
+// neutral is the original of a listener the controller created, used for a field taken over with no
+// record (one an older release set without recording). nil, for an adopted listener, means the
+// value being displaced is the original.
+func planListenerAcl(spec, current v1alpha1.ListenerAcl, record, neutral *v1alpha1.ListenerAcl, peerDeclares func(aclField) bool) aclPlan {
 	var plan aclPlan
 	before, after := cloneAcl(record), cloneAcl(record)
 
@@ -111,7 +131,9 @@ func planListenerAcl(spec, current v1alpha1.ListenerAcl, record *v1alpha1.Listen
 				// The value we are about to displace, or drop for a listener reporting no defaultAction: a listener
 				// created through the vLB API without defaultAction reports drop (measured 2026-10-01).
 				o := ""
-				if have != nil {
+				if n := f.get(neutral); n != nil {
+					o = *n
+				} else if have != nil {
 					o = *have
 				} else if f == aclDefaultAction {
 					o = listeneracl.ActionDrop

@@ -146,7 +146,7 @@ func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbI
 	if originalDefaultPoolId != nil {
 		original = *originalDefaultPoolId
 	}
-	restore := planListenerAcl(v1alpha1.ListenerAcl{}, currentAcl(listener), originalAcl,
+	restore := planListenerAcl(v1alpha1.ListenerAcl{}, currentAcl(listener), originalAcl, nil,
 		func(aclField) bool { return false })
 	if listener.DefaultPoolId == original && len(restore.Changes) == 0 {
 		return nil // nothing was displaced, or it has already been put back
