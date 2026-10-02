@@ -158,10 +158,10 @@ func planListenerAcl(spec, current v1alpha1.ListenerAcl, record, neutral *v1alph
 }
 
 // aclValueEqual compares CIDR lists as sets of canonical networks, since vLB may echo a list back
-// reformatted. The user's text is still what gets sent.
+// reformatted, and default actions regardless of case. The user's text is still what gets sent.
 func aclValueEqual(f aclField, a, b *string) bool {
 	if f == aclDefaultAction {
-		return deref(a) == deref(b)
+		return strings.EqualFold(deref(a), deref(b))
 	}
 	return slices.Equal(cidrSet(deref(a)), cidrSet(deref(b)))
 }

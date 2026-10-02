@@ -147,3 +147,15 @@ func TestPlanAclKeepsAnExistingRecordOverTheNeutralAcl(t *testing.T) {
 		cur("192.0.2.0/24", "", "drop"), rec, neutral, noPeers)
 	assert.Equal(t, "198.51.100.0/24", *p.RecordBefore.AllowedCidrs)
 }
+
+// Review C3: vLB may report the default action in another case; that is not a change.
+func TestPlanAclComparesDefaultActionsCaseInsensitively(t *testing.T) {
+	p := planListenerAcl(v1alpha1.ListenerAcl{DefaultAction: ptrTo("drop")}, cur("0.0.0.0/0", "", "DROP"), nil, nil, noPeers)
+	assert.Nil(t, p.Desired.DefaultAction)
+	assert.Empty(t, p.Changes)
+	assert.Nil(t, p.RecordBefore)
+}
+
+func TestCurrentAclKeepsAnEmptyDefaultActionAsNil(t *testing.T) {
+	assert.Nil(t, cur("0.0.0.0/0", "", "").DefaultAction)
+}
