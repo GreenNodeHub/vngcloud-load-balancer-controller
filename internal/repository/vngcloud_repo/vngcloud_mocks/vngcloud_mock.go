@@ -952,6 +952,9 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			ClientCertificateAuthentication: nil,
 		},
 	}
+	if newListener.DefaultAction == "" {
+		newListener.DefaultAction = string(loadbalancerv2.ListenerDefaultActionDrop) // what vLB reports (measured 2026-10-01)
+	}
 	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS ||
 		listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTP {
 		if listener.InsertHeaders == nil {

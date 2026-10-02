@@ -83,7 +83,7 @@ func (t *defaultModelDeployTask) deployListener(ctx context.Context, lbId string
 	// The record of what the update displaces is written before the update, so a crash between
 	// the two cannot lose the only copy of what to put back.
 	acl := planListenerAcl(specAcl(listenerSpec), currentAcl(currentListener),
-		t.originalAclOf(currentListener.UUID), t.peerDeclaresAcl(listenerSpec.ProtocolPort))
+		t.originalAclOf(currentListener.UUID), t.neutralFallback(currentListener.UUID), t.peerDeclaresAcl(listenerSpec.ProtocolPort))
 	if err := t.statusSetOriginalAcl(ctx, currentListener.UUID, acl.RecordBefore); err != nil {
 		return nil, err
 	}

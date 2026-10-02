@@ -51,6 +51,10 @@ func TestAclRecordIsWrittenBeforeThePut(t *testing.T) {
 	vng, k8s := repository.NewMockVngCloudRepository(t), repository.NewMockK8sRepository(t)
 	onListener(vng, entityv2.Listener{AllowedCidrs: "0.0.0.0/0", BlockedCidrs: "192.0.2.1/32", DefaultAction: "accept"})
 	task := aclTask(vng, k8s, tcp80(ptrTo("203.0.113.9/32")), nil)
+	// Adopted, so the displaced value is the user's and is what the record must hold.
+	task.lbConfig.Status.CreatedLoadBalancerId = nil
+	task.lbConfig.Status.AdoptedLoadBalancerId = ptrTo("lb-acl")
+	task.lbConfig.Status.CreatedListeners[0].Adopted = true
 	stored, _ := storedStatusPatch(k8s, task)
 	persistedBlocked := func() *string {
 		require.Len(t, stored.Status.CreatedListeners, 1)
@@ -278,4 +282,43 @@ func TestAclRecordFailsWhenTheListenerIsMissingFromStoredStatus(t *testing.T) {
 	assert.Contains(t, err.Error(), "not in status, need to retry")
 	assert.Equal(t, 0, *writes)
 	assert.Nil(t, task.originalAclOf(aclListenerId), "the in-memory copy must not claim a record that was not stored")
+}
+
+func allow80(allowed string) v1alpha1.Listener {
+	return v1alpha1.Listener{Name: "l80", Protocol: loadbalancerv2.ListenerProtocolTCP, ProtocolPort: 80, AllowedCidrs: ptrTo(allowed)}
+}
+
+// Review C1: a listener on our own load balancer, on the books from an older release without a
+// record, carrying a whitelist that release applied. Taking it over records the neutral listener.
+func TestCreatedListenerWithoutARecordTakesOverFromNeutral(t *testing.T) {
+	vng, k8s := repository.NewMockVngCloudRepository(t), repository.NewMockK8sRepository(t)
+	onListener(vng, entityv2.Listener{AllowedCidrs: "192.0.2.0/24", DefaultAction: "drop"})
+	task := aclTask(vng, k8s, allow80("203.0.113.0/24"), nil)
+	stored, _ := storedStatusPatch(k8s, task)
+	vng.EXPECT().UpdateListener(mock.Anything, "lb-acl", aclListenerId, mock.Anything).Return(nil).Once()
+	vng.EXPECT().WaitForLBActive(mock.Anything, "lb-acl").Return(&entityv2.LoadBalancer{UUID: "lb-acl"}, nil)
+
+	created, err := task.deployListeners(context.Background(), "lb-acl", nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, created[0].OriginalAcl)
+	assert.Equal(t, "0.0.0.0/0", *created[0].OriginalAcl.AllowedCidrs, "the configured default, not the legacy whitelist")
+	assert.Nil(t, created[0].OriginalAcl.BlockedCidrs)
+	assert.Equal(t, "0.0.0.0/0", *stored.Status.CreatedListeners[0].OriginalAcl.AllowedCidrs)
+}
+
+func TestAdoptedListenerWithoutARecordTakesOverFromWhatItHas(t *testing.T) {
+	vng, k8s := repository.NewMockVngCloudRepository(t), repository.NewMockK8sRepository(t)
+	onListener(vng, entityv2.Listener{AllowedCidrs: "192.0.2.0/24", DefaultAction: "drop"})
+	task := aclTask(vng, k8s, allow80("203.0.113.0/24"), nil)
+	task.lbConfig.Status.CreatedLoadBalancerId = nil
+	task.lbConfig.Status.AdoptedLoadBalancerId = ptrTo("lb-acl")
+	task.lbConfig.Status.CreatedListeners[0].Adopted = true
+	stored, _ := storedStatusPatch(k8s, task)
+	vng.EXPECT().UpdateListener(mock.Anything, "lb-acl", aclListenerId, mock.Anything).Return(nil).Once()
+	vng.EXPECT().WaitForLBActive(mock.Anything, "lb-acl").Return(&entityv2.LoadBalancer{UUID: "lb-acl"}, nil)
+
+	created, err := task.deployListeners(context.Background(), "lb-acl", nil, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "192.0.2.0/24", *created[0].OriginalAcl.AllowedCidrs)
+	assert.Equal(t, "192.0.2.0/24", *stored.Status.CreatedListeners[0].OriginalAcl.AllowedCidrs)
 }
