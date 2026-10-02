@@ -212,45 +212,8 @@ func (t *defaultModelDeployTask) validateCrossListenerDefaultPools(_ context.Con
 // declare in t.aclPeers, and warns when this LBC leaves a field unset that a peer sets.
 func (t *defaultModelDeployTask) validateCrossListenerAcl(_ context.Context, lbId string, allLBCs *v1alpha1.LoadBalancerConfigList) error {
 	selfName := fmt.Sprintf("%s/%s", t.lbConfig.Namespace, t.lbConfig.Name)
-	declared := make(map[int32]map[aclField][]aclDeclaration)
-	collect := func(lbcName string, listeners []v1alpha1.Listener) {
-		for _, listener := range listeners {
-			acl := specAcl(listener)
-			for _, f := range aclFields {
-				v := f.get(&acl)
-				if v == nil {
-					continue
-				}
-				if declared[listener.ProtocolPort] == nil {
-					declared[listener.ProtocolPort] = make(map[aclField][]aclDeclaration)
-				}
-				declared[listener.ProtocolPort][f] = append(declared[listener.ProtocolPort][f], aclDeclaration{lbcName: lbcName, value: *v})
-			}
-		}
-	}
-
 	// Self is taken from the object being reconciled, not from the possibly stale list copy.
-	collect(selfName, t.lbConfig.Spec.Listeners)
-	for _, lbc := range allLBCs.Items {
-		lbcName := fmt.Sprintf("%s/%s", lbc.Namespace, lbc.Name)
-		if lbcName == selfName {
-			continue
-		}
-
-		// Determine which load balancer this LBC references
-		lbcId := ""
-		if lbc.Spec.LoadBalancerId != nil && *lbc.Spec.LoadBalancerId != "" {
-			lbcId = *lbc.Spec.LoadBalancerId
-		} else if lbc.Status.LoadBalancerId != nil && *lbc.Status.LoadBalancerId != "" {
-			lbcId = *lbc.Status.LoadBalancerId
-		}
-
-		// Skip if this LBC uses a different load balancer
-		if lbcId == "" || lbcId != lbId {
-			continue
-		}
-		collect(lbcName, lbc.Spec.Listeners)
-	}
+	declared := collectAclDeclarations(selfName, t.lbConfig.Spec.Listeners, lbId, allLBCs)
 
 	selfAcl := make(map[int32]v1alpha1.ListenerAcl)
 	for _, listener := range t.lbConfig.Spec.Listeners {
@@ -310,4 +273,65 @@ func (t *defaultModelDeployTask) validateCrossListenerAcl(_ context.Context, lbI
 	}
 
 	return nil
+}
+
+// collectAclDeclarations gathers, per listener port and ACL field, what every LBC targeting lbId
+// declares. selfListeners, under selfName, come first; the list's own copy of self is skipped.
+func collectAclDeclarations(selfName string, selfListeners []v1alpha1.Listener, lbId string, allLBCs *v1alpha1.LoadBalancerConfigList) map[int32]map[aclField][]aclDeclaration {
+	declared := make(map[int32]map[aclField][]aclDeclaration)
+	collect := func(lbcName string, listeners []v1alpha1.Listener) {
+		for _, listener := range listeners {
+			acl := specAcl(listener)
+			for _, f := range aclFields {
+				v := f.get(&acl)
+				if v == nil {
+					continue
+				}
+				if declared[listener.ProtocolPort] == nil {
+					declared[listener.ProtocolPort] = make(map[aclField][]aclDeclaration)
+				}
+				declared[listener.ProtocolPort][f] = append(declared[listener.ProtocolPort][f], aclDeclaration{lbcName: lbcName, value: *v})
+			}
+		}
+	}
+
+	collect(selfName, selfListeners)
+	for _, lbc := range allLBCs.Items {
+		lbcName := fmt.Sprintf("%s/%s", lbc.Namespace, lbc.Name)
+		if lbcName == selfName {
+			continue
+		}
+
+		// Determine which load balancer this LBC references
+		lbcId := ""
+		if lbc.Spec.LoadBalancerId != nil && *lbc.Spec.LoadBalancerId != "" {
+			lbcId = *lbc.Spec.LoadBalancerId
+		} else if lbc.Status.LoadBalancerId != nil && *lbc.Status.LoadBalancerId != "" {
+			lbcId = *lbc.Status.LoadBalancerId
+		}
+
+		// Skip if this LBC uses a different load balancer
+		if lbcId == "" || lbcId != lbId {
+			continue
+		}
+		collect(lbcName, lbc.Spec.Listeners)
+	}
+	return declared
+}
+
+// collectAclPeers is, per listener port and ACL field, the first declaration by an LBC other than
+// this one on lbId - what t.aclPeers holds after validateCrossListenerAcl, for paths that do not
+// run it, such as the teardown.
+func (t *defaultModelDeployTask) collectAclPeers(lbId string, allLBCs *v1alpha1.LoadBalancerConfigList) map[int32]map[aclField]*aclDeclaration {
+	selfName := fmt.Sprintf("%s/%s", t.lbConfig.Namespace, t.lbConfig.Name)
+	peers := make(map[int32]map[aclField]*aclDeclaration)
+	for port, fields := range collectAclDeclarations(selfName, nil, lbId, allLBCs) {
+		for f, decls := range fields {
+			if peers[port] == nil {
+				peers[port] = make(map[aclField]*aclDeclaration)
+			}
+			peers[port][f] = &decls[0]
+		}
+	}
+	return peers
 }
