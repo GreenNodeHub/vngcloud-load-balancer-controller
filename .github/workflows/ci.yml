@@ -91,6 +91,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
+          # .golangci.yml reports only what a change introduces, which needs the history
+          # back to the merge base with main.
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -100,7 +103,7 @@ jobs:
       - name: Run linter
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.5.0
+          version: v2.12.2
           args: --timeout 15m0s --verbose
 
   analyze:
