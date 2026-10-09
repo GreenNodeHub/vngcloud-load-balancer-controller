@@ -117,6 +117,14 @@ docs-build: ## Build documentation static site into site/
 docs-publish: ## Publish versioned docs to GitHub Pages (VERSION defaults to 'latest')
 	pipenv run mike deploy $(or $(VERSION),latest) latest --update-aliases --push
 
+# The toolchain directive in go.mod is a preference, not a floor. A machine with
+# GOTOOLCHAIN=local and Go 1.26.0-1.26.8 satisfies `go 1.26.0`, ignores the directive, and
+# builds - silently, exit 0 - a binary whose net/http still carries the advisories 1.26.9
+# fixed. Setting it here puts the floor in one place for every path that builds through this
+# Makefile, the image included: the Dockerfile runs `make build-pro`.
+GOTOOLCHAIN ?= go1.26.9
+export GOTOOLCHAIN
+
 ##@ Build
 
 .PHONY: build

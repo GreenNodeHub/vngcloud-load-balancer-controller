@@ -15,7 +15,7 @@
 
 **Environment:**
 - Container runtime: `gcr.io/distroless/static:nonroot` (production base image)
-- Build image: `golang:1.26` (multi-stage Docker build)
+- Build image: `golang:1.26.9` (multi-stage Docker build)
 - Binary runs as UID/GID 65532 (nonroot)
 
 **Package Manager:**
@@ -101,7 +101,7 @@
 - `--disable-*-controller` flags for each of 7 controllers
 
 **Build:**
-- `Dockerfile` - Multi-stage build; builder stage uses `golang:1.26`, final stage `gcr.io/distroless/static:nonroot`
+- `Dockerfile` - Multi-stage build; builder stage uses `golang:1.26.9`, final stage `gcr.io/distroless/static:nonroot`
 - Version and commit injected via ldflags: `-X github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version` and `.Commit`
 - Target binary: `manager` at repo root
 
