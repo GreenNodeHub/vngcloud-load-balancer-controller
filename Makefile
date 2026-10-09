@@ -90,8 +90,9 @@ test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
 # LINT_BASE: lint reports only issues in code that is new relative to this ref, so
-# pre-existing findings in old code do not fail it. CI lints the whole tree with the same
-# version and .golangci.yml.
+# pre-existing findings in old code do not fail it. CI uses the same version and
+# .golangci.yml, and also reports only new issues - through the action's only-new-issues
+# rather than this flag. See the comment on that step in .github/workflows/ci.yml.
 LINT_BASE ?= origin/main
 
 .PHONY: lint

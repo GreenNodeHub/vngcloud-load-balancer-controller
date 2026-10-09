@@ -1,5 +1,9 @@
 # Build the manager binary
-FROM golang:1.26 AS builder
+# Pinned to the patch, not the 1.26 line: the official images set GOTOOLCHAIN=local, so the
+# toolchain directive in go.mod has no say here and `go 1.26.0` alone would accept 1.26.0-1.26.8,
+# whose net/http still carries the advisories this bump exists to clear. A cached floating tag
+# would then build a vulnerable binary with nothing failing.
+FROM golang:1.26.9 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION

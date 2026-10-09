@@ -91,8 +91,6 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref }}
-          # only-new-issues below needs the base commit present to work out the patch.
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -109,6 +107,14 @@ jobs:
           # untouched main, all goconst and prealloc. Clearing them is #33421; until then
           # they would block every merge. The action derives the patch itself, so this holds
           # on push as well as on pull requests, and it leaves `make lint`'s LINT_BASE alone.
+          #
+          # What this gives up, until #33421 lands and this line comes out again:
+          #   - old code is never re-scanned, so a linter or rule added later only ever sees
+          #     new code;
+          #   - a finding a change causes on a line it did not touch - a function left
+          #     unused, a constant that only now repeats - is not reported.
+          # Nothing security-relevant is enabled today (no gosec, bodyclose or noctx), which
+          # is why this is acceptable as a stopgap rather than a standing policy.
           only-new-issues: true
 
   analyze:
