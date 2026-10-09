@@ -117,12 +117,19 @@ func TestDeleteRedundantPoolsRetriesABusyLoadBalancer(t *testing.T) {
 // (WaitForLBActive), while an adopted listener is handed back with an UpdateListener and no wait
 // at all. deleteRedundantPools runs straight after and starts by listing the listeners to see
 // which pools are still in use - and in that window vLB is still UPDATING, so it answers with the
-// default pool from before the restore. That is this cluster's pool, so it reads as "in use" and
-// never becomes a deletion candidate. It fails identically on every retry, because every retry
-// re-restores and re-reads inside the same window.
+// default pool from before the restore.
 //
-// The mock models exactly that: the restored value becomes visible only once the load balancer
-// has settled since the write.
+// That misreading goes both ways. This cluster's pool reads as "in use" and is spared - the leak
+// the issue reports. A pool of the customer's that deployPool adopted by name reads as used by
+// nothing and is deleted, which is worse; the fixture below puts one in status.createdPools,
+// which is how adopt-by-name records it.
+//
+// There is no second chance at either. A pool skipped as in-use is a `continue`, not a failure,
+// so the teardown returns nil, the finalizer comes off and the LBC is gone - the first pass is
+// the only pass.
+//
+// The mock models the one property that matters: the restored value becomes visible only once
+// the load balancer has settled since the write.
 func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
 	const (
 		lb       = "lb-1"
@@ -194,12 +201,18 @@ func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
 					Adopted:               true,
 					OriginalDefaultPoolId: ptrTo(custPool),
 				}},
-				// Both pools are in the record on purpose. deployPool adopts a pool of the
-				// customer's by name, so one can end up here without this cluster having
-				// created it - and then the only thing keeping it is that a listener still
-				// points at it, which is exactly the reading this change alters. With just
-				// our own pool listed the assertion below is vacuous: the customer's pool
-				// could never be a candidate whatever the code did.
+				// Both pools are in the record on purpose. CreatedPool carries no provenance -
+				// unlike CreatedListener there is no Adopted flag - so the teardown cannot tell
+				// a pool it created from one it merely recorded, and every entry here is a
+				// candidate. The only thing keeping the customer's is that a listener still
+				// points at it, which is exactly the reading this change alters. With just our
+				// own pool listed the assertion below is vacuous: the customer's could never be
+				// a candidate whatever the code did.
+				//
+				// The name here is the customer's own, not one this controller would generate.
+				// deployPool only records a pool it did not create when the names match exactly,
+				// so this fixture models the recorded state rather than the route into it; the
+				// deletion path compares ids and listener references and never looks at names.
 				CreatedPools: []v1alpha1.CreatedPool{
 					{Id: vksPool, Name: "vks-a-b-TCP-8080"},
 					{Id: custPool, Name: "customer_pool_8080"},
@@ -221,4 +234,47 @@ func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
 	// pointing at our pool, the customer's pool reads as used by nothing and is deleted.
 	assert.NotContains(t, deleted, custPool,
 		"the customer's own pool must never be deleted, however it got into the record")
+}
+
+// The wait above has to be conditional. An adopted listener that already carries its original
+// default pool - a second teardown pass, or one that never displaced anything - writes nothing,
+// and there is then nothing to become visible. Waiting anyway would be a new way to fail on a
+// load balancer that is not ours: one its owner has left non-ACTIVE would hold a reconcile
+// worker for the whole backoff, or come back ERROR and fail the teardown, which leaves the
+// finalizer on and wedges the delete. The teardown used to walk straight past that case.
+//
+// The mock is strict, so the guard is that neither UpdateListener nor WaitForLBActive is
+// declared here: either call fails the test.
+func TestAdoptedListenerTeardownDoesNotWaitWhenItRestoredNothing(t *testing.T) {
+	const (
+		lb       = "lb-1"
+		listener = "lis-1"
+		custPool = "pool-customer"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{
+			{UUID: listener, DefaultPoolId: custPool}, // already what it was adopted with
+		}}, nil)
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer4},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedListeners: []v1alpha1.CreatedListener{{
+					Id:                    listener,
+					Port:                  8080,
+					Adopted:               true,
+					OriginalDefaultPoolId: ptrTo(custPool),
+				}},
+			},
+		},
+	}
+
+	require.NoError(t, task.deleteRedundantListeners(context.Background(), lb, nil, nil))
 }
