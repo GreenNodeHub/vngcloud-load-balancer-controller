@@ -120,9 +120,40 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 			// pool the listener came with. Left like that the user gets their listener back
 			// serving nothing, and the pool it pointed at orphaned.
 			if adopted != nil && !isListenerInUse(candidateId) {
-				if err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId); err != nil {
+				restored, err := t.restoreAdoptedListener(ctx, lbId, listener, adopted.OriginalDefaultPoolId)
+				if err != nil {
 					failures = append(failures, fmt.Errorf("listener %s: restore default pool: %w", candidateId, err))
 					continue
+				}
+				// Wait for the restore to land, exactly as the delete branch above waits. The
+				// caller runs deleteRedundantPools straight after, and that starts by listing
+				// the listeners to see which pools are still in use. The restore is a write, so
+				// the load balancer is still UPDATING, and a read in that window answers with
+				// the default pool from before - this cluster's.
+				//
+				// Both halves of that stale reading are wrong, and in opposite directions: our
+				// own pool reads as in use and is spared, while a pool of the customer's that
+				// deployPool adopted by name reads as used by nothing and is deleted.
+				//
+				// There is no second chance at it. A pool still read as in-use simply falls
+				// through both branches of the loop in deleteRedundantPoolsFrom - it is not
+				// recorded as a failure - so the teardown returns nil, the finalizer comes off
+				// and the LBC is gone: the first pass is the only pass. That is also why this
+				// wait has to be enough on its own: if the load balancer reports ACTIVE before
+				// the new default pool is visible, the mistake is made silently, with no error
+				// to retry.
+				//
+				// Only when the restore actually wrote. With nothing written there is nothing to
+				// become visible, and waiting anyway would be a new way to fail on a load
+				// balancer that is not ours: one left non-ACTIVE by its owner would hold a
+				// reconcile worker for the length of the backoff, or come back ERROR, fail the
+				// teardown and leave the finalizer on for good. The teardown used to walk
+				// straight past that case.
+				if restored {
+					if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+						failures = append(failures, fmt.Errorf("listener %s: wait after restoring default pool: %w", candidateId, err))
+						continue
+					}
 				}
 			}
 		}
@@ -137,13 +168,15 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 // restoreAdoptedListener puts back the default pool this LBC displaced when it adopted the
 // listener, so a load balancer handed back to its owner is in the state they left it. Every other
 // field is copied from the listener as it stands, so nothing else is disturbed.
-func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string) error {
+// It reports whether it wrote anything, so the caller only waits for the load balancer when
+// there is a write to wait for.
+func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbId string, listener *entityv2.Listener, originalDefaultPoolId *string) (bool, error) {
 	original := ""
 	if originalDefaultPoolId != nil {
 		original = *originalDefaultPoolId
 	}
 	if listener.DefaultPoolId == original {
-		return nil // nothing was displaced, or it has already been put back
+		return false, nil // nothing was displaced, or it has already been put back
 	}
 
 	opt := &loadbalancerv2.UpdateListenerRequest{
@@ -165,9 +198,12 @@ func (t *defaultModelDeployTask) restoreAdoptedListener(ctx context.Context, lbI
 	t.logger.Infof("Restoring default pool (%s -> %s) on adopted listener %s of load balancer %s",
 		listener.DefaultPoolId, original, listener.UUID, lbId)
 
-	return t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+	if err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 		return t.vngcloudRepo.UpdateListener(ctx, lbId, listener.UUID, opt)
-	})
+	}); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // canDeleteWholeListener checks if we can delete the whole listener
