@@ -1,8 +1,10 @@
 # Build the manager binary
-# Pinned to the patch, not the 1.26 line: the official images set GOTOOLCHAIN=local, so the
-# toolchain directive in go.mod has no say here and `go 1.26.0` alone would accept 1.26.0-1.26.8,
-# whose net/http still carries the advisories this bump exists to clear. A cached floating tag
-# would then build a vulnerable binary with nothing failing.
+# Pinned to the patch, not the 1.26 line. The floor itself comes from the toolchain directive
+# in go.mod, which the Makefile restores with `override GOTOOLCHAIN = auto` - the official
+# images set GOTOOLCHAIN=local, which would otherwise ignore it. Two reasons the pin stays on
+# top of that: `go mod download` below runs outside make and so has only this tag to go on,
+# and a floating tag makes the compiler that produced a given image unknowable afterwards.
+# Removing either one leaves a gap; they are not two spellings of the same guard.
 FROM golang:1.26.9 AS builder
 ARG TARGETOS
 ARG TARGETARCH
