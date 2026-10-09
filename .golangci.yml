@@ -4,14 +4,6 @@ run:
   timeout: 5m
   allow-parallel-runners: true
 
-# Report only what a change introduces, the same rule `make lint` applies through
-# --new-from-rev. Without this CI lints the whole tree on push and workflow_call, where
-# the action's only-new-issues has no pull request to diff against - so bumping the linter
-# turns every pre-existing finding into a merge blocker. New code is still linted in full.
-# Requires fetch-depth: 0 on the lint job's checkout.
-issues:
-  new-from-merge-base: origin/main
-
 linters:
   default: none
   enable:
