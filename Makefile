@@ -90,8 +90,9 @@ test-e2e:
 	go test ./test/e2e/ -v -ginkgo.v
 
 # LINT_BASE: lint reports only issues in code that is new relative to this ref, so
-# pre-existing findings in old code do not fail it. CI lints the whole tree with the same
-# version and .golangci.yml.
+# pre-existing findings in old code do not fail it. CI uses the same version and
+# .golangci.yml, and also reports only new issues - through the action's only-new-issues
+# rather than this flag. See the comment on that step in .github/workflows/ci.yml.
 LINT_BASE ?= origin/main
 
 .PHONY: lint
@@ -115,6 +116,21 @@ docs-build: ## Build documentation static site into site/
 .PHONY: docs-publish
 docs-publish: ## Publish versioned docs to GitHub Pages (VERSION defaults to 'latest')
 	pipenv run mike deploy $(or $(VERSION),latest) latest --update-aliases --push
+
+# The toolchain directive in go.mod is a preference, not a floor. A machine with
+# GOTOOLCHAIN=local and Go 1.26.0-1.26.8 satisfies `go 1.26.0`, ignores the directive, and
+# builds - silently, exit 0 - a binary whose net/http still carries the advisories 1.26.9
+# fixed. The Dockerfile runs `make build-pro`, so putting the floor here covers the image as
+# well as a developer machine.
+#
+# `override` rather than `?=`: the official golang images set GOTOOLCHAIN=local in the
+# environment, and `?=` yields to that, which left the image with no floor at all.
+# Plain `auto`, not a version: `go1.26.9+auto` reads as a ceiling as well as a floor, so a
+# newer base image would be quietly stepped back down to 1.26.9 - bumping FROM for the next
+# Go CVE would then produce a binary that still carried it. `auto` takes the floor from the
+# toolchain directive in go.mod, leaving one source of truth instead of three.
+override GOTOOLCHAIN = auto
+export GOTOOLCHAIN
 
 ##@ Build
 
@@ -211,7 +227,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 KUSTOMIZE_VERSION ?= v5.4.3
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
 ENVTEST_VERSION ?= release-0.19
-GOLANGCI_LINT_VERSION ?= v2.5.0
+GOLANGCI_LINT_VERSION ?= v2.12.2
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
