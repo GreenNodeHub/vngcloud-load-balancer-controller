@@ -152,3 +152,59 @@ func TestDeleteReleasesTheClusterTagOnTheTargetAfterARequeue(t *testing.T) {
 		"the record of which tags this cluster authored is not what decides whether its own id "+
 			"comes out of the cluster tag")
 }
+
+// Naming the cluster tag as ours is what asks for its removal, so it has to ask for no more
+// than this cluster's own id. With another cluster still listed the key stays, carrying what
+// is left of it - and that has to hold on the pass where the created-tag record is empty,
+// which is the pass that reaches the new branch.
+func TestDeleteLeavesAnotherClustersIdOnTheTargetAfterARequeue(t *testing.T) {
+	vngcloudRepo := repository.NewMockVngCloudRepository(t)
+	k8sRepo := repository.NewMockK8sRepository(t)
+
+	shared := onTheTargetLB()
+	shared[domain.ClusterTagKey] = otherClusterId + domain.ClusterTagValueSeparator + thisClusterId
+
+	vngcloudRepo.EXPECT().GetLoadBalancerByID(mock.Anything, targetLbId).
+		Return(&entityv2.LoadBalancer{UUID: targetLbId}, nil)
+	vngcloudRepo.EXPECT().ListListenerOfLB(mock.Anything, targetLbId).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloudRepo.EXPECT().ListPool(mock.Anything, targetLbId).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil)
+	// Nobody else in *this* cluster uses it; the other cluster is a separate cluster, which
+	// this lookup cannot see and which the tag is the only record of.
+	k8sRepo.EXPECT().ListLoadBalancerConfig(mock.Anything, mock.Anything).Return(nil)
+	k8sRepo.EXPECT().
+		PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	var written map[string]string
+	vngcloudRepo.EXPECT().ListTags(mock.Anything, targetLbId).Return(tagList(shared), nil)
+	vngcloudRepo.EXPECT().InvalidateTagsCache(targetLbId).Maybe()
+	vngcloudRepo.EXPECT().CreateTags(mock.Anything, targetLbId, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, tags map[string]string) error {
+			written = tags
+			return nil
+		}).Once()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloudRepo,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				ClusterId:      ptrTo(thisClusterId),
+				Type:           loadbalancerv2.LoadBalancerTypeLayer4,
+				LoadBalancerId: ptrTo(targetLbId),
+			},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(targetLbId),
+				CreatedTags:    map[string]string{},
+			},
+		},
+	}
+
+	require.NoError(t, task.delete(context.Background()))
+
+	assert.Equal(t, otherClusterId, written[domain.ClusterTagKey],
+		"the other cluster is still using the load balancer, so the key stays and keeps its id")
+}
