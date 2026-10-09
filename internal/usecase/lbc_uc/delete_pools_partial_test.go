@@ -108,3 +108,103 @@ func TestDeleteRedundantPoolsRetriesABusyLoadBalancer(t *testing.T) {
 	assert.NoError(t, err, "a busy load balancer is transient, not a failure")
 	assert.Equal(t, 3, attempts, "pool-1 is retried once after the wait, then pool-2 is deleted")
 }
+
+// #33308 - a Service pinned to a customer's Layer 4 load balancer left this cluster's pool on it
+// for good. The teardown restored the adopted listener's default pool correctly, and then never
+// deleted the pool it had displaced.
+//
+// The asymmetry that causes it: a listener this LBC created is deleted and then waited on
+// (WaitForLBActive), while an adopted listener is handed back with an UpdateListener and no wait
+// at all. deleteRedundantPools runs straight after and starts by listing the listeners to see
+// which pools are still in use - and in that window vLB is still UPDATING, so it answers with the
+// default pool from before the restore. That is this cluster's pool, so it reads as "in use" and
+// never becomes a deletion candidate. It fails identically on every retry, because every retry
+// re-restores and re-reads inside the same window.
+//
+// The mock models exactly that: the restored value becomes visible only once the load balancer
+// has settled since the write.
+func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
+	const (
+		lb       = "lb-1"
+		listener = "lis-1"
+		vksPool  = "pool-vks"
+		custPool = "pool-customer"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+
+	var restored, settled bool
+
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		RunAndReturn(func(context.Context, string) (*entityv2.ListListeners, error) {
+			defaultPool := vksPool
+			if restored && settled {
+				defaultPool = custPool
+			}
+			return &entityv2.ListListeners{Items: []*entityv2.Listener{
+				{UUID: listener, DefaultPoolId: defaultPool},
+			}}, nil
+		})
+
+	vngcloud.EXPECT().
+		UpdateListener(mock.Anything, lb, listener, mock.Anything).
+		RunAndReturn(func(context.Context, string, string, loadbalancerv2.IUpdateListenerRequest) error {
+			restored = true
+			settled = false // the write leaves the load balancer UPDATING
+			return nil
+		})
+
+	vngcloud.EXPECT().
+		WaitForLBActive(mock.Anything, lb).
+		RunAndReturn(func(context.Context, string) (*entityv2.LoadBalancer, error) {
+			settled = true
+			return &entityv2.LoadBalancer{UUID: lb}, nil
+		}).Maybe()
+
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{
+			{UUID: vksPool, Name: "vks-a-b-TCP-8080"},
+			{UUID: custPool, Name: "customer_pool_8080"},
+		}}, nil)
+
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, mock.Anything).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{}}, nil).Maybe()
+
+	deleted := make([]string, 0)
+	vngcloud.EXPECT().
+		DeletePool(mock.Anything, lb, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, poolId string) error {
+			deleted = append(deleted, poolId)
+			return nil
+		}).Maybe()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer4},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedListeners: []v1alpha1.CreatedListener{{
+					Id:                    listener,
+					Port:                  8080,
+					Adopted:               true,
+					OriginalDefaultPoolId: ptrTo(custPool),
+				}},
+				CreatedPools: []v1alpha1.CreatedPool{{Id: vksPool, Name: "vks-a-b-TCP-8080"}},
+			},
+		},
+	}
+
+	// The order delete() uses: listeners first, then the pools they no longer hold.
+	ctx := context.Background()
+	require.NoError(t, task.deleteRedundantListeners(ctx, lb, nil, nil))
+	require.NoError(t, task.deleteRedundantPools(ctx, lb, nil))
+
+	assert.True(t, restored, "the adopted listener must get its original default pool back")
+	assert.Equal(t, []string{vksPool}, deleted,
+		"the pool this cluster created must be deleted, and the customer's pool left alone")
+}

@@ -124,6 +124,17 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 					failures = append(failures, fmt.Errorf("listener %s: restore default pool: %w", candidateId, err))
 					continue
 				}
+				// Wait for the restore to land, exactly as the delete branch above waits. The
+				// caller runs deleteRedundantPools straight after, and that starts by listing
+				// the listeners to see which pools are still in use. The restore is a write, so
+				// the load balancer is still UPDATING, and a read in that window answers with
+				// the default pool from before - this cluster's. The pool then reads as in use
+				// and never becomes a deletion candidate, so it stays on a load balancer that
+				// is not ours, on every retry, for good.
+				if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+					failures = append(failures, fmt.Errorf("listener %s: wait after restoring default pool: %w", candidateId, err))
+					continue
+				}
 			}
 		}
 	}
