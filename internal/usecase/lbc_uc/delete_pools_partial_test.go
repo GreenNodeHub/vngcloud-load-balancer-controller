@@ -194,7 +194,16 @@ func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
 					Adopted:               true,
 					OriginalDefaultPoolId: ptrTo(custPool),
 				}},
-				CreatedPools: []v1alpha1.CreatedPool{{Id: vksPool, Name: "vks-a-b-TCP-8080"}},
+				// Both pools are in the record on purpose. deployPool adopts a pool of the
+				// customer's by name, so one can end up here without this cluster having
+				// created it - and then the only thing keeping it is that a listener still
+				// points at it, which is exactly the reading this change alters. With just
+				// our own pool listed the assertion below is vacuous: the customer's pool
+				// could never be a candidate whatever the code did.
+				CreatedPools: []v1alpha1.CreatedPool{
+					{Id: vksPool, Name: "vks-a-b-TCP-8080"},
+					{Id: custPool, Name: "customer_pool_8080"},
+				},
 			},
 		},
 	}
@@ -206,5 +215,10 @@ func TestAdoptedListenerTeardownDeletesTheClusterPoolItDisplaced(t *testing.T) {
 
 	assert.True(t, restored, "the adopted listener must get its original default pool back")
 	assert.Equal(t, []string{vksPool}, deleted,
-		"the pool this cluster created must be deleted, and the customer's pool left alone")
+		"the pool this cluster created must be deleted, and the customer's left alone")
+	// Read the failure in both directions. Empty means the leak this issue is about. Holding
+	// custPool means the worse half of the same stale read: with the listener still reported as
+	// pointing at our pool, the customer's pool reads as used by nothing and is deleted.
+	assert.NotContains(t, deleted, custPool,
+		"the customer's own pool must never be deleted, however it got into the record")
 }
