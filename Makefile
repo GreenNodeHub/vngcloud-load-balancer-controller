@@ -125,9 +125,11 @@ docs-publish: ## Publish versioned docs to GitHub Pages (VERSION defaults to 'la
 #
 # `override` rather than `?=`: the official golang images set GOTOOLCHAIN=local in the
 # environment, and `?=` yields to that, which left the image with no floor at all.
-# `+auto` rather than a bare version: a bare one pins exactly, so raising the toolchain in
-# go.mod past this line would break every target here instead of being a floor.
-override GOTOOLCHAIN = go1.26.9+auto
+# Plain `auto`, not a version: `go1.26.9+auto` reads as a ceiling as well as a floor, so a
+# newer base image would be quietly stepped back down to 1.26.9 - bumping FROM for the next
+# Go CVE would then produce a binary that still carried it. `auto` takes the floor from the
+# toolchain directive in go.mod, leaving one source of truth instead of three.
+override GOTOOLCHAIN = auto
 export GOTOOLCHAIN
 
 ##@ Build

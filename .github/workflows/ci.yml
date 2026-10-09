@@ -102,8 +102,8 @@ jobs:
         with:
           version: v2.12.2
           args: --timeout 15m0s --verbose
-          # Report only what a change introduces. v2.12.2 is the first release built with
-          # Go 1.26, and it finds 76 things in code that predates this - the same 76 on an
+          # Report only what a change introduces. v2.12.2 is built with Go 1.26, which the
+          # module now needs, and it finds 76 things in code that predates this - the same 76 on an
           # untouched main, all goconst and prealloc. Clearing them is #33421; until then
           # they would block every merge. The action derives the patch itself, so this holds
           # on push as well as on pull requests, and it leaves `make lint`'s LINT_BASE alone.
