@@ -29,18 +29,19 @@ func onTheTargetLB() map[string]string {
 	}
 }
 
-// QC #33307: deleting an Ingress mid-migration leaves the cluster id on the target load
-// balancer for good.
+// The first reconcile pass of a delete that arrives mid-migration, which was already correct:
+// tearing down the retiring load balancer overwrites status.createdTags on the server, but the
+// object this pass works from still holds the target's record, so the id comes off.
 //
-// delete() tears down the retiring load balancer first and then the current one, and both
-// paths release the cluster tag through the same code. Yet QC measured the retiring one
-// losing the id while the target kept it, with the resource cleanup running on both - so the
-// two paths disagree about the tag and only about the tag.
+// This one is the contrast, not the guard - it passes without the production change. What it
+// pins is that a single pass stays correct, which is what makes the next test's failure mean
+// "only once the object is read back", rather than "the target was never handled at all".
 //
-// The target load balancer is the user's, pinned by id: it survives the delete, which is
-// exactly why a cluster id left on it matters. Provenance is read from that tag later, and an
-// id naming a cluster that no longer exists makes the load balancer look like that cluster's
-// forever.
+// The target load balancer is the user's, pinned by id, so it survives the delete - which is
+// why an id left on it matters. The id is what the fleet inventory reads to tell which clusters
+// use a load balancer; one naming a cluster that stopped using it makes the load balancer look
+// like that cluster's forever. Deletion is decided by vng.vks.created-by-cluster, not by this
+// tag.
 func TestDeleteReleasesTheClusterTagOnTheTargetLoadBalancerToo(t *testing.T) {
 	vngcloudRepo := repository.NewMockVngCloudRepository(t)
 	k8sRepo := repository.NewMockK8sRepository(t)
