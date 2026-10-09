@@ -135,12 +135,13 @@ func (t *defaultModelDeployTask) deleteRedundantListenersFrom(ctx context.Contex
 				// own pool reads as in use and is spared, while a pool of the customer's that
 				// deployPool adopted by name reads as used by nothing and is deleted.
 				//
-				// There is no second chance at it. A pool skipped as in-use is a `continue`,
-				// not a failure, so the teardown returns nil, the finalizer comes off and the
-				// LBC is gone - the first pass is the only pass. That is also why this wait has
-				// to be enough on its own: if the load balancer reports ACTIVE before the new
-				// default pool is visible, the mistake is made silently, with no error to
-				// retry.
+				// There is no second chance at it. A pool still read as in-use simply falls
+				// through both branches of the loop in deleteRedundantPoolsFrom - it is not
+				// recorded as a failure - so the teardown returns nil, the finalizer comes off
+				// and the LBC is gone: the first pass is the only pass. That is also why this
+				// wait has to be enough on its own: if the load balancer reports ACTIVE before
+				// the new default pool is visible, the mistake is made silently, with no error
+				// to retry.
 				//
 				// Only when the restore actually wrote. With nothing written there is nothing to
 				// become visible, and waiting anyway would be a new way to fail on a load

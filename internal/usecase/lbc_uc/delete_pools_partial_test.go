@@ -124,9 +124,9 @@ func TestDeleteRedundantPoolsRetriesABusyLoadBalancer(t *testing.T) {
 // nothing and is deleted, which is worse; the fixture below puts one in status.createdPools,
 // which is how adopt-by-name records it.
 //
-// There is no second chance at either. A pool skipped as in-use is a `continue`, not a failure,
-// so the teardown returns nil, the finalizer comes off and the LBC is gone - the first pass is
-// the only pass.
+// There is no second chance at either. A pool still read as in-use simply falls through both
+// branches of the loop and is not recorded as a failure, so the teardown returns nil, the
+// finalizer comes off and the LBC is gone: the first pass is the only pass.
 //
 // The mock models the one property that matters: the restored value becomes visible only once
 // the load balancer has settled since the write.
