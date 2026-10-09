@@ -1,5 +1,11 @@
 # Build the manager binary
-FROM golang:1.25 AS builder
+# Pinned to the patch, not the 1.26 line. The floor itself comes from the toolchain directive
+# in go.mod, which the Makefile restores with `override GOTOOLCHAIN = auto` - the official
+# images set GOTOOLCHAIN=local, which would otherwise ignore it. Two reasons the pin stays on
+# top of that: `go mod download` below runs outside make and so has only this tag to go on,
+# and a floating tag makes the compiler that produced a given image unknowable afterwards.
+# Removing either one leaves a gap; they are not two spellings of the same guard.
+FROM golang:1.26.9 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION
