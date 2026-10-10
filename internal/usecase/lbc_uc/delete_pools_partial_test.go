@@ -169,3 +169,65 @@ func TestDeleteLeavesAPoolThatWasOnlyAdopted(t *testing.T) {
 	assert.NotContains(t, deleted, theirsPool,
 		"a pool we only adopted by name belongs to the user and must be left on the load balancer")
 }
+
+// Leaving the pool is only half of handing it back. The members this controller put into a pool
+// of the user's are still its own to take out - and that is exactly the case the teardown used to
+// skip, because when every member in the pool is one of ours canDeleteWholePool answers "the whole
+// pool can go" and builds no member update at all. Blocking the delete there and doing nothing
+// else leaves our members in a stranger's pool for good, which is the mirror of #33308.
+func TestDeleteTakesOurMembersBackOutOfAnAdoptedPool(t *testing.T) {
+	const (
+		lb         = "lb-user"
+		theirsPool = "pool-theirs"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{{UUID: theirsPool, Name: "vks-a-b-80"}}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	// every member in the pool is one this cluster added
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, theirsPool).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{
+			{Address: "10.0.0.1", ProtocolPort: 80},
+			{Address: "10.0.0.2", ProtocolPort: 80},
+		}}, nil)
+	vngcloud.EXPECT().
+		WaitForLBActive(mock.Anything, lb).
+		Return(&entityv2.LoadBalancer{UUID: lb}, nil).Maybe()
+
+	var handedBack loadbalancerv2.IUpdatePoolMembersRequest
+	vngcloud.EXPECT().
+		UpdatePoolMembers(mock.Anything, lb, theirsPool, mock.Anything).
+		RunAndReturn(func(_ context.Context, _, _ string, req loadbalancerv2.IUpdatePoolMembersRequest) error {
+			handedBack = req
+			return nil
+		}).Once()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedPools: []v1alpha1.CreatedPool{{
+					Id:      theirsPool,
+					Name:    "vks-a-b-80",
+					Adopted: true,
+					CreatedMembers: []v1alpha1.PoolMember{
+						{IP: "10.0.0.1", Port: 80},
+						{IP: "10.0.0.2", Port: 80},
+					},
+				}},
+			},
+		},
+	}
+
+	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil))
+
+	require.NotNil(t, handedBack, "the pool must be handed back without the members we put in it")
+}

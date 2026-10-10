@@ -28,8 +28,10 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, lbId string, createdPools []v1alpha1.CreatedPool, newCreatedPools []v1alpha1.CreatedPool) error {
 	deleteCandidates := make([]string, 0)
 	// A pool this LBC only matched by name was on the load balancer before it was, so it is no
-	// more ours to delete than the load balancer itself. It stays a candidate for member cleanup
-	// below - the members we put in it are ours to take out - but never for deletion.
+	// more ours to delete than the load balancer itself. The members we put in it are still ours
+	// to take back out, which is handled below - leaving them is not a tidiness problem but a
+	// routing one: the user's pool would go on forwarding to nodes of a cluster that has stopped
+	// using the load balancer, and those addresses get recycled.
 	adoptedPools := make(map[string]bool)
 	for _, pool := range createdPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
@@ -117,7 +119,27 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 
 		canDeleteWhole, updateMemberOption := t.canDeleteWholePool(ctx, lbId, candidateId, currentListMembers, createdMembers, newCreatedMembers)
 
-		if !isPoolInUse(candidateId) && canDeleteWhole && !adoptedPools[candidateId] {
+		if adoptedPools[candidateId] {
+			// Handing the pool back means handing it back empty of us. When every member in it
+			// is one of ours - the ordinary case at teardown - canDeleteWholePool answers "the
+			// whole pool can go" and builds no member update at all, because deleting the pool
+			// would have removed them. We are not deleting it, so the removal has to be said
+			// explicitly: an update carrying the members that are not ours, which here is none.
+			// NewUpdatePoolMembersRequest starts that list empty rather than nil, so this sends
+			// `"members": []` and not `null`.
+			//
+			// Only when the pool actually holds something. An adopted pool that is already empty
+			// needs no write, and sending one on every teardown would be a cloud API call that
+			// changes nothing.
+			if canDeleteWhole && updateMemberOption == nil && len(currentListMembers.Items) > 0 {
+				t.logger.Infof("Pool %s on LB %s was adopted by name: handing it back without the %d member(s) this cluster put in it",
+					candidateId, lbId, len(currentListMembers.Items))
+				updateMemberOption = loadbalancerv2.NewUpdatePoolMembersRequest(lbId, candidateId)
+			}
+			canDeleteWhole = false
+		}
+
+		if !isPoolInUse(candidateId) && canDeleteWhole {
 			// delete pool
 			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 				return t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
@@ -130,11 +152,6 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 				failures = append(failures, fmt.Errorf("pool %s: wait after delete: %w", candidateId, err))
 				continue
 			}
-		} else if adoptedPools[candidateId] && updateMemberOption == nil {
-			// Nothing of ours left in a pool that is not ours: say so once, because "no delete
-			// line for this pool" is otherwise indistinguishable from the bug this guards.
-			t.logger.Infof("Pool %s on LB %s was adopted by name, leaving it in place for its owner",
-				candidateId, lbId)
 		} else if updateMemberOption != nil {
 			// update to delete redundant members
 			t.logger.Infof("Updating pool %s on LB %s to remove redundant members", candidateId, lbId)

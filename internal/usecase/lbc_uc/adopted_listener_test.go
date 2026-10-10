@@ -514,3 +514,32 @@ func TestAPoolOnOurOwnLoadBalancerIsNeverAdopted(t *testing.T) {
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
 	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted)
 }
+
+// The same break, on the pool side. It is the one that actually happened to listeners: the
+// mutation runs against the fresh object, sees the pool already recorded and correctly changes
+// nothing - but the in-memory copy still lacks it, so deciding again from that copy reads "not on
+// our books yet" and adopts a pool that is ours. Adopted means never deleted, so that is a leak
+// on every pool, traded for the rare wrong delete this issue is about.
+func TestAdoptingNeverMarksAPoolTheControllerCreatedWhenTheInMemoryCopyIsStale(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+
+	// what the API server holds: the pool this LBC created, two reconciles ago
+	fresh := &v1alpha1.LoadBalancerConfig{
+		Status: v1alpha1.LoadBalancerConfigStatus{
+			CreatedPools: []v1alpha1.CreatedPool{{Id: "pool-ours", Name: "vks-a-b-80"}},
+		},
+	}
+	applyStatusPatchToFresh(k8sRepo, fresh)
+
+	// what this reconcile is holding: nothing yet
+	task := taskWithPools(k8sRepo)
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+
+	require.Len(t, fresh.Status.CreatedPools, 1)
+	assert.False(t, fresh.Status.CreatedPools[0].Adopted,
+		"a pool already recorded on the fresh object was created by us, however stale the copy in hand")
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+		"and the decision carried back must be that same one, not a fresh guess")
+}
