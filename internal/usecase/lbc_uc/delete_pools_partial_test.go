@@ -14,6 +14,8 @@ import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // twoRedundantPools sets up a load balancer carrying two pools this LBC created, neither in
@@ -151,6 +153,7 @@ func TestDeleteLeavesAPoolThatWasOnlyAdopted(t *testing.T) {
 	task := &defaultModelDeployTask{
 		logger:       logrus.NewEntry(logrus.New()),
 		vngcloudRepo: vngcloud,
+		k8sRepo:      noOtherLBC(t),
 		lbConfig: &v1alpha1.LoadBalancerConfig{
 			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
 			Status: v1alpha1.LoadBalancerConfigStatus{
@@ -210,6 +213,7 @@ func TestDeleteTakesOurMembersBackOutOfAnAdoptedPool(t *testing.T) {
 	task := &defaultModelDeployTask{
 		logger:       logrus.NewEntry(logrus.New()),
 		vngcloudRepo: vngcloud,
+		k8sRepo:      noOtherLBC(t),
 		lbConfig: &v1alpha1.LoadBalancerConfig{
 			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
 			Status: v1alpha1.LoadBalancerConfigStatus{
@@ -230,4 +234,126 @@ func TestDeleteTakesOurMembersBackOutOfAnAdoptedPool(t *testing.T) {
 	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil))
 
 	require.NotNil(t, handedBack, "the pool must be handed back without the members we put in it")
+	// Not just "a write happened": one built with our own members would be the opposite of the
+	// point, and `"members": []` is the whole mechanism.
+	sent, ok := handedBack.(*loadbalancerv2.UpdatePoolMembersRequest)
+	require.True(t, ok)
+	assert.Empty(t, sent.Members, "the hand-back carries the members that are not ours, which is none")
+}
+
+// The hand-back writes to a pool that is not ours, on a load balancer that is not ours, and vLB's
+// answer to an empty member list is not something this code gets to assume. If that write failing
+// failed the teardown, the LBC's finalizer would never come off and the Service, the Ingress and
+// anything waiting on them would stay Terminating with no way out - for every user of a pinned
+// load balancer, on the commonest path there is. Leaving our members behind is the lesser harm,
+// and it is reported rather than swallowed quietly.
+func TestDeleteStillFinishesWhenTheAdoptedPoolHandBackFails(t *testing.T) {
+	const (
+		lb         = "lb-user"
+		theirsPool = "pool-theirs"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{{UUID: theirsPool, Name: "vks-a-b-80"}}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, theirsPool).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{{Address: "10.0.0.1", ProtocolPort: 80}}}, nil)
+	// what vLB might say about an empty member list - nobody has measured it yet
+	vngcloud.EXPECT().
+		UpdatePoolMembers(mock.Anything, lb, theirsPool, mock.Anything).
+		Return(errors.New("members: must not be empty")).Once()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		k8sRepo:      noOtherLBC(t),
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedPools: []v1alpha1.CreatedPool{{
+					Id:             theirsPool,
+					Name:           "vks-a-b-80",
+					Adopted:        true,
+					CreatedMembers: []v1alpha1.PoolMember{{IP: "10.0.0.1", Port: 80}},
+				}},
+			},
+		},
+	}
+
+	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil),
+		"the finalizer has to come off even when a pool that is not ours cannot be tidied")
+}
+
+// noOtherLBC: this LBC is the only one in the cluster, which is the ordinary case and the one the
+// hand-back is allowed to act in.
+func noOtherLBC(t *testing.T) *repository.MockK8sRepository {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	k8sRepo.EXPECT().
+		ListLoadBalancerConfig(mock.Anything, mock.Anything).
+		Return(nil).Maybe()
+	return k8sRepo
+}
+
+// Two Ingresses of one cluster pinned to the same load balancer share a pool by design -
+// validateCrossListenerDefaultPools requires the same default pool name on the same port - and the
+// second LBC to meet that pool records it as adopted, because the load balancer is not its own.
+// Emptying it when that LBC is torn down would take the first one's traffic with it. The members
+// belong to the cluster, not to whichever LBC happens to be leaving.
+func TestDeleteLeavesAnAdoptedPoolAloneWhileAnotherLBCStillUsesIt(t *testing.T) {
+	const (
+		lb         = "lb-user"
+		sharedPool = "pool-shared"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{{UUID: sharedPool, Name: "vks-a-b-80"}}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, sharedPool).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{{Address: "10.0.0.1", ProtocolPort: 80}}}, nil)
+	// strict mock: UpdatePoolMembers and DeletePool are undeclared, so either one fails the test
+
+	k8sRepo := repository.NewMockK8sRepository(t)
+	k8sRepo.EXPECT().
+		ListLoadBalancerConfig(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, list *v1alpha1.LoadBalancerConfigList, _ ...client.ListOption) error {
+			list.Items = []v1alpha1.LoadBalancerConfig{{
+				ObjectMeta: metav1.ObjectMeta{Name: "the-sibling", UID: "uid-sibling"},
+				Status: v1alpha1.LoadBalancerConfigStatus{
+					CreatedPools: []v1alpha1.CreatedPool{{Id: sharedPool, Name: "vks-a-b-80"}},
+				},
+			}}
+			return nil
+		})
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		k8sRepo:      k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: "the-one-leaving", UID: "uid-leaving"},
+			Spec:       v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedPools: []v1alpha1.CreatedPool{{
+					Id:             sharedPool,
+					Name:           "vks-a-b-80",
+					Adopted:        true,
+					CreatedMembers: []v1alpha1.PoolMember{{IP: "10.0.0.1", Port: 80}},
+				}},
+			},
+		},
+	}
+
+	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil))
 }

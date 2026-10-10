@@ -119,24 +119,12 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 
 		canDeleteWhole, updateMemberOption := t.canDeleteWholePool(ctx, lbId, candidateId, currentListMembers, createdMembers, newCreatedMembers)
 
+		// A pool we only adopted is never deleted, and its clean-up is never allowed to fail the
+		// teardown. Both halves matter, so it gets its own branch rather than flags threaded
+		// through the one below.
 		if adoptedPools[candidateId] {
-			// Handing the pool back means handing it back empty of us. When every member in it
-			// is one of ours - the ordinary case at teardown - canDeleteWholePool answers "the
-			// whole pool can go" and builds no member update at all, because deleting the pool
-			// would have removed them. We are not deleting it, so the removal has to be said
-			// explicitly: an update carrying the members that are not ours, which here is none.
-			// NewUpdatePoolMembersRequest starts that list empty rather than nil, so this sends
-			// `"members": []` and not `null`.
-			//
-			// Only when the pool actually holds something. An adopted pool that is already empty
-			// needs no write, and sending one on every teardown would be a cloud API call that
-			// changes nothing.
-			if canDeleteWhole && updateMemberOption == nil && len(currentListMembers.Items) > 0 {
-				t.logger.Infof("Pool %s on LB %s was adopted by name: handing it back without the %d member(s) this cluster put in it",
-					candidateId, lbId, len(currentListMembers.Items))
-				updateMemberOption = loadbalancerv2.NewUpdatePoolMembersRequest(lbId, candidateId)
-			}
-			canDeleteWhole = false
+			t.handBackAdoptedPool(ctx, lbId, candidateId, canDeleteWhole, updateMemberOption, len(currentListMembers.Items))
+			continue
 		}
 
 		if !isPoolInUse(candidateId) && canDeleteWhole {
@@ -173,6 +161,85 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 		return fmt.Errorf("%w: %w", errPartialDelete, errors.Join(failures...))
 	}
 	return nil
+}
+
+// handBackAdoptedPool returns a pool this LBC only matched by name to its owner: still there, and
+// without the members this cluster put in it. Leaving those behind is not untidiness - the pool
+// goes on forwarding to nodes of a cluster that has stopped using the load balancer, and those
+// addresses get recycled.
+//
+// Nothing here is allowed to fail the teardown, which is why it reports no error. The write is to
+// a pool that is not ours, on a load balancer that is not ours, and refusing to finish over it
+// would leave the LBC's finalizer on for good - the Service, the Ingress and whatever waits on
+// them stay Terminating, with no way out. Leaving our members in a stranger's pool is bad;
+// making every user of a pinned load balancer unable to delete a Service is worse. So the failure
+// is loud and the teardown continues.
+func (t *defaultModelDeployTask) handBackAdoptedPool(ctx context.Context, lbId, poolId string, canDeleteWhole bool, updateMembers loadbalancerv2.IUpdatePoolMembersRequest, liveMembers int) {
+	// When every member in the pool is one of ours - the ordinary case at teardown -
+	// canDeleteWholePool answers "the whole pool can go" and builds no member update at all,
+	// because deleting the pool would have taken them with it. We are not deleting it, so the
+	// removal has to be said out loud: an update carrying the members that are not ours, which
+	// here is none. NewUpdatePoolMembersRequest starts that list empty rather than nil, so this
+	// sends `"members": []` and not `null`.
+	//
+	// Only when the pool actually holds something: one that is already empty needs no write, and
+	// sending one on every teardown would be a cloud API call that changes nothing.
+	if canDeleteWhole && updateMembers == nil && liveMembers > 0 {
+		updateMembers = loadbalancerv2.NewUpdatePoolMembersRequest(lbId, poolId)
+	}
+	if updateMembers == nil {
+		return
+	}
+
+	// Not while a sibling still serves from it. Two Ingresses of this cluster pinned to one load
+	// balancer share a pool by design - validateCrossListenerDefaultPools requires the same
+	// default pool name on the same port - and the second LBC to meet it records it as adopted,
+	// because the load balancer is not its own. Emptying it on that LBC's teardown would take the
+	// first one's traffic down with it. The members belong to the cluster, not to this LBC.
+	if shared, err := t.poolHasOtherLBC(ctx, poolId); err != nil {
+		t.logger.Warnf("could not tell whether another LBC still uses adopted pool %s on LB %s, leaving its members alone: %v",
+			poolId, lbId, err)
+		return
+	} else if shared {
+		t.logger.Infof("Adopted pool %s on LB %s is still used by another LBC, leaving its members in place", poolId, lbId)
+		return
+	}
+
+	t.logger.Infof("Pool %s on LB %s was adopted by name, handing it back without this cluster's members", poolId, lbId)
+	if err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
+		return t.vngcloudRepo.UpdatePoolMembers(ctx, lbId, poolId, updateMembers)
+	}); err != nil {
+		t.logger.Warnf("could not take this cluster's members back out of adopted pool %s on LB %s, leaving them in place rather than blocking the teardown: %v",
+			poolId, lbId, err)
+		return
+	}
+	if _, err := t.vngcloudRepo.WaitForLBActive(ctx, lbId); err != nil {
+		t.logger.Warnf("load balancer %s did not settle after handing back adopted pool %s: %v", lbId, poolId, err)
+	}
+}
+
+// poolHasOtherLBC reports whether a LoadBalancerConfig other than this one still records the pool.
+// Shaped on loadBalancerHasOtherLBC, which answers the same question about the load balancer: LBCs
+// sharing one can live in different namespaces, so the whole cluster is searched, and one already
+// being deleted does not count - whichever finishes last is the one that cleans up.
+func (t *defaultModelDeployTask) poolHasOtherLBC(ctx context.Context, poolId string) (bool, error) {
+	allLBCs := &v1alpha1.LoadBalancerConfigList{}
+	if err := t.k8sRepo.ListLoadBalancerConfig(ctx, allLBCs); err != nil {
+		return false, fmt.Errorf("list LoadBalancerConfigs sharing pool %s: %w", poolId, err)
+	}
+
+	for i := range allLBCs.Items {
+		other := &allLBCs.Items[i]
+		if other.UID == t.lbConfig.UID || other.DeletionTimestamp != nil {
+			continue
+		}
+		for _, p := range other.Status.CreatedPools {
+			if p.Id == poolId {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 // canDeleteWholePool checks if we can delete the whole pool
