@@ -501,3 +501,33 @@ func TestDeleteLoadBalancerConfirmsLastOutAgainBeforeTheLateDelete(t *testing.T)
 
 	assert.NoError(t, task.delete(context.Background()))
 }
+
+// The end state the ticket actually recorded: one listener left, no pools, and no CR anywhere
+// pointing at the load balancer. Layer 7, so unlike the case above this one goes through the
+// policy check as well.
+func TestDeleteLoadBalancerLastClusterOutClearsTheTicketsEndState(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	vngcloud.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-1").
+		Return(&entityv2.LoadBalancer{UUID: "lb-1"}, nil).Maybe()
+	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{{UUID: "lis-1", Name: "vks_http_listener"}}}, nil).Maybe()
+	vngcloud.EXPECT().ListPolicyOfListener(mock.Anything, "lb-1", "lis-1").
+		Return(&entityv2.ListPolicies{Items: []*entityv2.Policy{}}, nil).Maybe()
+	vngcloud.EXPECT().ListPool(mock.Anything, "lb-1").
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil).Maybe()
+	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(&entityv2.ListTags{Items: []*entityv2.Tag{
+		{Key: domain.CreatedByClusterTagKey, Value: siblingClusterId},
+		{Key: domain.ClusterTagKey, Value: ownershipClusterId},
+	}}, nil).Maybe()
+	vngcloud.EXPECT().CreateTags(mock.Anything, "lb-1", mock.Anything).Return(nil).Maybe()
+	vngcloud.EXPECT().InvalidateTagsCache("lb-1").Maybe()
+	soleLBCInTheCluster(k8s)
+
+	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
+	task.lbConfig.Status.CreatedListeners = []v1alpha1.CreatedListener{{Id: "lis-1", Port: 80, Adopted: true}}
+
+	vngcloud.EXPECT().DeleteLoadBalancer(mock.Anything, "lb-1").Return(nil).Once()
+
+	assert.NoError(t, task.delete(context.Background()))
+}
