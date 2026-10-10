@@ -2,6 +2,8 @@ package lbc_uc
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -55,6 +57,12 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 	}
 	currentTags := tagsToMap(tags)
 	ours := t.createdByThisCluster(lbId, currentTags)
+	if !ours && t.lastClusterOutOf(currentTags) {
+		// Nobody else is left to do it. See lastClusterOutOf.
+		t.logger.Infof("Load balancer %s was created by another cluster, but this is the last one using it, so it goes with LBC %s/%s",
+			lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+		ours = true
+	}
 	if !ours {
 		t.logger.Infof("Load balancer %s was not created by this cluster, it will be left in place for LBC %s/%s",
 			lbId, t.lbConfig.Namespace, t.lbConfig.Name)
@@ -101,6 +109,42 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		}
 	}
 	return nil
+}
+
+// lastClusterOutOf reports whether this cluster is the final one to stop using a load balancer
+// that some VKS cluster created.
+//
+// The deadlock it breaks (#33310): one cluster creates a load balancer, another pins it. The
+// creator leaves first and cannot delete it, because the second cluster is still serving from it.
+// The second leaves later and cannot delete it either, because it did not create it. Both refusals
+// are right on their own, and between them the load balancer outlives everyone and goes on being
+// billed.
+//
+// What settles it is that the provenance tag names a cluster at all. A load balancer the user
+// brought carries no such tag, and nothing here can make one deletable - being the last to leave
+// somebody else's property confers nothing. One that a cluster of ours made is a different thing:
+// when the last cluster walks away from it, there is no owner left to come back for it.
+//
+// "Last" is read from the cluster list, which each LBC takes its own id out of as it leaves. This
+// cluster has to be on that list to begin with: not being named on it means the record is not
+// describing us, and a claim to be last would be guesswork.
+//
+// It does not help when a cluster was destroyed outright rather than torn down - its id stays on
+// the list forever, so there is never a last one out. That case needs a sweep from outside; no
+// controller runs on a cluster that no longer exists.
+func (t *defaultModelDeployTask) lastClusterOutOf(currentTags map[string]string) bool {
+	createdBy, tagged := currentTags[domain.CreatedByClusterTagKey]
+	if !tagged || !isValidVksId(createdBy) {
+		return false
+	}
+	if t.lbConfig.Spec.ClusterId == nil {
+		return false
+	}
+	users := currentTags[domain.ClusterTagKey]
+	if !slices.Contains(strings.Split(users, domain.ClusterTagValueSeparator), *t.lbConfig.Spec.ClusterId) {
+		return false
+	}
+	return removeTagValue(users, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator) == ""
 }
 
 // check if can delete whole loadbalancer
