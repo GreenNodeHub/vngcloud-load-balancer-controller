@@ -197,22 +197,31 @@ func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId str
 			if obj.Status.CreatedPools[i].Id != poolId {
 				continue
 			}
-			// Already on our books, so it is one we created - or one adopted on an earlier pass,
-			// whose record must be carried forward untouched.
+			changed := false
+			// On our books with an answer already recorded: carry it forward untouched. The
+			// decision is made once and never revisited, because the inputs to it can go stale
+			// while the truth they described cannot.
+			//
+			// On our books with no answer at all is a different thing: that record predates the
+			// field. Deciding it now is the only way the fix reaches a cluster that is already
+			// carrying a user's pool - and those are the clusters the bug was reported from.
+			if obj.Status.CreatedPools[i].Adopted == nil {
+				obj.Status.CreatedPools[i].Adopted = ptr.To(!clusterOwnsLB)
+				changed = true
+			}
 			if obj.Status.CreatedPools[i].Name != name {
 				obj.Status.CreatedPools[i].Name = name
-				decided = obj.Status.CreatedPools[i]
-				return true
+				changed = true
 			}
 			decided = obj.Status.CreatedPools[i]
-			return false
+			return changed
 		}
 
 		// Not on the books - which proves nothing on its own, because status.createdPools is
 		// rewritten wholesale at the end of every deploy. What decides is the load balancer:
 		// nothing on one this cluster created can belong to anyone else - whichever of its LBCs
 		// happens to be looking.
-		decided = v1alpha1.CreatedPool{Id: poolId, Name: name, Adopted: !clusterOwnsLB}
+		decided = v1alpha1.CreatedPool{Id: poolId, Name: name, Adopted: ptr.To(!clusterOwnsLB)}
 		obj.Status.CreatedPools = append(obj.Status.CreatedPools, decided)
 		return true
 	})
@@ -234,14 +243,15 @@ func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId str
 }
 
 // poolWasAdopted reports what statusAdoptPool decided, so deployPool can carry it into the value
-// it returns - that value is what deploy() writes over status with.
-func (t *defaultModelDeployTask) poolWasAdopted(poolId string) bool {
+// it returns - that value is what deploy() writes over status with. nil only if the pool is not on
+// the books at all, which deployPool's caller has just made sure it is.
+func (t *defaultModelDeployTask) poolWasAdopted(poolId string) *bool {
 	for _, p := range t.lbConfig.Status.CreatedPools {
 		if p.Id == poolId {
 			return p.Adopted
 		}
 	}
-	return false
+	return nil
 }
 
 func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId string, name string, members []v1alpha1.PoolMember) error {
@@ -259,7 +269,11 @@ func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId
 				return true
 			}
 		}
-		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{Id: poolId, Name: name, CreatedMembers: members})
+		// Explicitly not adopted: this is reached when the controller has just created the pool.
+		// Writing the answer down is what keeps "we made this" apart from "nobody has decided",
+		// which is the whole reason the field is a pointer.
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools,
+			v1alpha1.CreatedPool{Id: poolId, Name: name, CreatedMembers: members, Adopted: ptr.To(false)})
 		return true
 	})
 }

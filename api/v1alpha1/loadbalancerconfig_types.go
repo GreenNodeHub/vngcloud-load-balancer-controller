@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/utils/ptr"
 	"slices"
 
 	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
@@ -551,13 +552,19 @@ type CreatedPool struct {
 	// namespace, service and port, so a pool of the user's carrying that name is matched like any
 	// other - and without this flag it goes on the books as "created" and the teardown deletes
 	// it. The same distinction CreatedListener.Adopted draws, for the same reason.
+	//
+	// A pointer so that "nobody has decided yet" is a state of its own. A record written before
+	// this field existed has no value here, and reading that as false would leave every cluster
+	// already carrying a user's pool deleting it on the next teardown - the very clusters the bug
+	// was reported from. nil is decided once, on the next pass that matches the pool; false is
+	// written explicitly when this controller creates one, so the two can never be confused.
 	// +optional
-	Adopted bool `json:"adopted,omitempty"`
+	Adopted *bool `json:"adopted,omitempty"`
 }
 
 // Equal compares two CreatedPool for equality (order-independent for members)
 func (a CreatedPool) Equal(b CreatedPool) bool {
-	if a.Id != b.Id || a.Name != b.Name || a.Adopted != b.Adopted {
+	if a.Id != b.Id || a.Name != b.Name || !ptr.Equal(a.Adopted, b.Adopted) {
 		return false
 	}
 	if len(a.CreatedMembers) != len(b.CreatedMembers) {

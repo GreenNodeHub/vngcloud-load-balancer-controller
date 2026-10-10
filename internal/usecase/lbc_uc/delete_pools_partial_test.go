@@ -160,7 +160,7 @@ func TestDeleteLeavesAPoolThatWasOnlyAdopted(t *testing.T) {
 				LoadBalancerId: ptrTo(lb),
 				CreatedPools: []v1alpha1.CreatedPool{
 					{Id: oursPool, Name: "vks-a-b-80"},
-					{Id: theirsPool, Name: "vks-a-b-81", Adopted: true},
+					{Id: theirsPool, Name: "vks-a-b-81", Adopted: ptrTo(true)},
 				},
 			},
 		},
@@ -221,7 +221,7 @@ func TestDeleteTakesOurMembersBackOutOfAnAdoptedPool(t *testing.T) {
 				CreatedPools: []v1alpha1.CreatedPool{{
 					Id:      theirsPool,
 					Name:    "vks-a-b-80",
-					Adopted: true,
+					Adopted: ptrTo(true),
 					CreatedMembers: []v1alpha1.PoolMember{
 						{IP: "10.0.0.1", Port: 80},
 						{IP: "10.0.0.2", Port: 80},
@@ -279,7 +279,7 @@ func TestDeleteStillFinishesWhenTheAdoptedPoolHandBackFails(t *testing.T) {
 				CreatedPools: []v1alpha1.CreatedPool{{
 					Id:             theirsPool,
 					Name:           "vks-a-b-80",
-					Adopted:        true,
+					Adopted:        ptrTo(true),
 					CreatedMembers: []v1alpha1.PoolMember{{IP: "10.0.0.1", Port: 80}},
 				}},
 			},
@@ -348,7 +348,7 @@ func TestDeleteLeavesAnAdoptedPoolAloneWhileAnotherLBCStillUsesIt(t *testing.T) 
 				CreatedPools: []v1alpha1.CreatedPool{{
 					Id:             sharedPool,
 					Name:           "vks-a-b-80",
-					Adopted:        true,
+					Adopted:        ptrTo(true),
 					CreatedMembers: []v1alpha1.PoolMember{{IP: "10.0.0.1", Port: 80}},
 				}},
 			},
@@ -356,4 +356,70 @@ func TestDeleteLeavesAnAdoptedPoolAloneWhileAnotherLBCStillUsesIt(t *testing.T) 
 	}
 
 	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil))
+}
+
+// deleteRedundantPools runs on the deploy path too, not only at teardown. An adopted pool shared
+// with a sibling LBC must still track the cluster's nodes there - skipping its member update
+// because a sibling exists would leave the pool holding nodes that have gone away, which is the
+// leak LBC-INV-04 is about. The sibling only gets a veto over emptying it completely.
+func TestDeployStillUpdatesMembersOfAnAdoptedPoolSharedWithAnotherLBC(t *testing.T) {
+	const (
+		lb         = "lb-user"
+		sharedPool = "pool-shared"
+	)
+
+	gone := v1alpha1.PoolMember{IP: "10.0.0.2", Port: 80}
+	stays := v1alpha1.PoolMember{IP: "10.0.0.1", Port: 80}
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{{UUID: sharedPool, Name: "vks-a-b-80"}}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, sharedPool).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{
+			{Address: stays.IP, ProtocolPort: stays.Port},
+			{Address: gone.IP, ProtocolPort: gone.Port},
+		}}, nil)
+	vngcloud.EXPECT().
+		WaitForLBActive(mock.Anything, lb).
+		Return(&entityv2.LoadBalancer{UUID: lb}, nil).Maybe()
+
+	var sent loadbalancerv2.IUpdatePoolMembersRequest
+	vngcloud.EXPECT().
+		UpdatePoolMembers(mock.Anything, lb, sharedPool, mock.Anything).
+		RunAndReturn(func(_ context.Context, _, _ string, req loadbalancerv2.IUpdatePoolMembersRequest) error {
+			sent = req
+			return nil
+		}).Once()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		// no k8sRepo on purpose: a member update must not need the sibling lookup at all
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedPools: []v1alpha1.CreatedPool{{
+					Id:             sharedPool,
+					Name:           "vks-a-b-80",
+					Adopted:        ptrTo(true),
+					CreatedMembers: []v1alpha1.PoolMember{stays, gone},
+				}},
+			},
+		},
+	}
+
+	// the deploy path: one member is still wanted, so this is an ordinary diff, not a hand-back
+	require.NoError(t, task.deleteRedundantPools(context.Background(), lb,
+		[]v1alpha1.CreatedPool{{Id: sharedPool, Name: "vks-a-b-80", Adopted: ptrTo(true), CreatedMembers: []v1alpha1.PoolMember{stays}}}))
+
+	require.NotNil(t, sent, "the shared pool must still follow the cluster's nodes")
+	req, ok := sent.(*loadbalancerv2.UpdatePoolMembersRequest)
+	require.True(t, ok)
+	assert.Len(t, req.Members, 1, "the node that went away is dropped, the one that stayed is kept")
 }

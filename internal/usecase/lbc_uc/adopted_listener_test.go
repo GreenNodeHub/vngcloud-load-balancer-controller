@@ -13,6 +13,7 @@ import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
+	"k8s.io/utils/ptr"
 )
 
 // Every load balancer created on the portal arrives with a listener on port 80 and a default
@@ -480,7 +481,7 @@ func TestAdoptingAPoolOnAUserLoadBalancerRecordsIt(t *testing.T) {
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
 	rec := task.lbConfig.Status.CreatedPools[0]
-	assert.True(t, rec.Adopted, "a pool found on a load balancer that is not ours was not created by us")
+	assert.True(t, ptr.Deref(rec.Adopted, false), "a pool found on a load balancer that is not ours was not created by us")
 	assert.Equal(t, "vks-a-b-80", rec.Name)
 }
 
@@ -490,12 +491,12 @@ func TestAdoptingAPoolOnAUserLoadBalancerRecordsIt(t *testing.T) {
 func TestAPoolThisLBCCreatedIsNotMarkedAdoptedOnTheNextPass(t *testing.T) {
 	k8sRepo := repository.NewMockK8sRepository(t)
 	applyStatusPatch(k8sRepo)
-	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-ours", Name: "vks-a-b-80"})
+	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-ours", Name: "vks-a-b-80", Adopted: ptrTo(false)})
 
 	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", false /* and yet: already on the books */))
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
-	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+	assert.False(t, ptr.Deref(task.lbConfig.Status.CreatedPools[0].Adopted, true),
 		"a pool already on our books was created by us, not adopted")
 }
 
@@ -516,7 +517,7 @@ func TestAPoolOnOurOwnLoadBalancerIsNeverAdopted(t *testing.T) {
 	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", true /* but the cluster did */))
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
-	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+	assert.False(t, ptr.Deref(task.lbConfig.Status.CreatedPools[0].Adopted, true),
 		"a sibling LBC's pool on a load balancer this cluster created is the cluster's, not a stranger's")
 }
 
@@ -531,7 +532,7 @@ func TestAdoptingNeverMarksAPoolTheControllerCreatedWhenTheInMemoryCopyIsStale(t
 	// what the API server holds: the pool this LBC created, two reconciles ago
 	fresh := &v1alpha1.LoadBalancerConfig{
 		Status: v1alpha1.LoadBalancerConfigStatus{
-			CreatedPools: []v1alpha1.CreatedPool{{Id: "pool-ours", Name: "vks-a-b-80"}},
+			CreatedPools: []v1alpha1.CreatedPool{{Id: "pool-ours", Name: "vks-a-b-80", Adopted: ptrTo(false)}},
 		},
 	}
 	applyStatusPatchToFresh(k8sRepo, fresh)
@@ -542,9 +543,41 @@ func TestAdoptingNeverMarksAPoolTheControllerCreatedWhenTheInMemoryCopyIsStale(t
 	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", false /* and yet: already on the books */))
 
 	require.Len(t, fresh.Status.CreatedPools, 1)
-	assert.False(t, fresh.Status.CreatedPools[0].Adopted,
+	assert.False(t, ptr.Deref(fresh.Status.CreatedPools[0].Adopted, true),
 		"a pool already recorded on the fresh object was created by us, however stale the copy in hand")
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
-	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+	assert.False(t, ptr.Deref(task.lbConfig.Status.CreatedPools[0].Adopted, true),
 		"and the decision carried back must be that same one, not a fresh guess")
+}
+
+// The record a cluster already carrying the bug has: written before the field existed, so it has
+// no answer at all. Reading that as "not adopted" is what would leave those clusters - the ones
+// the bug was reported from - still deleting the user's pool after the upgrade. Absent is not
+// false, which is the whole reason the field is a pointer.
+func TestAPoolRecordedBeforeTheFieldExistedIsDecidedOnTheNextPass(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	// no Adopted at all, the way a pre-upgrade status reads back
+	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-theirs", Name: "vks-a-b-80"})
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-theirs", "vks-a-b-80", false /* the cluster did not create this LB */))
+
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	require.NotNil(t, task.lbConfig.Status.CreatedPools[0].Adopted, "an undecided record must be decided, not left undecided")
+	assert.True(t, *task.lbConfig.Status.CreatedPools[0].Adopted,
+		"on a load balancer this cluster did not create, a pool of unknown provenance is the user's")
+}
+
+// And the other direction, so the decision cannot be read as "always adopt what has no answer":
+// on a load balancer the cluster did create, there is nobody else it could belong to.
+func TestAPoolRecordedBeforeTheFieldExistedOnOurOwnLoadBalancerIsOurs(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-ours", Name: "vks-a-b-80"})
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", true /* the cluster created it */))
+
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	require.NotNil(t, task.lbConfig.Status.CreatedPools[0].Adopted)
+	assert.False(t, *task.lbConfig.Status.CreatedPools[0].Adopted)
 }

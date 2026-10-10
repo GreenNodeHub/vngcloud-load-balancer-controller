@@ -178,8 +178,8 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		Id:             currentPool.UUID,
 		Name:           currentPool.Name,
 		CreatedMembers: pool.Members,
-		// Carried, not recomputed: deploy() overwrites status.createdPools with this value, so a
-		// flag left off here is a flag lost at the end of the reconcile.
+		// Carried, not recomputed: deploy() overwrites status.createdPools with this value, so an
+		// answer left off here is an answer lost at the end of the reconcile.
 		Adopted: t.poolWasAdopted(currentPool.UUID),
 	}, nil
 }

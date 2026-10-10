@@ -35,8 +35,17 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 	adoptedPools := make(map[string]bool)
 	for _, pool := range createdPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
-		if pool.Adopted {
+		switch {
+		case pool.Adopted != nil:
+			adoptedPools[pool.Id] = *pool.Adopted
+		case !t.loadBalancerIsOurs():
+			// No answer recorded, on a load balancer that is not this LBC's: a record written
+			// before the field existed, and the teardown may be the first pass after the upgrade,
+			// so nothing has had a chance to decide. Read it the safe way round - keeping a pool
+			// that turns out to be ours costs a pool; deleting one that turns out to be the
+			// user's costs theirs.
 			adoptedPools[pool.Id] = true
+			t.logger.Infof("Pool %s on LB %s has no provenance recorded and the load balancer is not this LBC's, treating it as the user's", pool.Id, lbId)
 		}
 	}
 
@@ -184,25 +193,33 @@ func (t *defaultModelDeployTask) handBackAdoptedPool(ctx context.Context, lbId, 
 	//
 	// Only when the pool actually holds something: one that is already empty needs no write, and
 	// sending one on every teardown would be a cloud API call that changes nothing.
+	emptyingIt := false
 	if canDeleteWhole && updateMembers == nil && liveMembers > 0 {
 		updateMembers = loadbalancerv2.NewUpdatePoolMembersRequest(lbId, poolId)
+		emptyingIt = true
 	}
 	if updateMembers == nil {
 		return
 	}
 
-	// Not while a sibling still serves from it. Two Ingresses of this cluster pinned to one load
-	// balancer share a pool by design - validateCrossListenerDefaultPools requires the same
-	// default pool name on the same port - and the second LBC to meet it records it as adopted,
-	// because the load balancer is not its own. Emptying it on that LBC's teardown would take the
-	// first one's traffic down with it. The members belong to the cluster, not to this LBC.
-	if shared, err := t.poolHasOtherLBC(ctx, poolId); err != nil {
-		t.logger.Warnf("could not tell whether another LBC still uses adopted pool %s on LB %s, leaving its members alone: %v",
-			poolId, lbId, err)
-		return
-	} else if shared {
-		t.logger.Infof("Adopted pool %s on LB %s is still used by another LBC, leaving its members in place", poolId, lbId)
-		return
+	// Emptying it completely is the only part a sibling gets a veto over. Two Ingresses of this
+	// cluster pinned to one load balancer share a pool by design - validateCrossListenerDefaultPools
+	// requires the same default pool name on the same port - and the second LBC to meet it records
+	// it as adopted, because the load balancer is not its own. Taking every member out on that
+	// LBC's teardown would take the first one's traffic with it.
+	//
+	// An ordinary member update is a different thing and is not gated: this runs on the deploy
+	// path too, where both LBCs push the same desired set, and skipping it there would leave a
+	// shared pool holding nodes that have gone away.
+	if emptyingIt {
+		if shared, err := t.poolHasOtherLBC(ctx, poolId); err != nil {
+			t.logger.Warnf("could not tell whether another LBC still uses adopted pool %s on LB %s, leaving its members alone: %v",
+				poolId, lbId, err)
+			return
+		} else if shared {
+			t.logger.Infof("Adopted pool %s on LB %s is still used by another LBC, leaving its members in place", poolId, lbId)
+			return
+		}
 	}
 
 	t.logger.Infof("Pool %s on LB %s was adopted by name, handing it back without this cluster's members", poolId, lbId)

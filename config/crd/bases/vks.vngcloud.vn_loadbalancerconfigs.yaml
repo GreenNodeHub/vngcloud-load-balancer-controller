@@ -616,6 +616,12 @@ spec:
                         namespace, service and port, so a pool of the user's carrying that name is matched like any
                         other - and without this flag it goes on the books as "created" and the teardown deletes
                         it. The same distinction CreatedListener.Adopted draws, for the same reason.
+
+                        A pointer so that "nobody has decided yet" is a state of its own. A record written before
+                        this field existed has no value here, and reading that as false would leave every cluster
+                        already carrying a user's pool deleting it on the next teardown - the very clusters the bug
+                        was reported from. nil is decided once, on the next pass that matches the pool; false is
+                        written explicitly when this controller creates one, so the two can never be confused.
                       type: boolean
                     createdMembers:
                       description: CreatedMembers is the list of created member IDs
@@ -758,6 +764,12 @@ spec:
                             namespace, service and port, so a pool of the user's carrying that name is matched like any
                             other - and without this flag it goes on the books as "created" and the teardown deletes
                             it. The same distinction CreatedListener.Adopted draws, for the same reason.
+
+                            A pointer so that "nobody has decided yet" is a state of its own. A record written before
+                            this field existed has no value here, and reading that as false would leave every cluster
+                            already carrying a user's pool deleting it on the next teardown - the very clusters the bug
+                            was reported from. nil is decided once, on the next pass that matches the pool; false is
+                            written explicitly when this controller creates one, so the two can never be confused.
                           type: boolean
                         createdMembers:
                           description: CreatedMembers is the list of created member
