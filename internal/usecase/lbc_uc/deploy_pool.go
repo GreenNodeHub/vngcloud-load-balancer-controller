@@ -83,6 +83,11 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 			Id:             _pool.UUID,
 			Name:           pool.Name,
 			CreatedMembers: pool.Members,
+			// Explicitly ours, for the same reason statusAddPoolMember says so: deploy()
+			// overwrites status.createdPools with this value, so leaving it unset would put the
+			// pool back on the books as "nobody has decided" - and on a load balancer this LBC
+			// did not create, the teardown reads that as the user's and never deletes it.
+			Adopted: ptr.To(false),
 		}, nil
 	} else {
 		// Only the identity here. The members are recorded further down, once the load
