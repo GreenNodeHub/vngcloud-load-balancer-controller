@@ -476,7 +476,7 @@ func TestAdoptingAPoolOnAUserLoadBalancerRecordsIt(t *testing.T) {
 	applyStatusPatch(k8sRepo)
 	task := taskWithPools(k8sRepo)
 
-	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-theirs", "vks-a-b-80"))
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-theirs", "vks-a-b-80", false /* the cluster did not create this LB */))
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
 	rec := task.lbConfig.Status.CreatedPools[0]
@@ -492,7 +492,7 @@ func TestAPoolThisLBCCreatedIsNotMarkedAdoptedOnTheNextPass(t *testing.T) {
 	applyStatusPatch(k8sRepo)
 	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-ours", Name: "vks-a-b-80"})
 
-	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", false /* and yet: already on the books */))
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
 	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
@@ -502,17 +502,22 @@ func TestAPoolThisLBCCreatedIsNotMarkedAdoptedOnTheNextPass(t *testing.T) {
 // And the other half of the same rule: being absent from status proves nothing, because
 // status.createdPools is rewritten wholesale at the end of every deploy. What decides is the load
 // balancer - nothing on one this cluster created can belong to anyone else.
+//
+// "This cluster", not "this LBC". The task here is set up the way the second LBC on a shared load
+// balancer sees it - the load balancer recorded as adopted, because this LBC did not create it -
+// and the pool must still come out as the cluster's. Getting that wrong leaves a pool nobody will
+// ever delete, so the load balancer never empties and never goes either; the envtest suite caught
+// exactly that, as a load balancer left behind.
 func TestAPoolOnOurOwnLoadBalancerIsNeverAdopted(t *testing.T) {
 	k8sRepo := repository.NewMockK8sRepository(t)
 	applyStatusPatch(k8sRepo)
-	task := taskWithPools(k8sRepo)
-	task.lbConfig.Status.AdoptedLoadBalancerId = nil
-	task.lbConfig.Status.CreatedLoadBalancerId = ptrTo("lb-user")
+	task := taskWithPools(k8sRepo) // AdoptedLoadBalancerId is set: this LBC did not create it
 
-	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", true /* but the cluster did */))
 
 	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
-	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted)
+	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+		"a sibling LBC's pool on a load balancer this cluster created is the cluster's, not a stranger's")
 }
 
 // The same break, on the pool side. It is the one that actually happened to listeners: the
@@ -534,7 +539,7 @@ func TestAdoptingNeverMarksAPoolTheControllerCreatedWhenTheInMemoryCopyIsStale(t
 	// what this reconcile is holding: nothing yet
 	task := taskWithPools(k8sRepo)
 
-	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80", false /* and yet: already on the books */))
 
 	require.Len(t, fresh.Status.CreatedPools, 1)
 	assert.False(t, fresh.Status.CreatedPools[0].Adopted,

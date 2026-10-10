@@ -57,6 +57,13 @@ func TestDeployPoolDoesNotRecordMembersItCouldNotPush(t *testing.T) {
 			return nil
 		}).Maybe()
 
+	// deployPool reads the load balancer's tags on the match-by-name path, to tell a pool of the
+	// cluster's from one of the user's that carries the same name. This one is the cluster's.
+	vngcloud.EXPECT().
+		ListTags(mock.Anything, lbID).
+		Return(&entityv2.ListTags{Items: []*entityv2.Tag{
+			{Key: "vng.vks.created-by-cluster", Value: "k8s-test"},
+		}}, nil).Maybe()
 	vngcloud.EXPECT().
 		GetPoolHealthMonitorById(mock.Anything, lbID, poolID).
 		Return(&entityv2.HealthMonitor{}, nil)

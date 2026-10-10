@@ -87,7 +87,14 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	} else {
 		// Only the identity here. The members are recorded further down, once the load
 		// balancer actually holds them - see the comment at that call.
-		if err := t.statusAdoptPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
+		// Read from the tag, which records the cluster that created the load balancer, rather
+		// than from this LBC's own view of how it reached it. ListTags is cached and deployTags
+		// has just filled it, so this costs nothing in the steady state.
+		tags, err := t.vngcloudRepo.ListTags(ctx, lbId)
+		if err != nil {
+			return nil, fmt.Errorf("read tags of LB %s to tell whose pool %s is: %w", lbId, currentPool.UUID, err)
+		}
+		if err := t.statusAdoptPool(ctx, currentPool.UUID, currentPool.Name, t.createdByThisCluster(lbId, tagsToMap(tags))); err != nil {
 			return nil, err
 		}
 	}

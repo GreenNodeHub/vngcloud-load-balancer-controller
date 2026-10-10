@@ -176,7 +176,13 @@ func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId
 // statusAdoptPool records a pool deployPool matched by name rather than created. The decision -
 // ours or the user's - is made here, once, and never revisited; see statusAdoptListener, which
 // solves the same problem for listeners and whose reasoning applies unchanged.
-func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId string, name string) error {
+//
+// clusterOwnsLB answers "did THIS CLUSTER create the load balancer", not "did this LBC". The
+// difference is the whole point: two Ingresses of one cluster can share a load balancer, and the
+// second LBC to reach it records it as adopted - but a pool the first one created is still the
+// cluster's, and marking it adopted would mean nobody ever deletes it and the load balancer is
+// never empty enough to go either.
+func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId string, name string, clusterOwnsLB bool) error {
 	if poolId == "" {
 		return errors.New("pool has no id, need to retry")
 	}
@@ -204,8 +210,9 @@ func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId str
 
 		// Not on the books - which proves nothing on its own, because status.createdPools is
 		// rewritten wholesale at the end of every deploy. What decides is the load balancer:
-		// nothing on one this cluster created can belong to anyone else.
-		decided = v1alpha1.CreatedPool{Id: poolId, Name: name, Adopted: !t.loadBalancerIsOurs()}
+		// nothing on one this cluster created can belong to anyone else - whichever of its LBCs
+		// happens to be looking.
+		decided = v1alpha1.CreatedPool{Id: poolId, Name: name, Adopted: !clusterOwnsLB}
 		obj.Status.CreatedPools = append(obj.Status.CreatedPools, decided)
 		return true
 	})
