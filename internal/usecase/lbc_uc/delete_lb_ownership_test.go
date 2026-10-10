@@ -462,3 +462,42 @@ func TestDeleteLoadBalancerIsNotLastOutWithoutAUsableClusterId(t *testing.T) {
 
 	assert.NoError(t, task.delete(context.Background()))
 }
+
+// The late delete: the load balancer did not look coverable at first, so the teardown went the
+// long way round - clearing listeners and pools, each of which can wait minutes on the load
+// balancer going ACTIVE - and only then found it empty. The cluster list read before all that is
+// no longer evidence. A cluster adopting this load balancer writes its id into the list before it
+// creates anything on it, so "empty" does not mean "unclaimed", and the claim has to be checked
+// again against a fresh list immediately before the delete.
+func TestDeleteLoadBalancerConfirmsLastOutAgainBeforeTheLateDelete(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	vngcloud.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-1").
+		Return(&entityv2.LoadBalancer{UUID: "lb-1"}, nil).Maybe()
+	// first read is canDeleteWholeLoadBalancer: a listener this LBC has no record of, so the
+	// whole-load-balancer delete is off; by the time isLoadBalancerEmpty looks, it is gone
+	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{{UUID: "lis-9", Name: "someone-elses"}}}, nil).Once()
+	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil).Maybe()
+	vngcloud.EXPECT().ListPool(mock.Anything, "lb-1").
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil).Maybe()
+	vngcloud.EXPECT().CreateTags(mock.Anything, "lb-1", mock.Anything).Return(nil).Maybe()
+	vngcloud.EXPECT().InvalidateTagsCache("lb-1").Maybe()
+	tags := func(list string) *entityv2.ListTags {
+		return &entityv2.ListTags{Items: []*entityv2.Tag{
+			{Key: domain.CreatedByClusterTagKey, Value: siblingClusterId},
+			{Key: domain.ClusterTagKey, Value: list},
+		}}
+	}
+	// alone on the list when the teardown starts, and alone on the read-through that follows
+	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(tags(ownershipClusterId), nil).Twice()
+	// by the time the long way round is done, a cluster has adopted it
+	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").
+		Return(tags(ownershipClusterId+domain.ClusterTagValueSeparator+siblingClusterId), nil).Maybe()
+	soleLBCInTheCluster(k8s)
+	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
+	task.lbConfig.Spec.Type = loadbalancerv2.LoadBalancerTypeLayer4
+
+	assert.NoError(t, task.delete(context.Background()))
+}

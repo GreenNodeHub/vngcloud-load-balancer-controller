@@ -57,8 +57,10 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 	}
 	currentTags := tagsToMap(tags)
 	ours := t.createdByThisCluster(lbId, currentTags)
+	lastOut := false
 	if !ours {
-		lastOut, err := t.lastClusterOutOf(ctx, lbId, currentTags)
+		var err error
+		lastOut, err = t.lastClusterOutOf(ctx, lbId, currentTags)
 		if err != nil {
 			return err
 		}
@@ -101,6 +103,21 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		if err != nil {
 			return err
 		}
+		// Getting here meant clearing listeners and pools first, each of which can wait
+		// minutes on the load balancer going ACTIVE, so the cluster list read at the top is
+		// no longer evidence of anything. A cluster adopting this load balancer writes its
+		// id into that list before it creates anything on it - "empty" is not "unclaimed".
+		if isEmpty && lastOut {
+			ours, err = t.lastClusterOutOf(ctx, lbId, currentTags)
+			if err != nil {
+				return err
+			}
+			if !ours {
+				t.logger.Infof("Load balancer %s was claimed by another cluster while LBC %s/%s was clearing it, leaving it in place",
+					lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+			}
+		}
+
 		if isEmpty && ours {
 			t.logger.Infof("Load balancer %s is empty, deleting it in VNGCloud for LBC %s/%s", lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			err = t.vngcloudRepo.DeleteLoadBalancer(ctx, lbId)
