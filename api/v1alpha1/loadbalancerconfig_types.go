@@ -545,11 +545,19 @@ type CreatedPool struct {
 	// +optional
 	// +listType=atomic
 	CreatedMembers []PoolMember `json:"createdMembers,omitempty"`
+
+	// Adopted marks a pool that was already on the load balancer when this LBC first matched it
+	// by name, rather than one the controller created. Pool names are derived from the cluster,
+	// namespace, service and port, so a pool of the user's carrying that name is matched like any
+	// other - and without this flag it goes on the books as "created" and the teardown deletes
+	// it. The same distinction CreatedListener.Adopted draws, for the same reason.
+	// +optional
+	Adopted bool `json:"adopted,omitempty"`
 }
 
 // Equal compares two CreatedPool for equality (order-independent for members)
 func (a CreatedPool) Equal(b CreatedPool) bool {
-	if a.Id != b.Id || a.Name != b.Name {
+	if a.Id != b.Id || a.Name != b.Name || a.Adopted != b.Adopted {
 		return false
 	}
 	if len(a.CreatedMembers) != len(b.CreatedMembers) {

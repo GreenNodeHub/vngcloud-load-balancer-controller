@@ -87,7 +87,7 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 	} else {
 		// Only the identity here. The members are recorded further down, once the load
 		// balancer actually holds them - see the comment at that call.
-		if err := t.statusAddPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
+		if err := t.statusAdoptPool(ctx, currentPool.UUID, currentPool.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -171,6 +171,9 @@ func (t *defaultModelDeployTask) deployPool(ctx context.Context, lbId string, po
 		Id:             currentPool.UUID,
 		Name:           currentPool.Name,
 		CreatedMembers: pool.Members,
+		// Carried, not recomputed: deploy() overwrites status.createdPools with this value, so a
+		// flag left off here is a flag lost at the end of the reconcile.
+		Adopted: t.poolWasAdopted(currentPool.UUID),
 	}, nil
 }
 

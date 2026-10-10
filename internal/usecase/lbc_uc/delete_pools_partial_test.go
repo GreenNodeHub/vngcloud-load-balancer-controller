@@ -108,3 +108,64 @@ func TestDeleteRedundantPoolsRetriesABusyLoadBalancer(t *testing.T) {
 	assert.NoError(t, err, "a busy load balancer is transient, not a failure")
 	assert.Equal(t, 3, attempts, "pool-1 is retried once after the wait, then pool-2 is deleted")
 }
+
+// #33309 - a pool of the user's that happens to carry the name this controller generates was
+// matched by name, written to status.createdPools, and then deleted by the teardown. The word
+// "created" in that list is what does it: deleteRedundantPoolsFrom takes every entry as a
+// deletion candidate, unconditionally.
+//
+// QC's own contrast is the proof that the teardown is otherwise right: a pool named anything else
+// is never touched. What was wrong was how "mine" is decided, not what is done with it.
+func TestDeleteLeavesAPoolThatWasOnlyAdopted(t *testing.T) {
+	const (
+		lb         = "lb-user"
+		oursPool   = "pool-ours"
+		theirsPool = "pool-theirs"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, lb).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{
+			{UUID: oursPool, Name: "vks-a-b-80"},
+			{UUID: theirsPool, Name: "vks-a-b-81"}, // the user's, carrying a name we generate
+		}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, lb).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, lb, mock.Anything).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{}}, nil).Maybe()
+	vngcloud.EXPECT().
+		WaitForLBActive(mock.Anything, lb).
+		Return(&entityv2.LoadBalancer{UUID: lb}, nil).Maybe()
+
+	deleted := make([]string, 0)
+	vngcloud.EXPECT().
+		DeletePool(mock.Anything, lb, mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, poolId string) error {
+			deleted = append(deleted, poolId)
+			return nil
+		}).Maybe()
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer7},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId: ptrTo(lb),
+				CreatedPools: []v1alpha1.CreatedPool{
+					{Id: oursPool, Name: "vks-a-b-80"},
+					{Id: theirsPool, Name: "vks-a-b-81", Adopted: true},
+				},
+			},
+		},
+	}
+
+	require.NoError(t, task.deleteRedundantPools(context.Background(), lb, nil))
+
+	assert.Contains(t, deleted, oursPool, "a pool this cluster created is still ours to remove")
+	assert.NotContains(t, deleted, theirsPool,
+		"a pool we only adopted by name belongs to the user and must be left on the load balancer")
+}

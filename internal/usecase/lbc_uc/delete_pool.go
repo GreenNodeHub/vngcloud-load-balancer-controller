@@ -27,8 +27,15 @@ func (t *defaultModelDeployTask) deleteRedundantPools(ctx context.Context, lbId 
 // the live created* lists have moved on to the new one.
 func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, lbId string, createdPools []v1alpha1.CreatedPool, newCreatedPools []v1alpha1.CreatedPool) error {
 	deleteCandidates := make([]string, 0)
+	// A pool this LBC only matched by name was on the load balancer before it was, so it is no
+	// more ours to delete than the load balancer itself. It stays a candidate for member cleanup
+	// below - the members we put in it are ours to take out - but never for deletion.
+	adoptedPools := make(map[string]bool)
 	for _, pool := range createdPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
+		if pool.Adopted {
+			adoptedPools[pool.Id] = true
+		}
 	}
 
 	currentPools, err := t.vngcloudRepo.ListPool(ctx, lbId)
@@ -110,7 +117,7 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 
 		canDeleteWhole, updateMemberOption := t.canDeleteWholePool(ctx, lbId, candidateId, currentListMembers, createdMembers, newCreatedMembers)
 
-		if !isPoolInUse(candidateId) && canDeleteWhole {
+		if !isPoolInUse(candidateId) && canDeleteWhole && !adoptedPools[candidateId] {
 			// delete pool
 			err := t.retryOnLoadBalancerNotReady(ctx, lbId, func() error {
 				return t.vngcloudRepo.DeletePool(ctx, lbId, candidateId)
@@ -123,6 +130,11 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 				failures = append(failures, fmt.Errorf("pool %s: wait after delete: %w", candidateId, err))
 				continue
 			}
+		} else if adoptedPools[candidateId] && updateMemberOption == nil {
+			// Nothing of ours left in a pool that is not ours: say so once, because "no delete
+			// line for this pool" is otherwise indistinguishable from the bug this guards.
+			t.logger.Infof("Pool %s on LB %s was adopted by name, leaving it in place for its owner",
+				candidateId, lbId)
 		} else if updateMemberOption != nil {
 			// update to delete redundant members
 			t.logger.Infof("Updating pool %s on LB %s to remove redundant members", candidateId, lbId)

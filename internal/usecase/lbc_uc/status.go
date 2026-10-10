@@ -173,32 +173,68 @@ func (t *defaultModelDeployTask) statusAddPolicy(ctx context.Context, listenerId
 	})
 }
 
-func (t *defaultModelDeployTask) statusAddPool(ctx context.Context, poolId string, name string) error {
-	// A cloud resource we cannot name is a cloud resource we have lost: nothing later can
-	// find it, update it or delete it. Recording it with an empty id is worse than failing
-	// here, because id is the key of a map-list - the API server rejects the whole status
-	// patch, every reconcile, and the LBC never moves again. deployLoadBalancer already
-	// guards the load balancer's own id this way.
+// statusAdoptPool records a pool deployPool matched by name rather than created. The decision -
+// ours or the user's - is made here, once, and never revisited; see statusAdoptListener, which
+// solves the same problem for listeners and whose reasoning applies unchanged.
+func (t *defaultModelDeployTask) statusAdoptPool(ctx context.Context, poolId string, name string) error {
 	if poolId == "" {
-		return errors.New("pool has no id after create, need to retry")
+		return errors.New("pool has no id, need to retry")
 	}
 
-	return t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
-		// check on fresh copy if already exists with same values
-		for _, p := range obj.Status.CreatedPools {
-			if p.Id == poolId && p.Name == name {
-				return false // no change needed
-			}
-		}
+	// Decided inside the mutation, because only the object the mutation runs against is a fresh
+	// read; t.lbConfig can be several writes behind, and deciding from it marked pools the
+	// controller had created as adopted - which would leave them on the load balancer forever.
+	var decided v1alpha1.CreatedPool
+
+	err := t.k8sRepo.PatchMutateStatusLoadBalancerConfig(ctx, t.lbConfig, func(ctx context.Context, obj *v1alpha1.LoadBalancerConfig) bool {
 		for i := range obj.Status.CreatedPools {
-			if obj.Status.CreatedPools[i].Id == poolId {
+			if obj.Status.CreatedPools[i].Id != poolId {
+				continue
+			}
+			// Already on our books, so it is one we created - or one adopted on an earlier pass,
+			// whose record must be carried forward untouched.
+			if obj.Status.CreatedPools[i].Name != name {
 				obj.Status.CreatedPools[i].Name = name
+				decided = obj.Status.CreatedPools[i]
 				return true
 			}
+			decided = obj.Status.CreatedPools[i]
+			return false
 		}
-		obj.Status.CreatedPools = append(obj.Status.CreatedPools, v1alpha1.CreatedPool{Id: poolId, Name: name})
+
+		// Not on the books - which proves nothing on its own, because status.createdPools is
+		// rewritten wholesale at the end of every deploy. What decides is the load balancer:
+		// nothing on one this cluster created can belong to anyone else.
+		decided = v1alpha1.CreatedPool{Id: poolId, Name: name, Adopted: !t.loadBalancerIsOurs()}
+		obj.Status.CreatedPools = append(obj.Status.CreatedPools, decided)
 		return true
 	})
+	if err != nil {
+		return err
+	}
+
+	// deployPool reads this back within the same reconcile - it has to, because deploy() ends by
+	// overwriting status.createdPools wholesale with what deployPools returned, and the patch
+	// helper never touches the object it was given. Carry the decision, do not remake it.
+	for i := range t.lbConfig.Status.CreatedPools {
+		if t.lbConfig.Status.CreatedPools[i].Id == poolId {
+			t.lbConfig.Status.CreatedPools[i] = decided
+			return nil
+		}
+	}
+	t.lbConfig.Status.CreatedPools = append(t.lbConfig.Status.CreatedPools, decided)
+	return nil
+}
+
+// poolWasAdopted reports what statusAdoptPool decided, so deployPool can carry it into the value
+// it returns - that value is what deploy() writes over status with.
+func (t *defaultModelDeployTask) poolWasAdopted(poolId string) bool {
+	for _, p := range t.lbConfig.Status.CreatedPools {
+		if p.Id == poolId {
+			return p.Adopted
+		}
+	}
+	return false
 }
 
 func (t *defaultModelDeployTask) statusAddPoolMember(ctx context.Context, poolId string, name string, members []v1alpha1.PoolMember) error {

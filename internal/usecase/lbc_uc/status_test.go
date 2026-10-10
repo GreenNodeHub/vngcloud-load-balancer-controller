@@ -20,7 +20,7 @@ import (
 func TestStatusAddRefusesAnEmptyId(t *testing.T) {
 	tests := map[string]func(*defaultModelDeployTask) error{
 		"pool": func(task *defaultModelDeployTask) error {
-			return task.statusAddPool(context.Background(), "", "vks-a-b-80")
+			return task.statusAdoptPool(context.Background(), "", "vks-a-b-80")
 		},
 		"listener": func(task *defaultModelDeployTask) error {
 			return task.statusAddListener(context.Background(), "", 80)

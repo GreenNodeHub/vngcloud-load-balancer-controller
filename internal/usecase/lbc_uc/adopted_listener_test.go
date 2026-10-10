@@ -448,3 +448,69 @@ func TestAdoptionStillHappensOnALoadBalancerThisClusterAdopted(t *testing.T) {
 	require.NotNil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 	assert.Equal(t, usersPoolId, *task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 }
+
+// ---------------------------------------------------------------------------
+// Adopting a pool (#33309)
+// ---------------------------------------------------------------------------
+
+// Pool names are derived from cluster, namespace, service and port, so a pool of the user's that
+// carries one is matched by deployPool like any other. Without a record of where it came from it
+// goes on the books as "created" and the teardown deletes it - QC saw exactly that, in about 15
+// seconds. Same shape as the listener case above, and the same three-way decision.
+func taskWithPools(k8sRepo *repository.MockK8sRepository, pools ...v1alpha1.CreatedPool) *defaultModelDeployTask {
+	return &defaultModelDeployTask{
+		logger:  logrus.NewEntry(logrus.New()),
+		k8sRepo: k8sRepo,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				LoadBalancerId:        ptrTo("lb-user"),
+				AdoptedLoadBalancerId: ptrTo("lb-user"),
+				CreatedPools:          pools,
+			},
+		},
+	}
+}
+
+func TestAdoptingAPoolOnAUserLoadBalancerRecordsIt(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	task := taskWithPools(k8sRepo)
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-theirs", "vks-a-b-80"))
+
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	rec := task.lbConfig.Status.CreatedPools[0]
+	assert.True(t, rec.Adopted, "a pool found on a load balancer that is not ours was not created by us")
+	assert.Equal(t, "vks-a-b-80", rec.Name)
+}
+
+// The trap the listener path already fell into once: a pool this LBC created is found by name on
+// the next reconcile and reaches the same code. Marking it adopted there would stop the teardown
+// ever deleting it - trading a rare wrong delete for a permanent leak on every pool.
+func TestAPoolThisLBCCreatedIsNotMarkedAdoptedOnTheNextPass(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	task := taskWithPools(k8sRepo, v1alpha1.CreatedPool{Id: "pool-ours", Name: "vks-a-b-80"})
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted,
+		"a pool already on our books was created by us, not adopted")
+}
+
+// And the other half of the same rule: being absent from status proves nothing, because
+// status.createdPools is rewritten wholesale at the end of every deploy. What decides is the load
+// balancer - nothing on one this cluster created can belong to anyone else.
+func TestAPoolOnOurOwnLoadBalancerIsNeverAdopted(t *testing.T) {
+	k8sRepo := repository.NewMockK8sRepository(t)
+	applyStatusPatch(k8sRepo)
+	task := taskWithPools(k8sRepo)
+	task.lbConfig.Status.AdoptedLoadBalancerId = nil
+	task.lbConfig.Status.CreatedLoadBalancerId = ptrTo("lb-user")
+
+	require.NoError(t, task.statusAdoptPool(context.Background(), "pool-ours", "vks-a-b-80"))
+
+	require.Len(t, task.lbConfig.Status.CreatedPools, 1)
+	assert.False(t, task.lbConfig.Status.CreatedPools[0].Adopted)
+}
