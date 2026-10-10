@@ -9,6 +9,7 @@ import (
 	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
+	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 )
 
 // errPartialDelete marks a pass in which some pools were cleaned up and others were not. The
@@ -32,20 +33,39 @@ func (t *defaultModelDeployTask) deleteRedundantPoolsFrom(ctx context.Context, l
 	// to take back out, which is handled below - leaving them is not a tidiness problem but a
 	// routing one: the user's pool would go on forwarding to nodes of a cluster that has stopped
 	// using the load balancer, and those addresses get recycled.
+	// Looked up lazily, and only when a record turns out to have no answer in it, because it
+	// costs a read of the load balancer's tags. Most teardowns have an answer for every pool.
+	var (
+		askedWhoseLB bool
+		clusterMade  bool
+	)
+	clusterCreatedLB := func() bool {
+		if !askedWhoseLB {
+			askedWhoseLB = true
+			clusterMade = t.clusterCreatedLoadBalancer(ctx, lbId)
+		}
+		return clusterMade
+	}
+
 	adoptedPools := make(map[string]bool)
 	for _, pool := range createdPools {
 		deleteCandidates = append(deleteCandidates, pool.Id)
 		switch {
 		case pool.Adopted != nil:
 			adoptedPools[pool.Id] = *pool.Adopted
-		case !t.loadBalancerIsOurs():
-			// No answer recorded, on a load balancer that is not this LBC's: a record written
-			// before the field existed, and the teardown may be the first pass after the upgrade,
-			// so nothing has had a chance to decide. Read it the safe way round - keeping a pool
-			// that turns out to be ours costs a pool; deleting one that turns out to be the
-			// user's costs theirs.
+		case !clusterCreatedLB():
+			// No answer recorded, on a load balancer this cluster did not create: a record
+			// written before the field existed, and the teardown may be the first pass after the
+			// upgrade, so nothing has had a chance to decide. Read it the safe way round -
+			// keeping a pool that turns out to be ours costs a pool; deleting one that turns out
+			// to be the user's costs theirs.
+			//
+			// The same question the deploy path asks, asked the same way: about the CLUSTER, from
+			// the tag. Asking "is it this LBC's" here instead would answer differently for the
+			// second LBC on a load balancer of the cluster's own, which is the divergence that
+			// left a load balancer undeleted in the envtest suite.
 			adoptedPools[pool.Id] = true
-			t.logger.Infof("Pool %s on LB %s has no provenance recorded and the load balancer is not this LBC's, treating it as the user's", pool.Id, lbId)
+			t.logger.Infof("Pool %s on LB %s has no provenance recorded and the cluster did not create the load balancer, treating it as the user's", pool.Id, lbId)
 		}
 	}
 
@@ -257,6 +277,31 @@ func (t *defaultModelDeployTask) poolHasOtherLBC(ctx context.Context, poolId str
 		}
 	}
 	return false, nil
+}
+
+// clusterCreatedLoadBalancer answers, for THIS load balancer id, whether the tag on it says this
+// cluster created it. Only the tag: createdByThisCluster falls back to status and to "not pinned"
+// when the tag is absent, and those fallbacks describe the load balancer the LBC is working on
+// now - which is the wrong one here, because this file also runs over the snapshot of a load
+// balancer being left behind, at a moment when status already describes its replacement. Reading
+// "ours" there would delete the user's pools off the load balancer the cluster is walking away
+// from, which is the exact direction the provenance field exists to prevent.
+//
+// Everything that is not a positive yes is a no, including a read that fails: keeping a pool that
+// turns out to be the cluster's costs a pool, deleting one that turns out to be the user's costs
+// theirs. Tags are cached and both callers have just read them, so this costs nothing in the
+// steady state.
+func (t *defaultModelDeployTask) clusterCreatedLoadBalancer(ctx context.Context, lbId string) bool {
+	if t.lbConfig.Spec.ClusterId == nil {
+		return false
+	}
+	tags, err := t.vngcloudRepo.ListTags(ctx, lbId)
+	if err != nil {
+		t.logger.Warnf("could not read tags of LB %s to tell whose its pools are, treating them as the user's: %v", lbId, err)
+		return false
+	}
+	createdBy, tagged := tagsToMap(tags)[domain.CreatedByClusterTagKey]
+	return tagged && createdBy == *t.lbConfig.Spec.ClusterId
 }
 
 // canDeleteWholePool checks if we can delete the whole pool

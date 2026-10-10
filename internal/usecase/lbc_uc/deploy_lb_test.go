@@ -25,7 +25,12 @@ func retiringSnapshot() *v1alpha1.RetiringLoadBalancer {
 	return &v1alpha1.RetiringLoadBalancer{
 		Id:               oldLbId,
 		CreatedListeners: []v1alpha1.CreatedListener{{Id: "listener-1", Port: 80}},
-		CreatedPools:     []v1alpha1.CreatedPool{{Id: "pool-1", Name: "vks-a-b-80"}},
+		// Provenance stated rather than left to be inferred: these tests are about sweeping the
+		// load balancer being left behind, not about working out whose its pools are. A record
+		// with no answer in it means "nobody has decided", and the teardown deliberately keeps
+		// those - TestDeleteDoesNotTreatARetiringLoadBalancersPoolsAsOursJustBecauseTheNewOneIs
+		// is the test for that case.
+		CreatedPools: []v1alpha1.CreatedPool{{Id: "pool-1", Name: "vks-a-b-80", Adopted: ptrTo(false)}},
 		CreatedTags: map[string]string{
 			domain.ClusterTagKey: thisClusterId,
 			domain.VpcTagKey:     "net-1111",

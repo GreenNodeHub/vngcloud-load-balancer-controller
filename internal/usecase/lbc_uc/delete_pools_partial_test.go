@@ -42,9 +42,12 @@ func twoRedundantPools(vngcloud *repository.MockVngCloudRepository) *defaultMode
 			Spec: v1alpha1.LoadBalancerConfigSpec{Type: loadbalancerv2.LoadBalancerTypeLayer4},
 			Status: v1alpha1.LoadBalancerConfigStatus{
 				LoadBalancerId: ptrTo("lb-1"),
+				// Provenance stated: these tests are about what happens when a delete fails, not
+				// about working out whose the pools are. A record with no answer means "nobody
+				// has decided", which the teardown deliberately keeps.
 				CreatedPools: []v1alpha1.CreatedPool{
-					{Id: "pool-1", Name: "vks-a-b-80"},
-					{Id: "pool-2", Name: "vks-a-b-81"},
+					{Id: "pool-1", Name: "vks-a-b-80", Adopted: ptrTo(false)},
+					{Id: "pool-2", Name: "vks-a-b-81", Adopted: ptrTo(false)},
 				},
 			},
 		},
@@ -159,7 +162,7 @@ func TestDeleteLeavesAPoolThatWasOnlyAdopted(t *testing.T) {
 			Status: v1alpha1.LoadBalancerConfigStatus{
 				LoadBalancerId: ptrTo(lb),
 				CreatedPools: []v1alpha1.CreatedPool{
-					{Id: oursPool, Name: "vks-a-b-80"},
+					{Id: oursPool, Name: "vks-a-b-80", Adopted: ptrTo(false)},
 					{Id: theirsPool, Name: "vks-a-b-81", Adopted: ptrTo(true)},
 				},
 			},
@@ -422,4 +425,54 @@ func TestDeployStillUpdatesMembersOfAnAdoptedPoolSharedWithAnotherLBC(t *testing
 	req, ok := sent.(*loadbalancerv2.UpdatePoolMembersRequest)
 	require.True(t, ok)
 	assert.Len(t, req.Members, 1, "the node that went away is dropped, the one that stayed is kept")
+}
+
+// #33309, the retiring-load-balancer path. deleteRedundantPoolsFrom also runs over the snapshot of
+// a load balancer the cluster is walking away from, at a moment when status already describes its
+// replacement. Deciding provenance from status there answers for the wrong load balancer: the new
+// one is the cluster's, so every record in the old one's snapshot that predates the Adopted field
+// reads as the cluster's too - and the user's pools get deleted off the load balancer being left
+// behind. That is the direction the field exists to prevent.
+func TestDeleteDoesNotTreatARetiringLoadBalancersPoolsAsOursJustBecauseTheNewOneIs(t *testing.T) {
+	const (
+		retiringLB = "lb-user-left-behind"
+		newLB      = "lb-we-made"
+		theirsPool = "pool-on-the-old-one"
+	)
+
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	vngcloud.EXPECT().
+		ListPool(mock.Anything, retiringLB).
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{{UUID: theirsPool, Name: "vks-a-b-80"}}}, nil)
+	vngcloud.EXPECT().
+		ListListenerOfLB(mock.Anything, retiringLB).
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil)
+	vngcloud.EXPECT().
+		GetPoolMembers(mock.Anything, retiringLB, theirsPool).
+		Return(&entityv2.ListMembers{Items: []*entityv2.Member{}}, nil).Maybe()
+	// the load balancer being left behind carries no created-by tag of ours
+	vngcloud.EXPECT().
+		ListTags(mock.Anything, retiringLB).
+		Return(&entityv2.ListTags{Items: []*entityv2.Tag{}}, nil)
+	// strict mock: DeletePool is undeclared, so deleting the user's pool fails the test outright
+
+	task := &defaultModelDeployTask{
+		logger:       logrus.NewEntry(logrus.New()),
+		vngcloudRepo: vngcloud,
+		lbConfig: &v1alpha1.LoadBalancerConfig{
+			Spec: v1alpha1.LoadBalancerConfigSpec{
+				Type:      loadbalancerv2.LoadBalancerTypeLayer7,
+				ClusterId: ptrTo("k8s-ours"),
+			},
+			Status: v1alpha1.LoadBalancerConfigStatus{
+				// status has already moved on to the load balancer we made
+				LoadBalancerId:        ptrTo(newLB),
+				CreatedLoadBalancerId: ptrTo(newLB),
+			},
+		},
+	}
+
+	// the snapshot of the one being left behind, written before the field existed
+	require.NoError(t, task.deleteRedundantPoolsFrom(context.Background(), retiringLB,
+		[]v1alpha1.CreatedPool{{Id: theirsPool, Name: "vks-a-b-80"}}, nil))
 }
