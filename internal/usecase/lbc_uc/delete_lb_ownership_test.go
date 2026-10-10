@@ -391,3 +391,74 @@ func TestDeleteLoadBalancerLastClusterOutTakesWhatItAdoptedFromTheSibling(t *tes
 
 	assert.NoError(t, task.delete(context.Background()))
 }
+
+// vksLoadBalancerSharedWith mocks an empty load balancer a sibling cluster created. Each entry in
+// users is the cluster list one read of the tags hands back, in order, so a test can show the list
+// changing under the teardown; the last entry answers any further reads.
+func vksLoadBalancerSharedWith(vngcloud *repository.MockVngCloudRepository, users ...string) {
+	vngcloud.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-1").
+		Return(&entityv2.LoadBalancer{UUID: "lb-1"}, nil).Maybe()
+	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{}}, nil).Maybe()
+	vngcloud.EXPECT().ListPool(mock.Anything, "lb-1").
+		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil).Maybe()
+	vngcloud.EXPECT().CreateTags(mock.Anything, "lb-1", mock.Anything).Return(nil).Maybe()
+	vngcloud.EXPECT().InvalidateTagsCache("lb-1").Maybe()
+	tags := func(list string) *entityv2.ListTags {
+		return &entityv2.ListTags{Items: []*entityv2.Tag{
+			{Key: domain.CreatedByClusterTagKey, Value: siblingClusterId},
+			{Key: domain.ClusterTagKey, Value: list},
+		}}
+	}
+	for _, list := range users {
+		vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(tags(list), nil).Once()
+	}
+	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(tags(users[len(users)-1]), nil).Maybe()
+}
+
+// The cluster tag names clusters, not LBCs, so a cluster id on it can stand for a sibling LBC in
+// this same cluster - which is why the tag teardown asks who else points at the load balancer
+// before dropping the id. Being the only cluster on the tag therefore does not make this LBC the
+// last user: the sibling is behind that same id, and deleting the load balancer takes it out from
+// under them.
+func TestDeleteLoadBalancerIsNotLastOutWhileASiblingLBCInThisClusterUsesIt(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	vksLoadBalancerSharedWith(vngcloud, ownershipClusterId)
+	expectOtherLBC(k8s, "lb-1")
+	k8s.EXPECT().ListLoadBalancerConfig(mock.Anything, mock.Anything).Return(nil).Maybe()
+	k8s.EXPECT().PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Maybe()
+	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
+
+	assert.NoError(t, task.delete(context.Background()))
+}
+
+// Tags are served from a five-minute cache, and the repository's contract is that a cached read
+// may only ever say "no write needed" - never decide a write. Deleting a load balancer is the
+// least reversible write there is, so the cluster list it rests on has to be read through.
+func TestDeleteLoadBalancerRereadsTagsBeforeDecidingItIsLastOut(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	// first read is the cached one and says we are alone; the read-through finds the cluster
+	// that added itself while that entry was being served
+	vksLoadBalancerSharedWith(vngcloud, ownershipClusterId,
+		ownershipClusterId+domain.ClusterTagValueSeparator+siblingClusterId)
+	soleLBCInTheCluster(k8s)
+	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
+
+	assert.NoError(t, task.delete(context.Background()))
+}
+
+// An LBC with no usable cluster id cannot be anybody's last user. Empty splits into one empty
+// field and subtracts to nothing, so without this both halves of the test pass vacuously.
+func TestDeleteLoadBalancerIsNotLastOutWithoutAUsableClusterId(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	vksLoadBalancerSharedWith(vngcloud, "")
+	soleLBCInTheCluster(k8s)
+	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
+	task.lbConfig.Spec.ClusterId = ptr.To("")
+
+	assert.NoError(t, task.delete(context.Background()))
+}

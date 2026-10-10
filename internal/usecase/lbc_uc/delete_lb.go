@@ -57,11 +57,17 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 	}
 	currentTags := tagsToMap(tags)
 	ours := t.createdByThisCluster(lbId, currentTags)
-	if !ours && t.lastClusterOutOf(currentTags) {
-		// Nobody else is left to do it. See lastClusterOutOf.
-		t.logger.Infof("Load balancer %s was created by another cluster, but this is the last one using it, so it goes with LBC %s/%s",
-			lbId, t.lbConfig.Namespace, t.lbConfig.Name)
-		ours = true
+	if !ours {
+		lastOut, err := t.lastClusterOutOf(ctx, lbId, currentTags)
+		if err != nil {
+			return err
+		}
+		if lastOut {
+			// Nobody else is left to do it. See lastClusterOutOf.
+			t.logger.Infof("Load balancer %s was created by another cluster, but this is the last one still using it, so clearing it up falls to LBC %s/%s",
+				lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+			ours = true
+		}
 	}
 	if !ours {
 		t.logger.Infof("Load balancer %s was not created by this cluster, it will be left in place for LBC %s/%s",
@@ -125,19 +131,51 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 // somebody else's property confers nothing. One that a cluster of ours made is a different thing:
 // when the last cluster walks away from it, there is no owner left to come back for it.
 //
-// "Last" is read from the cluster list, which each LBC takes its own id out of as it leaves. This
-// cluster has to be on that list to begin with: not being named on it means the record is not
-// describing us, and a claim to be last would be guesswork.
+// Two things the cluster list on its own does not tell us, both of which can end in deleting a
+// load balancer somebody is serving from:
+//
+//   - It names clusters, not LBCs, so this cluster's id may be standing for a sibling LBC next to
+//     this one. That is why dropping the id consults loadBalancerHasOtherLBC, and so does this.
+//   - It is served from a five-minute cache whose contract is that a cached read may only say "no
+//     write needed". Deleting a load balancer is the least reversible write there is, so the list
+//     is read through before the decision stands.
 //
 // It does not help when a cluster was destroyed outright rather than torn down - its id stays on
-// the list forever, so there is never a last one out. That case needs a sweep from outside; no
-// controller runs on a cluster that no longer exists.
-func (t *defaultModelDeployTask) lastClusterOutOf(currentTags map[string]string) bool {
+// the list forever, so there is never a last one out. Nor when two LBCs in this cluster are torn
+// down in the same instant: each ignores the other as already deleting, the first takes the
+// cluster id off without deleting, and the second no longer finds itself on the list. Both need a
+// sweep from outside; no controller runs on a cluster that no longer exists.
+func (t *defaultModelDeployTask) lastClusterOutOf(ctx context.Context, lbId string, currentTags map[string]string) (bool, error) {
+	if !t.looksLastOutOf(currentTags) {
+		return false, nil
+	}
+
+	hasOther, err := t.loadBalancerHasOtherLBC(ctx, lbId)
+	if err != nil {
+		return false, err
+	}
+	if hasOther {
+		return false, nil
+	}
+
+	t.vngcloudRepo.InvalidateTagsCache(lbId)
+	fresh, err := t.vngcloudRepo.ListTags(ctx, lbId)
+	if err != nil {
+		return false, err
+	}
+	return t.looksLastOutOf(tagsToMap(fresh)), nil
+}
+
+// looksLastOutOf reads the question off one set of tags: a load balancer some VKS cluster made,
+// a cluster list this cluster is named on, and nobody left on it once this cluster is taken out.
+// An LBC without a usable cluster id is nobody's last user - the empty string splits into one
+// empty field and subtracts to nothing, so both halves would pass vacuously.
+func (t *defaultModelDeployTask) looksLastOutOf(currentTags map[string]string) bool {
 	createdBy, tagged := currentTags[domain.CreatedByClusterTagKey]
 	if !tagged || !isValidVksId(createdBy) {
 		return false
 	}
-	if t.lbConfig.Spec.ClusterId == nil {
+	if t.lbConfig.Spec.ClusterId == nil || !isValidVksId(*t.lbConfig.Spec.ClusterId) {
 		return false
 	}
 	users := currentTags[domain.ClusterTagKey]
