@@ -98,9 +98,9 @@ func TestRateLimitRequeueAfter_Ceiling(t *testing.T) {
 	assert.Less(t, got, 8*time.Minute)
 }
 
-// sdkRateLimitErr is what the SDK actually hands back on HTTP 429: vngcloud/client/http.go maps
-// 429 to WithErrorPermissionDenied, and SdkErrorHandler returns early once an error code is set,
-// so no product matcher ever runs and this string is a constant for every 429.
+// sdkRateLimitErr carries the text the SDK used to hand back on HTTP 429, when 429 was mapped to
+// WithErrorPermissionDenied. From v2.24.0 the text is different but still a constant, and this
+// test is about what the message must never say, so the older wording is the stricter fixture.
 func sdkRateLimitErr() sdk_error.IError {
 	return makeSDKErr(http.StatusTooManyRequests, http.Header{"X-Ratelimit-Reset": []string{"32"}}).
 		WithErrors(errors.New("permission denied when making request to external service"))

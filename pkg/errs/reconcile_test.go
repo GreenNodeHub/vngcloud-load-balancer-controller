@@ -1,17 +1,12 @@
 package errs
 
 import (
-	stderrors "errors"
 	"fmt"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/sdk_error"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -104,31 +99,4 @@ func TestHandleReconcileError(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-// #33486: the SDK's own text for a 429 used to be the constant "permission denied when making
-// request to external service", so it was dropped from the error's message - it said nothing, and
-// what it did say was wrong. From v2.24.0 it says the server's reason, and nothing was printing
-// it: the CR message is built from Error(), and this handler builds its own sentence. Debug is
-// where it belongs - the warning above stays short because it is the line an operator reads.
-func TestHandleReconcileErrorLogsTheRateLimitCauseAtDebug(t *testing.T) {
-	sdkErr := sdk_error.ErrorHandler(stderrors.New("rate limited by external service, too many requests")).
-		WithKVparameters("statusCode", http.StatusTooManyRequests, "method", "GET", "url", "https://example/api")
-	sdk_error.WithErrorTooManyRequests()(sdkErr)
-
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-	hook := test.NewLocal(logger)
-
-	_, err := HandleReconcileError(domain.SDKError(sdkErr), logger.WithField("test", t.Name()))
-
-	assert.NoError(t, err)
-	var debug []string
-	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.DebugLevel {
-			debug = append(debug, e.Message)
-		}
-	}
-	assert.Contains(t, strings.Join(debug, "\n"), "too many requests",
-		"the server's own reason for the throttle should be recoverable from the logs")
 }

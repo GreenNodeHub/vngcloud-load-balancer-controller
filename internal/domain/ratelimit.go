@@ -22,11 +22,12 @@ type RateLimitError struct {
 	cause      error
 }
 
-// Error deliberately leaves the SDK's own text out, even though from SDK v2.24.0 that text is
-// no longer the misleading constant it used to be ("permission denied when making request to
-// external service", the same sentence for every 429). This message is what lands on the CR as
-// status.lastReconcileMessage, which an operator reads before the logs, so it stays short and
-// stable. The cause is reachable through Unwrap, and HandleReconcileError prints it at Debug.
+// Error deliberately leaves the SDK's own text out. On a 429 that text is a constant the SDK
+// substitutes for whatever the server said - "permission denied when making request to external
+// service" up to v2.23.0, "rate limited by external service, too many requests" from v2.24.0 -
+// so it adds nothing to a message that already names the method, the URL and the retry hint.
+// This message is what lands on the CR as status.lastReconcileMessage, which an operator reads
+// before the logs, so it stays short and stable. The cause remains reachable through Unwrap.
 func (e *RateLimitError) Error() string {
 	return fmt.Sprintf("vngcloud rate limit exceeded (retry after %s) on %s %s",
 		e.RetryAfter, e.Method, e.URL)
