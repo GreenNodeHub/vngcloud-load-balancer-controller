@@ -12,6 +12,8 @@ const (
 	SuffixIdleTimeoutMember          = "idle-timeout-member"          // idle timeout for member
 	SuffixIdleTimeoutConnection      = "idle-timeout-connection"      // idle timeout for connection
 	SuffixInboundCIDRs               = "inbound-cidrs"                // inbound CIDRs
+	SuffixDroppedCIDRs               = "dropped-cidrs"                // dropped (blocked) CIDRs
+	SuffixACLDefaultAction           = "acl-default-action"           // listener ACL default action
 	SuffixHealthcheckPort            = "healthcheck-port"             // healthcheck port
 	SuffixHealthcheckProtocol        = "healthcheck-protocol"         // healthcheck protocol
 	SuffixSuccessCodes               = "success-codes"                // success codes, http/https only

@@ -99,6 +99,10 @@ spec:
                     allowedCidrs:
                       description: AllowedCidrs defines the allowed CIDR blocks
                       type: string
+                    blockedCidrs:
+                      description: BlockedCidrs defines CIDR blocks dropped before
+                        AllowedCidrs is consulted
+                      type: string
                     certificateAuthorities:
                       description: CertificateAuthorities is a list of certificate
                         authorities for mutual TLS (for L7)
@@ -138,6 +142,13 @@ spec:
                     clientCertificateId:
                       description: ClientCertificateId is the client certificate Id
                         for mutual TLS
+                      type: string
+                    defaultAction:
+                      description: DefaultAction applies to traffic that matches neither
+                        BlockedCidrs nor AllowedCidrs
+                      enum:
+                      - accept
+                      - drop
                       type: string
                     defaultPoolName:
                       description: DefaultPoolName is the name of the default pool
@@ -576,6 +587,19 @@ spec:
                     id:
                       description: Id is the ID of the created listener
                       type: string
+                    originalAcl:
+                      description: |-
+                        OriginalAcl records the ACL values this LBC displaced, field by field, so removing the
+                        annotation puts them back. Written before the update that displaces them, never rewritten
+                        while held. See ListenerAcl.
+                      properties:
+                        allowedCidrs:
+                          type: string
+                        blockedCidrs:
+                          type: string
+                        defaultAction:
+                          type: string
+                      type: object
                     originalDefaultPoolId:
                       description: |-
                         OriginalDefaultPoolId is the listener's defaultPoolId at the moment it was adopted, so
@@ -723,6 +747,19 @@ spec:
                         id:
                           description: Id is the ID of the created listener
                           type: string
+                        originalAcl:
+                          description: |-
+                            OriginalAcl records the ACL values this LBC displaced, field by field, so removing the
+                            annotation puts them back. Written before the update that displaces them, never rewritten
+                            while held. See ListenerAcl.
+                          properties:
+                            allowedCidrs:
+                              type: string
+                            blockedCidrs:
+                              type: string
+                            defaultAction:
+                              type: string
+                          type: object
                         originalDefaultPoolId:
                           description: |-
                             OriginalDefaultPoolId is the listener's defaultPoolId at the moment it was adopted, so

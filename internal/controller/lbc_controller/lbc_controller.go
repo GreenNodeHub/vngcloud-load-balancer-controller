@@ -18,6 +18,7 @@ package lbc_controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -177,6 +178,12 @@ func (r *LoadBalancerConfigReconciler) reconcileEnsure(ctx context.Context, req 
 		err = r.lbcUseCase.EnsureLoadBalancerConfigUseCase(ctx, req)
 	}
 	r.metricsCollector.ObserveControllerReconcileLatency(controllerName, "ensure", ensureFn)
+	var warning *domain.ReconcileWarning
+	if errors.As(err, &warning) {
+		r.eventRecorder.Event(obj, corev1.EventTypeWarning, domain.LBCEventReasonSharedListenerAcl, warning.Error())
+		ownerevents.RecordEventOnOwner(r.restMapper, r.eventRecorder, obj, corev1.EventTypeWarning, domain.LBCEventReasonSharedListenerAcl, warning.Error())
+		return nil
+	}
 	if err != nil {
 		return errs.NewErrorWithMetrics(controllerName, "ensure_error", err, r.metricsCollector)
 	}

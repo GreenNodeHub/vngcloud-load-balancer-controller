@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	global "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 	"github.com/pkg/errors"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	global "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/glb/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )

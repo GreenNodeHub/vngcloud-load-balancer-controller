@@ -6,7 +6,7 @@
 
 **VNGCloud Platform (primary integration):**
 - VNGCloud VLB (Virtual Load Balancer) API
-  - SDK/Client: `github.com/vngcloud/vngcloud-go-sdk/v2` via `client.IClient`
+  - SDK/Client: `github.com/GreenNodeHub/vngcloud-go-sdk/v2` via `client.IClient`
   - Endpoint config: `global.vserverURL` + `vlb-gateway` suffix
   - Used in: `internal/repository/vngcloud_repo/vngcloud_loadbalancer.go`, `vngcloud_listener.go`, `vngcloud_pool.go`, `vngcloud_policy.go`
   - Auth: OAuth2 client credentials (`global.clientID` / `global.clientSecret`)
@@ -22,7 +22,7 @@
   - Used in: `internal/repository/vngcloud_repo/vngcloud_global.go`
 
 - VNGCloud IAM / Portal API
-  - SDK/Client: `github.com/vngcloud/vngcloud-go-sdk/v2` portal service
+  - SDK/Client: `github.com/GreenNodeHub/vngcloud-go-sdk/v2` portal service
   - Endpoint config: `global.identityURL` (e.g., `https://iamapis.vngcloud.vn/accounts-api`)
   - Purpose: Resolve under-project-ID to real project ID and user ID at startup
   - Entry point: `internal/repository/vngcloud_repo/vngcloud_repo.go` `setupProjectId()`
@@ -54,7 +54,7 @@
 **VNGCloud OAuth2:**
 - Provider: VNGCloud IAM (`global.identityURL`)
 - Flow: Client credentials grant using `global.clientID` + `global.clientSecret`
-- Implemented via `github.com/vngcloud/vngcloud-go-sdk/v2/client.NewSdkConfigure()`
+- Implemented via `github.com/GreenNodeHub/vngcloud-go-sdk/v2/client.NewSdkConfigure()`
 - Token management handled internally by the SDK
 
 **Project/User Resolution (startup):**
