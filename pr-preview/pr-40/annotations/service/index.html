@@ -910,6 +910,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#access-control-acl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access control (ACL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#health-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1240,6 +1251,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#access-control-acl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access control (ACL)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#health-checks" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1439,10 +1461,62 @@
 <td>integer (seconds)</td>
 <td>Connection timeout</td>
 </tr>
+</tbody>
+</table>
+<h2 id="access-control-acl">Access control (ACL)<a class="headerlink" href="#access-control-acl" title="Permanent link">&para;</a></h2>
+<p>Applied to every listener of this resource. The first matching rule wins: dropped CIDRs are checked first, then inbound (allowed) CIDRs; only traffic matching neither follows the default action. Dropped traffic is discarded silently (clients time out). IPv6 is not supported.</p>
+<table>
+<thead>
+<tr>
+<th>Annotation</th>
+<th>Values</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td><code>vks.vngcloud.vn/inbound-cidrs</code></td>
 <td>CIDR list</td>
-<td>Restrict inbound traffic to these CIDRs</td>
+<td>Allowed source CIDRs. Implies <code>acl-default-action: drop</code> unless set</td>
+</tr>
+<tr>
+<td><code>vks.vngcloud.vn/dropped-cidrs</code></td>
+<td>comma-separated IPv4 CIDRs or addresses</td>
+<td>Source CIDRs dropped first. <code>0.0.0.0/0</code> drops everything. <code>""</code> keeps the list managed and empty</td>
+</tr>
+<tr>
+<td><code>vks.vngcloud.vn/acl-default-action</code></td>
+<td><code>accept</code> | <code>drop</code></td>
+<td>Action for traffic that matches no rule</td>
+</tr>
+</tbody>
+</table>
+<p>Removing an annotation puts back the value the listener had before the controller changed it. ACL values set on the portal are left alone while no annotation manages them.</p>
+<p><strong>Shared load balancers.</strong> Services sharing a load balancer (via <code>vks.vngcloud.vn/load-balancer-id</code>) that use the same port share that listener, and so one ACL. Declare the ACL on one of them; different dropped CIDRs or default actions (including the <code>drop</code> that <code>inbound-cidrs</code> implies) on the same port are rejected. Different inbound CIDRs only produce a <code>SharedListenerAcl</code> warning event, and the listener follows whichever Service applied last. A resource without the annotations on such a listener also receives a <code>SharedListenerAcl</code> warning event.</p>
+<p>If the Service holding the original is removed first, the last value can remain on the listener. To clear it, remove the annotation from the remaining Service, then clear the leftover value on the portal. Alternatively, keep <code>vks.vngcloud.vn/dropped-cidrs: ""</code> on the remaining Service permanently: it records the leftover value as the original, so removing it later puts the block back.</p>
+<table>
+<thead>
+<tr>
+<th>Goal</th>
+<th>Annotations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Drop a few addresses</td>
+<td><code>vks.vngcloud.vn/dropped-cidrs: "203.0.113.9/32,198.51.100.0/24"</code></td>
+</tr>
+<tr>
+<td>Allow only some ranges</td>
+<td><code>vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"</code></td>
+</tr>
+<tr>
+<td>Allow a range except a few addresses</td>
+<td><code>vks.vngcloud.vn/inbound-cidrs: "192.0.2.0/24"</code> + <code>vks.vngcloud.vn/dropped-cidrs: "192.0.2.13/32"</code> (dropped is checked first)</td>
+</tr>
+<tr>
+<td>Drop everything</td>
+<td><code>vks.vngcloud.vn/dropped-cidrs: "0.0.0.0/0"</code></td>
 </tr>
 </tbody>
 </table>
