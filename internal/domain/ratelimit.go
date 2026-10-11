@@ -22,9 +22,17 @@ type RateLimitError struct {
 	cause      error
 }
 
+// Error deliberately leaves the SDK's own text out. On HTTP 429 the SDK labels the error
+// "permission denied when making request to external service" - the same sentence for every
+// 429, because vngcloud/client/http.go maps 429 to WithErrorPermissionDenied and
+// SdkErrorHandler returns as soon as an error code is set, so no product matcher ever runs.
+// The sentence therefore carries no information, and it is wrong: this message is what lands
+// on the CR as status.lastReconcileMessage, which an operator reads before the logs. Pointing
+// them at an IAM problem that does not exist is how the previous rate-limit incident lost its
+// first hours. The cause stays reachable through Unwrap for anything that wants it.
 func (e *RateLimitError) Error() string {
-	return fmt.Sprintf("vngcloud rate limit exceeded (retry after %s) on %s %s: %v",
-		e.RetryAfter, e.Method, e.URL, e.cause)
+	return fmt.Sprintf("vngcloud rate limit exceeded (retry after %s) on %s %s",
+		e.RetryAfter, e.Method, e.URL)
 }
 
 func (e *RateLimitError) Unwrap() error { return e.cause }
