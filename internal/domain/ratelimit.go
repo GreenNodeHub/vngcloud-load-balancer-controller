@@ -22,14 +22,12 @@ type RateLimitError struct {
 	cause      error
 }
 
-// Error deliberately leaves the SDK's own text out. On HTTP 429 the SDK labels the error
-// "permission denied when making request to external service" - the same sentence for every
-// 429, because vngcloud/client/http.go maps 429 to WithErrorPermissionDenied and
-// SdkErrorHandler returns as soon as an error code is set, so no product matcher ever runs.
-// The sentence therefore carries no information, and it is wrong: this message is what lands
-// on the CR as status.lastReconcileMessage, which an operator reads before the logs. Pointing
-// them at an IAM problem that does not exist is how the previous rate-limit incident lost its
-// first hours. The cause stays reachable through Unwrap for anything that wants it.
+// Error deliberately leaves the SDK's own text out. On a 429 that text is a constant the SDK
+// substitutes for whatever the server said - "permission denied when making request to external
+// service" up to v2.23.0, "rate limited by external service, too many requests" from v2.24.0 -
+// so it adds nothing to a message that already names the method, the URL and the retry hint.
+// This message is what lands on the CR as status.lastReconcileMessage, which an operator reads
+// before the logs, so it stays short and stable. The cause remains reachable through Unwrap.
 func (e *RateLimitError) Error() string {
 	return fmt.Sprintf("vngcloud rate limit exceeded (retry after %s) on %s %s",
 		e.RetryAfter, e.Method, e.URL)
@@ -51,12 +49,15 @@ func SDKError(sdkErr sdk_error.IError) error {
 	return sdkErr.GetError()
 }
 
+// parseRateLimit recognises a throttle by the SDK's error code. Up to v2.23.0 that code was
+// shared with HTTP 403, so the only way to tell the two apart was the raw status in the
+// parameters; from v2.24.0 the code says it (GreenNodeHub/vngcloud-go-sdk#4). The parameters are
+// still read, but for the retry hint rather than to decide what the error is.
 func parseRateLimit(sdkErr sdk_error.IError) *RateLimitError {
-	params := sdkErr.GetParameters()
-	code, _ := params["statusCode"].(int)
-	if code != http.StatusTooManyRequests {
+	if sdkErr.GetErrorCode() != sdk_error.EcTooManyRequests {
 		return nil
 	}
+	params := sdkErr.GetParameters()
 	headers, _ := params["responseHeaders"].(http.Header)
 	method, _ := params["method"].(string)
 	url, _ := params["url"].(string)
