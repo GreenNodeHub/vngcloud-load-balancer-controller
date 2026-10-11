@@ -21,6 +21,13 @@ func HandleReconcileError(err error, log *logrus.Entry) (ctrl.Result, error) {
 		wait := domain.RateLimitRequeueAfter(rateLimit.RetryAfter)
 		log.Warnf("rate limited by VngCloud API, requeue after %s (server hint: %s, %s %s)",
 			wait, rateLimit.RetryAfter, rateLimit.Method, rateLimit.URL)
+		// The warning above is the line an operator reads, so it stays short; the server's own
+		// reason goes here. Nothing else prints it - the CR message is built from Error(), which
+		// leaves it out on purpose - so without this line it would only be reachable through
+		// Unwrap, by no one.
+		if cause := errors.Unwrap(rateLimit); cause != nil {
+			log.Debugf("rate limit cause from the API: %v", cause)
+		}
 		return ctrl.Result{RequeueAfter: wait}, nil
 	}
 

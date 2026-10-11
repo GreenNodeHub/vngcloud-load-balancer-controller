@@ -11,9 +11,10 @@ import (
 // the VNGCloud API the same question on every reconcile.
 //
 // Those repeated reads are what exhausts the per-project rate limit: once the project's
-// budget is gone every caller in it starts getting 429, which the SDK reports as
-// "permission denied", and unrelated work across the whole project stalls. Each cache
-// here removes one such read from the hot path.
+// budget is gone every caller in it starts getting 429, and unrelated work across the whole
+// project stalls. Each cache here removes one such read from the hot path. (Until SDK
+// v2.24.0 a 429 also arrived labelled "permission denied", which sent more than one incident
+// after an authorisation problem that did not exist.)
 //
 // Deliberately minimal: entries expire, the map is bounded, and exactly one instance per
 // kind is built per process in NewVngCloudRepository. A cache allocated per reconcile has

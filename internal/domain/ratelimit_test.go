@@ -10,13 +10,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// makeSDKErr builds what the SDK hands back for statusCode. From v2.24.0 a 429 carries
+// EcTooManyRequests, so the fixture applies the SDK's own option rather than only setting the
+// parameters - a fixture that carried the status without the code would be testing a shape the
+// SDK no longer produces.
 func makeSDKErr(statusCode int, headers http.Header) sdk_error.IError {
-	return sdk_error.ErrorHandler(errors.New("upstream rejected")).WithKVparameters(
+	sdkErr := sdk_error.ErrorHandler(errors.New("upstream rejected")).WithKVparameters(
 		"statusCode", statusCode,
 		"url", "https://example/api",
 		"method", "GET",
 		"responseHeaders", headers,
 	)
+	if statusCode == http.StatusTooManyRequests {
+		sdk_error.WithErrorTooManyRequests()(sdkErr)
+	}
+	return sdkErr
 }
 
 func TestSDKError_NotRateLimit(t *testing.T) {
@@ -126,4 +134,24 @@ func TestRateLimitErrorStillUnwrapsToTheSdkError(t *testing.T) {
 
 	assert.True(t, IsRateLimitExceeded(err))
 	assert.Equal(t, cause.Error(), errors.Unwrap(err).Error())
+}
+
+// #33486: the SDK used to report 429 and 403 under one code, so the only way to tell a throttle
+// apart was to read the raw status out of the parameters. From v2.24.0 the code says it, and that
+// is what the controller should believe - the parameters stay in use for the retry hint, not for
+// deciding what the error is.
+func TestSDKErrorRecognisesARateLimitByItsErrorCode(t *testing.T) {
+	sdkErr := sdk_error.ErrorHandler(errors.New("rate limited by external service, too many requests"))
+	sdk_error.WithErrorTooManyRequests()(sdkErr) // coded as a throttle, no statusCode parameter at all
+
+	assert.True(t, IsRateLimitExceeded(SDKError(sdkErr)))
+}
+
+// And a real authorisation failure still is not one, which is the distinction the SDK change
+// exists to make.
+func TestSDKErrorDoesNotTakePermissionDeniedForARateLimit(t *testing.T) {
+	sdkErr := sdk_error.ErrorHandler(errors.New("permission denied when making request to external service"))
+	sdk_error.WithErrorPermissionDenied()(sdkErr)
+
+	assert.False(t, IsRateLimitExceeded(SDKError(sdkErr)))
 }
