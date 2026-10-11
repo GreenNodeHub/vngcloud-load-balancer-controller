@@ -1,6 +1,6 @@
 # VNGCloud Load Balancer Controller
 
-[![Go Version](https://img.shields.io/badge/go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/go-1.26%2B-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Helm Chart](https://img.shields.io/badge/helm-OCI-0F1689?logo=helm)](https://vcr.vngcloud.vn/81-vks-public/vks-helm-charts/vngcloud-load-balancer-controller)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-526CFE?logo=materialformkdocs)](https://vngcloud.github.io/vngcloud-load-balancer-controller/)

@@ -5,7 +5,7 @@
 ## Languages
 
 **Primary:**
-- Go 1.25.0 (toolchain go1.25.9) - All application code, controllers, use-cases, repositories
+- Go 1.26.0 (toolchain go1.26.9) - All application code, controllers, use-cases, repositories
 
 **Secondary:**
 - YAML - Kubernetes manifests, Helm chart templates, configuration files
@@ -15,7 +15,7 @@
 
 **Environment:**
 - Container runtime: `gcr.io/distroless/static:nonroot` (production base image)
-- Build image: `golang:1.25` (multi-stage Docker build)
+- Build image: `golang:1.26.9` (multi-stage Docker build)
 - Binary runs as UID/GID 65532 (nonroot)
 
 **Package Manager:**
@@ -101,14 +101,14 @@
 - `--disable-*-controller` flags for each of 7 controllers
 
 **Build:**
-- `Dockerfile` - Multi-stage build; builder stage uses `golang:1.25`, final stage `gcr.io/distroless/static:nonroot`
+- `Dockerfile` - Multi-stage build; builder stage uses `golang:1.26.9`, final stage `gcr.io/distroless/static:nonroot`
 - Version and commit injected via ldflags: `-X github.com/vngcloud/vngcloud-load-balancer-controller/pkg/version.Version` and `.Commit`
 - Target binary: `manager` at repo root
 
 ## Platform Requirements
 
 **Development:**
-- Go 1.25+ (toolchain 1.25.9)
+- Go 1.26+ (toolchain 1.26.9)
 - Docker (or compatible container tool) for image builds
 - `kubectl` for deployment operations
 - `kustomize` / `helm` for manifest generation
