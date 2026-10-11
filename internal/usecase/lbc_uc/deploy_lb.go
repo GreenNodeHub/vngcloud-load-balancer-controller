@@ -8,10 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
@@ -26,6 +26,13 @@ type defaultModelDeployTask struct {
 	vngcloudRepo repository.VngCloudRepository
 	k8sRepo      repository.K8sRepository
 	lbConfig     *v1alpha1.LoadBalancerConfig
+
+	// aclPeers holds, per listener port, which ACL fields another LBC sharing the load balancer
+	// declares. Filled by validateCrossListenerAcl.
+	aclPeers map[int32]map[aclField]*aclDeclaration
+
+	// warnings are reported to the user as events; they do not fail the reconcile.
+	warnings []string
 }
 
 func (t *defaultModelDeployTask) deploy(ctx context.Context) error {

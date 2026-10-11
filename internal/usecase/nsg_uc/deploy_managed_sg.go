@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	networkv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/anngdinh/operator-helper/contexts"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 )

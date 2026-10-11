@@ -66,6 +66,20 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 			// perform.
 			delete(createdTags, domain.ClusterTagKey)
 		} else if t.lbConfig.Spec.ClusterId != nil {
+			// What makes the id ours to take off is that this cluster is leaving, not that we
+			// still remember writing it. recordedTags comes from status.createdTags, a single
+			// record shared by every load balancer this LBC has touched: tearing down a
+			// retiring load balancer overwrites it with that one's tags, so by the next
+			// reconcile it no longer names the cluster tag here. Then buildTag kept the key in
+			// the write, its removal check - which only fires on a key the write drops - never
+			// saw a removal, and the id stayed on the load balancer for good.
+			//
+			// Naming the key here is what asks for its removal. The shortened value below puts
+			// it straight back when other clusters are still listed.
+			if _, present := currentTags[domain.ClusterTagKey]; present {
+				createdTags[domain.ClusterTagKey] = currentTags[domain.ClusterTagKey]
+			}
+
 			// ensure remove ClusterTagKey
 			vksClusterValue := currentTags[domain.ClusterTagKey]
 			vksClusterValue = removeTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)

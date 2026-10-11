@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/common"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	networkv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"github.com/anngdinh/operator-helper/contexts"
 	clone "github.com/huandu/go-clone"
 	"github.com/pkg/errors"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/common"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/inter"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
-	networkv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/network/v2"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 
@@ -940,6 +940,8 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			TimeoutMember:                   listener.TimeoutMember,
 			TimeoutConnection:               listener.TimeoutConnection,
 			AllowedCidrs:                    listener.AllowedCidrs,
+			BlockedCidrs:                    listener.BlockedCidrs,
+			DefaultAction:                   string(listener.DefaultAction),
 			DisplayStatus:                   consts.ACTIVE_LOADBALANCER_STATUS,
 			CreatedAt:                       time.Now().Format(time.RFC3339),
 			UpdatedAt:                       time.Now().Format(time.RFC3339),
@@ -949,6 +951,9 @@ func (m *MockProvider) CreateListener(ctx context.Context, lbID string, opt load
 			DefaultCertificateAuthority:     nil,
 			ClientCertificateAuthentication: nil,
 		},
+	}
+	if newListener.DefaultAction == "" {
+		newListener.DefaultAction = string(loadbalancerv2.ListenerDefaultActionDrop) // what vLB reports (measured 2026-10-01)
 	}
 	if listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTPS ||
 		listener.ListenerProtocol == loadbalancerv2.ListenerProtocolHTTP {
@@ -1041,6 +1046,13 @@ func (m *MockProvider) UpdateListener(ctx context.Context, lbID, listenerID stri
 	listener.TimeoutConnection = updateOpt.TimeoutConnection
 	listener.TimeoutMember = updateOpt.TimeoutMember
 	listener.AllowedCidrs = updateOpt.AllowedCidrs
+	// vLB keeps any field a PUT leaves null or out, so the mock does too.
+	if updateOpt.BlockedCidrs != nil {
+		listener.BlockedCidrs = *updateOpt.BlockedCidrs
+	}
+	if updateOpt.DefaultAction != nil {
+		listener.DefaultAction = string(*updateOpt.DefaultAction)
+	}
 
 	if listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTPs) ||
 		listener.Protocol == string(loadbalancerv2.HealthCheckProtocolHTTP) {
