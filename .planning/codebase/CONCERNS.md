@@ -4,9 +4,9 @@
 
 ## Tech Debt
 
-**Unimplemented rate-limit error detection:**
-- Issue: `IsRateLimitExceeded` always returns `false`. Any API rate-limit errors from VNGCloud are treated as generic errors and trigger a full requeue instead of being handled gracefully (e.g., with exponential back-off).
-- Files: `internal/domain/error.go:72`
+**Rate limits reach the controller as a constant sentence:**
+- Issue: the SDK replaces whatever the server said about a 429 with a fixed string (`WithErrorTooManyRequests`), so the reason behind a throttle - which quota, which bucket - never reaches the controller. Detection itself works: `IsRateLimitExceeded` matches `*domain.RateLimitError`, built from the SDK's `EcTooManyRequests` code, and `HandleReconcileError` requeues on the server's `X-Ratelimit-Reset` hint with a floor and jitter.
+- Files: `internal/domain/ratelimit.go`, `pkg/errs/reconcile.go`
 - Impact: Under heavy load, the controller can enter a tight retry loop that amplifies the rate-limit condition.
 - Fix approach: Inspect the VNGCloud SDK error body for a rate-limit indicator and return `true` accordingly.
 
@@ -152,9 +152,9 @@
 
 ## Missing Critical Features
 
-**No rate-limit handling:**
-- Problem: The cloud API can return rate-limit errors, but `IsRateLimitExceeded` is a stub returning `false`. There is no back-off beyond the controller-runtime default requeue delay.
-- Blocks: Safe operation at high reconcile frequency; responsible behaviour when multiple clusters share the same VNGCloud project quota.
+**No coordination between clusters sharing one project quota:**
+- Problem: rate limits are now detected and backed off per controller (`domain.RateLimitRequeueAfter` honours the server hint with a floor and jitter), but nothing coordinates across the clusters sharing a VNGCloud project. When the project's budget runs out, every controller in it backs off on its own clock and they can come back together.
+- Blocks: responsible behaviour when many clusters share the same project quota.
 
 **No inter-LBC listener/pool inlined at creation for INTERVPC:**
 - Problem: `buildCreateLoadBalancerRequest` for INTERVPC LBs skips attaching the initial listener and pool to the creation request.
