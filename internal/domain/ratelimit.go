@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/sdk_error"
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/sdk_error"
 )
 
 // RateLimitError indicates the VngCloud API returned HTTP 429 (Too Many

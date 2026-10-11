@@ -2,15 +2,18 @@ package lbc_uc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	loadbalancerv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/api/v1alpha1"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
 )
@@ -447,4 +450,154 @@ func TestAdoptionStillHappensOnALoadBalancerThisClusterAdopted(t *testing.T) {
 	assert.True(t, task.lbConfig.Status.CreatedListeners[0].Adopted)
 	require.NotNil(t, task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
 	assert.Equal(t, usersPoolId, *task.lbConfig.Status.CreatedListeners[0].OriginalDefaultPoolId)
+}
+
+func noPeer(aclField) bool { return false }
+
+// The owner gets back the ACL they had, not ours; a field we never held is left out of the PUT.
+func TestRestoringAnAdoptedListenerPutsItsAclBack(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t)
+	var sent *loadbalancerv2.UpdateListenerRequest
+	vng.EXPECT().UpdateListener(mock.Anything, "lb-user", usersListenerId, mock.Anything).
+		RunAndReturn(func(_ context.Context, _, _ string, o loadbalancerv2.IUpdateListenerRequest) error {
+			sent = o.(*loadbalancerv2.UpdateListenerRequest)
+			return nil
+		}).Once()
+	task := adoptedListenerTask(vng, repository.NewMockK8sRepository(t), true)
+
+	err := task.restoreAdoptedListener(context.Background(), "lb-user",
+		&entityv2.Listener{UUID: usersListenerId, DefaultPoolId: "", AllowedCidrs: "0.0.0.0/0", BlockedCidrs: "203.0.113.9/32", DefaultAction: "drop"},
+		ptrTo(usersPoolId), &v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/32")}, noPeer)
+
+	require.NoError(t, err)
+	assert.Equal(t, "192.0.2.1/32", *sent.BlockedCidrs)
+	assert.Nil(t, sent.DefaultAction, "a field we never held is left out, so vLB keeps it")
+}
+
+func TestRestoringAnAdoptedListenerWithNothingDisplacedSendsNothing(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t) // UpdateListener undeclared: a call fails the test
+	task := adoptedListenerTask(vng, repository.NewMockK8sRepository(t), true)
+	require.NoError(t, task.restoreAdoptedListener(context.Background(), "lb-user",
+		&entityv2.Listener{UUID: usersListenerId, DefaultPoolId: usersPoolId, BlockedCidrs: "192.0.2.1/32"},
+		ptrTo(usersPoolId), &v1alpha1.ListenerAcl{BlockedCidrs: ptrTo("192.0.2.1/32")}, noPeer))
+}
+
+// ---------------------------------------------------------------------------
+// Handing back an adopted listener another LBC still uses
+// ---------------------------------------------------------------------------
+
+const sharedAllowed = "10.0.0.0/8"
+
+// sharedAdoptedTask is LBC default/a on its way out, holding the record of the user's original
+// allowed CIDRs on the adopted port-80 listener.
+func sharedAdoptedTask(vng *repository.MockVngCloudRepository, k8s *repository.MockK8sRepository) *defaultModelDeployTask {
+	task := adoptedListenerTask(vng, k8s, true)
+	task.lbConfig.Namespace, task.lbConfig.Name = "default", "a"
+	task.lbConfig.Status.CreatedListeners[0].OriginalAcl = &v1alpha1.ListenerAcl{AllowedCidrs: ptrTo("0.0.0.0/0")}
+	return task
+}
+
+// onTheSharedLoadBalancer is onTheLoadBalancer with the listener filtering by sharedAllowed.
+func onTheSharedLoadBalancer(vng *repository.MockVngCloudRepository) {
+	vng.EXPECT().
+		ListListenerOfLB(mock.Anything, "lb-user").
+		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{
+			{UUID: usersListenerId, ProtocolPort: 80, DefaultPoolId: "", AllowedCidrs: sharedAllowed},
+		}}, nil)
+	vng.EXPECT().
+		ListPolicyOfListener(mock.Anything, "lb-user", usersListenerId).
+		Return(&entityv2.ListPolicies{Items: []*entityv2.Policy{{UUID: ourPolicyId}}}, nil)
+	vng.EXPECT().
+		DeletePolicy(mock.Anything, "lb-user", usersListenerId, ourPolicyId).
+		Return(nil).Once()
+	vng.EXPECT().
+		WaitForLBActive(mock.Anything, "lb-user").
+		Return(&entityv2.LoadBalancer{UUID: "lb-user"}, nil)
+}
+
+// lbcsInTheCluster makes the cluster hold the departing LBC itself plus the given others.
+func lbcsInTheCluster(k8s *repository.MockK8sRepository, self *v1alpha1.LoadBalancerConfig, others ...v1alpha1.LoadBalancerConfig) {
+	k8s.EXPECT().
+		ListLoadBalancerConfig(mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, list *v1alpha1.LoadBalancerConfigList, _ ...client.ListOption) error {
+			list.Items = append([]v1alpha1.LoadBalancerConfig{*self.DeepCopy()}, others...)
+			return nil
+		}).Once()
+}
+
+func lbcOn(name, lbId string, listeners ...v1alpha1.Listener) v1alpha1.LoadBalancerConfig {
+	return v1alpha1.LoadBalancerConfig{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: name},
+		Spec:       v1alpha1.LoadBalancerConfigSpec{LoadBalancerId: ptrTo(lbId), Listeners: listeners},
+	}
+}
+
+func captureUpdateListener(vng *repository.MockVngCloudRepository) **loadbalancerv2.UpdateListenerRequest {
+	var sent *loadbalancerv2.UpdateListenerRequest
+	vng.EXPECT().UpdateListener(mock.Anything, "lb-user", usersListenerId, mock.Anything).
+		RunAndReturn(func(_ context.Context, _, _ string, o loadbalancerv2.IUpdateListenerRequest) error {
+			sent = o.(*loadbalancerv2.UpdateListenerRequest)
+			return nil
+		}).Once()
+	return &sent
+}
+
+// The break this catches: Ingress a and b pin the same customer load balancer and both declare
+// inbound-cidrs on the adopted :80 listener. Deleting a must not open the listener to everyone
+// while b still asks for the whitelist - nothing would make b reconcile and close it again.
+func TestHandingBackASharedAdoptedListenerLeavesThePeersAclAlone(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	onTheSharedLoadBalancer(vng)
+	sent := captureUpdateListener(vng)
+	task := sharedAdoptedTask(vng, k8s)
+	lbcsInTheCluster(k8s, task.lbConfig,
+		lbcOn("b", "lb-user", v1alpha1.Listener{ProtocolPort: 80, AllowedCidrs: ptrTo(sharedAllowed)}))
+
+	require.NoError(t, task.deleteRedundantListenersFrom(context.Background(), "lb-user",
+		task.lbConfig.Status.CreatedListeners, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}))
+
+	require.NotNil(t, *sent, "the default pool is still handed back")
+	assert.Equal(t, usersPoolId, (*sent).DefaultPoolId)
+	assert.Equal(t, sharedAllowed, (*sent).AllowedCidrs,
+		"b still declares the whitelist, so a's record is dropped instead of restored")
+	assert.Nil(t, (*sent).BlockedCidrs)
+	assert.Nil(t, (*sent).DefaultAction)
+}
+
+// A peer on the load balancer that declares nothing on the port, and one declaring it on another
+// load balancer, change nothing: the owner gets their ACL back as before.
+func TestHandingBackAnAdoptedListenerNoPeerDeclaresRestoresTheAcl(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	onTheSharedLoadBalancer(vng)
+	sent := captureUpdateListener(vng)
+	task := sharedAdoptedTask(vng, k8s)
+	lbcsInTheCluster(k8s, task.lbConfig,
+		lbcOn("b", "lb-user", v1alpha1.Listener{ProtocolPort: 80}, v1alpha1.Listener{ProtocolPort: 443, AllowedCidrs: ptrTo(sharedAllowed)}),
+		lbcOn("c", "lb-other", v1alpha1.Listener{ProtocolPort: 80, AllowedCidrs: ptrTo(sharedAllowed)}))
+
+	require.NoError(t, task.deleteRedundantListenersFrom(context.Background(), "lb-user",
+		task.lbConfig.Status.CreatedListeners, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{}))
+
+	require.NotNil(t, *sent)
+	assert.Equal(t, usersPoolId, (*sent).DefaultPoolId)
+	assert.Equal(t, "0.0.0.0/0", (*sent).AllowedCidrs)
+}
+
+// Not knowing whether a peer still declares the ACL is not a reason to restore it anyway: the
+// teardown fails and retries rather than risk opening a peer's whitelist.
+func TestHandingBackAnAdoptedListenerFailsClosedWhenPeersCannotBeListed(t *testing.T) {
+	vng := repository.NewMockVngCloudRepository(t) // UpdateListener undeclared: a call fails the test
+	k8s := repository.NewMockK8sRepository(t)
+	onTheSharedLoadBalancer(vng)
+	task := sharedAdoptedTask(vng, k8s)
+	k8s.EXPECT().ListLoadBalancerConfig(mock.Anything, mock.Anything).
+		Return(errors.New("apiserver unavailable")).Once()
+
+	err := task.deleteRedundantListenersFrom(context.Background(), "lb-user",
+		task.lbConfig.Status.CreatedListeners, []v1alpha1.CreatedListener{}, []v1alpha1.CreatedPool{})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "apiserver unavailable")
 }

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/GreenNodeHub/vngcloud-go-sdk/v2/client"
+	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
+	portalv1 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/portal/v1"
 	"github.com/anngdinh/operator-helper/contexts"
 	cuongpigerutils "github.com/cuongpiger/joat/utils"
 	"github.com/pkg/errors"
-	"github.com/vngcloud/vngcloud-go-sdk/v2/client"
-	entityv2 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/entity"
-	portalv1 "github.com/vngcloud/vngcloud-go-sdk/v2/vngcloud/services/portal/v1"
 
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/domain"
 	"github.com/vngcloud/vngcloud-load-balancer-controller/internal/repository"
