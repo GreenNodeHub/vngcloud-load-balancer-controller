@@ -33,6 +33,13 @@ linters:
         linters:
           - dupl
           - lll
+      # Tests repeat the literals they are about - a CIDR, a protocol, a listener id - and the
+      # repetition is what makes each case readable on its own. Hoisting them into constants
+      # moves the thing under test away from the assertion, and goconst counts per package, so
+      # the warning only appears once enough cases exist to be worth reading.
+      - path: "_test\\.go$"
+        linters:
+          - goconst
   settings:
     revive:
       rules:
