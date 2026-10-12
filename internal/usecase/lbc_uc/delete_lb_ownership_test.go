@@ -3,16 +3,12 @@ package lbc_uc
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	entityv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/entity"
 	loadbalancerv2 "github.com/GreenNodeHub/vngcloud-go-sdk/v2/vngcloud/services/loadbalancer/v2"
@@ -577,157 +573,4 @@ func TestDeleteLoadBalancerReReadsTagsBeforeConcludingItIsNotLastOut(t *testing.
 	vngcloud.EXPECT().DeleteLoadBalancer(mock.Anything, "lb-1").Return(nil).Once()
 
 	assert.NoError(t, task.delete(context.Background()))
-}
-
-// QC's closing point: when a VKS-made load balancer is left behind with nobody on it, the
-// teardown says "Delete successful" and goes quiet. In production nobody learns about it until
-// the bill arrives. The cases that can still orphan one are known and out of scope - a cluster
-// destroyed outright, an adopted listener still carrying a departed cluster's policies - but
-// leaving silently is a separate choice, and a warning costs nothing.
-func TestDeleteLoadBalancerWarnsWhenItLeavesAVksLoadBalancerWithNobodyOnIt(t *testing.T) {
-	vngcloud := repository.NewMockVngCloudRepository(t)
-	k8s := repository.NewMockK8sRepository(t)
-	vngcloud.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-1").
-		Return(&entityv2.LoadBalancer{UUID: "lb-1"}, nil).Maybe()
-	// a listener this LBC has no record of: the load balancer can neither be covered nor emptied,
-	// so the teardown walks away and leaves it standing
-	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
-		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{{UUID: "lis-9", Name: "left-behind"}}}, nil).Maybe()
-	vngcloud.EXPECT().ListPool(mock.Anything, "lb-1").
-		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil).Maybe()
-	vngcloud.EXPECT().ListPolicyOfListener(mock.Anything, "lb-1", "lis-9").
-		Return(&entityv2.ListPolicies{Items: []*entityv2.Policy{}}, nil).Maybe()
-	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(&entityv2.ListTags{Items: []*entityv2.Tag{
-		{Key: domain.CreatedByClusterTagKey, Value: siblingClusterId},
-		{Key: domain.ClusterTagKey, Value: ownershipClusterId},
-	}}, nil).Maybe()
-	vngcloud.EXPECT().CreateTags(mock.Anything, "lb-1", mock.Anything).Return(nil).Maybe()
-	vngcloud.EXPECT().InvalidateTagsCache("lb-1").Maybe()
-	soleLBCInTheCluster(k8s)
-
-	logger := logrus.New()
-	hook := logrustest.NewLocal(logger)
-	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
-	task.logger = logger.WithField("test", t.Name())
-
-	assert.NoError(t, task.delete(context.Background()))
-
-	// Exactly once. ensureTags runs its closure twice - the cached read, then the read-through -
-	// so a warning raised from inside it is said twice and, worse, the first time off tags that
-	// may be five minutes old.
-	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook),
-		"leaving a VKS load balancer with no cluster left on it should say so, once")
-}
-
-// warningsAbout returns one entry per Warn mentioning the load balancer these tests use,
-// collapsed to its id so the count is what the assertion is about.
-func warningsAbout(hook *logrustest.Hook) []string {
-	var out []string
-	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "lb-1") {
-			out = append(out, "lb-1")
-		}
-	}
-	return out
-}
-
-// A load balancer another cluster made, that this one was never listed on, is not this cluster's
-// orphan to announce. removeTagValue returns the empty string both for "we were the last id" and
-// for "there was no cluster list at all", so without a separate check the teardown would warn
-// about somebody else's load balancer every time it walked past one.
-func TestDeleteLoadBalancerDoesNotCallSomebodyElsesLoadBalancerAnOrphan(t *testing.T) {
-	vngcloud := repository.NewMockVngCloudRepository(t)
-	k8s := repository.NewMockK8sRepository(t)
-	emptyLoadBalancer(vngcloud, map[string]string{
-		domain.CreatedByClusterTagKey: siblingClusterId, // no cluster list: we were never on it
-	})
-	soleLBCInTheCluster(k8s)
-
-	logger := logrus.New()
-	hook := logrustest.NewLocal(logger)
-	task := ownershipTask(vngcloud, k8s, nil, nil)
-	task.logger = logger.WithField("test", t.Name())
-
-	assert.NoError(t, task.delete(context.Background()))
-
-	assert.Empty(t, warningsAbout(hook))
-}
-
-// orphanScenario mocks a load balancer this teardown cannot clear: a listener it has no record
-// of, so it is neither coverable nor empty, and the cluster tag names only this cluster.
-func orphanScenario(vngcloud *repository.MockVngCloudRepository) {
-	vngcloud.EXPECT().GetLoadBalancerByID(mock.Anything, "lb-1").
-		Return(&entityv2.LoadBalancer{UUID: "lb-1"}, nil).Maybe()
-	vngcloud.EXPECT().ListListenerOfLB(mock.Anything, "lb-1").
-		Return(&entityv2.ListListeners{Items: []*entityv2.Listener{{UUID: "lis-9", Name: "left-behind"}}}, nil).Maybe()
-	vngcloud.EXPECT().ListPool(mock.Anything, "lb-1").
-		Return(&entityv2.ListPools{Items: []*entityv2.Pool{}}, nil).Maybe()
-	vngcloud.EXPECT().ListPolicyOfListener(mock.Anything, "lb-1", "lis-9").
-		Return(&entityv2.ListPolicies{Items: []*entityv2.Policy{}}, nil).Maybe()
-	vngcloud.EXPECT().ListTags(mock.Anything, "lb-1").Return(&entityv2.ListTags{Items: []*entityv2.Tag{
-		{Key: domain.CreatedByClusterTagKey, Value: siblingClusterId},
-		{Key: domain.ClusterTagKey, Value: ownershipClusterId},
-	}}, nil).Maybe()
-	vngcloud.EXPECT().CreateTags(mock.Anything, "lb-1", mock.Anything).Return(nil).Maybe()
-	vngcloud.EXPECT().InvalidateTagsCache("lb-1").Maybe()
-}
-
-// expectOtherLBCAlsoDeleting makes the lookup find a sibling LBC on the same load balancer that
-// is itself on the way out.
-func expectOtherLBCAlsoDeleting(k8sRepo *repository.MockK8sRepository, lbId string) {
-	gone := metav1.Now()
-	k8sRepo.EXPECT().
-		ListLoadBalancerConfig(mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, list *v1alpha1.LoadBalancerConfigList, _ ...client.ListOption) error {
-			list.Items = []v1alpha1.LoadBalancerConfig{{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "sibling", Namespace: "default", UID: "other-uid", DeletionTimestamp: &gone,
-				},
-				Status: v1alpha1.LoadBalancerConfigStatus{LoadBalancerId: ptr.To(lbId)},
-			}}
-			return nil
-		}).Maybe()
-	k8sRepo.EXPECT().PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Maybe()
-}
-
-// Two LBCs in one cluster going away together - a helm uninstall - is an ordinary thing, and the
-// one that happens to finish first must not announce a billing orphan. The tag lookup skips a
-// sibling that is already deleting, which is right for deciding whose tag it is, but says nothing
-// about whether that sibling will clear the load balancer. It usually will.
-func TestDeleteLoadBalancerDoesNotCryOrphanWhileASiblingIsStillOnItsWayOut(t *testing.T) {
-	vngcloud := repository.NewMockVngCloudRepository(t)
-	k8s := repository.NewMockK8sRepository(t)
-	orphanScenario(vngcloud)
-	expectOtherLBCAlsoDeleting(k8s, "lb-1")
-
-	logger := logrus.New()
-	hook := logrustest.NewLocal(logger)
-	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
-	task.logger = logger.WithField("test", t.Name())
-
-	assert.NoError(t, task.delete(context.Background()))
-
-	assert.Empty(t, warningsAbout(hook))
-}
-
-// The tag write is what takes this cluster off the load balancer, and it has already happened by
-// the time the status record is updated. If that record fails, the warning is the only trace left:
-// the next reconcile finds this cluster no longer listed, so it never reaches the condition again.
-func TestDeleteLoadBalancerStillWarnsWhenTheStatusWriteAfterTheTagsFails(t *testing.T) {
-	vngcloud := repository.NewMockVngCloudRepository(t)
-	k8s := repository.NewMockK8sRepository(t)
-	orphanScenario(vngcloud)
-	k8s.EXPECT().ListLoadBalancerConfig(mock.Anything, mock.Anything).Return(nil).Maybe()
-	k8s.EXPECT().PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
-		Return(errors.New("conflict recording created tags")).Maybe()
-
-	logger := logrus.New()
-	hook := logrustest.NewLocal(logger)
-	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)
-	task.logger = logger.WithField("test", t.Name())
-
-	_ = task.delete(context.Background())
-
-	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook))
 }
