@@ -429,9 +429,12 @@ func TestDeleteLoadBalancerIsNotLastOutWhileASiblingLBCInThisClusterUsesIt(t *te
 	vngcloud := repository.NewMockVngCloudRepository(t)
 	k8s := repository.NewMockK8sRepository(t)
 	vksLoadBalancerSharedWith(vngcloud, ownershipClusterId)
+	// One stub per lookup the teardown makes. A catch-all fallback here used to answer the
+	// third call with an empty list, which quietly turned this into a test of the cluster id
+	// being dropped while the sibling still used the load balancer - the opposite case.
 	expectOtherLBC(k8s, "lb-1")
 	expectOtherLBC(k8s, "lb-1")
-	k8s.EXPECT().ListLoadBalancerConfig(mock.Anything, mock.Anything).Return(nil).Maybe()
+	expectOtherLBC(k8s, "lb-1")
 	k8s.EXPECT().PatchMutateStatusLoadBalancerConfig(mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).Maybe()
 	task := ownershipTask(vngcloud, k8s, ptr.To("lb-1"), nil)

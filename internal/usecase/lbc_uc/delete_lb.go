@@ -126,11 +126,12 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 			if ferr != nil {
 				return ferr
 			}
+			wasOurs := ours
 			ours, err = t.lastClusterOutOf(ctx, lbId, tagsToMap(fresh))
 			if err != nil {
 				return err
 			}
-			if !ours {
+			if wasOurs && !ours {
 				t.logger.Infof("Load balancer %s was claimed by another cluster while LBC %s/%s was clearing it, leaving it in place",
 					lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			}
