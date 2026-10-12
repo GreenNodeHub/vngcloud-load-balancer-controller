@@ -36,9 +36,10 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 	// Looked up lazily, and only when there is a cluster tag to take off, because it costs a
 	// list of every LBC in the cluster. ensureTags runs the closure twice, hence the memo.
 	var (
-		lookedUp  bool
-		lookupErr error
-		shared    bool
+		lookedUp   bool
+		lookupErr  error
+		shared     bool
+		anySibling bool
 	)
 	// ensureTags runs the closure twice - once on the cached tag list, then again after
 	// invalidating it - so the closure records what it saw instead of announcing it, and the
@@ -51,7 +52,7 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 	stillShared := func() bool {
 		if !lookedUp {
 			lookedUp = true
-			shared, lookupErr = t.loadBalancerHasOtherLBC(ctx, lbId)
+			shared, anySibling, lookupErr = t.siblingLBCs(ctx, lbId)
 			if lookupErr != nil {
 				// Keep the tag while we cannot tell. The error is returned below, so this
 				// reconcile is retried rather than trusted.
@@ -131,7 +132,12 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 		return lookupErr
 	}
 
-	if err == nil && leftAnOrphan {
+	// Not gated on err: the tag write is what takes this cluster off the load balancer, and it
+	// has already happened by the time anything after it can fail. Lose the warning there and
+	// the next reconcile finds this cluster no longer listed, so the condition never comes back.
+	// anySibling comes from the same list stillShared() already paid for, and the flag is only
+	// set on a path that consulted it.
+	if leftAnOrphan && !anySibling {
 		t.logger.Warnf("Load balancer %s was created by VKS and no cluster is left using it, "+
 			"but it could not be cleared and stays in VNGCloud - it will go on being billed "+
 			"until someone removes it (LBC %s/%s)",
@@ -146,26 +152,48 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 //
 // An LBC already being deleted does not count: it is on its way out, and whichever of the
 // two finishes last is the one that should take the cluster id with it.
-func (t *defaultModelDeployTask) loadBalancerHasOtherLBC(ctx context.Context, lbId string) (bool, error) {
+// siblingLBCs answers both questions a teardown asks about the other LBCs in this cluster, from
+// one list.
+//
+//   - live: a sibling that is not itself being deleted still points at the load balancer. Whose
+//     cluster tag it is turns on this, and a sibling on its way out has to be ignored, or the id
+//     would never come off when a whole release goes at once.
+//   - any: a sibling points at it at all, deleting or not. Whether to call the load balancer
+//     abandoned turns on this instead: a sibling on its way out is very likely the one about to
+//     delete it, and this LBC cannot find out.
+func (t *defaultModelDeployTask) siblingLBCs(ctx context.Context, lbId string) (live, any bool, err error) {
 	allLBCs := &v1alpha1.LoadBalancerConfigList{}
 	if err := t.k8sRepo.ListLoadBalancerConfig(ctx, allLBCs); err != nil {
-		return false, errors.Wrap(err, "failed to list LoadBalancerConfigs to see who else uses the load balancer")
+		return false, false, errors.Wrap(err, "failed to list LoadBalancerConfigs to see who else uses the load balancer")
 	}
 
 	for i := range allLBCs.Items {
 		other := &allLBCs.Items[i]
-		if other.UID == t.lbConfig.UID || other.DeletionTimestamp != nil {
+		if other.UID == t.lbConfig.UID {
 			continue
 		}
 		// Status is where a deployed load balancer is recorded; Spec covers one that is
 		// pinned but has not been deployed yet.
+		points := false
 		for _, id := range []*string{other.Status.LoadBalancerId, other.Spec.LoadBalancerId} {
 			if id != nil && *id == lbId {
-				t.logger.Infof("Load balancer %s is still used by LBC %s/%s, keeping the cluster tag",
-					lbId, other.Namespace, other.Name)
-				return true, nil
+				points = true
 			}
 		}
+		if !points {
+			continue
+		}
+		any = true
+		if other.DeletionTimestamp == nil {
+			t.logger.Infof("Load balancer %s is still used by LBC %s/%s",
+				lbId, other.Namespace, other.Name)
+			live = true
+		}
 	}
-	return false, nil
+	return live, any, nil
+}
+
+func (t *defaultModelDeployTask) loadBalancerHasOtherLBC(ctx context.Context, lbId string) (bool, error) {
+	live, _, err := t.siblingLBCs(ctx, lbId)
+	return live, err
 }
