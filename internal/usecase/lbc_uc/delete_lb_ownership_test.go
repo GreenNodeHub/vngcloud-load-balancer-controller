@@ -610,12 +610,43 @@ func TestDeleteLoadBalancerWarnsWhenItLeavesAVksLoadBalancerWithNobodyOnIt(t *te
 
 	assert.NoError(t, task.delete(context.Background()))
 
-	var warnings []string
+	// Exactly once. ensureTags runs its closure twice - the cached read, then the read-through -
+	// so a warning raised from inside it is said twice and, worse, the first time off tags that
+	// may be five minutes old.
+	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook, "lb-1"),
+		"leaving a VKS load balancer with no cluster left on it should say so, once")
+}
+
+// warningsAbout returns one entry per Warn mentioning lbId, collapsed to lbId so the count is
+// what the assertion is about.
+func warningsAbout(hook *logrustest.Hook, lbId string) []string {
+	var out []string
 	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.WarnLevel {
-			warnings = append(warnings, e.Message)
+		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, lbId) {
+			out = append(out, lbId)
 		}
 	}
-	assert.Contains(t, strings.Join(warnings, "\n"), "lb-1",
-		"leaving a VKS load balancer with no cluster left on it should say so")
+	return out
+}
+
+// A load balancer another cluster made, that this one was never listed on, is not this cluster's
+// orphan to announce. removeTagValue returns the empty string both for "we were the last id" and
+// for "there was no cluster list at all", so without a separate check the teardown would warn
+// about somebody else's load balancer every time it walked past one.
+func TestDeleteLoadBalancerDoesNotCallSomebodyElsesLoadBalancerAnOrphan(t *testing.T) {
+	vngcloud := repository.NewMockVngCloudRepository(t)
+	k8s := repository.NewMockK8sRepository(t)
+	emptyLoadBalancer(vngcloud, map[string]string{
+		domain.CreatedByClusterTagKey: siblingClusterId, // no cluster list: we were never on it
+	})
+	soleLBCInTheCluster(k8s)
+
+	logger := logrus.New()
+	hook := logrustest.NewLocal(logger)
+	task := ownershipTask(vngcloud, k8s, nil, nil)
+	task.logger = logger.WithField("test", t.Name())
+
+	assert.NoError(t, task.delete(context.Background()))
+
+	assert.Empty(t, warningsAbout(hook, "lb-1"))
 }

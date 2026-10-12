@@ -2,6 +2,8 @@ package lbc_uc
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -38,6 +40,14 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 		lookupErr error
 		shared    bool
 	)
+	// ensureTags runs the closure twice - once on the cached tag list, then again after
+	// invalidating it - so the closure records what it saw instead of announcing it, and the
+	// announcement happens once, below, from whatever the last pass recorded.
+	//
+	// That last pass is always the read-through one here: the flag is only set when this
+	// cluster's id is in the list, which is exactly when the write has something to remove, so
+	// ensureTags never returns after the cached pass with the flag set.
+	var leftAnOrphan bool
 	stillShared := func() bool {
 		if !lookedUp {
 			lookedUp = true
@@ -52,6 +62,7 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 	}
 
 	err := t.ensureTags(ctx, lbId, func(currentTags map[string]string) (map[string]string, map[string]string) {
+		leftAnOrphan = false
 		ensuredTags := make(map[string]string)
 
 		createdTags := make(map[string]string, len(recordedTags))
@@ -82,21 +93,20 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 
 			// ensure remove ClusterTagKey
 			vksClusterValue := currentTags[domain.ClusterTagKey]
+			wasListed := slices.Contains(
+				strings.Split(vksClusterValue, domain.ClusterTagValueSeparator), *t.lbConfig.Spec.ClusterId)
 			vksClusterValue = removeTagValue(vksClusterValue, *t.lbConfig.Spec.ClusterId, domain.ClusterTagValueSeparator)
 			if vksClusterValue != "" {
 				ensuredTags[domain.ClusterTagKey] = vksClusterValue
-			} else if _, vksMade := currentTags[domain.CreatedByClusterTagKey]; vksMade {
+			} else if wasListed && t.madeByAVksCluster(currentTags) {
 				// Nobody is left on a load balancer VKS made, and it is still standing - this
 				// teardown could not clear it. Every remaining way that happens is known and
 				// out of scope (a cluster destroyed rather than torn down, an adopted listener
 				// still carrying a departed cluster's policies, a re-pin), and all of them end
-				// the same way: no CR points at it, no cluster is named on it, and nothing
-				// says so. Said once, here, where the tag list is read through before the
-				// write, so the emptiness is a fact rather than a guess.
-				t.logger.Warnf("Load balancer %s was created by VKS and no cluster is left using it, "+
-					"but it could not be cleared and stays in VNGCloud - it will go on being billed "+
-					"until someone removes it (LBC %s/%s)",
-					lbId, t.lbConfig.Namespace, t.lbConfig.Name)
+				// the same way: no CR points at it, no cluster is named on it, and nothing says
+				// so. wasListed is what separates that from walking past a load balancer this
+				// cluster was never on: removeTagValue returns the empty string for both.
+				leftAnOrphan = true
 			}
 
 			// // ensure remove DeprecatedClusterTagKey
@@ -119,6 +129,13 @@ func (t *defaultModelDeployTask) deleteRedundantTagsFrom(ctx context.Context, lb
 	})
 	if lookupErr != nil {
 		return lookupErr
+	}
+
+	if err == nil && leftAnOrphan {
+		t.logger.Warnf("Load balancer %s was created by VKS and no cluster is left using it, "+
+			"but it could not be cleared and stays in VNGCloud - it will go on being billed "+
+			"until someone removes it (LBC %s/%s)",
+			lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 	}
 	return err
 }
