@@ -163,7 +163,17 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 // cluster id off without deleting, and the second no longer finds itself on the list. Both need a
 // sweep from outside; no controller runs on a cluster that no longer exists.
 func (t *defaultModelDeployTask) lastClusterOutOf(ctx context.Context, lbId string, currentTags map[string]string) (bool, error) {
-	if !t.looksLastOutOf(currentTags) {
+	// The two tags this rests on do not age the same way, so they are not read the same way.
+	//
+	// Provenance is written once, when the load balancer is created, and never changes - a
+	// cached copy of it is as good as a fresh one. The cluster list changes every time a
+	// cluster joins or leaves, and ListTags serves it from a five-minute cache.
+	//
+	// Deciding the list from the cached copy was the bug QC reopened this for: the sibling had
+	// left two minutes earlier, the cached list still named it, so taking this cluster out left
+	// the sibling behind and the rule said no. The read-through below used to run only to
+	// confirm a yes, so a no from stale tags was never revisited and the load balancer stayed.
+	if !t.madeByAVksCluster(currentTags) {
 		return false, nil
 	}
 
@@ -183,16 +193,24 @@ func (t *defaultModelDeployTask) lastClusterOutOf(ctx context.Context, lbId stri
 	return t.looksLastOutOf(tagsToMap(fresh)), nil
 }
 
-// looksLastOutOf reads the question off one set of tags: a load balancer some VKS cluster made,
-// a cluster list this cluster is named on, and nobody left on it once this cluster is taken out.
-// An LBC without a usable cluster id is nobody's last user - the empty string splits into one
-// empty field and subtracts to nothing, so both halves would pass vacuously.
-func (t *defaultModelDeployTask) looksLastOutOf(currentTags map[string]string) bool {
+// madeByAVksCluster is the part of the question a cached read can answer: some VKS cluster
+// created this load balancer, and this LBC has a cluster id to compare against. Both are
+// write-once, so staleness cannot change either answer.
+func (t *defaultModelDeployTask) madeByAVksCluster(currentTags map[string]string) bool {
 	createdBy, tagged := currentTags[domain.CreatedByClusterTagKey]
 	if !tagged || !isValidVksId(createdBy) {
 		return false
 	}
-	if t.lbConfig.Spec.ClusterId == nil || !isValidVksId(*t.lbConfig.Spec.ClusterId) {
+	return t.lbConfig.Spec.ClusterId != nil && isValidVksId(*t.lbConfig.Spec.ClusterId)
+}
+
+// looksLastOutOf answers the whole question off one set of tags, and must only ever be given a
+// read-through one: a load balancer some VKS cluster made, a cluster list this cluster is named
+// on, and nobody left on it once this cluster is taken out. An LBC without a usable cluster id is
+// nobody's last user - the empty string splits into one empty field and subtracts to nothing, so
+// both halves would pass vacuously.
+func (t *defaultModelDeployTask) looksLastOutOf(currentTags map[string]string) bool {
+	if !t.madeByAVksCluster(currentTags) {
 		return false
 	}
 	users := currentTags[domain.ClusterTagKey]
