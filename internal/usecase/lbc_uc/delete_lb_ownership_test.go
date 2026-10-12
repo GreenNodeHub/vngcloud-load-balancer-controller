@@ -615,17 +615,17 @@ func TestDeleteLoadBalancerWarnsWhenItLeavesAVksLoadBalancerWithNobodyOnIt(t *te
 	// Exactly once. ensureTags runs its closure twice - the cached read, then the read-through -
 	// so a warning raised from inside it is said twice and, worse, the first time off tags that
 	// may be five minutes old.
-	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook, "lb-1"),
+	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook),
 		"leaving a VKS load balancer with no cluster left on it should say so, once")
 }
 
-// warningsAbout returns one entry per Warn mentioning lbId, collapsed to lbId so the count is
-// what the assertion is about.
-func warningsAbout(hook *logrustest.Hook, lbId string) []string {
+// warningsAbout returns one entry per Warn mentioning the load balancer these tests use,
+// collapsed to its id so the count is what the assertion is about.
+func warningsAbout(hook *logrustest.Hook) []string {
 	var out []string
 	for _, e := range hook.AllEntries() {
-		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, lbId) {
-			out = append(out, lbId)
+		if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "lb-1") {
+			out = append(out, "lb-1")
 		}
 	}
 	return out
@@ -650,7 +650,7 @@ func TestDeleteLoadBalancerDoesNotCallSomebodyElsesLoadBalancerAnOrphan(t *testi
 
 	assert.NoError(t, task.delete(context.Background()))
 
-	assert.Empty(t, warningsAbout(hook, "lb-1"))
+	assert.Empty(t, warningsAbout(hook))
 }
 
 // orphanScenario mocks a load balancer this teardown cannot clear: a listener it has no record
@@ -708,7 +708,7 @@ func TestDeleteLoadBalancerDoesNotCryOrphanWhileASiblingIsStillOnItsWayOut(t *te
 
 	assert.NoError(t, task.delete(context.Background()))
 
-	assert.Empty(t, warningsAbout(hook, "lb-1"))
+	assert.Empty(t, warningsAbout(hook))
 }
 
 // The tag write is what takes this cluster off the load balancer, and it has already happened by
@@ -729,5 +729,5 @@ func TestDeleteLoadBalancerStillWarnsWhenTheStatusWriteAfterTheTagsFails(t *test
 
 	_ = task.delete(context.Background())
 
-	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook, "lb-1"))
+	assert.Equal(t, []string{"lb-1"}, warningsAbout(hook))
 }
