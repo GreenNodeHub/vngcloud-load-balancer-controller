@@ -132,7 +132,9 @@ func (t *defaultModelDeployTask) loadBalancerHasOtherLBC(ctx context.Context, lb
 		// pinned but has not been deployed yet.
 		for _, id := range []*string{other.Status.LoadBalancerId, other.Spec.LoadBalancerId} {
 			if id != nil && *id == lbId {
-				t.logger.Infof("Load balancer %s is still used by LBC %s/%s, keeping the cluster tag",
+				// Not "keeping the cluster tag": since the ownership check widened, this is
+				// called from there too, and that caller decides no tags.
+				t.logger.Infof("Load balancer %s is still used by LBC %s/%s",
 					lbId, other.Namespace, other.Name)
 				return true, nil
 			}

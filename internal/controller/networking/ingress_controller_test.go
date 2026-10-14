@@ -48,6 +48,21 @@ const (
 var _ = Describe("Ingress Controller", func() {
 
 	AfterEach(func() {
+		// Deferred so that they run even when an assertion below gives up. They used to come
+		// after, and a single slow spec then poisoned every spec after it: the expectNo* calls
+		// are Eventually, a timeout aborts the rest of this node, the cleanup never ran, and
+		// the Service it would have removed still held nodePort 30000 - which thirteen specs
+		// in this file ask for by name. The next spec could not create its Service, and so on
+		// down the file. Seven specs failed that way on one run, five of them in code the
+		// change under test never touched.
+		defer func() {
+			cleanupAllEndpoints()
+			cleanupAllLBCs()
+			cleanupAllNSGs()
+			cleanupAllIngreses()
+			cleanupAllServices()
+		}()
+
 		// Ensure clean state before each test
 		expectNoLoadBalancers()
 		expectNoSecurityGroups()
@@ -56,12 +71,6 @@ var _ = Describe("Ingress Controller", func() {
 		expectNoLBCs()
 		expectNoNSGs()
 		expectNoEndpoints()
-
-		cleanupAllEndpoints()
-		cleanupAllLBCs()
-		cleanupAllNSGs()
-		cleanupAllIngreses()
-		cleanupAllServices()
 	})
 
 	Context("When create ingress with default annotation default", func() {

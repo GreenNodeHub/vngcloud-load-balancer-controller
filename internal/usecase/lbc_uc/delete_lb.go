@@ -49,18 +49,25 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		return err
 	}
 
-	// Only a load balancer this cluster created is ours to delete. Reading the tags is how
-	// provenance is established, and the read is cached - deployTags has just made it.
+	// Only a load balancer this cluster created is ours to delete, and reading the tags is how
+	// that is established. Read through rather than from the five-minute cache: a teardown
+	// decides whether a load balancer lives, and the cluster list it decides from changes every
+	// time a cluster joins or leaves. QC reopened #33310 on exactly that - a sibling had left
+	// two minutes earlier, the cached list still named it, and the load balancer was left
+	// standing with nobody on it. One read-through per teardown, and every decision below rests
+	// on it.
+	t.vngcloudRepo.InvalidateTagsCache(lbId)
 	tags, err := t.vngcloudRepo.ListTags(ctx, lbId)
 	if err != nil {
 		return err
 	}
 	currentTags := tagsToMap(tags)
-	ours := t.createdByThisCluster(lbId, currentTags)
-	lastOut := false
+	// Whether this cluster created it is settled by write-once records, so it is asked once and
+	// kept: it is also what says whether the question below has to be asked again later.
+	createdHere := t.createdByThisCluster(lbId, currentTags)
+	ours := createdHere
 	if !ours {
-		var err error
-		lastOut, err = t.lastClusterOutOf(ctx, lbId, currentTags)
+		lastOut, err := t.lastClusterOutOf(ctx, lbId, currentTags)
 		if err != nil {
 			return err
 		}
@@ -105,14 +112,26 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 		}
 		// Getting here meant clearing listeners and pools first, each of which can wait
 		// minutes on the load balancer going ACTIVE, so the cluster list read at the top is
-		// no longer evidence of anything. A cluster adopting this load balancer writes its
-		// id into that list before it creates anything on it - "empty" is not "unclaimed".
-		if isEmpty && lastOut {
-			ours, err = t.lastClusterOutOf(ctx, lbId, currentTags)
+		// no longer evidence of anything - in either direction. A cluster adopting this load
+		// balancer writes its id into that list before it creates anything on it, so "empty"
+		// is not "unclaimed"; and a sibling that was still listed when this teardown began may
+		// have left since, which is the orphan this ticket is about.
+		//
+		// So the question is asked again whenever it was asked at all, not only when the first
+		// answer was yes. Gating the re-check on that answer is the same asymmetry that let a
+		// stale no stand inside lastClusterOutOf.
+		if isEmpty && !createdHere {
+			t.vngcloudRepo.InvalidateTagsCache(lbId)
+			fresh, ferr := t.vngcloudRepo.ListTags(ctx, lbId)
+			if ferr != nil {
+				return ferr
+			}
+			wasOurs := ours
+			ours, err = t.lastClusterOutOf(ctx, lbId, tagsToMap(fresh))
 			if err != nil {
 				return err
 			}
-			if !ours {
+			if wasOurs && !ours {
 				t.logger.Infof("Load balancer %s was claimed by another cluster while LBC %s/%s was clearing it, leaving it in place",
 					lbId, t.lbConfig.Namespace, t.lbConfig.Name)
 			}
@@ -163,30 +182,26 @@ func (t *defaultModelDeployTask) deleteLoadBalancer(ctx context.Context, lbId st
 // cluster id off without deleting, and the second no longer finds itself on the list. Both need a
 // sweep from outside; no controller runs on a cluster that no longer exists.
 func (t *defaultModelDeployTask) lastClusterOutOf(ctx context.Context, lbId string, currentTags map[string]string) (bool, error) {
+	// currentTags must be a read-through list; the caller is responsible for that, because a
+	// teardown reads it once and every decision in it rests on the same read.
 	if !t.looksLastOutOf(currentTags) {
 		return false, nil
 	}
 
+	// The cluster tag names clusters, not LBCs, so this cluster's id on it may be standing for
+	// a sibling LBC next to this one.
 	hasOther, err := t.loadBalancerHasOtherLBC(ctx, lbId)
 	if err != nil {
 		return false, err
 	}
-	if hasOther {
-		return false, nil
-	}
-
-	t.vngcloudRepo.InvalidateTagsCache(lbId)
-	fresh, err := t.vngcloudRepo.ListTags(ctx, lbId)
-	if err != nil {
-		return false, err
-	}
-	return t.looksLastOutOf(tagsToMap(fresh)), nil
+	return !hasOther, nil
 }
 
-// looksLastOutOf reads the question off one set of tags: a load balancer some VKS cluster made,
-// a cluster list this cluster is named on, and nobody left on it once this cluster is taken out.
-// An LBC without a usable cluster id is nobody's last user - the empty string splits into one
-// empty field and subtracts to nothing, so both halves would pass vacuously.
+// looksLastOutOf answers the whole question off one set of tags, and must only ever be given a
+// read-through one: a load balancer some VKS cluster made, a cluster list this cluster is named
+// on, and nobody left on it once this cluster is taken out. An LBC without a usable cluster id is
+// nobody's last user - the empty string splits into one empty field and subtracts to nothing, so
+// both halves would pass vacuously.
 func (t *defaultModelDeployTask) looksLastOutOf(currentTags map[string]string) bool {
 	createdBy, tagged := currentTags[domain.CreatedByClusterTagKey]
 	if !tagged || !isValidVksId(createdBy) {
