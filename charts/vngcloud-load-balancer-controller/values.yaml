@@ -79,6 +79,9 @@ mysecret:
     clientSecret: ""
     identityURL: https://iamapis.vngcloud.vn/accounts-api
     vserverURL: https://hcm-3.api.vngcloud.vn/vserver
+    # Global load balancer API. Leave it on glb.console.greennode.ai: the old
+    # glb.console.vngcloud.vn host redirects there and the redirect loses the token.
+    glbURL: https://glb.console.greennode.ai/glb-controller/
   loadBalancerOpts:
     defaultL4PackageName: "NLB_Small"
     defaultL7PackageName: "ALB_Small"

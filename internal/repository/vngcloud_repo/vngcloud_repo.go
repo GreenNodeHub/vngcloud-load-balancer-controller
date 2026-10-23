@@ -55,7 +55,7 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 		WithIamEndpoint(vngcloudRepo.cfg.Global.IdentityURL).
 		WithVServerEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vserver-gateway").
 		WithVLBEndpoint(cuongpigerutils.NormalizeURL(vngcloudRepo.cfg.Global.VServerURL) + "vlb-gateway").
-		WithGLBEndpoint("https://glb.console.vngcloud.vn/glb-controller/").
+		WithGLBEndpoint(glbEndpoint(vngcloudRepo.cfg)).
 		WithUserAgent(vngcloudRepo.userAgent)
 	vngcloudRepo.client = client.NewClient(ctx).WithRetryCount(1).WithSleep(10).Configure(sdkConfig)
 
@@ -72,6 +72,12 @@ func NewVngCloudRepository(ctx context.Context, cfg *config.Config) (repository.
 		vngcloudRepo.superClient = client.NewClient(context.Background()).WithRetryCount(1).WithSleep(10).Configure(superSdkConfig)
 	}
 	return vngcloudRepo, nil
+}
+
+// glbEndpoint is the GLB API base. The SDK appends "v1" to it with no separator, so it must end
+// with a slash.
+func glbEndpoint(pcfg *config.Config) string {
+	return cuongpigerutils.NormalizeURL(pcfg.Global.GetGLBURL())
 }
 
 type vngCloudRepository struct {

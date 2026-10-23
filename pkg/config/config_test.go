@@ -165,3 +165,28 @@ func TestConfig_NewConfig_Defaults(t *testing.T) {
 	assert.NotNil(t, config)
 	assert.Equal(t, "configDriver,metadataService", config.Metadata.SearchOrder)
 }
+
+// glb.console.vngcloud.vn answers every call with a 301 to glb.console.greennode.ai, and Go drops
+// the Authorization header on a cross-host redirect, so a controller still pointed at the old host
+// gets 401 on every GLB call. Existing installs carry no glbURL, so the default has to be the host
+// that actually serves the API.
+func TestGLBURLDefaultsToTheGreenNodeHost(t *testing.T) {
+	assert.Equal(t, "https://glb.console.greennode.ai/glb-controller/", AuthOpts{}.GetGLBURL())
+	assert.NotContains(t, AuthOpts{}.GetGLBURL(), "vngcloud.vn")
+}
+
+func TestGLBURLFromConfigWins(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "glb-url-*.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+
+	if _, err := tmpFile.WriteString("global:\n  glbURL: \"https://glb.example.test/glb-controller\"\n"); err != nil {
+		t.Fatalf("Failed to write to temp config file: %v", err)
+	}
+
+	config := NewConfig()
+	assert.NoError(t, config.Init(newMockLogger(), tmpFile.Name()))
+	assert.Equal(t, "https://glb.example.test/glb-controller", config.Global.GetGLBURL())
+}
