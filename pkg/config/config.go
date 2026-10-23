@@ -26,8 +26,10 @@ type Config struct {
 }
 
 type AuthOpts struct {
-	IdentityURL  string `gcfg:"identity-url" mapstructure:"identityURL" name:"identity-url"`
-	VServerURL   string `gcfg:"vserver-url" mapstructure:"vserverURL" name:"vserver-url"`
+	IdentityURL string `gcfg:"identity-url" mapstructure:"identityURL" name:"identity-url"`
+	VServerURL  string `gcfg:"vserver-url" mapstructure:"vserverURL" name:"vserver-url"`
+	// GLBURL is the global load balancer API; empty means DefaultGLBURL. Read it through GetGLBURL.
+	GLBURL       string `gcfg:"glb-url" mapstructure:"glbURL" name:"glb-url"`
 	ClientID     string `gcfg:"client-id" mapstructure:"clientID" name:"client-id"`
 	ClientSecret string `gcfg:"client-secret" mapstructure:"clientSecret" name:"client-secret"`
 	// it should help in dev mode, pass the projectID and userID directly
@@ -37,6 +39,20 @@ type AuthOpts struct {
 	// for super client to manage INTERVPC load balancer (optional)
 	SuperClientID     string `gcfg:"super-client-id" mapstructure:"superClientID" name:"super-client-id"`
 	SuperClientSecret string `gcfg:"super-client-secret" mapstructure:"superClientSecret" name:"super-client-secret"`
+}
+
+// DefaultGLBURL is where the GLB API is served. The former host, glb.console.vngcloud.vn, answers
+// every call with a 301 to this one, and Go drops the Authorization header on a cross-host
+// redirect, so a controller pointed at the old host gets 401 on every GLB call.
+const DefaultGLBURL = "https://glb.console.greennode.ai/glb-controller/"
+
+// GetGLBURL returns the configured GLB API base, or DefaultGLBURL when none is set - existing
+// installs carry no glbURL.
+func (s AuthOpts) GetGLBURL() string {
+	if s.GLBURL != "" {
+		return s.GLBURL
+	}
+	return DefaultGLBURL
 }
 
 type LoadBalancerOpts struct {
