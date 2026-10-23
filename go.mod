@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.26.9
 
 require (
-	github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.24.0
+	github.com/GreenNodeHub/vngcloud-go-sdk/v2 v2.24.1
 	github.com/anngdinh/operator-helper v0.0.8-0.20250606033238-e50b218b202c
 	github.com/blang/semver/v4 v4.0.0
 	github.com/cuongpiger/joat v1.0.17
