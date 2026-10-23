@@ -14,6 +14,10 @@ global:
   # VNGCloud vServer API endpoint (required)
   vserverURL: "https://hcm-3.api.vngcloud.vn/vserver"
 
+  # Optional: global load balancer API endpoint
+  # (default https://glb.console.greennode.ai/glb-controller/)
+  glbURL: ""
+
   # OAuth2 credentials (required)
   clientID: ""
   clientSecret: ""
@@ -106,6 +110,7 @@ Key values:
 | `mysecret.global.clientID` | VNGCloud client ID | `""` |
 | `mysecret.global.clientSecret` | VNGCloud client secret | `""` |
 | `mysecret.global.vserverURL` | vServer API endpoint | `""` |
+| `mysecret.global.glbURL` | Global load balancer API endpoint | `https://glb.console.greennode.ai/glb-controller/` |
 | `manager.manager.image.repository` | Controller image repository | `vcr.vngcloud.vn/81-vks-public/vngcloud-load-balancer-controller` |
 | `manager.manager.image.tag` | Controller image tag | chart's appVersion |
 | `manager.replicaCount` | Number of controller replicas | `1` |
